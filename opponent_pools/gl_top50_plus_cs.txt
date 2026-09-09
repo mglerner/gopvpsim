@@ -1,119 +1,77 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group.
-# Generated 2026-06-10 by scripts/build_opponent_pool.py against current
-# GitHub-master rankings (post-June-2026 move rebalance; PvPoke pushed
-# the regenerated rankings after the local 06-05 `bc532fbda` pull).
-# 67 species from the auto recipe + 4 hand-extended = 71 total.
-#
-# Rebalance churn vs the 2026-06-02 pool: in — Umbreon, Milotic,
-# Dondozo, Primeape (+Shadow), Shelgon (+Shadow), Dragonair (+Shadow),
-# Fearow, Furret, Lumineon; out — Blastoise, Clefable, Dartrix,
-# Drapion (Shadow), Dusclops (+Shadow), Florges.
-#
-# Hand-extended focals: dive focals that don't clear the auto recipe,
-# kept so each dive's opponent pool includes the cross-form / alt-form
-# partner and cross-focal matchups stay symmetric (deep_dive.py only
-# auto-appends the dive's own focal for mirror analysis).
-#   - Oinkologne / Oinkologne (Female): out of top-50 since 2026-06-02.
-#   - Sylveon: NAIC focal (2026-06), never in the auto recipe.
-#   - Jumpluff (Shadow): left top-50 in the rebalance while Jumpluff
-#     stays — retained per the keep-shadow-pairs policy (players prep
-#     against each form deliberately), and it's a dive focal.
-#
-# Aegislash: both forms come out of the auto recipe (Blade via the
-# championshipseries group), but are EXCLUDED as of 2026-09-09 -- our
-# engine over-farms Aegislash in Shield form and accounts for all 6
-# undocumented oracle mismatches. See CURATED_EXCLUSIONS in
-# scripts/build_opponent_pool.py; the exclusion is applied by the recipe,
-# so a regeneration keeps it out. TEMPORARY: it clears the cut on merit
-# and comes back once the oracle grid is green.
-# Blade's default-moveset rejection is handled in src/gopvpsim/data.py
-# via _DEFAULT_MOVESET_FALLBACK (pins PSYCHO_CUT/SHADOW_BALL/GYRO_BALL
-# for aegislash_blade).
-#
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 73 unique species.
+# Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
-# --- hand-extended focals (2026-06-10) ---
-Oinkologne
-Oinkologne (Female)
-Sylveon
-Jumpluff (Shadow)
-# Mimikyu (2026-06-24): newly PvPoke-ranked in GL (speciesId 'mimikyu';
-# bare name resolves to the ranked default moveset). New dive focal and a
-# real GL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
-# Forever Forward, so it is included here for the broad meta.
-Mimikyu
-
-# --- auto recipe (top 50 GL ∪ championshipseries) ---
-Lickilicky
-Altaria
-Altaria (Shadow)
-Empoleon
-Jellicent
-Quagsire (Shadow)
-Corsola (Galarian)
-Quagsire
-Empoleon (Shadow)
 Tinkaton
-Ninetales
-Seaking
-Azumarill
-Forretress
-Feraligatr
-Guzzlord
-Mantine
 Ninetales (Shadow)
-Malamar
-Kingdra
+Corsola (Galarian)
 Corviknight
+Cramorant
+Quagsire (Shadow)
+Quagsire
+Altaria
+Melmetal
+Empoleon
+Mantine
+Ninetales
+Snorlax
+Empoleon (Shadow)
+Florges
+Thievul
 Corviknight (Shadow)
-Fearow
-Forretress (Shadow)
-Kingdra (Shadow)
-Feraligatr (Shadow)
-Dragonair (Shadow)
-Medicham
-Sableye (Shadow)
-Shelgon
-Sliggoo
-Jumpluff
-Stunfisk (Galarian)
-Dragonair
-Seismitoad
-Shelgon (Shadow)
-Clodsire
+Mimikyu (Busted)
+Feraligatr
+Jellicent
+Altaria (Shadow)
+Araquanid
 Furret
+Azumarill
+Clodsire
+Fearow
+Vigoroth
+Deoxys (Defense)
+Marowak
+Annihilape
+Annihilape (Shadow)
+Feraligatr (Shadow)
+Malamar
+Sableye (Shadow)
+Electrode (Hisuian)
+Malamar (Shadow)
 Lapras
-Sealeo
-Sealeo (Shadow)
-Stunfisk
-Talonflame
 Umbreon
-Pelipper
 Dondozo
-Grumpig
-Lumineon
-Milotic
-Greedent
+Guzzlord
+Mandibuzz
+Snorlax (Shadow)
+Vigoroth (Shadow)
+Araquanid (Shadow)
+Kingdra
+Hippowdon
+Kingdra (Shadow)
+Sableye
+Jumpluff
+Blastoise
+Carbink
 Charjabug
 Cradily
 Dewgong
 Diggersby
-Dusknoir (Shadow)
-Gourgeist (Super)
-Sableye
-Steelix
-Talonflame (Shadow)
+Dunsparce
+Forretress (Shadow)
+Hippowdon (Shadow)
+Medicham
+Mimikyu
+Morpeko (Full Belly)
+Stunfisk
+Talonflame
 Togekiss
-Togetic
-Weezing (Galarian) (Shadow)
-Wigglytuff
-Annihilape
-Primeape
-Primeape (Shadow)
-
-# --- 2026-06-25 union additions (current PvPoke top-50) ---
-Dusclops
-Lapras (Shadow)
-Dusclops (Shadow)
-Florges
-Moltres (Galarian)
+Lickilicky
+Toxapex
+Forretress
+Spidops
+Morpeko (Hangry)
+Rillaboom
+Wartortle
+Bombirdier
+Volbeat

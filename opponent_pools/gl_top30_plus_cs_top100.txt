@@ -1,46 +1,63 @@
-# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 42 unique species.
-# Generated 2026-04-17 by scripts/build_opponent_pool.py
+# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 59 unique species.
+# Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
-Quagsire
-Quagsire (Shadow)
 Tinkaton
-Corviknight
-Jellicent
-Wigglytuff
-Empoleon
-Forretress
-Altaria
-Altaria (Shadow)
-Azumarill
-Forretress (Shadow)
-Empoleon (Shadow)
-Feraligatr
-Lickilicky
-Medicham
+Ninetales (Shadow)
 Corsola (Galarian)
-Talonflame
-Lapras
-Sealeo
-Malamar
-Clodsire
-Dusclops
-Sealeo (Shadow)
-Clefable
-Drapion (Shadow)
-Stunfisk
-Annihilape
-Blastoise
-Dusclops (Shadow)
-Charjabug
+Corviknight
+Cramorant
+Quagsire (Shadow)
+Quagsire
+Altaria
+Melmetal
+Empoleon
+Mantine
+Ninetales
+Snorlax
+Empoleon (Shadow)
 Florges
+Thievul
+Corviknight (Shadow)
+Mimikyu (Busted)
+Feraligatr
+Jellicent
+Altaria (Shadow)
+Araquanid
 Furret
-Gourgeist (Super)
-Guzzlord
-Moltres (Galarian)
-Ninetales (Alolan)
-Politoed (Shadow)
-Shelgon
-Stunfisk (Galarian)
-Weezing (Galarian) (Shadow)
+Azumarill
+Clodsire
+Fearow
+Vigoroth
+Deoxys (Defense)
+Marowak
+Annihilape
+Annihilape (Shadow)
+Carbink
+Charjabug
+Cradily
+Dewgong
 Diggersby
+Dondozo
+Dunsparce
+Electrode (Hisuian)
+Forretress (Shadow)
+Guzzlord
+Hippowdon (Shadow)
+Jumpluff
+Kingdra
+Malamar
+Medicham
+Sableye
+Sableye (Shadow)
+Snorlax (Shadow)
+Talonflame
+Lickilicky
+Toxapex
+Forretress
+Spidops
+Morpeko (Hangry)
+Rillaboom
+Wartortle
+Bombirdier
+Volbeat

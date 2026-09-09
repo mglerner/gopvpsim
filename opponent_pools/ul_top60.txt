@@ -3,6 +3,15 @@
 # Refreshed top-60 2026-06-02; unioned with the current PvPoke top-60 2026-06-25.
 # Aegislash (Shield/Blade) removed 2026-06-25: not UL-viable as an opponent.
 #
+# Regenerated 2026-09-09 against post-rebalance rankings (+12 / -20). Two
+# entries that carried HAND-TUNED moveset overrides fell out because the
+# species themselves left the top 60, not because the tuning was wrong:
+#     Cradily   | fast=ACID         | charged=ROCK_TOMB,GRASS_KNOT
+#     Golisopod | fast=FURY_CUTTER  | charged=X_SCISSOR,AQUA_JET
+# Recorded here so the knowledge is not lost. NOTE Cradily (Shadow) IS in the
+# pool now and carries no override; whether it should inherit the one above is
+# an open call, and post-rebalance the right kit may differ anyway.
+#
 # Generated base list via `get_top_opponents('ultra', 60)` in
 # scripts/deep_dive.py.
 #
@@ -13,87 +22,62 @@
 #     print('\n'.join(get_top_opponents('ultra', 60)))"
 
 Tinkaton
-Lickilicky
-Zygarde (Complete Forme)
-Jellicent
 Corviknight
-# Corviknight (Shadow) (2026-06-24): PvPoke UL rank ~5, but only the non-shadow
-# was in this pool. Added per the keep-shadow-pairs convention.
+Snorlax (Shadow)
 Corviknight (Shadow)
-Florges
-Feraligatr (Shadow)
+Melmetal
 Virizion
-Empoleon (Shadow)
+Zygarde (Complete Forme)
 Empoleon
+Empoleon (Shadow)
+Mimikyu (Busted)
+Snorlax
+Florges
 Moltres (Galarian)
-Kingdra
-Blastoise
-Forretress
-Malamar
-Malamar (Shadow)
-Annihilape
-Annihilape (Shadow)
-# Cradily (2026-06-25): the bare name resolves to a GL-only clone slug
-# ('cradily_b') that is absent from the UL rankings, so get_default_moveset
-# silently drops it from every UL dive. Pin the canonical UL default moveset
-# inline so it stays in the pool (IVs/stats resolve fine off the base name).
-# Remove this override once species_id is made league-aware.
-Cradily | fast=ACID | charged=ROCK_TOMB,GRASS_KNOT
-Forretress (Shadow)
-Ninetales (Alolan)
-Clefable
+Feraligatr (Shadow)
 Feraligatr
-Ninetales
-Oranguru
-Registeel
-Kingdra (Shadow)
-Lapras
-Dusknoir
-Ninetales (Alolan) (Shadow)
-Seaking
-Dusknoir (Shadow)
-Turtonator
-Dondozo
+Jellicent
 Giratina (Altered)
-Lapras (Shadow)
-Milotic
-Regidrago
-Swampert
-Talonflame
-Walrein (Shadow)
-Walrein
-Bellibolt
-Ninetales (Shadow)
-Cresselia
-Raikou (Shadow)
-# Golisopod (2026-06-25): same GL-only clone-slug issue as Cradily above
-# ('golisopodsh' is absent from UL rankings). Pin the canonical UL default
-# moveset inline so it isn't silently dropped from the UL dives.
-Golisopod | fast=FURY_CUTTER | charged=X_SCISSOR,AQUA_JET
-Milotic (Shadow)
-Talonflame (Shadow)
-Togekiss
-Gyarados
-Toucannon (Shadow)
-Giratina (Altered) (Shadow)
-Hippowdon
-Hydreigon (Shadow)
-Orthworm
-Toucannon
+Cramorant
 Guzzlord
-Seismitoad
-Aromatisse
-
-# Mimikyu (2026-06-24): newly PvPoke-ranked in UL (speciesId 'mimikyu';
-# bare name resolves to the ranked default moveset). New dive focal and a
-# real UL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
-# Forever Forward, so it is included here for the broad meta.
-Mimikyu
-
-# --- 2026-06-25 union additions (current PvPoke top-60) ---
-Steelix
+Skeledirge
+Rillaboom
+Lapras
+Lapras (Shadow)
+Dusknoir
+Ninetales (Alolan)
+Dondozo
+Dusknoir (Shadow)
+Registeel
+Blastoise
+Ninetales (Alolan) (Shadow)
+Forretress
+Giratina (Altered) (Shadow)
+Regidrago
+Ninetales
+Cresselia
+Muk (Alolan)
+Clefable
+Talonflame
+Forretress (Shadow)
+Walrein
+Walrein (Shadow)
+Deoxys (Defense)
 Runerigus
-Steelix (Shadow)
+Steelix
+Seaking
 Cresselia (Shadow)
-Ampharos (Shadow)
+Steelix (Shadow)
+Swampert
+Toucannon
+Milotic (Shadow)
+Primarina
 Ampharos
+Cradily (Shadow)
+Malamar (Shadow)
+Ampharos (Shadow)
+Talonflame (Shadow)
+Bellibolt
+Seismitoad
+Annihilape
+Miltank

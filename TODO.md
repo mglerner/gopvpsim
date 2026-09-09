@@ -1133,7 +1133,22 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    digest. **Do not re-pin before 1-4** -- re-pinning silences the signal.
 6. Delete `scripts/mechanics_notice.py` and its call sites (its own stated
    deletion condition is now met except for the green harness run).
-7. **Regenerate the opponent pools**, augmenting the rank cut with ItsAxn's
+7. **DONE 2026-09-09** (was: regenerate the opponent pools). All 8 pools now
+   match live post-rebalance rankings; `verify_opponent_pools.py` is green.
+   GL = top50 + championshipseries + ItsAxn meta-or-better + Rillaboom;
+   UL = top60 (Melmetal clears at #5); ML = top60 (Melmetal #28).
+   ItsAxn's list is transcribed in `ITSAXN_META_PLUS` with per-species
+   timestamps and the judgment calls recorded.
+
+   **EXPECTED NEW RED, do not "fix" it:**
+   `test_verify_overnight_pool_containment.py::test_real_dives_contain_their_declared_pools`
+   now fails on `aegislash-blade-great-league` with 29 opponents (Cramorant,
+   Araquanid, ...) absent from the regenerated pool. That is a TRUE statement:
+   the shipped dive artifacts were baked against the OLD pool. The bake clears
+   it. Suppressing it would hide exactly the staleness it exists to catch.
+   Fast tier is therefore 103 red, not 102.
+
+   Superseded text kept for the residual work: augmenting the rank cut with ItsAxn's
    tier list -- see `AUGMENTATION SOURCES` in `scripts/build_opponent_pool.py`.
    Transcribe from the video TRANSCRIPT, cross-check against the sprites;
    Michael has the link. `verify_opponent_pools.py` reports 3 of 8 stale and

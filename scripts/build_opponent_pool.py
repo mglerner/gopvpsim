@@ -237,6 +237,66 @@ def apply_exclusions(pool_key, names):
     return [n for n in names if n not in drop]
 
 
+# ---------------------------------------------------------------------------
+# ItsAxn "Meta and better" -- community tier list, folded into the GL cut
+# ---------------------------------------------------------------------------
+# Source: ItsAxn, new-season GL tier list.
+#   https://www.youtube.com/watch?v=EstL6_1AB-w
+# Tiers, strongest first: meta defining > top meta > (regular) meta > spice >
+# fringe spice > garbage (stated by him at 00:28-00:36). Michael's rule
+# (2026-09-09): everything in META OR BETTER is a pool candidate regardless of
+# where PvPoke's ranker puts it -- see AUGMENTATION SOURCES above for why an
+# expert's read catches things a 1v1 score cannot ("sim heroes", 3v3 play).
+#
+# TRANSCRIBED FROM THE TRANSCRIPT, not from the tier-list image, per the
+# procedure in AUGMENTATION SOURCES. Boundaries used:
+#   top meta ends  15:30  ("And rounding out our top meta...")
+#   meta ends     ~21:59  (first spice language: "might be an interesting
+#                          spice pick")
+#
+# JUDGMENT CALLS, so they can be revisited:
+#  * EXCLUDED as passing references rather than tier placements -- each is
+#    named inside another mon's sentence: Floette ("Carbink or Floette that
+#    otherwise were..."), Electrike ("want to see Electrike"), Wigglytuff
+#    ("Just like Wigglytuff was").
+#  * EXCLUDED by Michael (2026-09-09) as sitting on the meta/spice boundary
+#    at 20:47-21:49, where each is discussed only as a move-buff beneficiary
+#    rather than placed: Doublade (#71), Maushold (#200), Oinkologne (#340),
+#    Nidoqueen (#235), Persian (#139), Audino (#376), Mega Malamar.
+#  * NOT LISTED HERE because they already clear the top-50 cut on merit
+#    post-rebalance: Mimikyu (Busted) #18, Deoxys (Defense) #28, Corsola
+#    (Galarian) #3, Sableye #48, Blastoise #50, Dondozo #39. He rates all of
+#    them meta-or-better and the ranker now agrees.
+#  * Aegislash (Blade) is in his TOP META at #72 and is deliberately NOT here:
+#    it is in CURATED_EXCLUSIONS because OUR ENGINE sims it wrong, not because
+#    it is weak. Restore it to this list when that defect is fixed.
+
+ITSAXN_META_PLUS = {
+    'Lickilicky':          'top meta, 05:19, x12 mentions; GL #155',
+    'Toxapex':             'top meta, 08:36; GL #126',
+    'Charjabug':           'top meta, 11:53; GL #60',
+    'Forretress':          'top meta, 12:49; GL #55',
+    'Spidops':             'top meta, 13:20; GL #57',
+    'Morpeko (Hangry)':    'top meta, 14:04 (he says "Full Belly"; PvPoke '
+                           'ranks the Hangry form, and it form-changes in '
+                           'battle either way); GL #88',
+    'Rillaboom':           'meta, 16:14; GL #70. Also named by Michael.',
+    'Wartortle':           'meta, 17:16; GL #110',
+    'Bombirdier':          'meta, 18:37; GL #228',
+    'Dunsparce':           'meta, 18:53; GL #91',
+    'Volbeat':             'meta, 19:17; GL #193',
+}
+
+
+def apply_itsaxn(names):
+    """Append ItsAxn meta-or-better picks missing from ``names``."""
+    out = list(names); have = set(out)
+    for species in ITSAXN_META_PLUS:
+        if species not in have:
+            out.append(species)
+    return out
+
+
 def apply_inclusions(pool_key, names):
     """Append any curated inclusions missing from ``names`` (order preserved)."""
     out = list(names)
@@ -264,7 +324,8 @@ def recipe_gl_top50_plus_cs():
             seen.add(n)
             union.append(n)
     union = apply_exclusions('gl_top50_plus_cs',
-                             apply_inclusions('gl_top50_plus_cs', union))
+                             apply_itsaxn(
+                                 apply_inclusions('gl_top50_plus_cs', union)))
     return union, (f'Top 50 GL overall rankings (PvPoke) union the '
                    f'championshipseries group. {len(union)} unique species.')
 
@@ -291,7 +352,8 @@ def recipe_gl_top30_plus_cs_top100():
             seen.add(n)
             union.append(n)
     union = apply_exclusions('gl_top30_plus_cs_top100',
-                             apply_inclusions('gl_top30_plus_cs_top100', union))
+                             apply_itsaxn(
+                                 apply_inclusions('gl_top30_plus_cs_top100', union)))
     return union, (f'Top 30 GL overall rankings (PvPoke) union '
                    f'championshipseries members ranked <= 100. '
                    f'{len(union)} unique species.')
