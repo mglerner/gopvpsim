@@ -1,4 +1,4 @@
-# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 58 unique species.
+# Top 30 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 49 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -32,31 +32,22 @@ Vigoroth
 Deoxys (Defense)
 Marowak
 Annihilape
-Annihilape (Shadow)
-Carbink
-Charjabug
-Cradily
-Dewgong
-Diggersby
-Dondozo
-Dunsparce
-Electrode (Hisuian)
-Forretress (Shadow)
-Guzzlord
-Hippowdon (Shadow)
-Jumpluff
-Kingdra
-Malamar
-Medicham
-Morpeko (Full Belly)
-Sableye
-Sableye (Shadow)
-Snorlax (Shadow)
-Talonflame
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)
+Hippowdon (Shadow)
 Forretress
 Spidops
+Charjabug
+Morpeko (Full Belly)
 Stunfisk
 Toxapex
+Dondozo
+Jumpluff
+Blastoise
+Carbink
+Turtonator
+Cradily
+Wartortle
+Bombirdier
+Cradily (Shadow)
