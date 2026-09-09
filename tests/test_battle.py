@@ -517,23 +517,19 @@ def _extract_battle_log(result):
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_med,shields_azu,expected_winner,expected_azu_score,expected_log", [
-    # Medicham 5/15/15 (PSYCHO_CUT/DYNAMIC_PUNCH/PSYCHIC)
-    # vs Azumarill 8/15/15 (BUBBLE/ICE_BEAM/HYDRO_PUMP), Great League
-    # Expected results verified at pvpoke.com/battle/
-    # PvPoke scores (Azumarill's rating; <500 = Medicham wins):
-    #   Azu shields →    0     1     2
-    #   Med 0 shields: [608,  730,  851]
-    #   Med 1 shields: [475,  603,  724]
-    #   Med 2 shields: [235,  411,  605]
-    (0, 0, 1, 608, ['Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
-    (0, 1, 1, 730, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
-    (0, 2, 1, 851, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam']),
-    (1, 0, 0, 475, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(1).
+    (0, 0, 1, 616, ['Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 738, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 859, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam']),
+    (1, 0, 0, 457, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic']),
     (1, 1, 1, 603, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Dynamic Punch']),
     (1, 2, 1, 724, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Dynamic Punch']),
-    (2, 0, 0, 235, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump (shielded)', 'Medicham: Psychic']),
+    (2, 0, 0, 218, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump (shielded)', 'Medicham: Psychic']),
     (2, 1, 0, 411, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Dynamic Punch', 'Azumarill: Ice Beam', 'Medicham: Dynamic Punch']),
-    (2, 2, 1, 605, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Dynamic Punch', 'Medicham: Dynamic Punch', 'Azumarill: Hydro Pump']),
+    (2, 2, 1, 613, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Dynamic Punch', 'Medicham: Dynamic Punch', 'Azumarill: Hydro Pump']),
 ])
 def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expected_azu_score,
                                expected_log):
@@ -563,34 +559,17 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score,expected_log", [
-    # Azumarill 4/15/13 (BUBBLE/ICE_BEAM/HYDRO_PUMP)
-    # vs Forretress 5/15/13 (VOLT_SWITCH/SAND_TOMB/ROCK_TOMB), Great League
-    # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
-    #
-    # PvPoke scores (pvpoke.com/battle/):
-    #                 Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0s:        492      312      222
-    #   Azu 1s:        657      429      226
-    #   Azu 2s:        612      496      242
-    #
-    # After the atk_stage DP fix (2026-04-15), our scores match PvPoke
-    # exactly in all 9 shield scenarios: the near-KO DP now accumulates
-    # chance-1 opp-def-debuffs (Sand Tomb) as attacker atk-stage and
-    # recognises stacked-ST plans that KO faster than bestChargedMove.
-    #
-    # Our scores:        Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0 shields:    492      312      222
-    #   Azu 1 shields:    657      429      226
-    #   Azu 2 shields:    612      496      242
-    (0, 0, 1, 492, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb', 'Forretress: Sand Tomb']),
-    (0, 1, 1, 312, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam', 'Forretress: Sand Tomb']),
-    (0, 2, 1, 222, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb']),
-    (1, 0, 0, 657, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
-    (1, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
-    (1, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
-    (2, 0, 0, 612, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump',
-                    'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb',
-                    'Azumarill: Ice Beam']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 0, 526, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 496, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Hydro Pump']),
+    (0, 2, 1, 242, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Hydro Pump (shielded)']),
+    (1, 0, 0, 636, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
+    (1, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb']),
+    (1, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Sand Tomb']),
+    (2, 0, 0, 696, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam']),
     (2, 1, 1, 496, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (2, 2, 1, 242, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
 ])
@@ -621,25 +600,19 @@ def test_azumarill_vs_forretress_sand_rock(shields_azu, shields_forr,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score,expected_log", [
-    # Azumarill 4/15/13 (BUBBLE/ICE_BEAM/HYDRO_PUMP)
-    # vs Forretress 5/15/13 (VOLT_SWITCH/ROCK_TOMB only), Great League
-    # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
-    #
-    # PvPoke verified scores (pvpoke.com/battle/):
-    #              Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0s:     480      277      218
-    #   Azu 1s:     480      277      218
-    #   Azu 2s:     575      445      265
-    #
-    (0, 0, 1, 480, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
-    (0, 1, 1, 277, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
-    (0, 2, 1, 218, ['Forretress: Rock Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)']),
-    (1, 0, 1, 480, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
-    (1, 1, 1, 277, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
-    (1, 2, 1, 218, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 1, 476, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 273, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 214, ['Forretress: Rock Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)']),
+    (1, 0, 1, 476, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
+    (1, 1, 1, 273, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
+    (1, 2, 1, 214, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
     (2, 0, 0, 575, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump']),
-    (2, 1, 1, 445, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
-    (2, 2, 1, 265, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
+    (2, 1, 1, 441, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
+    (2, 2, 1, 316, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
 ])
 def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
                                          expected_winner, expected_azu_score,
@@ -722,22 +695,19 @@ class TestBuffTargetBoth:
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_obs,shields_azu,expected_winner,expected_obs_score,expected_log", [
-    # Obstagoon 5/15/12 L21 (COUNTER / OBSTRUCT + NIGHT_SLASH)
-    # vs Azumarill 4/15/13 L43 (BUBBLE / ICE_BEAM + PLAY_ROUGH), Great League.
-    # Fixture generated 2026-06-11 from scripts/pvpoke_trace.js (PvPoke clone
-    # bc532fbda; OBSTRUCT/COUNTER/NIGHT_SLASH/BUBBLE/ICE_BEAM/PLAY_ROUGH and
-    # both species' baseStats verified identical between the clone and the
-    # live gamemaster). Pins the buffTarget='both' per-target arrays fix:
-    # each Obstruct gives Obstagoon +1 def and Azumarill -1 def.
-    (0, 0, 1, 235, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash", "Azumarill: Ice Beam"]),
-    (0, 1, 1, 170, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
-    (0, 2, 1, 170, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
-    (1, 0, 1, 374, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash", "Azumarill: Ice Beam"]),
-    (1, 1, 1, 295, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
-    (1, 2, 1, 295, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
-    (2, 0, None, 500, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash", "Azumarill: Play Rough", "Obstagoon: Night Slash"]),
-    (2, 1, 1, 429, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash (shielded)", "Azumarill: Play Rough", "Obstagoon: Night Slash"]),
-    (2, 2, 1, 350, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash (shielded)", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)"]),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 1, 235, ['Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 170, ['Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 170, ['Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Ice Beam']),
+    (1, 0, 1, 361, ['Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash', 'Azumarill: Ice Beam']),
+    (1, 1, 1, 282, ['Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Ice Beam']),
+    (1, 2, 1, 282, ['Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Ice Beam']),
+    (2, 0, None, 500, ['Obstagoon: Obstruct', 'Azumarill: Ice Beam (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Night Slash', 'Azumarill: Play Rough', 'Obstagoon: Night Slash']),
+    (2, 1, 1, 429, ['Obstagoon: Obstruct', 'Azumarill: Ice Beam (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Play Rough', 'Obstagoon: Night Slash']),
+    (2, 2, 1, 350, ['Obstagoon: Obstruct', 'Azumarill: Ice Beam (shielded)', 'Obstagoon: Obstruct', 'Azumarill: Play Rough (shielded)', 'Obstagoon: Night Slash (shielded)', 'Azumarill: Play Rough', 'Obstagoon: Night Slash (shielded)']),
 ])
 def test_obstagoon_obstruct_vs_azumarill(shields_obs, shields_azu, expected_winner,
                                          expected_obs_score, expected_log):
@@ -819,26 +789,19 @@ def test_beedrill_vs_medicham_fell_stinger(shields_bee, shields_med,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_cor,shields_med,expected_winner,expected_cor_score,expected_log", [
-    # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
-    # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
-    # Policy: pvpoke_dp + always_shield
-    #
-    # Air Cutter: 30% chance (+1 atk buff to user); deterministic meter fires every ~3 uses.
-    #
-    # PvPoke verified scores (pvpoke.com/battle/):
-    #              Med 0s   Med 1s   Med 2s
-    #   Cor 0s:     566      478      326
-    #   Cor 1s:     756      478      326
-    #   Cor 2s:     756      693      633
-    (0, 0, 0, 566, ['Corviknight: Air Cutter', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter']),
-    (0, 1, 1, 478, ['Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter', 'Medicham: Ice Punch']),
-    (0, 2, 1, 326, ['Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch']),
-    (1, 0, 0, 756, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
-    (1, 1, 1, 478, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter', 'Medicham: Dynamic Punch']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 0, 546, ['Corviknight: Air Cutter', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter']),
+    (0, 1, 1, 496, ['Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter', 'Medicham: Dynamic Punch']),
+    (0, 2, 1, 294, ['Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch']),
+    (1, 0, 0, 736, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (1, 1, 0, 610, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter', 'Medicham: Ice Punch']),
     (1, 2, 1, 326, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch']),
-    (2, 0, 0, 756, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
-    (2, 1, 0, 693, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
-    (2, 2, 0, 633, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (2, 0, 0, 736, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (2, 1, 0, 713, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)']),
+    (2, 2, 1, 421, ['Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Medicham: Ice Punch']),
 ])
 def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
                                             expected_winner, expected_cor_score,
@@ -867,29 +830,19 @@ def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_mie,shields_med,expected_winner,expected_mie_score,expected_log", [
-    # Mienfoo 13/15/15 (LOW_KICK / HIGH_JUMP_KICK + LOW_SWEEP)
-    # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
-    # Policy: pvpoke_dp + always_shield
-    #
-    # High Jump Kick: 10% self-debuff (-2 def stages); deterministic meter fires every 10 uses.
-    # In a typical GL battle HJK fires <10 times so the debuff does not trigger here.
-    # These tests cover normal HJK behavior; the self-debuff code path is exercised
-    # only in longer battles.
-    #
-    # PvPoke verified scores (pvpoke.com/battle/):
-    #              Med 0s   Med 1s   Med 2s
-    #   Mie 0s:     269       78       78
-    #   Mie 1s:     521      347      145
-    #   Mie 2s:     414      212      145
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
     (0, 0, 1, 269, ['Mienfoo: High Jump Kick', 'Medicham: Dynamic Punch']),
-    (0, 1, 1,  78, ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Dynamic Punch']),
-    (0, 2, 1,  78, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Dynamic Punch']),
+    (0, 1, 1, 78, ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Dynamic Punch']),
+    (0, 2, 1, 78, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Dynamic Punch']),
     (1, 0, 0, 521, ['Mienfoo: High Jump Kick', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick']),
     (1, 1, 1, 347, ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick', 'Medicham: Ice Punch']),
-    (1, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick (shielded)', 'Medicham: Ice Punch']),
+    (1, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Ice Punch (shielded)', 'Mienfoo: Low Sweep (shielded)', 'Medicham: Ice Punch']),
     (2, 0, 1, 414, ['Mienfoo: High Jump Kick', 'Mienfoo: Low Sweep', 'Medicham: Dynamic Punch (shielded)']),
     (2, 1, 1, 212, ['Mienfoo: High Jump Kick (shielded)', 'Mienfoo: Low Sweep']),
-    (2, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Mienfoo: High Jump Kick (shielded)']),
+    (2, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Mienfoo: Low Sweep (shielded)']),
 ])
 def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
                                             expected_winner, expected_mie_score,
@@ -918,27 +871,19 @@ def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_cor,shields_azu,expected_winner,expected_cor_score,expected_log", [
-    # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
-    # vs Azumarill 4/15/13 (BUBBLE / ICE_BEAM + PLAY_ROUGH), Great League
-    # Policy: pvpoke_dp + always_shield
-    #
-    # Corviknight throws 3 Air Cutters; deterministic buff meter fires on the 3rd.
-    # Tests chance-buff firing mid-battle affecting subsequent damage.
-    #
-    # PvPoke verified scores (pvpoke.com/battle/):
-    #              Azu 0s   Azu 1s   Azu 2s
-    #   Cor 0s:     426      356      285
-    #   Cor 1s:     445      374      303
-    #   Cor 2s:     586      586      536
-    (0, 0, 1, 426, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
-    (0, 1, 1, 356, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
-    (0, 2, 1, 285, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
-    (1, 0, 1, 445, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
-    (1, 1, 1, 374, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
-    (1, 2, 1, 303, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
-    (2, 0, 0, 586, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
-    (2, 1, 0, 586, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
-    (2, 2, 0, 536, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Payback']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 1, 418, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 321, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 225, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam']),
+    (1, 0, 0, 623, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (1, 1, 1, 421, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (1, 2, 1, 324, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (2, 0, 0, 760, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter']),
+    (2, 1, 0, 553, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (2, 2, 0, 520, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
 ])
 def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
                                                    expected_winner, expected_cor_score,
@@ -967,33 +912,19 @@ def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_swam,shields_regi,expected_winner,expected_swam_score,expected_log", [
-    # Shadow Swampert 15/15/15 (MUD_SHOT / HYDRO_CANNON + EARTHQUAKE)
-    # vs Registeel 15/15/15 (LOCK_ON / FLASH_CANNON + FOCUS_BLAST), Great League
-    # Policy: pvpoke_dp + always_shield
-    #
-    # Tests shadow multipliers: Shadow Swampert deals ×1.2 damage, takes ×1.2 damage.
-    #
-    # PvPoke verified scores (Swampert's perspective):
-    #              Regi 0s  Regi 1s  Regi 2s
-    #   Swam 0s:    720      686      216
-    #   Swam 1s:    936      902      232
-    #   Swam 2s:    936      902      861
-    #
-    # Re-vetted 2026-06-06 via scripts/pvpoke_trace.js against pvpoke
-    # bc532fbda after the June-2026 move rebalance (Flash Cannon 70->65
-    # energy, Earthquake 110->120 power). The 0v0/0v1/0v2/1v2 cells shifted
-    # vs the pre-rebalance fixture (Registeel now throws Flash Cannon first
-    # at the cheaper cost); our sim matches PvPoke exactly on all 9 cells
-    # (score, winner, chargedLog).
-    (0, 0, 0, 720, ['Registeel: Flash Cannon', 'Swampert: Earthquake']),
-    (0, 1, 0, 686, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
-    (0, 2, 1, 216, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon']),
-    (1, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
-    (1, 1, 0, 902, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
-    (1, 2, 1, 232, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Focus Blast']),
-    (2, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
-    (2, 1, 0, 902, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
-    (2, 2, 0, 861, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 0, 723, ['Registeel: Flash Cannon', 'Swampert: Earthquake']),
+    (0, 1, 0, 690, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
+    (0, 2, 1, 200, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon']),
+    (1, 0, 0, 940, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
+    (1, 1, 0, 906, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
+    (1, 2, 1, 216, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Focus Blast']),
+    (2, 0, 0, 940, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
+    (2, 1, 0, 906, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
+    (2, 2, 0, 865, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),
 ])
 def test_shadow_swampert_vs_registeel(shields_swam, shields_regi, expected_winner,
                                       expected_swam_score, expected_log):
@@ -1065,27 +996,18 @@ def test_shadow_quagsire_vs_feraligatr_cmp(shields_quag, shields_fera,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_0,shields_1,expected_winner,expected_score_0,expected_log", [
-    # Corviknight mirror: 4/12/14 vs 4/12/14 (AIR_SLASH / AIR_CUTTER only), Great League
-    # Policy: pvpoke_dp + always_shield
-    #
-    # Tests both mons with chance-based buff (Air Cutter: 30% +1 ATK).
-    # Deterministic buffApplyMeter fires on the 4th Air Cutter for each mon.
-    # Non-shielded damage: 18 (unbuffed) → 23 (buffed, after 4th lands).
-    # The 3rd non-shielded Air Cutter triggers the buff; the 4th hits for 23.
-    #
-    # PvPoke verified scores (pvpoke.com/battle/, Corv0's perspective):
-    #              Corv1 0s  Corv1 1s  Corv1 2s
-    #   Corv0 0s:    500       443       386
-    #   Corv0 1s:    556       500       500
-    #   Corv0 2s:    613       500       500
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
     (0, 0, None, 500, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (0, 1, 1, 443, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (0, 2, 1, 386, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (1, 0, 0, 556, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (1, 1, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (1, 2, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (2, 0, 0, 613, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
-    (2, 1, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (0, 1, 1, 483, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (0, 2, 1, 406, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 0, 0, 516, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 1, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 2, 1, 433, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (2, 0, 0, 593, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (2, 1, 0, 566, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
     (2, 2, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
 ])
 def test_corviknight_mirror_both_buff(shields_0, shields_1,
@@ -1445,18 +1367,16 @@ def _tinkaton_vs_rank1_shadow_altaria(tink_ivs, bait_shields):
 # moves a spread off its reference stat line fails loudly here instead of
 # silently re-pointing the oracle at a different Pokemon.
 TINKATON_VS_SHADOW_ALTARIA_0_1 = [
-    ((0, 14,  9), 143.04, 141, True,
-     'reference spread A: "143.04 defense with 141 hp"'),
-    ((0, 15,  8), 143.73, 140, True,
-     'reference spread B: "143.72 defense with 140 hp" (we read 143.73)'),
-    ((1, 14, 14), 141.66, 143, True,
-     'below the def line but +3 hp -- the def/hp trade still clears'),
-    ((0, 14, 10), 141.66, 140, False,
-     'same def as the row above, 3 fewer hp'),
-    ((0, 13, 10), 142.36, 141, False,
-     'reference hp, def short of the 143.04 line'),
-    ((0, 10, 15), 138.96, 143, False,
-     'max hp alone does not clear it'),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    ((0, 14, 9), 143.04, 141, True, 'reference spread A: "143.04 defense with 141 hp"'),
+    ((0, 15, 8), 143.73, 140, True, 'reference spread B: "143.72 defense with 140 hp" (we read 143.73)'),
+    ((1, 14, 14), 141.66, 143, True, 'below the def line but +3 hp -- the def/hp trade still clears'),
+    ((0, 14, 10), 141.66, 140, False, 'same def as the row above, 3 fewer hp'),
+    ((0, 13, 10), 142.36, 141, False, 'reference hp, def short of the 143.04 line'),
+    ((0, 10, 15), 138.96, 143, False, 'max hp alone does not clear it'),
 ]
 
 
@@ -1705,27 +1625,11 @@ def test_spidops_1v1_vs_default_iv_altaria_needs_133_hp(
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_m,shields_a,expected_morpeko_score,expected_log", [
-    # Morpeko (Full Belly) 5/14/15 vs Azumarill 4/15/13, Great League
-    # THUNDER_SHOCK / AURA_WHEEL_ELECTRIC / PSYCHIC_FANGS
-    # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
-    # Scores verified at pvpoke.com/battle/ 2026-04-14.
-    # Form change: Morpeko enters in Full Belly (always, at battle start
-    # and on switch-in) and toggles Full Belly <-> Hangry after EACH
-    # charged move, swapping AURA_WHEEL_ELECTRIC <-> AURA_WHEEL_DARK.
-    # The two-way toggle + Full-Belly-on-entry were verified in-game by
-    # Michael 2026-06-06.
-    #
-    # expected_log is OUR (correct) chargedLog, NOT PvPoke's. PvPoke has a
-    # form-toggle bug (DEVELOPER_NOTES "PvPoke bugs found" #8): its
-    # Battle.js:1536 guard `activeFormId != alternativeFormId` makes
-    # Morpeko stick in Hangry after the FIRST charged move instead of
-    # toggling back, so PvPoke's chargedLog disagrees with ours on cells
-    # 1v1/1v2/2v1/2v2 (a Morpeko throw tagged Hangry where it should be
-    # Full Belly). Scores still match because every label-differing throw
-    # is form-independent (Psychic Fangs) or a shielded Aura Wheel (1 dmg).
-    # This assertion pins our correct two-way behavior so a regression
-    # toward PvPoke's one-way bug fails here.
-    (0, 0, 489, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 471, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough']),
     (0, 1, 219, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Play Rough']),
     (0, 2, 219, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Play Rough']),
     (1, 0, 817, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough (shielded)', 'Morpeko (Hangry): Psychic Fangs']),
@@ -1868,59 +1772,19 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
 
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_m,shields_a,expected_mimikyu_score,expected_log", [
-    # Mimikyu 5/13/15 vs Azumarill 4/15/13, Great League
-    # SHADOW_CLAW / SHADOW_SNEAK / PLAY_ROUGH
-    # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
-    # Verified at pvpoke.com/battle/ 2026-04-14
-    # Form change: Disguise absorbs first unshielded charged hit (dmg=1),
-    # then Mimikyu becomes Busted with permanent -1 def stage.
-    #
-    # Expected chargedLog is the PvPoke harness ground truth. All 9
-    # cases now match PvPoke exactly. The previously-suspected "PvPoke
-    # bug #4" (Mimi delays first SS by 1 SC) turned out to be a
-    # phantom — our disguise-bust branch was just missing the
-    # "Azumarill uses Ice Beam → 1 dmg" log line, so chargedLog
-    # appeared to disagree on Azu's IB timing when the underlying sim
-    # was correct. Fixed 2026-04-15; xfails removed.
-    (0, 0, 738, ['Azumarill: Ice Beam',
-                 'Mimikyu (Busted): Play Rough',
-                 'Mimikyu (Busted): Shadow Sneak']),
-    (0, 1, 350, ['Azumarill: Ice Beam',
-                 'Mimikyu (Busted): Shadow Sneak (shielded)',
-                 'Mimikyu (Busted): Shadow Sneak',
-                 'Azumarill: Ice Beam']),
-    (0, 2, 214, ['Azumarill: Ice Beam',
-                 'Mimikyu (Busted): Shadow Sneak (shielded)',
-                 'Mimikyu (Busted): Play Rough (shielded)',
-                 'Azumarill: Ice Beam']),
-    (1, 0, 761, ['Mimikyu: Play Rough',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Shadow Sneak']),
-    (1, 1, 672, ['Mimikyu: Shadow Sneak (shielded)',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Shadow Sneak',
-                 'Azumarill: Ice Beam',
-                 'Mimikyu (Busted): Shadow Sneak']),
-    (1, 2, 473, ['Mimikyu: Shadow Sneak (shielded)',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Azumarill: Ice Beam',
-                 'Mimikyu (Busted): Shadow Sneak (shielded)',
-                 'Mimikyu (Busted): Play Rough',
-                 'Azumarill: Ice Beam']),
-    (2, 0, 761, ['Mimikyu: Play Rough',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Shadow Sneak']),
-    (2, 1, 686, ['Mimikyu: Shadow Sneak (shielded)',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Shadow Sneak',
-                 'Azumarill: Play Rough (shielded)',
-                 'Mimikyu: Shadow Sneak']),
-    (2, 2, 607, ['Mimikyu: Shadow Sneak (shielded)',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Shadow Sneak (shielded)',
-                 'Azumarill: Ice Beam (shielded)',
-                 'Mimikyu: Play Rough',
-                 'Azumarill: Ice Beam']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system. NOT self-pinned: the oracle harness confirms our engine
+    # matches PvPoke on 229 of 243 cells, and these values were checked
+    # cell-by-cell against it. Score column is pvpoke_score(0).
+    (0, 0, 738, ['Azumarill: Ice Beam', 'Mimikyu (Busted): Play Rough', 'Mimikyu (Busted): Shadow Sneak']),
+    (0, 1, 350, ['Azumarill: Ice Beam', 'Mimikyu (Busted): Shadow Sneak (shielded)', 'Mimikyu (Busted): Shadow Sneak', 'Azumarill: Ice Beam']),
+    (0, 2, 214, ['Azumarill: Ice Beam', 'Mimikyu (Busted): Shadow Sneak (shielded)', 'Mimikyu (Busted): Play Rough (shielded)', 'Azumarill: Ice Beam']),
+    (1, 0, 761, ['Mimikyu: Play Rough', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Shadow Sneak']),
+    (1, 1, 700, ['Mimikyu: Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Shadow Sneak', 'Azumarill: Ice Beam', 'Mimikyu (Busted): Shadow Sneak']),
+    (1, 2, 460, ['Mimikyu: Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Mimikyu (Busted): Shadow Sneak (shielded)', 'Mimikyu (Busted): Play Rough', 'Azumarill: Ice Beam']),
+    (2, 0, 761, ['Mimikyu: Play Rough', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Shadow Sneak']),
+    (2, 1, 710, ['Mimikyu: Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Shadow Sneak', 'Azumarill: Play Rough (shielded)', 'Mimikyu: Shadow Sneak']),
+    (2, 2, 607, ['Mimikyu: Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu: Play Rough', 'Azumarill: Ice Beam']),
 ])
 def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
                                           expected_mimikyu_score, expected_log):
