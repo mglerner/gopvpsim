@@ -133,6 +133,19 @@ def _cs_names():
 
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
+        'Aegislash (Shield)': (
+            'Michael, 2026-09-09. ItsAxn rates it top-meta/meta and it sits at '
+            'GL #72, outside the top-50 cut. It used to arrive via PvPoke\'s '
+            'championshipseries group; PvPoke has since DROPPED it from that '
+            'group, so without this entry it leaves the pool silently. NB the '
+            'rankings display it as "Aegislash (Blade)" under speciesId '
+            'aegislash_shield -- the same display-name trap as Mimikyu, see '
+            'resolvable_name().'),
+        'Aegislash (Blade)': (
+            'As above. Both forms are carried because the dive treats them as '
+            'distinct opponents and each form-changes into the other mid-'
+            'fight; Blade resolves through _DEFAULT_MOVESET_FALLBACK in '
+            'data.py, which pins PSYCHO_CUT / SHADOW_BALL, GYRO_BALL.'),
         'Deoxys (Defense)': (
             'Michael, 2026-09-06. Post-rebalance it switches its fast move to '
             'LOW_KICK and jumps GL #540 -> #60 (measured on '
@@ -161,6 +174,8 @@ CURATED_INCLUSIONS = {
             'pool independent of where any given ranking pass puts it.'),
     },
     'gl_top30_plus_cs_top100': {
+        'Aegislash (Shield)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
+        'Aegislash (Blade)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Melmetal': 'same as gl_top50_plus_cs -- this is the fast-dive GL pool',
         'Deoxys (Defense)': ('same as gl_top50_plus_cs, including the '
                              'no-swap caveat -- this is the fast-dive GL pool'),
@@ -187,21 +202,6 @@ CURATED_INCLUSIONS = {
 # become redundant is clutter, and one whose reasoning has gone stale is worse.
 
 
-_AEGISLASH_REASON = (
-    'Michael, 2026-09-09: TEMPORARY, pending a fix. Our engine over-farms '
-    'Aegislash in SHIELD form. Traced on aegislash_blade vs azumarill [1v0] '
-    'against pvpoke master: both engines toggle Blade->Shield->Blade, but '
-    'PvPoke commits its second Shadow Ball on T30 ("it KOs or it wants to '
-    'farm down afterwards") while ours banks to the full 100 energy and '
-    'throws on T44 -- 25 turns farming at 1 damage per Psycho Cut vs their '
-    '10. Scores 570/429 ours vs 712/287 theirs. That is 6 of the 6 '
-    'undocumented oracle mismatches. Sims against a wrong Aegislash would '
-    'contaminate every other focal, so it comes out until the DP commit '
-    'behaviour in the low-attack form is fixed. REMOVE THIS once the oracle '
-    'grid is green -- Aegislash clears the cut on merit and belongs here.'
-)
-
-
 # ---------------------------------------------------------------------------
 # Curated EXCLUSIONS -- species the recipe produces that we deliberately drop
 # ---------------------------------------------------------------------------
@@ -216,14 +216,27 @@ _AEGISLASH_REASON = (
 # drift, not an exclusion.
 
 CURATED_EXCLUSIONS = {
-    'gl_top50_plus_cs': {
-        'Aegislash (Blade)': _AEGISLASH_REASON,
-        'Aegislash (Shield)': _AEGISLASH_REASON,
-    },
-    'gl_top30_plus_cs_top100': {
-        'Aegislash (Blade)': _AEGISLASH_REASON,
-        'Aegislash (Shield)': _AEGISLASH_REASON,
-    },
+    # AEGISLASH WAS EXCLUDED HERE ON 2026-09-09 AND THE EXCLUSION WAS
+    # WITHDRAWN THE SAME DAY. Recorded because the reasoning is the point:
+    #
+    # The claim was "our engine sims Aegislash wrong -- it over-farms in Shield
+    # form". What was actually measured is that our Aegislash banks 100 energy
+    # and throws on T44 where PvPoke commits on T30. That is a real difference
+    # in commit TIMING, but it is not evidence we are wrong:
+    #   * all 6 diverging cells agree on the WINNER; only scores differ (50-142)
+    #   * farming in Shield (1 dmg/fast, tanky) and bursting in Blade is
+    #     Aegislash's actual gimmick, so our line is strategically coherent
+    #   * PvPoke's rating is damage-weighted, so 25 turns of 1-damage farming
+    #     depresses the score even in a fight we win
+    #   * our own harness comment from 2026-06-12 concludes the OPPOSITE for
+    #     these same cells -- that PvPoke's Aegislash makes the worse choice
+    #
+    # CLAUDE.md's bar is "does PvPoke produce a demonstrably better outcome?"
+    # Same winner in all 6 means that bar was never cleared. Excluding a real
+    # meta species on an unproven claim is the worse error, and if a future
+    # investigation does change our behaviour, migrate_cache can re-sim just
+    # the Aegislash columns (species is stored per column) rather than forcing
+    # a cold re-dive. Michael's call, 2026-09-09.
     # NOT ul_top60.txt: Aegislash has been out of the UL pool since
     # 2026-06-25 for an unrelated reason (not UL-viable as an opponent -- see
     # that file's header). Adding it here would overwrite a correct, older
@@ -290,9 +303,10 @@ def apply_exclusions(pool_key, names):
 #    post-rebalance: Mimikyu (Busted) #18, Deoxys (Defense) #28, Corsola
 #    (Galarian) #3, Sableye #48, Blastoise #50, Dondozo #39. He rates all of
 #    them meta-or-better and the ranker now agrees.
-#  * Aegislash (Blade) is in his TOP META at #72 and is deliberately NOT here:
-#    it is in CURATED_EXCLUSIONS because OUR ENGINE sims it wrong, not because
-#    it is weak. Restore it to this list when that defect is fixed.
+#  * Aegislash (Blade) is in his TOP META at #72 and needs no entry here: it
+#    clears via the championshipseries group. It was briefly excluded on
+#    2026-09-09 over an oracle divergence; that exclusion was WITHDRAWN the
+#    same day (see CURATED_EXCLUSIONS).
 
 ITSAXN_META_PLUS = {
     'Ninetales (Alolan)':  'META DEFINING (his #3), 01:47, x16; GL #63. The '
