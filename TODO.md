@@ -1055,6 +1055,57 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    form-change/farm axis as the Aegislash defect in step 4, so one root cause
    may clear a chunk of the 102. Do not re-baseline anything to our own output
    before step 4 lands, or we pin the bug.
+3b. **RE-VET THE THRESHOLD TOMLs -- they are INPUTS, so they are not
+   "regenerated", but a large subset has gone stale. Measured 2026-09-09.**
+
+   What the 55 files hold: 631 `kind` + 627 `opponent` are DECLARATIONS
+   ("discover all Azumarill bulkpoints"), and the bake recomputes their
+   numbers -- those survive a rebalance untouched. 705 `description` + 579
+   `source` are human prose and attribution. The only numeric payload is 59
+   spread stat-cutoffs, and those are community-sourced (HomeSliceHenry's
+   Discord), not computed by us.
+
+   **Check MOVES, not species entries.** Of 86 opponents named across the
+   TOMLs, only ONE (Cofagrigus, +ENERGY_BALL) has a battle-relevant change to
+   its own gamemaster entry -- but **32 of 86 have a rebalanced move in their
+   DEFAULT moveset**. A species-entry diff misses 31 of the 32. Likewise 105
+   pokemon entries changed but only 65 battle-relevantly; the other 40 are
+   `searchPriority`/`nicknames` churn (Lickilicky's entry "changed" only
+   because searchPriority went 10 -> 4).
+
+   Reach, by how many of the 55 files name them:
+
+       Lickilicky   39   BODY_SLAM, SHADOW_BALL
+       Umbreon      26   DARK_PULSE
+       Altaria      23   MOONBLAST      (+14 more as Altaria (Shadow))
+       Jellicent    22   SHADOW_BALL
+       Annihilape   15   LOW_KICK, RAGE_FIST
+       Tinkaton      9   BULLDOZE
+       ... 26 more opponents at 1-5 files each
+
+   **19 of the 55 FOCAL species also have a changed default moveset**
+   (aegislash both forms, altaria both, annihilape, corviknight both,
+   forretress both, jellicent, lickilicky, oinkologne both, sealeo both,
+   sliggoo, spidops, sylveon, tinkaton).
+
+   So the work is a reconciliation pass, ordered AFTER the bake:
+   a. Bake recomputes every anchor from its declaration.
+   b. Reconcile the 59 spread cutoffs against the new anchor output -- a
+      cutoff derived against a changed opponent no longer lands on a real
+      breakpoint. Azumarill-derived cutoffs SURVIVE (BUBBLE / ICE_BEAM /
+      PLAY_ROUGH all unchanged), which is why e.g. Tinkaton's
+      `defense = 143.03` is still good.
+   c. 182 descriptions cite a decimal number in prose; each one whose
+      underlying threshold moved is now a wrong published sentence.
+   d. Re-check the 5 `cd_prep` blocks: the CD moves have SHIPPED, and
+      CLAUDE.md is explicit that injecting an already-legal move is wrong.
+      Verify against `eliteMoves` before keeping any of them.
+
+   The cutoffs and prose are HUMAN-sourced with a `source` field. Where a
+   value is re-derivable (a bulkpoint is a computation) we can propose the
+   new number, but which bulkpoint defines "GH Great" is editorial and stays
+   Michael's call. Ship-mode narrative policy applies.
+
 4. **RESIZED by step 1: this is 6 cells, not 1, and it is now the only thing
    standing between us and a green harness.** Form change x the new ordering,
    all Aegislash/Azumarill. Two of the six flip `log_ok=False` (the chargedLog
