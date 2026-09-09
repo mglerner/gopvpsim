@@ -1,24 +1,25 @@
 """The product default is the turn system the game actually runs.
 
-Changed 2026-09-02 (Michael): the legacy turn system is gone from the live
-game, so a dive that models it describes a game nobody can play. Modelling the
-current ruleset approximately beats modelling a dead one exactly.
+Changed 2026-09-02 (Michael) for the CLIs; extended 2026-09-09 to
+`simulate()` itself and the oracle harness once PvPoke merged its
+new-mechanics work to master.
 
-The flip is deliberately at the PRODUCT boundary (the CLIs that generate
-published numbers), not at `gopvpsim.battle.simulate`'s signature. That is not
-timidity -- it is what keeps the verification asset intact:
+The 2026-09-02 version of this module argued that `simulate()`'s default had
+to STAY legacy, because the ~92 legacy-pinned assertions check our engine
+against PvPoke ground truth and PvPoke master still ran the legacy turn
+system. That reasoning was correct and it EXPIRED on 2026-09-09: master now
+runs the new system, so legacy-pinned oracle comparisons measure a dead model
+against a live one.
 
-  * The ~92 legacy-pinned assertions across tests/ check our engine against
-    PvPoke ground truth. They are what proves the port is faithful.
-  * PvPoke master still runs the LEGACY turn system, so that check is only
-    meaningful under `mechanics='legacy'`.
-  * Re-baselining them to `new` would make them pin OUR OWN unvalidated
-    model's output with no oracle behind it -- a suite that can only confirm
-    we still do whatever we currently do.
+Keeping legacy as the library default had also become actively dangerous.
+Seven scripts call `simulate()` without passing `mechanics` and inherit the
+default -- including `build_matchup_web.py`, which renders a PUBLISHED
+cross-species page. They were all silently modelling a ruleset nobody can
+play, with nothing to warn them.
 
-So `simulate()`'s default stays legacy until PvPoke's turn-system work merges
-and the re-port lands; at that point both flip together and the oracle becomes
-meaningful again. Sequence recorded in TODO.md.
+Cost of the flip, measured: the fast tier goes 104 -> 187 failures. Those 83
+are legacy-pinned expectations that now need re-deriving against the merged
+reference, which is tracked as its own step rather than hidden here.
 """
 import re
 import sys
@@ -51,40 +52,47 @@ def test_product_clis_default_to_the_live_turn_system(path):
         f'{path} still defaults to the retired turn system')
 
 
-def test_the_oracle_harness_stays_on_legacy():
-    """It answers "is our PORT faithful?", and PvPoke master is legacy.
+def test_the_oracle_harness_follows_pvpoke_master():
+    """It answers "is our PORT faithful?", and PvPoke master is now NEW.
 
-    Flipping this one would take it from 0 mismatches to 57 (measured) and
-    destroy the only instrument that verifies the port. It flips when PvPoke's
-    turn-system work merges, not before.
+    Flipped 2026-09-09 when the turn-system work merged to master. Keeping it
+    on legacy would compare our dead model against their live one, which
+    measures nothing. This is the condition the old version of this test named
+    as its own flip trigger.
     """
-    assert _argparse_default('scripts/audit_oracle_harness.py') == 'legacy', (
-        'the oracle harness follows PvPoke master, which still runs the '
-        'legacy turn system; flipping it makes the audit self-referential')
+    assert _argparse_default('scripts/audit_oracle_harness.py') == 'new', (
+        'the oracle harness follows PvPoke master, which now runs the new '
+        'turn system; leaving it on legacy compares two different rulesets')
 
 
-def test_simulate_signature_default_is_still_legacy_on_purpose():
-    """Pinned so the reason is recorded, not so the value is sacred.
+def test_simulate_signature_defaults_to_the_live_turn_system():
+    """The library default, not just the CLIs.
 
-    See this module's docstring: re-baselining the legacy-pinned suite to
-    `new` would make it pin our own unvalidated output. When the re-port lands
-    this test changes together with those fixtures.
+    Flipped 2026-09-09. Leaving it at legacy made it a SILENT TRAP: seven
+    scripts call simulate() without passing mechanics (build_matchup_web,
+    joint_iv_breakpoints, owned_breakdown, energy_probe, etm_iv_floor_sweep,
+    check_sableye_energy_lead, cramorant_policy_lab), so each was quietly
+    modelling a ruleset nobody can play. build_matchup_web is the worst of
+    them -- it renders a PUBLISHED cross-species page.
     """
     import inspect
     from gopvpsim.battle import simulate
-    assert inspect.signature(simulate).parameters['mechanics'].default == 'legacy'
+    assert inspect.signature(simulate).parameters['mechanics'].default == 'new'
 
 
 def test_both_models_carry_a_caveat():
-    """Neither setting is simply correct, so neither may be silent.
+    """Both still need saying, but for opposite reasons now.
 
-    `new` being the default makes its caveat MORE important, not less -- it is
-    now what someone gets without asking.
+    `new` is correct-but-not-perfect (6 open Aegislash cells); `legacy` is a
+    dead ruleset. Neither may be silent, and the `new` caveat matters most
+    because it is what someone gets without asking.
     """
-    for model in ('legacy', 'new'):
-        msg = mechanics_caveat(model)
-        assert msg and len(msg) > 80, model
-        assert 'UNVALIDATED' in msg or 'no longer runs' in msg, model
+    new = mechanics_caveat('new')
+    assert new and '237' in new and 'Aegislash' in new, (
+        'the new-model caveat must name the actual open divergence, not a '
+        'stale count -- it claimed 104 mismatches until 2026-09-09')
+    legacy = mechanics_caveat('legacy')
+    assert legacy and 'does not run it' in legacy
     assert mechanics_caveat('nonsense') is None
 
 

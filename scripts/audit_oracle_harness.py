@@ -309,8 +309,11 @@ def run_harness(m, s1, s2, root):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pvpoke-root', type=Path, default=DEFAULT_PVPOKE_ROOT)
-    ap.add_argument('--mechanics', choices=('legacy', 'new'), default='legacy',
-                    help="Turn-resolution model for OUR side. Pair 'new' with "
+    ap.add_argument('--mechanics', choices=('legacy', 'new'), default='new',
+                    help="Turn-resolution model for OUR side. Defaults to 'new' "
+                         "since 2026-09-09: PvPoke master now RUNS the new turn "
+                         "system, so 'legacy' compares our dead model against "
+                         "their live one and is meaningless. Pair 'new' with "
                          "a --pvpoke-root whose src/js comes from PvPoke's "
                          "new-mechanics branch, or the comparison is "
                          "meaningless. Use that branch's JS with MASTER's "
