@@ -25,33 +25,6 @@ sources = "Inadequance 'A Deep Dive into Chilling Water Florges!' YouTube video 
 # Spreads — Inadequance tiers (expert-shipped numbers)
 # ─────────────────────────────────────────────────────────────────────
 
-# Stat-cutoff tier the video names "SWak": minimum attack for the SWak
-# check, reference IV 9/6/14. Encoded exactly as shipped in the app.
-[Florges.Great.spreads.swak]
-description = "Inadequance's SWak attack tier: 121.50 atk minimum (reference IV 9/6/14). Which (opponent, move, tier) the 121.50 atk calibrates to is not recorded locally — recover it via the Level 3 breakpoint anchors below before promoting to a Level 1/2 anchor."
-source = "Inadequance YouTube video (KXLWLcOw3G4); shipped as 'SWak 9/6/14' in GoBattleKit DEFAULT_THRESHOLDS"
-attack = 121.5
-defense = 0
-stamina = 0
-
-# Inadequance's explicit GL IV picks from the same video.
-[Florges.Great.spreads.inadequance_picks]
-description = "Inadequance's explicit Great League IV picks: 0/14/13 (bulk pick), 9/6/14 (the SWak reference, clears the 121.50 atk tier), 8/1/8."
-source = "Inadequance YouTube video (KXLWLcOw3G4); shipped as 'Inadequance' in GoBattleKit DEFAULT_THRESHOLDS"
-ivs = [
-    [0, 14, 13],
-    [9, 6, 14],
-    [8, 1, 8],
-]
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side, Level 3 discover-all)
-#
-# Close, type-plausible matchups from the 2026-06-10 GL pool where a
-# def/hp tier on Florges credibly changes a damage number it takes.
-# ─────────────────────────────────────────────────────────────────────
-
-# The mirror (required; Florges is off-pool post-rebalance, auto-injected).
 [Florges.Great.anchors.mirror_blkp_any]
 kind = "bulkpoint"
 opponent = "Florges"
@@ -161,3 +134,28 @@ kind = "damage_breakpoint"
 opponent = "Medicham"
 description = "Discover all Medicham damage breakpoints. Super-effective Fairy Wind tiers against Medicham's modest def shorten the race against neutral Psychic / Ice Punch."
 source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Florges.Great.spreads.inadequance_picks]
+description = "Inadequance's explicit Great League IV picks: 0/14/13 (bulk pick), 9/6/14 (the SWak reference, clears the 121.50 atk tier), 8/1/8."
+source = "Inadequance YouTube video (KXLWLcOw3G4); shipped as 'Inadequance' in GoBattleKit DEFAULT_THRESHOLDS"
+ivs = [
+    [0, 14, 13],
+    [9, 6, 14],
+    [8, 1, 8],
+]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Close, type-plausible matchups from the 2026-06-10 GL pool where a
+# def/hp tier on Florges credibly changes a damage number it takes.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (required; Florges is off-pool post-rebalance, auto-injected).

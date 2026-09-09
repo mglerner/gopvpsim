@@ -40,19 +40,6 @@ sources = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04; Wayback 20
 # Quagsire (base) — spreads (stat-cutoff tiers named by the writeup)
 # ─────────────────────────────────────────────────────────────────────
 
-[Quagsire.Great.spreads."High Bulk"]
-attack = 0
-defense = 112.0
-stamina = 163
-description = "RyanSwag 'Non-Shadow, High Bulk' tier: 112.00 def + 163 hp. Enables the Sableye 0-0 & 2-2, fortifies the Carbink 0-1 & 1-2 and Charjabug 1-1, avoids Medicham's Counter breakpoint; 163 hp keeps the Water Gun Lanturn 1-2 (Mud Bomb), Froslass 1-2, and Powder Snow Shadow A-Ninetales 0-1 consistent. Preference ordering within the tier: 113.66 def, then 112.68 def + 164 hp, then raw 164 hp."
-source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Quagsire (base) — bulkpoint anchors (def-side, Level 3 discover-all)
-# Opponents picked from gl_top50_plus_cs.txt where Quagsire's def/hp
-# checks plausibly move a close matchup.
-# ─────────────────────────────────────────────────────────────────────
-
 [Quagsire.Great.anchors.sableye_blkp_any]
 kind = "bulkpoint"
 opponent = "Sableye"

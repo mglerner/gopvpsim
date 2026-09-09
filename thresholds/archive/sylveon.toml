@@ -1,0 +1,72 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for sylveon, lifted verbatim out of
+# thresholds/sylveon.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Sylveon.Great.spreads."Gatr Slayer"]
+description = "Card 'Gatr Slayer' (recommended IV 2/12/10 -> 117.79 atk / 124.68 def). def >= 124.61 clears the Feraligatr 2-2 (bait) bulkpoint = 'Slays ALL TOP Feraligatr'."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 0
+defense = 124.61
+stamina = 0
+
+[Sylveon.Great.spreads."Max Defense"]
+description = "Card 'Max Defense' (recommended IV 0/14/1 -> 118.20 atk / 127.52 def). Maximum bulk; clears every Feraligatr bulkpoint with margin. NOTE: its 'CMPs ALL TOP Sylveon' claim holds only vs the bulk-built mirror, not the full top-512 (atk 118.20 < top-512 max atk 120.34)."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 0
+defense = 127.52
+stamina = 0
+
+[Sylveon.Great.spreads."S. Quagsire Focus"]
+description = "Card 'S. Quagsire Focus' (recommended IV 12/4/10 -> 121.85 atk / 118.45 def). atk >= 121.70: Fairy Wind reaches 5 dmg vs rank-1 Shadow Quagsire (499/512 of the cohort, incl. rank #1); also out-CMPs all top-512 Sylveon."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 121.70
+defense = 0
+stamina = 0
+
+[Sylveon.Great.spreads."Full Attack"]
+description = "Card 'Full Attack' (recommended IV 11/2/2 -> 122.96 atk / 118.94 def). atk >= 122.96: Fairy Wind reaches 5 dmg vs ALL 512 top Shadow Quagsire (incl. the bulkiest); out-CMPs all top-512 Sylveon. Highest realistic attack."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 122.96
+defense = 0
+stamina = 0
+
+# Max-attack member of the top-512 (by stat product) Sylveon cohort.
+# Its effective atk (120.34) is the CMP target: any focal atk strictly
+# above this out-prioritizes every top-512 mirror Sylveon.
+

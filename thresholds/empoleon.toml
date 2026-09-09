@@ -37,38 +37,6 @@ pool 2026-06-10 (Empoleon GL meta rank 4).
 # Spreads — stat tiers named by the JRE47 writeup
 # ─────────────────────────────────────────────────────────────────────
 
-# JRE47's GL stats table lists the highest-stat-product build explicitly:
-# IVs 0/13/15 at 1500 CP, Level 19.5.
-[Empoleon.Great.spreads.jre_hsp]
-description = "JRE47 highest-stat-product GL build: IVs 0/13/15 at Level 19.5 (1500 CP). Article's High Stat Product column: 124.00 atk, 117.00 def + 125 hp."
-source = "JRE47, Pokémon GO Hub, 2026-01-03"
-ivs = [
-    [0, 13, 15],
-]
-
-# Stat-cutoff form of the article's headline GL stats column (the
-# non-HSP numbers, i.e. the PvPoke-default-style build). Membership:
-# at least the listed bulk; attack unconstrained.
-[Empoleon.Great.spreads.jre_gl_listed]
-description = "Bulk tier from JRE47's listed GL stats column: 125.00 atk, 117.00 def + 122 hp. Cutoff keeps the listed def/hp floor; atk unconstrained."
-source = "JRE47, Pokémon GO Hub, 2026-01-03"
-attack = 0
-defense = 117.0
-stamina = 122
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side, Level 3 discover-all)
-#
-# Opponents chosen from gl_top50_plus_cs.txt where the type matchup
-# makes a def/hp check plausible and the matchup is close. The JRE47
-# article's base-vs-shadow swap list is the main close-matchup signal:
-# matchups the base wins but the lower-bulk shadow loses (Altaria,
-# Feraligatr, Forretress, Diggersby) are exactly the ones where
-# Empoleon's defense tier decides the outcome.
-# ─────────────────────────────────────────────────────────────────────
-
-# Altaria: base Empoleon wins "even with Flamethrower" per JRE47, but
-# Shadow Empoleon loses — the canonical bulk-decided matchup.
 [Empoleon.Great.anchors.altaria_blkp_any]
 kind = "bulkpoint"
 opponent = "Altaria"
@@ -213,3 +181,21 @@ opponent = "Malamar"
 above_atk = 125.0
 description = "Smallest atk > 125.00 atk (JRE47's listed GL attack stat) at which damage to Malamar steps up — locates the tier the shadow's atk boost exploits."
 source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Empoleon.Great.spreads.jre_hsp]
+description = "JRE47 highest-stat-product GL build: IVs 0/13/15 at Level 19.5 (1500 CP). Article's High Stat Product column: 124.00 atk, 117.00 def + 125 hp."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+ivs = [
+    [0, 13, 15],
+]
+
+# Stat-cutoff form of the article's headline GL stats column (the
+# non-HSP numbers, i.e. the PvPoke-default-style build). Membership:
+# at least the listed bulk; attack unconstrained.

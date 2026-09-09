@@ -1,0 +1,69 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for spidops, lifted verbatim out of
+# thresholds/spidops.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Spidops.Great.spreads.Atk]
+attack = 113.03
+defense = 138.88
+stamina = 0
+description = "Slight attack-weight tier: 113.03 atk + 138.88 def, then as much hp as possible (1/7/1 cited as a strong spread). The atk cutoff is the rank #2 Forretress breakpoint."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Atk'"
+
+[Spidops.Great.spreads.Bulk]
+attack = 109.82
+defense = 138.88
+stamina = 0
+description = "Bulk-focus tier (minimum def): 109.82 atk + 138.88 def, then as much hp as possible. The atk cutoff is the rank #1 Cradily breakpoint; the def cutoff covers default Tinkaton and default Shadow Talonflame."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk'"
+
+[Spidops.Great.spreads."Bulk+"]
+attack = 109.82
+defense = 140.67
+stamina = 0
+description = "Bulk-focus tier (preferred def): 109.82 atk + 140.67 def, then as much hp as possible (2/15/15 cited). The def cutoff adds the rank #1 Altaria no-bait 1s flip."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk+'"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), Level 3 discover-all.
+#
+# Each anchor's description carries the HSH calibration atk so the
+# resolved sub-anchor distribution can be checked against the writeup.
+# ─────────────────────────────────────────────────────────────────────
+
+# The Bulk-tier atk calibration point.

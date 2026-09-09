@@ -1,0 +1,81 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for sableye, lifted verbatim out of
+# thresholds/sableye.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Sableye.Great.spreads."High Def"]
+attack = 0
+defense = 124.7
+stamina = 123
+description = "RyanSwag's High Def tier: 124.70 def + 123 hp (more HP the better). Tops the Skarmory 1-1/2-2 band (122.40 def to 124.70 def, may need the 123 hp), buys Vigoroth 0-1/2-2 potential at 124.70 def, Lapras 2-2 at 124.41 def, Obstagoon 0-0 at 124.26 def, Hex Jellicent 0-1/1-2 potential at 123.70 def, and Bastiodon 1-2 potential at 123.22 def — the latter three calibrated vs very-low-atk 'high SP' opponents. Going High Def lets you overlook most HP checks and settle at 123 hp."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Med Def"]
+attack = 0
+defense = 122.4
+stamina = 125
+description = "RyanSwag's Med Def tier: 122.40 def + 125 hp (126 hp for the 1-1 mirror; Med Def builds want 125-126 hp to make up for the lower def). Enters the Skarmory band at 122.40 def and covers Dewgong 1-1 potential at 122.13 def, the Froslass 1-1 band from 117.86 def to 121.54 def, Galar Stunfisk 1-1 at 120.35 def, Galvantula 1-1 at 118.72 def, and Shadow Nidoqueen potential at about 119.00 def."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Desperation Def"]
+attack = 0
+defense = 121.54
+stamina = 123
+description = "RyanSwag's fallback floor: 121.54 def is acceptable if you truly don't believe you'll get a better split — it adds about 47 more spreads (180 vs 133). Anything below this, hold out for a better Purified Sableye."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Slight Atk"]
+attack = 120.8
+defense = 0
+stamina = 0
+description = "RyanSwag's Slight Atk tie-breaker tier: 120.80 atk gets CMP on high-SP Froslass; 120.61 atk fully farms Deoxys Defense Forme in the 1-1; the Meganium 2-2 band runs 118.58 atk (max-SP Meganium) to 122.64 atk (max-def Meganium); Mew CMP from 119.30 atk with the cap at 121.50 atk (only 1 Mew of 216); 120.23 atk to 121.01 atk are the safer overall goals. Atk BPs are tie-breakers between similar builds, not goals."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."High Atk"]
+attack = 121.6
+defense = 0
+stamina = 0
+description = "RyanSwag's High Atk tier: 121.60 atk for Greedent 1-1 potential with straight Foul Play (watch out for debuffs); 120.96 atk gets Abomasnow and Shadow Abomasnow 1-1 with straight Foul Play; 121.50 atk is the Mew atk cap for CMP."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups from gl_top50_plus_cs.txt (2026-06-10)
+# ─────────────────────────────────────────────────────────────────────
+
+# Greedent: in the current pool AND a RyanSwag atk calibration point.

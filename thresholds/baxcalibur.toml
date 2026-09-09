@@ -47,6 +47,13 @@ notes = "Brick Break (Fighting) + Earthquake (Ground): the two main-series moves
 #   published IVs for the single-target breakpoint hunters.
 # ─────────────────────────────────────────────────────────────────────
 
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
 [Baxcalibur.Great.spreads."Bulk / R1 (0/15/5)"]
 ivs = [[0, 15, 5]]
 description = "Rank-1 stat product / max GL defense (135.7 atk, 97.79 def, 125 hp). Our sim's highest total-wins spread and the most robust catch — stays best with the realistic future coverage move (Brick Break). DragapultSim's R1 reference spread."
@@ -62,33 +69,10 @@ ivs = [[8, 4, 5]]
 description = "DragapultSim Furret breakpoint-guarantee spread (140.00 atk, 91.90 def). The most attack-weighted of the three; beats the most G-Corsola / Furret opponent IVs of any spread, at the cost of overall bulk."
 source = "DragapultSim (@DragapultSim), June 2026 Frigibax CD"
 
-[Baxcalibur.Great.spreads."General Bulk (def >= 94)"]
-attack = 0
-defense = 94.0
-stamina = 0
-description = "Practical catch floor: prioritize defense/HP. Sim says bulk wins more total matchups than attack-weighting for Baxcalibur, so a high-def catch is the safe keep when you are not chasing a specific breakpoint."
-source = "gopvpsim deep dive 2026-06-20"
-
-# ─────────────────────────────────────────────────────────────────────
-# Ultra League spreads (sim-derived; DragapultSim covered GL only)
-# ─────────────────────────────────────────────────────────────────────
-
 [Baxcalibur.Ultra.spreads."Bulk / R1 (1/15/15)"]
 ivs = [[1, 15, 15]]
 description = "Rank-1 stat product (173.7 atk, 124.7 def, 166 hp). Highest total-wins UL spread; bulk beats attack-weighting here too (max-atk 15/0/0 loses ~15 matchups vs this)."
 source = "gopvpsim deep dive 2026-06-20"
-
-[Baxcalibur.Ultra.spreads."General Bulk (def >= 120)"]
-attack = 0
-defense = 120.0
-stamina = 0
-description = "Practical UL catch floor: prioritize defense/HP. Same bulk-over-attack finding as GL."
-source = "gopvpsim deep dive 2026-06-20"
-
-# ─────────────────────────────────────────────────────────────────────
-# Master League spreads (no CP cap -> rank-1 stat product is the hundo;
-# Baxcalibur's best league, PvPoke overall rank ~67)
-# ─────────────────────────────────────────────────────────────────────
 
 [Baxcalibur.Master.spreads."Hundo (15/15/15)"]
 ivs = [[15, 15, 15]]

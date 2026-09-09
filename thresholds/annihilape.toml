@@ -17,91 +17,6 @@ sources = "Mirror slayer iteration (2026-04-07) + community Lurgan Ape + Discord
 # tier-coloring scatter plots keep working)
 # ─────────────────────────────────────────────────────────────────────
 
-[Annihilape.Great.spreads."High Atk (mirror)"]
-attack = 125.0
-defense = 103.0
-stamina = 0
-description = "High-attack mirror cutoff (legacy)."
-
-[Annihilape.Great.spreads.Balanced]
-attack = 122.0
-defense = 106.0
-stamina = 136
-description = "Balanced atk/bulk cutoff (legacy)."
-
-[Annihilape.Great.spreads."High Bulk"]
-attack = 0
-defense = 107.0
-stamina = 138
-description = "High-bulk cutoff (legacy)."
-
-# ─────────────────────────────────────────────────────────────────────
-# Spreads — IV-list form
-# ─────────────────────────────────────────────────────────────────────
-
-[Annihilape.Great.spreads.lurgan_ape]
-description = """
-Community 'Lurgan Ape' spread popularized by lurganrocket. Per Discord
-expert testimony (2026-04-08), the spread is defined by two cutoffs:
-  attack >= 127.2  (minimum atk for the Lickitung damage breakpoint)
-  defense >= 102.9 (def floor; which specific bulkpoint this preserves
-                    is not documented — likely a mirror or Lickitung
-                    bulkpoint, recoverable via Level 3 bulkpoint discovery
-                    once we add the bulkpoint anchor kind)
-The 27 IVs below are the enumeration of those cutoffs at GL CP cap. The
-spread predates the Counter nerf, Rage Fist addition, and Low Kick buff —
-treat as a historical anchor, not a current target. Current expert advice
-is to go higher attack than this baseline for CMP wins and BP security
-against the mirror and Lickitung.
-"""
-source = "Community spread (lurganrocket); Discord expert testimony 2026-04-08 (atk 127.2, def 102.9)"
-ivs = [
-    [11, 10, 2],
-    [15, 12, 5],
-    [11, 11, 0],
-    [15, 13, 4],
-    [11,  9, 3],
-    [11,  9, 2],
-    [15, 14, 3],
-    [15, 14, 2],
-    [11, 10, 1],
-    [11, 10, 0],
-    [12,  9, 1],
-    [12,  9, 0],
-    [15, 15, 1],
-    [15, 15, 0],
-    [15, 12, 4],
-    [15, 13, 3],
-    [15, 13, 2],
-    [11,  9, 1],
-    [11,  9, 0],
-    [15, 14, 1],
-    [15, 14, 0],
-    [15, 12, 3],
-    [15, 12, 2],
-    [15, 13, 1],
-    [15, 13, 0],
-    [15, 12, 1],
-    [15, 12, 0],
-]
-
-# Stat-cutoff form of the same Lurgan Ape spread. Per an HSH Discord member
-# (Discord, 2026-04-08) the spread is canonically defined by the two
-# cutoffs below; the lurgan_ape IV-list above is the enumeration of
-# those cutoffs at GL CP cap. Either form can be referenced from anchors;
-# use this form when you want a "is this IV a Lurgan Ape?" membership
-# check that's robust to game changes (e.g. level cap shifts).
-[Annihilape.Great.spreads.lurgan_ape_stat]
-description = "Stat-cutoff form of the Lurgan Ape spread (atk >= 127.2, def >= 102.9). Equivalent to the lurgan_ape IV list at GL CP cap, generative form."
-source = "Discord expert testimony 2026-04-08"
-attack = 127.2
-defense = 102.9
-stamina = 0
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — CMP
-# ─────────────────────────────────────────────────────────────────────
-
 [Annihilape.Great.anchors.cmp_vs_lurgan]
 kind = "cmp"
 spread = "lurgan_ape"
@@ -177,3 +92,63 @@ description = "Discover and tag every mirror-Annihilape bulkpoint in the survivo
 kind = "bulkpoint"
 opponent = "Lickitung"
 description = "Discover and tag every Lickitung bulkpoint in the survivor def range."
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Annihilape.Great.spreads.lurgan_ape]
+description = """
+Community 'Lurgan Ape' spread popularized by lurganrocket. Per Discord
+expert testimony (2026-04-08), the spread is defined by two cutoffs:
+  attack >= 127.2  (minimum atk for the Lickitung damage breakpoint)
+  defense >= 102.9 (def floor; which specific bulkpoint this preserves
+                    is not documented — likely a mirror or Lickitung
+                    bulkpoint, recoverable via Level 3 bulkpoint discovery
+                    once we add the bulkpoint anchor kind)
+The 27 IVs below are the enumeration of those cutoffs at GL CP cap. The
+spread predates the Counter nerf, Rage Fist addition, and Low Kick buff —
+treat as a historical anchor, not a current target. Current expert advice
+is to go higher attack than this baseline for CMP wins and BP security
+against the mirror and Lickitung.
+"""
+source = "Community spread (lurganrocket); Discord expert testimony 2026-04-08 (atk 127.2, def 102.9)"
+ivs = [
+    [11, 10, 2],
+    [15, 12, 5],
+    [11, 11, 0],
+    [15, 13, 4],
+    [11,  9, 3],
+    [11,  9, 2],
+    [15, 14, 3],
+    [15, 14, 2],
+    [11, 10, 1],
+    [11, 10, 0],
+    [12,  9, 1],
+    [12,  9, 0],
+    [15, 15, 1],
+    [15, 15, 0],
+    [15, 12, 4],
+    [15, 13, 3],
+    [15, 13, 2],
+    [11,  9, 1],
+    [11,  9, 0],
+    [15, 14, 1],
+    [15, 14, 0],
+    [15, 12, 3],
+    [15, 12, 2],
+    [15, 13, 1],
+    [15, 13, 0],
+    [15, 12, 1],
+    [15, 12, 0],
+]
+
+# Stat-cutoff form of the same Lurgan Ape spread. Per an HSH Discord member
+# (Discord, 2026-04-08) the spread is canonically defined by the two
+# cutoffs below; the lurgan_ape IV-list above is the enumeration of
+# those cutoffs at GL CP cap. Either form can be referenced from anchors;
+# use this form when you want a "is this IV a Lurgan Ape?" membership
+# check that's robust to game changes (e.g. level cap shifts).

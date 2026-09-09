@@ -51,52 +51,6 @@ unreachable 2026-06-12.
 # distinct from sim-derived tiers in scatter output.
 # ─────────────────────────────────────────────────────────────────────
 
-[Medicham.Great.spreads."Swag Good"]
-attack = 105.38
-defense = 138.6
-stamina = 140
-description = "SwagTips 'Good' tier: 105.38 atk, 138.60 def + 140 hp. Baseline keeper cutoff from the SwagTips-era Medicham writeup."
-source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
-
-[Medicham.Great.spreads."Swag Prem"]
-attack = 105.87
-defense = 138.64
-stamina = 140
-description = "SwagTips 'Prem' tier: 105.87 atk, 138.64 def + 140 hp. Premium cutoff — slightly higher atk and def floors than 'Good' at the same 140 hp."
-source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
-
-[Medicham.Great.spreads."Swag BB"]
-attack = 105.38
-defense = 140.3
-stamina = 142
-description = "SwagTips 'BB' (Best of Both worlds, bulk side) tier: 105.38 atk, 140.30 def + 142 hp. The max-bulk tier of the writeup — same atk floor as 'Good' with the def/hp floors pushed up."
-source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
-
-[Medicham.Great.spreads."Swag Mirror"]
-attack = 108.0
-defense = 137.64
-stamina = 0
-description = "SwagTips 'Mirror' tier: 108.00 atk, 137.64 def (no hp floor). Atk-weighted build calibrated for the Medicham mirror — see the mirror Level-2 anchors below which reproduce both numbers."
-source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Spreads — IV-list form (RyanSwag methodology-video builds)
-# ─────────────────────────────────────────────────────────────────────
-
-[Medicham.Great.spreads.ryanswag_preferred]
-description = "RyanSwag's preferred 'Best of Both Worlds' Medicham 7/15/14 at 106.92 atk (video-confirmed 2026-04-16). Same IV as shared.Great.spreads.medicham_atk_weighted; duplicated per-species so the CMP anchor below resolves locally. Note PvPoke's cp1500 default for Medicham is already 7/15/14."
-source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
-ivs = [[7, 15, 14]]
-
-[Medicham.Great.spreads.rank1_nbb]
-description = "Rank-1 no-best-buddy Medicham 5/15/15 at 105.88 atk + 142 hp (video-confirmed 2026-04-16; the transcript's '16 15 14' was '5 15 15' mis-transcribed). The baseline most opponents sim against."
-source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
-ivs = [[5, 15, 15]]
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — CMP (atk-side, expert encoding)
-# ─────────────────────────────────────────────────────────────────────
-
 [Medicham.Great.anchors.cmp_vs_ryanswag_preferred]
 kind = "cmp"
 spread = "ryanswag_preferred"
@@ -254,3 +208,24 @@ kind = "bulkpoint"
 opponent = "Guzzlord"
 description = "Discover and tag every Guzzlord bulkpoint in the survivor def range. Resisted Snarl chip plus Crabhammer nuke tiers against a stat-stick Medicham should beat on type."
 source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Medicham.Great.spreads.ryanswag_preferred]
+description = "RyanSwag's preferred 'Best of Both Worlds' Medicham 7/15/14 at 106.92 atk (video-confirmed 2026-04-16). Same IV as shared.Great.spreads.medicham_atk_weighted; duplicated per-species so the CMP anchor below resolves locally. Note PvPoke's cp1500 default for Medicham is already 7/15/14."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
+ivs = [[7, 15, 14]]
+
+[Medicham.Great.spreads.rank1_nbb]
+description = "Rank-1 no-best-buddy Medicham 5/15/15 at 105.88 atk + 142 hp (video-confirmed 2026-04-16; the transcript's '16 15 14' was '5 15 15' mis-transcribed). The baseline most opponents sim against."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
+ivs = [[5, 15, 15]]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP (atk-side, expert encoding)
+# ─────────────────────────────────────────────────────────────────────

@@ -37,35 +37,6 @@ notes = "GL meta rank 2 (2026-06). RyanSwag's bottom line: bulk is the name of t
 # style as tinkaton.toml's "GH Great"/"GH Good")
 # ─────────────────────────────────────────────────────────────────────
 
-[Altaria.Great.spreads."Trev Slayer"]
-attack = 102.97
-defense = 149.02
-stamina = 139
-description = "RyanSwag's 'Trevenant Slayer' tier: 102.97 atk, 149.02 def + 139 hp. Atk BP for Trevenant 1-2/2-2 plus def bulkpoint for Trevenant 1-1/0-1, both calibrated vs max-def Trevenant, while keeping the 2-2 mirror-tie HP. His general-safety pick; sort by def."
-source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Trev'"
-
-[Altaria.Great.spreads."Bulk + Trev"]
-attack = 101.95
-defense = 151.63
-stamina = 139
-description = "RyanSwag's 'Bulk + Trevenant maybe' tier: 101.95 atk, 151.63 def + 139 hp. For when you don't want to forgo the bulk life and don't expect high-def Trevenant; the def cutoff also covers the Water Gun Lanturn checks. Tie-breakers: + 140 hp generally better, and 153.95 def more useful than + 141 hp."
-source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Bulk+Trev'"
-
-[Altaria.Great.spreads."Bulk Focus"]
-attack = 0
-defense = 153.95
-stamina = 139
-description = "RyanSwag's pure-bulk tier: 153.95 def + 139 hp. 139 hp is the golden ticket that ties the 2-2 mirror (and Walrein 2-1); the 139-141 hp checks (Vigoroth 2-2, Venusaur 1-2, Umbreon 1-1) all likely require this def. His verdict: aside from ranks 1, 2 & 7, probably just go for the atk-weighted builds."
-source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Bulk'"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — damage breakpoints (atk-side), current-meta close matchups
-# (opponents from gl_top50_plus_cs.txt 2026-06-10)
-# ─────────────────────────────────────────────────────────────────────
-
-# Jumpluff: in the current pool AND a RyanSwag calibration point. Grass/
-# Flying with Fairy Wind pressure; the fast-move chip war is tight both
-# ways, so single damage steps decide the 1-1 and 0-1.
 [Altaria.Great.anchors.jumpluff_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Jumpluff"

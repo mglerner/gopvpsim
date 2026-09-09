@@ -1,0 +1,71 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for corviknight, lifted verbatim out of
+# thresholds/corviknight.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Corviknight.Great.spreads."HSH Basic"]
+attack = 0
+defense = 127.59
+stamina = 0
+description = "Baseline tier: 127.59 def floor; the entry-level def check from the HomeSliceHenry writeup."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.spreads."HSH Atk"]
+attack = 111.47
+defense = 127.59
+stamina = 0
+description = "Attack-weighted tier: 111.47 atk on top of the 127.59 def floor; trades rank-1 bulk for breakpoint/CMP pressure."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.spreads."HSH Bulk"]
+attack = 100
+defense = 132.10
+stamina = 149
+description = "Premium bulk tier: 100.00 atk minimum with 132.10 def + 149 hp."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), expert Level-2 floors
+#
+# The HomeSliceHenry def floors arrived without their (opponent, move,
+# tier) calibrations. Following the annihilape.toml lurgan-floor
+# precedent, each is encoded as a Level-2 anchor against the mirror,
+# with the Level-3 discover-all anchors below used to identify which
+# opponent/move tier each floor actually preserves — promote to
+# Level 1 once identified.
+# ─────────────────────────────────────────────────────────────────────

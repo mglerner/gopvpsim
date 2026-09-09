@@ -33,35 +33,6 @@ Drapion / Shadow Politoed).
 # GoBattleKit DEFAULT_THRESHOLDS keys exactly.
 # ─────────────────────────────────────────────────────────────────────
 
-[Spidops.Great.spreads.Atk]
-attack = 113.03
-defense = 138.88
-stamina = 0
-description = "Slight attack-weight tier: 113.03 atk + 138.88 def, then as much hp as possible (1/7/1 cited as a strong spread). The atk cutoff is the rank #2 Forretress breakpoint."
-source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Atk'"
-
-[Spidops.Great.spreads.Bulk]
-attack = 109.82
-defense = 138.88
-stamina = 0
-description = "Bulk-focus tier (minimum def): 109.82 atk + 138.88 def, then as much hp as possible. The atk cutoff is the rank #1 Cradily breakpoint; the def cutoff covers default Tinkaton and default Shadow Talonflame."
-source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk'"
-
-[Spidops.Great.spreads."Bulk+"]
-attack = 109.82
-defense = 140.67
-stamina = 0
-description = "Bulk-focus tier (preferred def): 109.82 atk + 140.67 def, then as much hp as possible (2/15/15 cited). The def cutoff adds the rank #1 Altaria no-bait 1s flip."
-source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk+'"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — damage breakpoints (atk-side), Level 3 discover-all.
-#
-# Each anchor's description carries the HSH calibration atk so the
-# resolved sub-anchor distribution can be checked against the writeup.
-# ─────────────────────────────────────────────────────────────────────
-
-# The Bulk-tier atk calibration point.
 [Spidops.Great.anchors.cradily_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Cradily"

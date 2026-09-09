@@ -34,32 +34,6 @@ sources = "JRE47 CD Ninetales + Alolan Ninetales article (pokemongohub.net, 2026
 # Spreads — JRE47's published GL stat lines (Kantonian, non-shadow)
 # ─────────────────────────────────────────────────────────────────────
 
-# JRE47's headline GL stat line for Kantonian Ninetales (first number of
-# each Kantonian/Alolan pair in the article's stats table).
-[Ninetales.Great.spreads.jre47_stat_line]
-attack = 114.0
-defense = 136.0
-stamina = 126
-description = "JRE47 headline GL stat line for Kantonian Ninetales: 114.00 atk, 136.00 def + 126 hp."
-source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
-
-# JRE47's highest-stat-product spread for Kantonian Ninetales:
-# 0-15-15, 1495 CP, Level 25.
-[Ninetales.Great.spreads.jre47_hsp]
-ivs = [[0, 15, 15]]
-description = "JRE47 highest-stat-product Kantonian Ninetales, 0/15/15 at 1495 CP (Level 25): 113.00 atk, 137.00 def + 128 hp."
-source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side, Level 3 discover-all)
-#
-# Opponents picked from gl_top50_plus_cs.txt where the type matchup
-# makes a def/hp check plausible and the matchup is close per JRE47's
-# 1v1-shielding win/loss lists.
-# ─────────────────────────────────────────────────────────────────────
-
-# The mirror. Fire resists Fire, so mirror chip damage sits in tiny
-# integer tiers where a single bulkpoint can decide the race.
 [Ninetales.Great.anchors.mirror_blkp_any]
 kind = "bulkpoint"
 opponent = "Ninetales"
@@ -196,3 +170,26 @@ kind = "damage_breakpoint"
 opponent = "Annihilape"
 description = "Discover all Annihilape damage breakpoints in the survivor atk range."
 source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Ninetales.Great.spreads.jre47_hsp]
+ivs = [[0, 15, 15]]
+description = "JRE47 highest-stat-product Kantonian Ninetales, 0/15/15 at 1495 CP (Level 25): 113.00 atk, 137.00 def + 128 hp."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents picked from gl_top50_plus_cs.txt where the type matchup
+# makes a def/hp check plausible and the matchup is close per JRE47's
+# 1v1-shielding win/loss lists.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Fire resists Fire, so mirror chip damage sits in tiny
+# integer tiers where a single bulkpoint can decide the race.

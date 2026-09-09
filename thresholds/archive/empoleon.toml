@@ -1,0 +1,62 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for empoleon, lifted verbatim out of
+# thresholds/empoleon.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+# JRE47's GL stats table lists the highest-stat-product build explicitly:
+# IVs 0/13/15 at 1500 CP, Level 19.5.
+[Empoleon.Great.spreads.jre_gl_listed]
+description = "Bulk tier from JRE47's listed GL stats column: 125.00 atk, 117.00 def + 122 hp. Cutoff keeps the listed def/hp floor; atk unconstrained."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+attack = 0
+defense = 117.0
+stamina = 122
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents chosen from gl_top50_plus_cs.txt where the type matchup
+# makes a def/hp check plausible and the matchup is close. The JRE47
+# article's base-vs-shadow swap list is the main close-matchup signal:
+# matchups the base wins but the lower-bulk shadow loses (Altaria,
+# Feraligatr, Forretress, Diggersby) are exactly the ones where
+# Empoleon's defense tier decides the outcome.
+# ─────────────────────────────────────────────────────────────────────
+
+# Altaria: base Empoleon wins "even with Flamethrower" per JRE47, but
+# Shadow Empoleon loses — the canonical bulk-decided matchup.

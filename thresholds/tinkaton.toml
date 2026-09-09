@@ -12,37 +12,6 @@ sources = "HomeSliceHenry's Discord #iv-tech; legacy JSON thresholds"
 # Spreads — stat-cutoff tiers from an HSH Discord member's summary
 # ─────────────────────────────────────────────────────────────────────
 
-[Tinkaton.Great.spreads."GH Great"]
-attack = 0
-defense = 143.03
-stamina = 138
-description = "Premium bulk: Azu bulkpoint + Medicham survival + all lower def checks."
-source = "HomeSliceHenry's Discord"
-
-[Tinkaton.Great.spreads."GH Good"]
-attack = 0
-defense = 141.66
-stamina = 138
-description = "Medicham Dynamic Punch survival (1s no bait) + all lower def checks."
-source = "HomeSliceHenry's Discord"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — CMP ties (atk-side)
-#
-# An HSH Discord member notes CMP thresholds at 105.58 (Corviknight), 105.79
-# (Lickilicky, flips 2s no-bait), 105.90 (Medicham, Jellicent). These
-# require IV-list spreads to encode as CMP anchors in our schema;
-# deferred until CMP anchors support single-opponent shorthand (see
-# TODO "Schema simplification"). The BP/blkp anchors below cover the
-# matchup-flipping thresholds.
-# ─────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — damage breakpoints (atk-side)
-# ─────────────────────────────────────────────────────────────────────
-
-# Level 3: discover all Jellicent BPs. An HSH Discord member notes 106.20 atk
-# beats Jellicent in 1-0 regardless of bait.
 [Tinkaton.Great.anchors.jellicent_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Jellicent"

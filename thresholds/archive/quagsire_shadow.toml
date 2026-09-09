@@ -1,0 +1,61 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for quagsire_shadow, lifted verbatim out of
+# thresholds/quagsire_shadow.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+["Quagsire (Shadow)".Great.spreads."High Bulk"]
+attack = 0
+defense = 112.68
+stamina = 163
+description = "RyanSwag 'Shadow, High Bulk' tier: 112.68 def + 163 hp recommended minimum. Enables the Sableye 0-0 (Mud Bomb) & 1-1 (Aqua Tail), potentiates the Gligar 2-1, Umbreon 1-0, and Powder Snow Shadow A-Ninetales 2-2; 164 hp enables the Vigoroth 1-1."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.spreads."Slight Atk Weight"]
+attack = 110.0
+defense = 110.26
+stamina = 163
+description = "RyanSwag 'Shadow, Slight Atk Weight' tier: 110.00 atk with 110.26 def + 163 hp. The next-best bulk option below High Bulk; 110.26 def is the soft minimum that avoids Carbink's Rock Throw breakpoint and holds the Shadow A-Sandslash 1-2 and Emolga 1-2 (Mud Bomb). 110.00 atk adds Medicham 2-1 (Mud Bomb), Shadow Venusaur 1-0, Noctowl 1-1, and Cofagrigus CMP potential."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.spreads."Carbink Slayer"]
+attack = 111.89
+defense = 108.0
+stamina = 162
+description = "RyanSwag 'Carbink Slayer' tier: 111.89 atk with 108.00 def + 162 hp. Takes down rank-1 Carbink in the 1-2 (either charge move) and the 0-2 (Mud Bomb); 112.22 atk covers Best Buddy Carbink. Bulk product >= 17748 is safer vs atk-weighted Carbink; going over 109.00 def may maintain the Shadow Venusaur 1-0, and over 110.26 def may enable the Emolga 1-2 (Mud Bomb)."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+

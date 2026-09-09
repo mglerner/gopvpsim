@@ -1,0 +1,72 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for medicham, lifted verbatim out of
+# thresholds/medicham.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Medicham.Great.spreads."Swag Good"]
+attack = 105.38
+defense = 138.6
+stamina = 140
+description = "SwagTips 'Good' tier: 105.38 atk, 138.60 def + 140 hp. Baseline keeper cutoff from the SwagTips-era Medicham writeup."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag Prem"]
+attack = 105.87
+defense = 138.64
+stamina = 140
+description = "SwagTips 'Prem' tier: 105.87 atk, 138.64 def + 140 hp. Premium cutoff — slightly higher atk and def floors than 'Good' at the same 140 hp."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag BB"]
+attack = 105.38
+defense = 140.3
+stamina = 142
+description = "SwagTips 'BB' (Best of Both worlds, bulk side) tier: 105.38 atk, 140.30 def + 142 hp. The max-bulk tier of the writeup — same atk floor as 'Good' with the def/hp floors pushed up."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag Mirror"]
+attack = 108.0
+defense = 137.64
+stamina = 0
+description = "SwagTips 'Mirror' tier: 108.00 atk, 137.64 def (no hp floor). Atk-weighted build calibrated for the Medicham mirror — see the mirror Level-2 anchors below which reproduce both numbers."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — IV-list form (RyanSwag methodology-video builds)
+# ─────────────────────────────────────────────────────────────────────
+

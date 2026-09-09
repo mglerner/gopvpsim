@@ -1,0 +1,75 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for stunfisk_galarian, lifted verbatim out of
+# thresholds/stunfisk_galarian.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+["Stunfisk (Galarian)".Great.spreads."High Bulk"]
+attack = 0
+defense = 124.75
+stamina = 174
+description = "RyanSwag 'High Bulk' tier: 124.75 def + 174 hp. Ranks 1 (0/12/15), 2 (0/13/14), 3 (0/15/11) stand above the rest aside from CMP; 125.90 def is the safer minimum for the mirror, and 174 hp gets iffy the further you drop below 127.00 def + 174 hp (below that you may need 175 hp)."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Pure Mirror Slayer"]
+attack = 101.79
+defense = 127.38
+stamina = 0
+description = "RyanSwag 'Pure Mirror Slayer': 101.79 atk with at least 127.38 def (the article's table line prints 127.34 def; body text asks for 127.38 def, ideally 127.88 def for better mirror coverage). Preferred over the Bulk Mirror Slayer."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Bulk Mirror Slayer"]
+attack = 101.79
+defense = 124.75
+stamina = 172
+description = "RyanSwag 'Bulk Mirror Slayer': 101.79 atk with 124.75 def + 172 hp — just enough atk and def for mirror slaying, plus more HP. The article calls this exact combo a 'goldilocks zone' (only 4 IV spreads manage it) but generally too inconsistent to pan out."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Minimum Bulk"]
+attack = 0
+defense = 124.75
+stamina = 172
+description = "RyanSwag 'Minimum bulk': 124.75 def + 172 hp — High Bulk with HP dropped to the floor (HP is the dump stat when thrifting). May still maintain the Azumarill and Altaria matchups; 125.90 def remains the safer mirror minimum."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all) vs the current
+# meta pool. Mirror first, then the close matchups where def/hp tiers
+# plausibly swing the result.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror — carries the article's whole def ladder.
