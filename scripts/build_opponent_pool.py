@@ -303,9 +303,10 @@ ITSAXN_META_PLUS = {
     'Charjabug':           'meta, 11:53; GL #60',
     'Forretress':          'meta, 12:49; GL #55',
     'Spidops':             'meta, 13:20; GL #57',
-    'Morpeko (Hangry)':    'meta, 14:04 (he says "Full Belly"; PvPoke ranks '
-                           'the Hangry form, and it form-changes in battle '
-                           'either way); GL #88',
+    'Morpeko (Full Belly)': 'meta, 14:04; GL #88. PvPoke DISPLAYS this as '
+                           '"Morpeko (Hangry)" but ranks it under sid '
+                           'morpeko_full_belly, and only the sid-derived name '
+                           'resolves in a dive -- see resolvable_name().',
     'Rillaboom':           'MICHAEL, not ItsAxn: he puts it in STRONG SPICE '
                            '(16:14, after the 15:08 meta boundary). Michael '
                            'asked for it explicitly on 2026-09-09. Kept on '
@@ -320,6 +321,26 @@ def apply_itsaxn(names):
         if species not in have:
             out.append(species)
     return out
+
+
+def resolvable_name(row):
+    """The pool name for a rankings row that the DIVE can actually resolve.
+
+    PvPoke ranks some form-change species under the BASE speciesId while
+    displaying the CHANGED form's name: `Mimikyu (Busted)` is the display name
+    for sid `mimikyu`, and `Morpeko (Hangry)` for sid `morpeko_full_belly`.
+    Writing the rankings' speciesName into a pool therefore produces an entry
+    the dive cannot look up -- `get_default_moveset` maps the name back through
+    the GAMEMASTER (giving `mimikyu_busted`), which is not a ranked id, so the
+    opponent is dropped with a warning.
+
+    Found 2026-09-09: a pool regeneration wrote display names and silently cost
+    every GL dive its Mimikyu and Morpeko columns -- Mimikyu being ItsAxn's #1
+    meta-defining pick. Always route a rankings row through here.
+    """
+    sid = row.get('speciesId')
+    name = _id_to_name_map().get(sid) if sid else None
+    return name or row['speciesName']
 
 
 def apply_inclusions(pool_key, names):
@@ -341,7 +362,7 @@ def recipe_gl_top50_plus_cs():
     the opponent pool we use for "real" GL deep dives where you want
     comprehensive coverage.
     """
-    top50 = [r['speciesName'] for r in load_rankings('great')[:50]]
+    top50 = [resolvable_name(r) for r in load_rankings('great')[:50]]
     cs = _cs_names()
     seen, union = set(), []
     for n in top50 + cs:
@@ -368,8 +389,8 @@ def recipe_gl_top30_plus_cs_top100():
     prep targets, not near-duplicates.
     """
     rankings = load_rankings('great')
-    rank = {r['speciesName']: i + 1 for i, r in enumerate(rankings)}
-    top30 = [r['speciesName'] for r in rankings[:30]]
+    rank = {resolvable_name(r): i + 1 for i, r in enumerate(rankings)}
+    top30 = [resolvable_name(r) for r in rankings[:30]]
     cs_filt = [n for n in _cs_names() if rank.get(n, 10**9) <= 100]
     seen, union = set(), []
     for n in top30 + cs_filt:
