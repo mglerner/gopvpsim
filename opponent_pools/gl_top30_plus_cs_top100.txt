@@ -1,4 +1,4 @@
-# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 59 unique species.
+# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 58 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -56,8 +56,7 @@ Talonflame
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)
-Lickilicky
-Toxapex
 Forretress
 Spidops
-Rillaboom
+Stunfisk
+Toxapex

@@ -133,9 +133,15 @@ def _cs_names():
 
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
+        'Rillaboom': (
+            'Michael, 2026-09-09, asked for explicitly. NOT an ItsAxn pick -- '
+            'he puts it in STRONG SPICE, not meta-or-better. GL #70, so it '
+            'misses the top-50 cut and needs this entry.'),
         'Aegislash (Shield)': (
-            'Michael, 2026-09-09. ItsAxn rates it top-meta/meta and it sits at '
-            'GL #72, outside the top-50 cut. It used to arrive via PvPoke\'s '
+            'Michael, 2026-09-09. NB ItsAxn rates it LOW ("we have Aegislash '
+            'down pretty low", 29:12) -- this entry is Michael\'s call, not his. '
+            'It sits at GL #72, outside the top-50 cut, and used to arrive via '
+            'PvPoke\'s '
             'championshipseries group; PvPoke has since DROPPED it from that '
             'group, so without this entry it leaves the pool silently. NB the '
             'rankings display it as "Aegislash (Blade)" under speciesId '
@@ -261,70 +267,54 @@ def apply_exclusions(pool_key, names):
 # where PvPoke's ranker puts it -- see AUGMENTATION SOURCES above for why an
 # expert's read catches things a 1v1 score cannot ("sim heroes", 3v3 play).
 #
-# TRANSCRIBED FROM THE TRANSCRIPT, then CROSS-CHECKED AGAINST THE IMAGE --
-# which is the whole point of the procedure in AUGMENTATION SOURCES, and it
-# caught a real error. First pass read "And rounding out our top meta" (15:28)
-# as closing a *top meta* tier with a separate *meta* tier running to ~21:59.
-# Wrong: it closes the ENTIRE meta block. Florges at 15:31 opens Strong Spice.
+# SOURCED FROM THE IMAGE, read by Michael 2026-09-09. The transcript is good
+# for NAMES and useless for TIERS, which took two wrong attempts to learn:
 #
-# The image settles it by COUNTS, which are far more reliable to read off
-# sprites than names are. Taking first-mention order and dropping three
-# passing references (Floette, Electrike, Wigglytuff) plus two duplicate
-# artifacts (Sableye (Mega) -- "like a Mega Sableye on this list, but if..."
-# is a wish, not a placement -- and plain Corsola), the order splits
-# 5 / 6 / 19, matching the image's three top rows exactly:
+#   1. First pass read "And rounding out our top meta" (15:28) as closing a
+#      *top meta* tier with a separate *meta* tier after it. It closes the
+#      whole meta block.
+#   2. Second pass mapped first-mention ORDER onto the image's row counts and
+#      appeared to fit 5/6/19 exactly. It was still wrong, because he walks
+#      the MOVE CHANGES rather than the chart: a species gets named early as a
+#      comparison and placed much later. Aegislash is the proof -- first
+#      mentioned 14:18, actually placed at 29:12 ("We have Aegislash down
+#      pretty low"). And he names only ~90 of ~250 charted species, so
+#      transcript position cannot map to tier membership at all.
 #
-#   Meta Defining  5   Mimikyu, Cramorant, Ninetales (Alolan), Melmetal, Sableye
-#   Top Meta       6   Tinkaton, Thievul, Lickilicky, Corsola (Galarian),
-#                      Electrode (Hisuian), Deoxys (Defense)
-#   Meta          19   Corviknight (07:31) ... Furret (15:08)
+# The casualty was Lickilicky: 12 mentions, first at 05:19, which the order
+# heuristic read as top meta. Almost all of those are cross-references from
+# other species' matchup talk. It is NOT in meta-or-better; it is GL #155.
 #
-# The first pass wrongly added five STRONG SPICE species on the bad boundary:
-# Bombirdier, Dunsparce, Volbeat, Wartortle (all removed) and Rillaboom (kept,
-# but on Michael's explicit request rather than on this list's authority).
+# Michael's tiers, from the image (meta-or-better = 32 species):
 #
-# Michael reads Aegislash as Strong Spice; this mapping puts it 28th of the 30,
-# i.e. in the last handful of the Meta row. The two readings differ by a couple
-# of sprites at the boundary and his direct read of the image wins -- but it
-# changes nothing here, because Aegislash is in CURATED_EXCLUSIONS regardless.
-# Mega Malamar is in his Meta row and is NOT added: it has no entry in the GL
-# rankings at all (megas rank in their own cup), so it cannot go in a GL pool.
+#   Meta Defining  Mimikyu, Cramorant, Ninetales (Alolan), Melmetal, Sableye
+#   Top Meta       Tinkaton, Thievul, Corsola (Galarian), Electrode (Hisuian),
+#                  Deoxys (Defense), Corviknight
+#   Meta           Toxapex, Stunfisk (Unova), Mantine, Fearow, Kingdra,
+#                  Quagsire (+Shadow), Empoleon, Altaria, Malamar, Vigoroth,
+#                  Hippowdon (+Shadow), Charjabug, Annihilape, Forretress,
+#                  Spidops, Morpeko, Jellicent, Furret, Florges
 #
-# JUDGMENT CALLS, so they can be revisited:
-#  * EXCLUDED as passing references rather than tier placements -- each is
-#    named inside another mon's sentence: Floette ("Carbink or Floette that
-#    otherwise were..."), Electrike ("want to see Electrike"), Wigglytuff
-#    ("Just like Wigglytuff was").
-#  * EXCLUDED by Michael (2026-09-09) as sitting on the meta/spice boundary
-#    at 20:47-21:49, where each is discussed only as a move-buff beneficiary
-#    rather than placed: Doublade (#71), Maushold (#200), Oinkologne (#340),
-#    Nidoqueen (#235), Persian (#139), Audino (#376), Mega Malamar.
-#  * NOT LISTED HERE because they already clear the top-50 cut on merit
-#    post-rebalance: Mimikyu (Busted) #18, Deoxys (Defense) #28, Corsola
-#    (Galarian) #3, Sableye #48, Blastoise #50, Dondozo #39. He rates all of
-#    them meta-or-better and the ranker now agrees.
-#  * Aegislash (Blade) is in his TOP META at #72 and needs no entry here: it
-#    clears via the championshipseries group. It was briefly excluded on
-#    2026-09-09 over an oracle divergence; that exclusion was WITHDRAWN the
-#    same day (see CURATED_EXCLUSIONS).
+# Only the 8 that miss the top-50 cut need an entry below; the other 24 clear
+# it on merit. Rillaboom is NOT here -- he puts it in Strong Spice, and it is
+# in the pool as a CURATED_INCLUSION on Michael's own authority.
 
 ITSAXN_META_PLUS = {
-    'Ninetales (Alolan)':  'META DEFINING (his #3), 01:47, x16; GL #63. The '
-                           'miss that mattered: a top-5 pick sitting outside '
-                           'the top-50 cut, so we had never simmed against it.',
-    'Lickilicky':          'top meta, 05:19, x12; GL #155',
-    'Toxapex':             'meta, 08:36; GL #126',
-    'Charjabug':           'meta, 11:53; GL #60',
-    'Forretress':          'meta, 12:49; GL #55',
-    'Spidops':             'meta, 13:20; GL #57',
-    'Morpeko (Full Belly)': 'meta, 14:04; GL #88. PvPoke DISPLAYS this as '
-                           '"Morpeko (Hangry)" but ranks it under sid '
-                           'morpeko_full_belly, and only the sid-derived name '
-                           'resolves in a dive -- see resolvable_name().',
-    'Rillaboom':           'MICHAEL, not ItsAxn: he puts it in STRONG SPICE '
-                           '(16:14, after the 15:08 meta boundary). Michael '
-                           'asked for it explicitly on 2026-09-09. Kept on '
-                           'his authority, not the tier list\'s; GL #70.',
+    # META DEFINING
+    'Ninetales (Alolan)':   'META DEFINING (his #3); GL #63.',
+    # META
+    'Hippowdon (Shadow)':   'meta; GL #53 (he lists Hippowdon "including shadow").',
+    'Forretress':           'meta; GL #55.',
+    'Spidops':              'meta; GL #57.',
+    'Charjabug':            'meta; GL #60.',
+    'Morpeko (Full Belly)': 'meta; GL #88. PvPoke DISPLAYS this as "Morpeko '
+                            '(Hangry)" but ranks it under sid '
+                            'morpeko_full_belly, and only the sid-derived name '
+                            'resolves in a dive -- see resolvable_name().',
+    'Stunfisk':             'meta; GL #113. The UNOVA form, not Galarian (#99). '
+                            'Was previously reaching the pool only via the '
+                            'championshipseries group.',
+    'Toxapex':              'meta; GL #126.',
 }
 
 
