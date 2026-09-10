@@ -1,10 +1,11 @@
 {
  "_meta": {
-  "captured": "2026-09-02",
+  "captured": "2026-09-09",
   "harness": "scripts/pvpoke_trace.js",
   "levels_pinned_because": "PvPoke mega GL/UL defaults sit far below the level cap (Mega Skarmory GL is level 14.5), so an unpinned level compares different Pokemon.",
   "purpose": "Full 9-shield-cell PvPoke ground truth for three-charged-move mega battles. Two ROTATE DISCRIMINATORS fail loudly if the activeChargedMoves shuffle regresses to a swap primitive (raichu_mega_y 2-2: 205 real vs 662 swap; victreebel_mega 1-1: 163 real vs 361 swap). Two 2-MOVE CONTROLS are byte-identical builds minus the *_PLUS move and must be asserted as a PAIR with their 3-move twin -- if the pair converges, slot 2 is being dropped somewhere.",
-  "pvpoke_head": "56bc6a8b1"
+  "pvpoke_head": "56bc6a8b1",
+  "recaptured_because": "PvPoke merged the new turn system to master and shipped the Twilight Trails move rebalance; the 2026-09-02 capture is pre-both."
  },
  "matchups": {
   "dragonite_mega_vs_altaria": {
@@ -58,18 +59,19 @@
       "Dragonite (Mega): Outrage+"
      ],
      "score": [
-      515,
-      485
+      535,
+      465
      ],
      "winner": 0
     },
     "1-2": {
      "chargedLog": [
-      "Dragonite (Mega): Thunder Punch (shielded)"
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Dragonite (Mega): Outrage+ (shielded)"
      ],
      "score": [
-      336,
-      663
+      340,
+      659
      ],
      "winner": 1
     },
@@ -90,18 +92,19 @@
       "Dragonite (Mega): Outrage+"
      ],
      "score": [
-      515,
-      485
+      535,
+      465
      ],
      "winner": 0
     },
     "2-2": {
      "chargedLog": [
-      "Dragonite (Mega): Thunder Punch (shielded)"
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Dragonite (Mega): Outrage+ (shielded)"
      ],
      "score": [
-      336,
-      663
+      340,
+      659
      ],
      "winner": 1
     }
@@ -347,8 +350,8 @@
       "Raichu (Mega X): Volt Tackle+"
      ],
      "score": [
-      657,
-      342
+      651,
+      348
      ],
      "winner": 0
     },
@@ -485,8 +488,8 @@
       "Azumarill: Ice Beam"
      ],
      "score": [
-      421,
-      578
+      345,
+      654
      ],
      "winner": 1
     },
@@ -996,13 +999,14 @@
     "0-0": {
      "chargedLog": [
       "Victreebel (Mega): Leaf Blade",
-      "Azumarill: Ice Beam"
+      "Azumarill: Ice Beam",
+      "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      431,
-      568
+      504,
+      495
      ],
-     "winner": 1
+     "winner": 0
     },
     "0-1": {
      "chargedLog": [
@@ -1010,8 +1014,8 @@
       "Azumarill: Ice Beam"
      ],
      "score": [
-      212,
-      787
+      180,
+      819
      ],
      "winner": 1
     },
@@ -1021,8 +1025,8 @@
       "Azumarill: Ice Beam"
      ],
      "score": [
-      212,
-      787
+      180,
+      819
      ],
      "winner": 1
     },
@@ -1033,8 +1037,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      883,
-      116
+      901,
+      98
      ],
      "winner": 0
     },
@@ -1045,8 +1049,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      864,
-      135
+      883,
+      116
      ],
      "winner": 0
     },
@@ -1058,8 +1062,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      808,
-      191
+      827,
+      172
      ],
      "winner": 0
     },
@@ -1070,8 +1074,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      883,
-      116
+      901,
+      98
      ],
      "winner": 0
     },
@@ -1082,8 +1086,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      864,
-      135
+      883,
+      116
      ],
      "winner": 0
     },
@@ -1095,8 +1099,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      808,
-      191
+      827,
+      172
      ],
      "winner": 0
     }
@@ -1136,39 +1140,38 @@
    "cells": {
     "0-0": {
      "chargedLog": [
-      "Lickilicky: Body Slam",
       "Victreebel (Mega): Leaf Blade",
+      "Lickilicky: Shadow Ball",
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      649,
-      350
+      598,
+      401
      ],
      "winner": 0
     },
     "0-1": {
      "chargedLog": [
-      "Lickilicky: Body Slam",
-      "Victreebel (Mega): Leaf Blade (shielded)",
-      "Victreebel (Mega): Leaf Blade",
+      "Victreebel (Mega): Sludge Bomb (shielded)",
+      "Lickilicky: Shadow Ball",
       "Lickilicky: Body Slam"
      ],
      "score": [
-      368,
-      631
+      190,
+      809
      ],
      "winner": 1
     },
     "0-2": {
      "chargedLog": [
-      "Lickilicky: Body Slam",
       "Victreebel (Mega): Leaf Blade (shielded)",
+      "Lickilicky: Shadow Ball",
       "Victreebel (Mega): Leaf Blade (shielded)",
       "Lickilicky: Body Slam"
      ],
      "score": [
-      175,
-      825
+      193,
+      806
      ],
      "winner": 1
     },
@@ -1179,8 +1182,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      855,
-      144
+      878,
+      121
      ],
      "winner": 0
     },
@@ -1189,11 +1192,11 @@
       "Victreebel (Mega): Sludge Bomb (shielded)",
       "Lickilicky: Body Slam (shielded)",
       "Lickilicky: Shadow Ball",
-      "Victreebel (Mega): Leaf Blade"
+      "Victreebel (Mega): Sludge Bomb"
      ],
      "score": [
-      406,
-      593
+      471,
+      528
      ],
      "winner": 1
     },
@@ -1202,11 +1205,11 @@
       "Victreebel (Mega): Leaf Blade (shielded)",
       "Lickilicky: Body Slam (shielded)",
       "Lickilicky: Shadow Ball",
-      "Victreebel (Mega): Sludge Bomb (shielded)"
+      "Victreebel (Mega): Acid Spray+ (shielded)"
      ],
      "score": [
-      212,
-      787
+      256,
+      743
      ],
      "winner": 1
     },
@@ -1217,8 +1220,8 @@
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      855,
-      144
+      878,
+      121
      ],
      "winner": 0
     },
@@ -1227,12 +1230,12 @@
       "Victreebel (Mega): Sludge Bomb (shielded)",
       "Lickilicky: Body Slam (shielded)",
       "Lickilicky: Body Slam (shielded)",
-      "Lickilicky: Body Slam",
-      "Victreebel (Mega): Sludge Bomb"
+      "Victreebel (Mega): Leaf Blade",
+      "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      570,
-      429
+      757,
+      242
      ],
      "winner": 0
     },
@@ -1242,12 +1245,11 @@
       "Lickilicky: Body Slam (shielded)",
       "Lickilicky: Body Slam (shielded)",
       "Victreebel (Mega): Acid Spray+ (shielded)",
-      "Lickilicky: Body Slam",
       "Victreebel (Mega): Leaf Blade"
      ],
      "score": [
-      570,
-      429
+      780,
+      219
      ],
      "winner": 0
     }
