@@ -137,3 +137,55 @@ reconcile with the published bar's units -- they record UL 0v0 as +0.558 where
 I measure +9.033. The WIN-CELL counts are plain counts and are directly
 comparable; the mean column orders options correctly against each other but
 cannot be checked against the August figures.
+
+---
+
+# UL 0v1 / Dondozo: PRE-EXISTING, not a rebalance regression
+
+The fix writeup above attributed this slice to "the new turn ordering, not move
+data". **That was wrong**, and the correction matters because it moves the item
+off the rebalance list entirely.
+
+## What it actually is
+
+Cramorant vs Dondozo, UL, 0 focal shields / 1 opponent shield:
+
+    baseline (plain PvPoke)   515   winner 0  (Cramorant WINS)
+    pogodives strat           500   winner None  (simultaneous-KO TIE)
+
+The strat converts a win into a draw, in both bait modes -- which is the whole
+of the slice's -2.
+
+## Three causes ruled out, by measurement
+
+* **Turn model.** Running the cell under `mechanics='legacy'` and
+  `mechanics='new'` gives byte-identical results (515/0 and 500/None in both).
+  The new clock has nothing to do with it.
+* **Move data.** Neither side's kit changed in any sim-relevant field.
+  Dondozo's WATERFALL / SURF / OUTRAGE are untouched, and Cramorant's only
+  diffs are `unlisted: None -> True` on the two Gulp Missiles -- a display
+  flag, not a sim input.
+* **Pool composition.** Re-running the whole UL 0v1 slice against the pool as
+  it stood at 83b8929 (2026-06-25, 67 opponents, pre-dating the August
+  campaign) gives the SAME -2, and the same two Dondozo cells.
+
+So it was there in August, under the old pool, the old moves and the legacy
+engine.
+
+## Why the August campaign did not catch it
+
+Not established. The strict-bar doc records UL 0v1 as a cell the OLD rule
+failed on flips (-526) which the sheet's `gate iff CMP won` fixed, and reports
+the fixed slice as "+8.8..+9.7" MEAN RATING without a flip count for UL. The
+sheet table is also labelled "stride-8 outcome", i.e. a subsample, so the most
+likely explanation is that the full-pool flip count for this slice was never
+measured. That is a guess; the campaign's raw output would settle it.
+
+## What to do about it
+
+Nothing urgent, and specifically NOT a re-fit input: a rule tuned to rescue
+this cell would be tuned against a weakness the strat has always had, not
+against anything the rebalance did. It is a genuine strategic cost of
+dive-early into a bulky opponent that can trade into the missile.
+
+Left as the single accepted exception, now correctly labelled.
