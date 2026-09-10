@@ -1006,42 +1006,30 @@ sheet, so removing it is safe but should be its own commit:
 Keep `scripts/cramorant_sensitivity.py` -- it is how this was found and how
 to re-ask after the next rebalance.
 
-OPEN, found 2026-09-09: THE SANDBOX LINK ENCODER NO LONGER ROUND-TRIPS.
-`scripts/pvpoke_sandbox.py`'s `timeline_to_actions` turns one of our battle
-timelines into a pvpoke.com/battle/sandbox URL, so a reader can replay our
-result in PvPoke's own engine. Under the new turn system that replay is a
-DIFFERENT fight:
+FIXED 2026-09-10: THE SANDBOX LINK ENCODER round-trips again.
 
-    our sim                 662 / hp [51, 0] / shields [0, 0]
-    PvPoke replaying it     573 / hp [23, 0] / shields [0, 1]
+Cause was a TURN-CLOCK MISMATCH, not the URL grammar. PvPoke gives the
+thrower a 1000 ms (one turn) cooldown after a charged move (pvpoke commit
+442a4afe8); our engine does not count that turn. So PvPoke's clock runs one
+turn later per charged move already thrown, our encoded actions landed on
+turns PvPoke could not execute, were SILENTLY dropped, and the replay
+degraded toward PvPoke's own AI.
 
-DIAGNOSED 2026-09-10 -- it IS the encoder, and the mechanism is a
-TURN-CLOCK MISMATCH, not the URL grammar.
+Derived rather than guessed: two all-agreeing fights gave deltas of exactly
+0,+1,+2,+3,+4 over five charged moves (Medicham/Azu ours 15,25,28,38,41 vs
+pvpoke 15,26,30,41,45; Registeel/Azu ours 15,22,28,41,42 vs 15,23,30,44,46).
 
-First, a correction: the 662-vs-573 gap is NOT engine divergence. The
-fixture runs the PoGoDives strat, so 662 is the strat's dive-early line
-while plain PvPoke's AI (573, confirmed via pvpoke_trace.js) never throws
-Dive at all. The replay lands on 573 because when our actions are dropped
-the fight degrades toward PvPoke's own AI.
+AUTO-FIRED moves are excluded from the count -- Battle.js fires Gulp Missile
+itself as part of the form change rather than as a thrown charged move, so
+it incurs no cooldown. Including it over-shifted and replayed 656/[49,0];
+excluding it gives 662/[51,0], matching our sim exactly.
 
-What actually breaks: TWO actions are silently dropped, both Cramorant FLY
-(T24 and T37). Our timeline logs a fast move's RESOLUTION one turn before
-PvPoke logs the same move -- ours has "T23 fast -> energy 48" then "T24 uses
-Fly", while PvPoke logs that PECK at T24. So the encoded charged action
-lands on a turn PvPoke cannot execute, gets dropped, and the loss cascades
-(T24's absence changes the state T37 depended on). Under the legacy clock
-the two numberings coincided; the new same-turn charged resolution pulled
-them apart.
-
-Confirmed by construction: shifting ONLY the T24 action to T25 makes the
-Fly fire and the shields go [0,1] -> [0,0], matching our sim. Shifting ALL
-actions +1 gives 417, so the correction is conditional on a fast move
-resolving that turn, not a uniform offset.
-
-FIX = a turn-mapping from our clock to PvPoke's action-script clock in
-timeline_to_actions. Not attempted yet; writing it without deriving the
-rule would be guessing.
-
+Side effect worth knowing: with the correction in place the CANCELLED-action
+encoding is now inert for the reference cell, because the fight ends on the
+turn it would have occupied. It is still emitted (harmless, and may matter in
+fights that continue past the cancellation), but the test's positive control
+was rewritten to corrupt a REAL action instead -- asserting the cancelled one
+changes this fight would now be asserting something false.
 Matters beyond the test: the same encoder builds the shareable "replay this
 on pvpoke.com" links on published Cramorant pages, so those links currently
 show readers a different fight from the one the page describes. Fix or

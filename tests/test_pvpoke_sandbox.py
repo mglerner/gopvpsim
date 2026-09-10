@@ -182,10 +182,13 @@ def test_cancelled_charged_is_encoded_as_an_action():
     a, b, r = _cramorant_lapras_ul_1_1()
     acts, auto = timeline_to_actions(r, a, b)
     tokens = [x.token() for x in acts]
-    assert '37.110000' in tokens, (
-        f'the cancelled turn-37 Sparkling Aria was not encoded: {tokens}')
+    # Turn 41 in PvPoke's clock, not our 37: timeline_to_actions applies the
+    # turn-clock correction (one turn per charged move already THROWN), so the
+    # emitted token carries PvPoke's turn number. See that function's comment.
+    assert '41.110000' in tokens, (
+        f'the cancelled Sparkling Aria was not encoded: {tokens}')
     # ... alongside the Fly that caused the KO, on the same turn.
-    assert '37.101000' in tokens, f'{tokens}'
+    assert '41.101000' in tokens, f'{tokens}'
     assert auto == [(26, 'Gulp Missile (Arrokuda)')], auto
 
 
@@ -211,52 +214,28 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     url = sandbox_url(2500, s0, s1, (1, 1), acts)
     got = verify_url(url)
     assert (round(got['score'][0]), got['hp'], got['shields']) == (
-        573, [23, 0], [0, 1]), (
-        f'the link does not replay the sim as currently encoded: {url}')
-    # THE INVARIANT THIS TEST EXISTS FOR IS CURRENTLY BROKEN, deliberately
-    # left visible rather than deleted. Our sim returns 662 / [51, 0] with
-    # both shields spent; replaying the SAME timeline through PvPoke's engine
-    # gives 573 / [23, 0] with Lapras still holding a shield.
-    #
-    # DIAGNOSED 2026-09-10: a TURN-CLOCK MISMATCH in timeline_to_actions.
-    # Our timeline logs a fast move's RESOLUTION one turn before PvPoke logs
-    # the same move (ours: "T23 fast -> energy 48" then "T24 uses Fly";
-    # PvPoke logs that PECK at T24). The encoded charged action therefore
-    # lands on a turn PvPoke cannot execute and is silently dropped -- two
-    # of them here, both Cramorant Fly. Shifting ONLY the T24 action to T25
-    # makes it fire and the shields match; shifting all actions +1 does not,
-    # so the correction is conditional on a fast move resolving that turn.
-    #
-    # NB the 662-vs-573 gap is not engine divergence: this fixture runs the
-    # PoGoDives strat, and plain PvPoke's AI independently returns 573
-    # without ever throwing Dive. The replay reaches 573 because dropped
-    # actions let it degrade toward PvPoke's own AI.
-    #
-    # Tracked in TODO.md. Matters beyond this test: the same encoder builds
-    # the shareable links on Cramorant pages.
-    assert round(got['score'][0]) != r.pvpoke_score(0), (
-        'the sandbox link now replays our sim again -- restore the equality '
-        'assertion below and delete this inversion')
+        662, [51, 0], [0, 0]), (
+        f'the link does not replay the sim (662 / [51, 0]): {url}')
+    assert round(got['score'][0]) == r.pvpoke_score(0)
 
-    # Control, and it is what proves the encoder round-trip is BROKEN rather
-    # than merely producing different numbers. Dropping the cancelled action
-    # from the URL used to replay a materially different fight (656 / [49,0]
-    # vs 662 / [51,0]); that difference is what the 2026-08-27 encoder fix
-    # bought. As of 2026-09-09 both scripts replay IDENTICALLY at 573 /
-    # [23,0], i.e. the cancelled action is now inert in PvPoke's replay.
+    # POSITIVE CONTROL: the replay must actually be driven by our action
+    # script, not merely coincide with PvPoke's own AI. Corrupt one REAL
+    # action (drop Cramorant's turn-25 Fly) and the replay must change.
     #
-    # So the action is being encoded into the URL (pre != url below still
-    # holds) but no longer changes the fight it produces. Combined with the
-    # shield discrepancy above, that is a round-trip failure under the new
-    # turn system, not a scoring drift.
-    pre = url.replace('-37.110000/', '/')
-    assert pre != url, f'the cancelled action is missing from {url}'
-    was = verify_url(pre)
-    assert (round(was['score'][0]), was['hp']) == (573, [23, 0])
-    assert (round(was['score'][0]), was['hp']) == (
+    # This replaces the old control, which dropped the CANCELLED action and
+    # asserted the fight changed. That was true under the legacy clock (656 vs
+    # 662) and is no longer: with the turn-clock correction in place the
+    # cancelled action is inert for this cell -- the fight ends on the turn it
+    # would have occupied. It is still encoded, because it costs nothing and
+    # may matter in fights that continue past the cancellation, but asserting
+    # that it changes THIS fight would now be asserting something false.
+    dropped = url.replace('25.101100-', '')
+    assert dropped != url, f'the turn-25 Fly is missing from {url}'
+    without_fly = verify_url(dropped)
+    assert (round(without_fly['score'][0]), without_fly['hp']) != (
         round(got['score'][0]), got['hp']), (
-        'the cancelled action changes the replay again -- the encoder '
-        'round-trip is working, so restore the original controls')
+        'dropping a real action changed nothing -- the replay is not being '
+        'driven by the action script at all')
 
 
 def test_cancel_line_wording_change_is_a_hard_error():

@@ -181,6 +181,7 @@ from __future__ import annotations
 
 import json
 import os
+import dataclasses
 import re
 import subprocess
 import warnings
@@ -581,7 +582,38 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
         seen.add((turn, actor))
         actions.append(Action(turn=turn, actor=actor,
                               value=slots[actor].index(move), shielded=shielded))
-    return actions, auto
+
+    # TURN-CLOCK CORRECTION (2026-09-10). Our turn counter and PvPoke's run at
+    # different rates once charged moves start landing: PvPoke gives the
+    # thrower a 1000 ms (= one turn) cooldown after a charged move
+    # (pvpoke commit 442a4afe8, "added one turn delay after Charged Attacks to
+    # resolve Fast Attack damage"), and our engine does not count that turn.
+    #
+    # So PvPoke's clock runs one turn later per charged move ALREADY RESOLVED,
+    # counting both sides and counting the auto-fired ones. Measured on two
+    # independent all-agreeing fights, deltas came out exactly 0, +1, +2, +3,
+    # +4 over five charged moves in both:
+    #
+    #   Medicham/Azu  ours 15,25,28,38,41   pvpoke 15,26,30,41,45
+    #   Registeel/Azu ours 15,22,28,41,42   pvpoke 15,23,30,44,46
+    #
+    # Without this, an action lands on a turn PvPoke cannot execute, is
+    # SILENTLY dropped, and the replay degrades toward PvPoke's own AI --
+    # which is what broke the UL Cramorant/Lapras link after the turn-system
+    # merge (tests/test_pvpoke_sandbox.py).
+    # AUTO-FIRED moves are excluded from the count. Battle.js fires them
+    # itself as part of the form-change mechanic (Cramorant's Gulp Missile)
+    # rather than as a charged move the Pokemon throws, so they do NOT incur
+    # the post-charge cooldown. Counting them over-shifts everything after the
+    # first one -- measured: including auto put the KO'ing Fly at turn 42 and
+    # replayed 656/[49,0]; excluding it puts the Fly at 41 and replays
+    # 662/[51,0], matching our sim exactly.
+    thrown = sorted(a.turn for a in actions)
+    shifted = []
+    for a in actions:
+        prior = sum(1 for t in thrown if t < a.turn)
+        shifted.append(dataclasses.replace(a, turn=a.turn + prior))
+    return shifted, auto
 
 
 # ---------------------------------------------------------------------------
