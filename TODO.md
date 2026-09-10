@@ -32,6 +32,15 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+- REBALANCE re-verify: **RUN 2026-09-10, and it FAILED the bar.** Still
+  net-positive overall (+76 win-cells vs baseline) but UL 2v1 is NEGATIVE
+  (-1.325 mean, all of it Jellicent) and UL 0v1 loses two win cells (both
+  Dondozo). Separately the LEAD constant is now inert -- lead 30/35/40/45 and
+  a static control differ in 12 of 2,394 cells, so the fitted 40 in the
+  shipped sheet buys nothing. Sheet v5's certification does NOT carry over;
+  do not re-publish on the old bar. Full writeup + the caveat that I did not
+  reproduce their exact margin metric:
+  `docs/validations/2026-09-10_cramorant_strat_reverify.md`. Original note:
 - REBALANCE re-verify (Michael 2026-08-25): a big move rebalance is
   expected ~2 weeks post-Worlds. When it lands: gamemaster-delta
   migration as usual, PLUS re-run the policy-lab verification corpus
