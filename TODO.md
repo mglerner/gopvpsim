@@ -381,18 +381,42 @@ blocking `subprocess.run` in a loop -- strictly serial, and there is no
 * a **render/analysis tail** that is strictly ONE core (measured: parent at
   99-100% CPU with no workers alive, for minutes at a stretch).
 
-Serial tail as a fraction of each dive, from the cold 2026-09-10 13:27 run:
+Serial share per dive, cold 2026-09-10 13:27 run, via
+`scripts/bake_timing_report.py`:
 
-| dive               | total | sweep (parallel) | tail (1 core) | serial |
-| ------------------ | ----- | ---------------- | ------------- | ------ |
-| Tinkaton           | 682s  | 474s             | 208s          | 30%    |
-| Ninetales          | 256s  | 81s              | 175s          | 68%    |
-| Corsola (Galarian) | 481s  | 69s              | 412s          | 86%    |
-| Corviknight        | 394s  | 135s             | 259s          | 66%    |
+| dive               | parallel | serial | serial% |
+| ------------------ | -------- | ------ | ------- |
+| Tinkaton           | 502s     | 180s   | 26%     |
+| Ninetales          | 193s     | 63s    | 25%     |
+| Corsola (Galarian) | 329s     | 152s   | 32%     |
+| Corviknight        | 277s     | 117s   | 30%     |
+|                    |          |        | **28%** |
 
-**The prize.** `chain_status.py` put the 2026-09-10 bake at **~36h** for 135
-dives + ML tail. Overlapping 2-3 dives fills each other's render tails; the
-dive step plausibly drops from ~17h to ~7-8h. Roughly a day per bake.
+**CORRECTED 2026-09-10.** The first pass at this reported 30-86% serial
+(Corsola 86%) and was WRONG -- it used one cut point per dive, counting
+everything after the last "Running <moveset>..." line as tail. The
+mirror-slayer rounds emit heavy PARALLEL sim work after that cut ("Round 2:
+... 1,142,784 sims to run", "sim progress: N/100 chunks"), so that time was
+misfiled as serial. `bake_timing_report.py` classifies each interval by its
+own marker instead. Anything quoting 65% or 86% predates the fix.
+
+Method caveat: an interval inherits the last marker seen (carry-forward), so
+a long silent stretch is attributed to the phase that preceded it. The
+script's unclassified bucket is therefore near-zero by construction and is
+NOT evidence the markers are healthy -- re-read them if the shape looks off.
+
+**The prize, resized.** At 28% serial the ceiling is ~28% of the dive step,
+not the ~65% the bad numbers implied: roughly 5h off a ~17h dive step, not a
+full day. Still real, still the biggest single lever, but no longer
+obviously worth interrupting a running bake for.
+
+**RE-EVALUATE ON THE FULL LOG** (Michael, 2026-09-10): these four dives are
+all early Great League from a run that CRASHED at dive 6, and are the cheap
+end -- Cramorant alone ran 18m against a 3m baseline. Re-run
+`scripts/bake_timing_report.py` against the completed chain log once the
+2026-09-10 bake finishes; UL, Forretress and the ML tail are unrepresented
+here, and `chain_status.py`'s own ETA flags `ul_full`/`forretress`/`ml_tail`
+as hardcoded fallbacks rather than measured.
 
 **Implementation gotchas already identified** (do not re-derive):
 
