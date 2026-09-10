@@ -41,10 +41,27 @@ now holds the blob this bake runs against, with the recovery recipe beside it.
 
 ## Open at the time of writing
 
-* **Spread tiers (L5).** 58 stat-cutoff spreads were retired on 2026-09-09. The
-  pages available (Melmetal, Deoxys-D) never HAD authored spreads, so they
-  cannot answer what a page looks like for a species that lost some. A
-  diagnostic Tinkaton dive (7 spreads retired) is running to settle it.
+* **Spread tiers (L5): SETTLED, and the feared regression did not happen.**
+  Ran a diagnostic Tinkaton dive -- Tinkaton lost 7 authored spreads, the most
+  of any species. The page renders normally: the Threshold Tiers section is
+  present with **14 distinct tier cards**, no empty state, no breakage. The
+  tiers are ANCHOR-derived, and anchors were never retired, so losing the
+  authored spreads cost the page its expert-named cutoff regions but not the
+  section itself.
+
+  Two stale references remain, both cosmetic:
+
+  - `thresholds/tinkaton.toml`'s ANCHOR descriptions still cite numbers from
+    the retired spreads ("Discover all Azumarill bulkpoints. 143.03 def flips
+    1-2"). That one is still TRUE -- Azumarill's kit was untouched by the
+    rebalance -- but the ~182 such descriptions include some derived against
+    the 32 opponents whose movesets DID change. Already tracked as the
+    threshold-TOML re-vet.
+  - The renderer's own glossary hardcodes `GH Great` / `GH Good` as its worked
+    example of a tier ("e.g. GH Great = Def >= 143.03, HP >= 138"). Those
+    tiers no longer exist on any page, so the glossary now teaches the concept
+    with an example a reader cannot find. Worth swapping for a live tier when
+    the renderer is next open.
 * **Chain smoke test.** `build_matchup_web.py`, `run_iv_guides.py`,
   `build_website_index.py` and `run_ship_gates.py` have not been run since the
   rebalance. They are the steps that consume hours 10-13 of the bake and would
