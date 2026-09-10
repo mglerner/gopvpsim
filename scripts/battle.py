@@ -133,10 +133,15 @@ def main():
     parser.add_argument('--policy', default='pvpoke_dp', choices=list(POLICIES),
                         help='Charged move policy for both sides (default: pvpoke_ai)')
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
-                        help='Turn-resolution model. legacy (default) = pre-2026-06-23. '
-                             'new = the post-2026-06-23 PvP turn system. NEITHER is '
-                             'simply correct as of 2026-09-02 -- both print a caveat; '
-                             'see scripts/mechanics_notice.py')
+                        help='Turn-resolution model. DEFAULT IS new: the turn '
+                             'system the live game runs, matching PvPoke master '
+                             'on 237 of 243 oracle cells (the 6 that differ are '
+                             'all Aegislash form-change, same winner). legacy = '
+                             'the pre-2026-09-02 system, which neither the game '
+                             'nor PvPoke master implements any more; it is '
+                             'retained only to keep the port-fidelity history '
+                             'runnable. Both print a caveat at runtime; see '
+                             'scripts/mechanics_notice.py')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
     parser.add_argument('--pvpoke-scores', action='store_true',

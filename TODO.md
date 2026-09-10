@@ -392,6 +392,26 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
+## POST-BAKE: deep_dive.py --mechanics help is a known-wrong claim
+
+`scripts/deep_dive.py`'s `--mechanics` help still says `new` is
+"still UNVALIDATED (104/243 oracle cells disagree with PvPoke's unmerged
+new-mechanics branch)". Both halves went stale on 2026-09-09: the branch
+MERGED to master, and the count is now 237/243 matching, with the 6 that
+differ all Aegislash form-change on the same winner (see
+`scripts/mechanics_notice.py`, which is the canonical wording). A user
+reading `deep_dive.py --help` today is told our default turn model is
+unvalidated when it is in fact the cross-checked one.
+
+Deferred only because the 2026-09-10 bake spawns `deep_dive.py` as a
+subprocess for every dive, so a typo mid-run would kill hours of work.
+Fix it as soon as the chain finishes. `scripts/battle.py` had the same
+class of staleness ("legacy (default)" six weeks after the default
+flipped) and was fixed 2026-09-10;
+`test_mechanics_help_does_not_contradict_its_own_default` now pins the
+default-vs-prose half for all three CLIs, but it does NOT catch a stale
+validation *count* -- that still needs eyes.
+
 ## DRY review 2026-08-05: fully executed -- open residue only
 
 The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed
