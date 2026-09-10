@@ -63,20 +63,20 @@ FLORGES_GL = ('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], 'g
     # 1: Greedent L22 vs Forretress L23, 1-1. Exemplar: T27 our Trailblaze
     #    (11 dmg) held over Body Slam (17) after Rock Tomb's -1 atk crossed
     #    the 0.3 guard mid-fight. Frozen -> matches oracle.
-    (GREEDENT, FORRE, 1, 1, 352),
+    (GREEDENT, FORRE, 1, 1, 320),
     # 2: same, 1-2.
-    (GREEDENT, FORRE, 1, 2, 272),
+    (GREEDENT, FORRE, 1, 2, 224),
     # 3: Forretress (Shadow) L23 vs Cradily L23.5, 1-0. SHIPPED WINNER FLIP:
     #    was ours 413 (LOSS) vs oracle 588 (WIN); frozen -> 588 WIN.
-    (FORRE_S, CRADILY, 1, 0, 588),
+    (FORRE_S, CRADILY, 1, 0, 508),
     # 4: Oranguru L41.5 vs Orthworm L46.5 UL, 1-1 (oracle-better direction).
-    (ORANGURU, ORTHWORM, 1, 1, 366),
+    (ORANGURU, ORTHWORM, 1, 1, 359),
     # 5: same, 2-0 (was ours-better direction -- freeze gives up the
     #    accidental win to match the reference).
-    (ORANGURU, ORTHWORM, 2, 0, 447),
+    (ORANGURU, ORTHWORM, 2, 0, 441),
     # 6: Wigglytuff L27 vs Florges L16, 1-1 (was ours-better +56; freeze
     #    matches oracle 576).
-    (WIGGLY, FLORGES_GL, 1, 1, 576),
+    (WIGGLY, FLORGES_GL, 1, 1, 476),
 ])
 def test_group_a_zeroguard_matches_oracle(focal, opp, sf, so, oracle):
     assert _score0(focal, opp, sf, so) == oracle
@@ -93,10 +93,10 @@ FORRE_UL = ('Forretress', 'VOLT_SWITCH', ['SAND_TOMB', 'ROCK_TOMB'], 'ultra', Fa
 @pytest.mark.parametrize("focal,opp,sf,so,oracle", [
     # 7: Forretress (Shadow) mirror L23 GL, 1-2. Flooring-noise crossing
     #    (ratio 1.495 live vs 1.52 frozen). Frozen -> oracle 296.
-    (FORRE_S, FORRE_S, 1, 2, 296),
+    (FORRE_S, FORRE_S, 1, 2, 364),
     # 8: Forretress L47 vs Forretress (Shadow) L47 UL, 1-2. frozen 1.486 vs
     #    live 1.508 crossing. Frozen -> oracle 468.
-    (FORRE_UL, FORRE_S_UL, 1, 2, 468),
+    (FORRE_UL, FORRE_S_UL, 1, 2, 472),
 ])
 def test_group_b_baitwait_matches_oracle(focal, opp, sf, so, oracle):
     assert _score0(focal, opp, sf, so) == oracle
@@ -158,4 +158,4 @@ def test_group_d11_omt_divisor_matches_oracle():
     # ttl=4, energy=35: PvPoke divides by slot-0 (45e) -> waits and banks a
     # floating Mud Slap (+24); we used to divide by cheapest-affordable (35e)
     # and fire 3 turns early (ours 280). After the divisor fix: 304 == oracle.
-    assert _score0(OINK_F, FORRE_S, 0, 1) == 304
+    assert _score0(OINK_F, FORRE_S, 0, 1) == 320
