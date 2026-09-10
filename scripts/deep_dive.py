@@ -436,8 +436,22 @@ def get_legal_moves(species_name):
     then run a full dive anyway.
     """
     entry = get_pokemon_entry(species_name)
+    _, charged_db = get_moves()
+    charged = (list(entry['chargedMoves'])
+               + list(entry.get('extraChargedMoves') or []))
+    # Drop moves flagged ``unlisted`` in the gamemaster. These are granted by
+    # the battle itself, never chosen at the moveset screen, so enumerating
+    # them as selectable produces movesets no player can bring. The whole set
+    # is Cramorant's two Gulp Missiles and Ditto's TRANSFORM; every mega
+    # ``*_PLUS`` move is listed and therefore survives this filter.
+    #
+    # They also all have energy 0, which divided by zero in the DP cache's
+    # dpe computation and crashed the Cramorant GL dive outright.
+    # Excluding them here does NOT remove Gulp Missile from the fight: the
+    # form-change machinery grants it off ``formChange.moveId`` when Dive or
+    # Surf triggers the form swap.
     return (entry['fastMoves'],
-            list(entry['chargedMoves']) + list(entry.get('extraChargedMoves') or []))
+            [m for m in charged if not charged_db.get(m, {}).get('unlisted')])
 
 
 def enumerate_movesets(species_name, user_fast=None, user_charged=None,
