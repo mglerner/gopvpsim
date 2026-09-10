@@ -32,6 +32,14 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+- REBALANCE re-verify: **RUN 2026-09-10; failed, then FIXED (option A).**
+  (2,1) is exempt again -- every firing setting was negative, and exempting
+  is strictly better than the v4 rule (same total wins, better mean).
+  ONE ACCEPTED EXCEPTION remains: UL 0v1 is -2 win cells (both Dondozo) with
+  +8.3 mean, kept because the -2 is exactly offset by +2 in GL. Root cause is
+  the new TURN ORDERING, not move data (Dondozo's moves were not
+  rebalanced) -- finding it is the only way to keep the GL gain without the
+  UL loss. Original failure notes:
 - REBALANCE re-verify: **RUN 2026-09-10, and it FAILED the bar.** Still
   net-positive overall (+76 win-cells vs baseline) but UL 2v1 is NEGATIVE
   (-1.325 mean, all of it Jellicent) and UL 0v1 loses two win cells (both

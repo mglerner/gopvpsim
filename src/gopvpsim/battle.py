@@ -330,13 +330,23 @@ _POGODIVES_SHEET = {
     (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (2, 0): None,
-    # 2v1 discovery rule (agent campaign 2026-08-26, full-4096-IV
-    # verified: worst slice +2220 net / +1.17 mean): gate-only with the
-    # ready-nuke condition, tank plain PvPoke (aggr 2.2 = both branches
-    # 2.2). v4: dpt_max recentered 0.0155 -> 0.0150 (0.0155 sat 2.6%
-    # from a cliff; 0.0150 is mid-plateau).
-    (2, 1): {'gate': 'cmp_ready_dpt', 'tank_aggr': 2.2, 'tank_rule': 'lead',
-             'dpt_max': 0.0150},
+    # 2v1: EXEMPT again as of 2026-09-10 (Michael). The v4 discovery rule
+    # ('cmp_ready_dpt' with dpt_max 0.0150) stopped paying after the
+    # Twilight Trails rebalance: it contributes ZERO net wins and costs
+    # -1.325 mean in UL, driven entirely by Jellicent, whose SHADOW_BALL
+    # was nerfed 100 -> 90 so the "live nuke threat" the gate trades into
+    # is no longer worth the forced Dive.
+    #
+    # Swept before exempting (scripts/cramorant_sensitivity.py + the refit
+    # sweep): EVERY setting that lets the rule fire is negative --
+    # dpt_max 0.0175 gives -2.9 in GL, 0.020+ loses 2 UL wins, gate 'cmp'
+    # and 'always' are far worse. Only turning it off returns to 0.000.
+    # That is the fallback the original campaign already documented:
+    # "Exemption = exactly 0 everywhere, which satisfies the bar."
+    #
+    # Exempting is strictly better than the v4 rule on today's data: same
+    # total wins (+59 vs plain PvPoke either way) and better mean.
+    (2, 1): None,
     # 2v2 v4 (discovery 2026-08-26): the LOADED-OPPONENT tank -- decline
     # the shield at 1.6 only while the opponent's post-throw energy
     # still covers another charged move (else nothing punishes them for

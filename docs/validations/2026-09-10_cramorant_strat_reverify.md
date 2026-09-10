@@ -78,3 +78,62 @@ this is the fitted POLICY drifting against new move data, exactly as the
    regression.
 3. The lead constant can probably be dropped rather than re-fitted, which
    would simplify the sheet. Needs the re-fit campaign to confirm.
+
+---
+
+# Fix applied 2026-09-10: (2, 1) re-exempted (option A)
+
+Swept the regressed cell before changing it. **Every setting that lets the
+(2, 1) rule fire is negative:**
+
+    (2,1) dpt_max   UL 2v1 win/mean    GL 2v1 win/mean   worst slice mean
+    0.0100          +0 / +0.000        +0 / +0.000        +0.000
+    0.0125          +0 / +0.000        +0 / +0.000        +0.000
+    0.0150 (ship)   +0 / -1.325        +0 / +0.329        -1.325
+    0.0175          +0 / -1.342        +0 / -2.932        -2.932
+    0.0200+         -2 / -3.758        +0 / -2.685        -3.758
+
+    (2,1) gate      UL 2v1             GL 2v1
+    cmp_ready_dpt   +0 / -1.325        +0 / +0.329
+    cmp             -2 / -7.042        -2 / -8.664
+    always          -5 / -12.550       -3 / -10.322
+    off             +0 / +0.000        +0 / +0.000
+
+Only turning it off returns to zero, which is the fallback the original
+campaign already documented ("Exemption = exactly 0 everywhere, which
+satisfies the bar"). So `(2, 1)` is `None` again.
+
+**Exempting is strictly better than the v4 rule on today's data**: identical
+total wins (+59 vs plain PvPoke either way -- the rule contributed no net
+wins at all) and a better mean.
+
+## The accepted exception: UL 0v1
+
+One slice still fails the self-imposed bar (`battle.py:296`, "every start
+scenario must be >= 0 on BOTH mean rating delta and net win flips"):
+
+    ultra 0v1:  -2 win cells, +8.308 mean
+
+Both lost cells are Dondozo (bait and nobait). Michael's call (2026-09-10) was
+to KEEP the (0, 1) rule and record the exception rather than switch it off,
+because:
+
+* the -2 UL win-cells are exactly offset by +2 GL win-cells -- **net zero
+  wins**, not a loss;
+* the mean is strongly positive in BOTH leagues (+8.3 UL, +8.7 GL);
+* switching it off zeroes the GL gain too, costing ~0.95 mean-of-slice-means
+  to satisfy a per-scenario rule that is about avoiding harm where there is no
+  net harm.
+
+**Root cause not addressed.** Dondozo's moves were NOT rebalanced
+(Waterfall / Surf / Outrage all unchanged), so the flip is the new turn
+ordering, not move data. Finding that is the only route to keeping the GL gain
+without the UL loss; until then the exception stands as measured.
+
+## Caveat carried forward
+
+The margin numbers here are mine (mean score delta per cell) and still do not
+reconcile with the published bar's units -- they record UL 0v0 as +0.558 where
+I measure +9.033. The WIN-CELL counts are plain counts and are directly
+comparable; the mean column orders options correctly against each other but
+cannot be checked against the August figures.

@@ -273,10 +273,18 @@ def test_start_scenario_sheet_exemptions():
     """Start-scenario SHEET (2026-08-26 strict-bar campaign, generalizing
     the round-7 2-0 exemption): a side whose _POGODIVES_SHEET row is None
     plays plain PvPoke (the flag stays False); every other start keeps
-    the strat. Exempt today: (2, 0) only (round 7). The (2, 1) row was
-    briefly exempt mid-campaign (pre-sheet it was strat-on and
-    net-NEGATIVE: GL -1175 win-cells / -27.6 rating) until the
-    ready-nuke gate rule was discovered and full-tensor verified.
+    the strat.
+
+    Exempt today: (2, 0) and (2, 1).
+
+    (2, 1) has been exempt TWICE. It was exempt mid-campaign (pre-sheet it
+    was strat-on and net-NEGATIVE: GL -1175 win-cells / -27.6 rating),
+    then the ready-nuke gate rule was discovered and full-tensor verified,
+    then the Twilight Trails rebalance took that rule back below zero
+    (2026-09-10: no net wins, -1.325 mean in UL, all of it Jellicent whose
+    SHADOW_BALL went 100 -> 90). Re-exempted rather than re-tuned because
+    a sweep found EVERY firing setting negative.
+
     Start-scenario, not live-state -- the flag is set at battle start
     and does NOT flip when shields are consumed mid-fight."""
     def flags_for(s1, s2):
@@ -293,7 +301,7 @@ def test_start_scenario_sheet_exemptions():
 
     import gopvpsim.battle as B
     exempt = {s for s, row in B._POGODIVES_SHEET.items() if row is None}
-    assert exempt == {(2, 0)}
+    assert exempt == {(2, 0), (2, 1)}
     for s1 in (0, 1, 2):
         for s2 in (0, 1, 2):
             expected = (s1, s2) not in exempt
@@ -398,44 +406,18 @@ def test_sheet_tank_rules():
 
 
 def test_sheet_2v1_ready_nuke_gate():
-    """The 2v1 'cmp_ready_dpt' gate (discovery rule 2026-08-26): fires
-    only when CMP is won AND the opponent's cheapest charged move costs
-    >= 40 energy AND they hold that energy RIGHT NOW AND their fast DPT
-    is under the row's tighter 0.0155 cap. Pre-rule this start was a
-    full exemption (delta exactly 0)."""
-    import gopvpsim.battle as B
+    """RETIRED 2026-09-10: the (2, 1) ready-nuke gate is gone.
 
-    def probe(cram_atk=120, opp_atk=100, opp_energy=45, opp_cost=45,
-              opp_fast_power=3):
-        cram = make_bp(atk=cram_atk, hp=130,
-                       fast=make_fast(power=6, energy_gain=8),
-                       charged=[make_charged(power=65, energy=40)])
-        opp = make_bp(atk=opp_atk, hp=140,
-                      fast=make_fast(power=opp_fast_power, energy_gain=8),
-                      charged=[make_charged(power=90, energy=opp_cost)])
-        opp.energy = opp_energy
-        cram._pogodives = True
-        cram._start_shields = (2, 1)
-        opp.fast_move['_turns'] = 2
-        return B._cram_dive_gate_dpe(cram, opp)
+    The rule this pinned ('cmp_ready_dpt' with dpt_max 0.0150) stopped
+    paying after the Twilight Trails rebalance and (2, 1) is a full
+    exemption again -- see test_start_scenario_sheet_exemptions, which is
+    now what guards this start scenario.
 
-    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
-    assert probe() == PG                              # all conditions met
-    assert probe(cram_atk=90) == PV                   # cmp lost
-    assert probe(opp_cost=35, opp_energy=45) == PV    # cheap moves
-    assert probe(opp_energy=30) == PV                 # not ready to throw
-    assert probe(opp_fast_power=30) == PV             # dpt over the cap
-    # v4 recentered the cap to 0.0150 (mid-plateau; 0.0155 sat 2.6%
-    # from a cliff)
-    # The tank side of the 2v1 row is plain PvPoke: aggr 2.2 == both
-    # branches == the PvPoke multiplier.
-    cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
-                   charged=[make_charged(power=65, energy=40)])
-    opp = make_bp(atk=110, hp=140, fast=make_fast(power=6, energy_gain=8),
-                  charged=[make_charged(power=90, energy=45)])
-    cram._pogodives = True
-    cram._start_shields = (2, 1)
-    assert B._cram_tank_mult(opp, cram, 30) == B._CRAM_TANK_MULT
+    Kept as a skip rather than deleted because the rule may come back: if
+    a future campaign re-derives a 2v1 discriminator, this is the shape of
+    the test it needs. The original body is in git history at 460a63e~1.
+    """
+    pytest.skip("(2, 1) is exempt again; see the docstring")
 
 
 def test_sheet_2v2_loaded_tank():
