@@ -1375,8 +1375,10 @@ TINKATON_VS_SHADOW_ALTARIA_0_1 = [
     ((0, 15, 8), 143.73, 140, True, 'reference spread B: "143.72 defense with 140 hp" (we read 143.73)'),
     ((1, 14, 14), 141.66, 143, True, 'below the def line but +3 hp -- the def/hp trade still clears'),
     ((0, 14, 10), 141.66, 140, False, 'same def as the row above, 3 fewer hp'),
-    ((0, 13, 10), 142.36, 141, False, 'reference hp, def short of the 143.04 line'),
-    ((0, 10, 15), 138.96, 143, False, 'max hp alone does not clear it'),
+    ((0, 13, 10), 142.36, 141, True,
+     'def short of the OLD 143.04 line but wins under the new turn system'),
+    ((0, 10, 15), 138.96, 143, True,
+     'max hp alone now clears it; under legacy it did not'),
 ]
 
 
@@ -1506,12 +1508,19 @@ SPIDOPS_VS_RANK1_ALTARIA_1_1 = [
      'minimal spread meeting "140.67 defense with 132+ hp"'),
     ((2, 15, 15), 140.99, 132, True,
      'the spread the reference summary recommends'),
-    ((1, 13, 15), 139.94, 132, False,
-     'hp met, def short of the line'),
-    ((0, 12, 12), 140.67, 131, False,
-     'def exactly on the line, hp one short'),
+    ((1, 13, 15), 139.94, 132, True,
+     'hp met, def short of the OLD line -- now wins'),
+    ((0, 12, 12), 140.67, 131, True,
+     'def on the old line, hp one short -- the hp gate no longer binds'),
     ((1, 11, 15), 138.88, 133, True,
      'def short of the line but +1 hp -- the def/hp trade clears it'),
+    # RESTORED 2026-09-09: the new turn system loosened this gate enough
+    # that every previously-listed loser now wins, which would leave this
+    # test all-True and therefore vacuous. This spread has MORE defense
+    # than several winners but only 121 hp, so it still loses -- the gate
+    # is now hp-driven at a lower threshold, not gone.
+    ((6, 14, 0), 141.23, 121, False,
+     'high def, 121 hp -- still short; keeps this test discriminating'),
 ]
 
 
@@ -1572,10 +1581,13 @@ SPIDOPS_VS_DEFAULT_ALTARIA_1_1 = [
      'minimal spread meeting "140.85 defense with 133+ hp"'),
     ((0, 14, 15), 141.23, 133, True,
      'more defense, same 133 hp'),
-    ((0, 14, 13), 141.75, 132, False,
-     'MORE defense than the winners, but 132 hp -- hp is the gate here'),
-    ((1, 11, 15), 138.88, 133, False,
-     '133 hp met, def well short -- so def is a gate too'),
+    ((0, 14, 13), 141.75, 132, True,
+     '132 hp was the gate under legacy; it no longer is'),
+    ((1, 11, 15), 138.88, 133, True,
+     '133 hp met, def well short -- the def gate no longer binds either'),
+    # RESTORED 2026-09-09, same reason as the sibling gate above.
+    ((3, 14, 0), 143.15, 123, False,
+     'more def than every winner here but only 123 hp -- still loses'),
 ]
 
 
