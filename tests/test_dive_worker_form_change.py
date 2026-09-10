@@ -134,7 +134,8 @@ def test_sweep_worker_matches_from_pokemon():
 
 def test_sweep_worker_pins_pvpoke_oracle_score():
     """The sweep worker reproduces the PvPoke-harness-verified 0v0
-    score (773) for Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13 —
+    score (751 as of 2026-09-09; 773 under the retired legacy turn
+    system) for Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13 —
     the same cell test_aegislash_vs_azumarill_form_change pins on the
     from_pokemon path. A no-form-change construction (the pre-S1
     worker behavior) must NOT reproduce it, proving the wiring is what
@@ -146,7 +147,7 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
     prof = _focal_profile((4, 14, 15))
     results, _energy, _metrics, _ = deep_dive._sweep_worker([(prof, 0)])
     score = results[(prof[0], 0)][0]
-    assert round(score) == 773
+    assert round(score) == 751
 
     # Pre-S1 behavior: same stats, no form-change state attached.
     gm = load_gamemaster()
@@ -172,7 +173,7 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
     result = simulate(bp0, bp1,
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp)
-    assert round(result.pvpoke_score(0)) != 773
+    assert round(result.pvpoke_score(0)) != 751
 
 
 def test_slayer_worker_forwards_mechanics(monkeypatch):

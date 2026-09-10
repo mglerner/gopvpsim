@@ -960,6 +960,32 @@ What is already in place so the wait is safe:
 - The PVPOKE-ENGINE tripwire fires on the merge and its message now names
   these follow-ups.
 
+OPEN, found 2026-09-09: THE SANDBOX LINK ENCODER NO LONGER ROUND-TRIPS.
+`scripts/pvpoke_sandbox.py`'s `timeline_to_actions` turns one of our battle
+timelines into a pvpoke.com/battle/sandbox URL, so a reader can replay our
+result in PvPoke's own engine. Under the new turn system that replay is a
+DIFFERENT fight:
+
+    our sim                 662 / hp [51, 0] / shields [0, 0]
+    PvPoke replaying it     573 / hp [23, 0] / shields [0, 1]
+
+Two things say encoder, not engine. Lapras still holds a shield in the
+replay that our sim spends. And dropping the cancelled-charged action from
+the URL changes NOTHING -- both scripts replay identically at 573 -- where
+before the 2026-08-27 encoder fix that action was worth 656 vs 662. So the
+action is still written into the URL but no longer alters the fight it
+produces, which is a round-trip failure rather than a scoring drift. The
+likely cause is that the new system resolves charged moves in the turn they
+are thrown and the URL grammar cannot express that ordering (or the shield
+decision attached to it). NOT confirmed.
+
+Matters beyond the test: the same encoder builds the shareable "replay this
+on pvpoke.com" links on published Cramorant pages, so those links currently
+show readers a different fight from the one the page describes. Fix or
+remove the links before the next publish. Pinned by
+tests/test_pvpoke_sandbox.py, whose controls are inverted to assert the
+broken state so a fix is detected.
+
 IDEA, parked 2026-09-09 (Michael: re-think after more dives land): a
 "does IV choice still matter once you're bulky?" number for the dive page.
 Metric is the RATIO, not the absolute spread -- what fraction of the full
