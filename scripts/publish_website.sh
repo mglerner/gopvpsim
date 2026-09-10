@@ -48,6 +48,35 @@ if [ ! -d "$SRC" ]; then
   exit 1
 fi
 
+# Completeness gate (added 2026-09-10). rsync runs with --delete, so this
+# script MIRRORS: whatever is in $SRC becomes the entire live site, and
+# anything missing locally is deleted from the server. That was safe while
+# userdata/website was always fully populated. It is not safe now -- the
+# 2026-09-09 userdata wipe means a publish part-way through a bake would
+# delete every page the bake had not reached yet.
+#
+# The existing "-d $SRC" check only catches the empty case. This catches the
+# PARTIAL case: refuse when the site has materially fewer dive pages than the
+# dive list says it should.
+EXPECTED_DIVES=$(cd "$REPO_ROOT" && python -c "
+import sys; sys.path.insert(0, 'scripts')
+from dive_registry import all_dives
+print(len(all_dives()))
+" 2>/dev/null || echo 0)
+ACTUAL_DIVES=$(find "$SRC" -mindepth 2 -maxdepth 2 -name index.html 2>/dev/null | wc -l | tr -d ' ')
+if [ "$SKIP_VERIFY" = false ] && [ "$EXPECTED_DIVES" -gt 0 ]; then
+  MIN_DIVES=$(( EXPECTED_DIVES * 9 / 10 ))
+  if [ "$ACTUAL_DIVES" -lt "$MIN_DIVES" ]; then
+    echo "error: refusing to publish an INCOMPLETE site." >&2
+    echo "  dive pages found: $ACTUAL_DIVES; expected ~$EXPECTED_DIVES (floor $MIN_DIVES)" >&2
+    echo "  rsync runs with --delete, so publishing now would REMOVE the" >&2
+    echo "  missing pages from pogodives.com." >&2
+    echo "  fix:    finish the bake (scripts/run_website_dives.py)" >&2
+    echo "  bypass: re-run with --skip-verify" >&2
+    exit 1
+  fi
+fi
+
 # Card-rerender gate: a renderer-side fix landed after the dives were simmed,
 # so the shipped HTML is stale until rebuilt from the replay blobs. The
 # sentinel is dropped when that happens and cleared by rerender_dive_cards.py.
