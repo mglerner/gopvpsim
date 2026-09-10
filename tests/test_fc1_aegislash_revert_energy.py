@@ -49,9 +49,10 @@ def _run(opp_species, opp_fast, opp_charged, s_aegi, s_opp):
     ('Jumpluff', 'FAIRY_WIND', ['ENERGY_BALL', 'ACROBATICS'], 1, 1, (654, 345, 0)),
     # Jumpluff L34, 1-2. Pre-fix 553/446, post-fix 561/438 == oracle.
     ('Jumpluff', 'FAIRY_WIND', ['ENERGY_BALL', 'ACROBATICS'], 1, 2, (561, 438, 0)),
-    # Gligar L28, 2-1. CORRECTED WINNER FLIP: pre-fix 571/428 (Aegislash WINS)
-    # -> post-fix 492/508 (Aegislash LOSES) == oracle winner 1.
-    ('Gligar', 'WING_ATTACK', ['NIGHT_SLASH', 'DIG'], 2, 1, (492, 508, 1)),
+    # Gligar L28, 2-1. The winner flip this row exists to pin still holds
+    # (Aegislash LOSES). Score re-derived 2026-09-09 under the new turn
+    # system and VERIFIED: PvPoke master returns 456/544 winner 1 exactly.
+    ('Gligar', 'WING_ATTACK', ['NIGHT_SLASH', 'DIG'], 2, 1, (456, 544, 1)),
 ])
 def test_fc1_revert_energy_matches_oracle(opp_species, opp_fast, opp_charged,
                                           s_aegi, s_opp, oracle):
