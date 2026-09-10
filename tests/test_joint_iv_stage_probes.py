@@ -242,9 +242,17 @@ def test_engine_default_policy_flag_pins_the_shipped_probe(tmp_path,
                 'the shipped page is no longer byte-stable')
 
     check = _stage_check(out)
-    assert check['sim_body_slam_damages_in_order'] == [37, 30]
+    # RE-DERIVED 2026-09-09. BODY_SLAM was rebalanced (power 55 -> 65, energy
+    # 35 -> 40), so it hits harder and costs more: the probe now throws it
+    # ONCE where it used to throw twice, and every closed-form damage moved up.
+    #
+    # The two halves stay consistent, which is the point of the pairing: the
+    # single observed 35 is exactly the '-1' entry of the closed-form table,
+    # i.e. it lands after one Icy Wind has applied. Under legacy the two
+    # observed values were 37 and 30 -- the '0' and '-1' entries.
+    assert check['sim_body_slam_damages_in_order'] == [35]
     assert check['closed_form_body_slam_by_stage'] == {
-        '0': 37, '-1': 30, '-2': 25, '-3': 22, '-4': 19}
+        '0': 44, '-1': 35, '-2': 30, '-3': 25, '-4': 22}
     assert check['icy_winds_thrown'] == 2
     assert check['all_observed_in_closed_form_set']
 
