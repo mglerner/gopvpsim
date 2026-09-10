@@ -480,6 +480,17 @@ def species_id(species_name, *, shadow=False):
     return sid
 
 
+_species_by_id = None
+
+
+def _species_entry(sid):
+    """Gamemaster entry for a speciesId, or None. Cached on first use."""
+    global _species_by_id
+    if _species_by_id is None:
+        _species_by_id = {p['speciesId']: p for p in load_gamemaster()['pokemon']}
+    return _species_by_id.get(sid)
+
+
 def get_default_moveset(species_name, league='great', shadow=False, cup=None):
     """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
 
@@ -530,6 +541,21 @@ def get_default_moveset(species_name, league='great', shadow=False, cup=None):
     index = _get_rankings_index(league)
     if sid in index:
         return _split(index[sid]['moveset'])
+
+    # MEGAS: PvPoke ranks them in their OWN cup, so a mega is absent from the
+    # open-league rankings no matter how strong it is -- Sableye (Mega) is #3
+    # in the mega GL cup and unranked in `all`. Fall back to that cup rather
+    # than making every caller know about it, and gate on the `mega` TAG so no
+    # other species' resolution changes. Added 2026-09-10 to let megas sit in
+    # the ordinary opponent pools (Michael: "just include a handful of megas
+    # in the pool", users filter them in the UI).
+    if cup is None and 'mega' in (_species_entry(sid) or {}).get('tags', ()):
+        try:
+            mega_index = _get_rankings_index(league, cup='mega')
+        except Exception:
+            mega_index = {}
+        if sid in mega_index:
+            return _split(mega_index[sid]['moveset'])
 
     # Primary lookup missed — try the explicit-fallback dict before raising.
     fallback = _DEFAULT_MOVESET_FALLBACK.get((sid, league))

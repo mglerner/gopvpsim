@@ -1,5 +1,5 @@
-# Top 30 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 49 unique species.
-# Generated 2026-09-09 by scripts/build_opponent_pool.py
+# Top 30 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 51 unique species.
+# Generated 2026-09-10 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 Tinkaton
@@ -32,6 +32,8 @@ Vigoroth
 Deoxys (Defense)
 Marowak
 Annihilape
+Sableye (Mega)
+Malamar (Mega)
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)

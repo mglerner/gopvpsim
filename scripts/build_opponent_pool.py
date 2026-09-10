@@ -133,6 +133,19 @@ def _cs_names():
 
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
+        'Sableye (Mega)': (
+            'Michael, 2026-09-10. MEGAS CANNOT REACH ANY RANK CUT: PvPoke '
+            'ranks them in their own cup, so a mega is absent from the open '
+            'GL rankings however strong it is. Sableye (Mega) is #3 in the '
+            'mega GL cup and unranked in `all`. Caleb Peng puts it in A tier '
+            'and ItsAxn also flags it. Megas are legal for much of this '
+            'season and users can filter them out in the dive UI, so it goes '
+            'in the ordinary pool rather than getting a separate dive.'),
+        'Malamar (Mega)': (
+            'As above; #27 in the mega GL cup, and in ItsAxn\'s Meta row. '
+            'A supermega, so it fields THREE charged moves. Sableye and '
+            'Malamar are the only two worth carrying -- the next mega is '
+            'Mawile at #181, so the tier drops off a cliff after these two.'),
         'Rillaboom': (
             'Michael, 2026-09-09, asked for explicitly. NOT an ItsAxn pick -- '
             'he puts it in STRONG SPICE, not meta-or-better. GL #70, so it '
@@ -180,6 +193,8 @@ CURATED_INCLUSIONS = {
             'pool independent of where any given ranking pass puts it.'),
     },
     'gl_top30_plus_cs_top100': {
+        'Sableye (Mega)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
+        'Malamar (Mega)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Aegislash (Shield)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Aegislash (Blade)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Melmetal': 'same as gl_top50_plus_cs -- this is the fast-dive GL pool',
