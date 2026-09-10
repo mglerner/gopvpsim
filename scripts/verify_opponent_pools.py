@@ -91,6 +91,23 @@ for _pool, _entries in _bop.CURATED_EXCLUSIONS.items():
     CURATED_EXCLUSIONS.setdefault(_pool, {}).update(_entries)
 
 
+def _species_only(name):
+    """Drop an inline `| fast=.. | charged=..` override.
+
+    _read_pool normalises pool lines to bare species names, so a curated
+    inclusion that CARRIES a moveset (both Thievul variants, 2026-09-10) must
+    be normalised the same way before the two sets are compared -- otherwise
+    the requirement can never be satisfied and the guard reports permanent
+    drift on a pool that is actually correct.
+
+    Consequence, stated because it is a real weakening: this checks that the
+    SPECIES is present, not that each moveset variant is. The generator is
+    what guarantees the variants, and test_recipes_actually_apply_their_
+    inclusions pins that.
+    """
+    return name.split('|', 1)[0].strip()
+
+
 def _required(pool_key):
     """Curated inclusions for a pool -- the table lives with the RECIPES.
 
@@ -100,7 +117,12 @@ def _required(pool_key):
     went stale to begin with.
     """
     from build_opponent_pool import CURATED_INCLUSIONS
-    return CURATED_INCLUSIONS.get(pool_key, {})
+    # Keys are normalised to bare species names: an inclusion may carry an
+    # inline moveset override (both Thievul variants), and _read_pool strips
+    # those, so the two sides have to be compared in the same shape. See
+    # _species_only.
+    return {_species_only(k): v
+            for k, v in CURATED_INCLUSIONS.get(pool_key, {}).items()}
 
 
 def _read_pool(path):
