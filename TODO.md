@@ -1014,9 +1014,25 @@ deep_dive_rendering.anchor_group_id once per moveset section. Worth cleaning
 for standards-compliance, not for behaviour; do it when the renderer is next
 open, and re-measure with the template-stripping trigger.
 
-DEAD CODE in the Cramorant strat, found 2026-09-10 by the sensitivity
-sweep, cleanup deferred (Michael). None of it is reachable from the shipped
-sheet, so removing it is safe but should be its own commit:
+NOT DEAD CODE after all -- item CLOSED 2026-09-10, no action.
+
+The sensitivity sweep flagged these as unreachable from the shipped sheet,
+which is true, and I started removing them. The tests say the retention is
+DELIBERATE:
+
+    test_pogodives.py:349  "The retired cmp_dpt / cmp_dpt_e modes stay
+                            available: synthetic rows."
+    test_pogodives.py:394  "The 'cheap' tank mechanism (kept for future
+                            rows): synthetic row."
+
+A previous session retired these from the SHEET while keeping the mechanisms
+working, and wrote synthetic-row tests that prove they still do. Removing
+them breaks those two tests, and the whole cost of keeping them is ~8 lines
+plus three constants. Reverted.
+
+Worth knowing if a future campaign wants a 2v1 or cheap-tank rule back: the
+machinery is live and tested, so the sheet entry is all that is needed.
+The former list, for reference:
 
   * `_POGODIVES_TANK_CHEAP_FRAC` -- read only under tank_rule 'cheap';
     the sheet uses only 'lead' and 'lead_ready'.
