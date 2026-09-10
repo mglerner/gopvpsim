@@ -84,12 +84,19 @@ def _sweep(focal, opp, league='master'):
     return out
 
 
-# Xerneas pairs a self-debuffing cheapest move (Close Combat) with a
-# non-debuffing alternative, which is exactly block (e)'s trigger shape. Found
-# by the corpus A/B, not hand-picked.
-XERNEAS = ('Xerneas', 'GEOMANCY', ['CLOSE_COMBAT', 'MOONBLAST'])
-PALKIA_O = ('Palkia (Origin)', 'DRAGON_BREATH',
-            ['SPACIAL_REND', 'DRACO_METEOR'])
+# The liveness probe needs a matchup that actually REACHES block (e): a
+# self-debuffing cheapest move paired with a clean alternative.
+#
+# Xerneas (Close Combat / Moonblast) was that matchup under the legacy turn
+# system and stopped being one on 2026-09-09 -- toggling the knob against
+# Palkia (Origin) changed nothing, which made a live knob look dead. Replaced
+# by SEARCHING the gamemaster for focals with the trigger shape and testing
+# which ones the toggle still moves, rather than hand-picking a replacement.
+# Raikou pairs WILD_CHARGE (self -2 defense) with SHADOW_BALL (clean) and both
+# it and Dialga are real Master League meta, so the probe stays meaningful.
+# Kept for reference: Galarian Rapidash also discriminates.
+RAIKOU = ('Raikou', 'THUNDER_SHOCK', ['WILD_CHARGE', 'SHADOW_BALL'])
+DIALGA = ('Dialga', 'DRAGON_BREATH', ['IRON_HEAD', 'DRACO_METEOR'])
 
 
 def test_block_e_actually_changes_something_when_toggled(knob):
@@ -100,9 +107,9 @@ def test_block_e_actually_changes_something_when_toggled(knob):
     current default is, so it keeps working if the decision is revisited.
     """
     knob('_AL_SHIELDS_DOWN_ANTI_DEBUFF', True)
-    on = _sweep(XERNEAS, PALKIA_O)
+    on = _sweep(RAIKOU, DIALGA)
     knob('_AL_SHIELDS_DOWN_ANTI_DEBUFF', False)
-    off = _sweep(XERNEAS, PALKIA_O)
+    off = _sweep(RAIKOU, DIALGA)
     before, after = off, on
     assert before != after, (
         'toggling _AL_SHIELDS_DOWN_ANTI_DEBUFF changed nothing on a matchup '
@@ -124,11 +131,11 @@ def test_disabling_a_knob_restores_the_default_result(knob, name):
     holds ordering and dpe) rather than only branching.
     """
     default = getattr(B, name)
-    base = _sweep(XERNEAS, PALKIA_O)
+    base = _sweep(RAIKOU, DIALGA)
     knob(name, not default)
-    _sweep(XERNEAS, PALKIA_O)
+    _sweep(RAIKOU, DIALGA)
     knob(name, default)
-    assert _sweep(XERNEAS, PALKIA_O) == base
+    assert _sweep(RAIKOU, DIALGA) == base
 
 
 def test_knobs_are_documented_where_someone_will_look():

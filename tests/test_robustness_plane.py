@@ -114,13 +114,20 @@ def test_no_bait_plane_differs_and_wrapper_stays_bait_on():
     """focal_bait=False is a real axis and the wrapper never exposes it
     (always bait-on, matching the historical behavior).
 
-    Fixture: Lickilicky (Body Slam 35 / Shadow Ball 55 -- the classic
-    cheap-bait spread) vs Shadow Quagsire, which at k=24 differs in 49
-    score cells AND flips 24 win cells between bait modes (measured
-    2026-08-10; Corviknight vs Azumarill, the other fixtures' pair, is
-    genuinely bait-insensitive at small k)."""
-    r1 = iv_rank('Lickilicky', league='great', shadow=False)[0]
-    args = ('Lickilicky', 'ROLLOUT', ['BODY_SLAM', 'SHADOW_BALL'], False,
+    Fixture: Cramorant (Dive 45 / Fly 45+ -- Dive is the cheap bait) vs
+    Shadow Quagsire, which at k=24 differs in 72 score cells AND flips 24
+    win cells between bait modes (measured 2026-09-09).
+
+    REPLACED 2026-09-09. The previous fixture was Lickilicky (Body Slam 35 /
+    Shadow Ball 55), which differed in 49 score cells under the legacy turn
+    system and differs in ZERO now -- BOTH of its charged moves were
+    rebalanced this season, so the bait economics moved out from under it and
+    a live axis looked dead. The replacement was found by SEARCHING focal /
+    opponent pairs for one that still separates, not by hand-picking;
+    Corviknight vs Lickilicky (48 cells, 12 flips) also works if this one ever
+    goes quiet."""
+    r1 = iv_rank('Cramorant', league='great', shadow=False)[0]
+    args = ('Cramorant', 'PECK', ['DIVE', 'FLY'], False,
             (r1['atk_iv'], r1['def_iv'], r1['sta_iv']),
             'Quagsire', 'MUD_SHOT', ['AQUA_TAIL', 'STONE_EDGE'], True,
             'great', [(sf, so) for sf in range(3) for so in range(3)])
