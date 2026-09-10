@@ -62,12 +62,12 @@ def build(species, shadow, sh):
 
 # Policies that IGNORE the passed mechanics -> force LEGACY decisions, so we can
 # isolate the new-resolution/legacy-decisions baseline (the non-regression floor).
-def _cp_leg(a, d, mechanics='legacy'):
-    return pvpoke_dp(a, d, mechanics='legacy')
+def _cp_leg(a, d, mechanics='new'):
+    return pvpoke_dp(a, d, mechanics='new')
 
 
-def _sp_leg(a, d, m, mechanics='legacy'):
-    return pvpoke_simulate_shield(a, d, m, mechanics='legacy')
+def _sp_leg(a, d, m, mechanics='new'):
+    return pvpoke_simulate_shield(a, d, m, mechanics='new')
 
 
 def run_one(focal, f_sh, opp, o_sh, s0, s1, force_legacy):

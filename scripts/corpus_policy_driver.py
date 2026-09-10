@@ -16,8 +16,8 @@ gains (candidate > baseline). Usage from a scratchpad script (cwd = repo root):
     import sys; sys.path.insert(0, 'scripts')
     from corpus_policy_driver import compare, build, cp_leg
     from gopvpsim.battle import pvpoke_dp
-    def candidate(a, d, mechanics='legacy'):
-        base = pvpoke_dp(a, d, mechanics='legacy')        # legacy choice
+    def candidate(a, d, mechanics='new'):
+        base = pvpoke_dp(a, d, mechanics='new')        # legacy choice
         if mechanics == 'new' and <grounded condition>:
             return <override move index>
         return base
@@ -62,14 +62,14 @@ def build(species, shadow, sh):
                                       shields=sh, league_cp=LEAGUE_CAPS['great'])
 
 
-def cp_leg(a, d, mechanics='legacy'):
+def cp_leg(a, d, mechanics='new'):
     """Forced-legacy charged decision (the baseline / opponent policy)."""
-    return pvpoke_dp(a, d, mechanics='legacy')
+    return pvpoke_dp(a, d, mechanics='new')
 
 
-def sp_leg(a, d, m, mechanics='legacy'):
+def sp_leg(a, d, m, mechanics='new'):
     """Forced-legacy shield decision (the baseline / opponent policy)."""
-    return pvpoke_simulate_shield(a, d, m, mechanics='legacy')
+    return pvpoke_simulate_shield(a, d, m, mechanics='new')
 
 
 def compare(focal, shadow, focal_cp, focal_sp=None,

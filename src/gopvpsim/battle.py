@@ -127,11 +127,11 @@ ChargedMovePolicy = Callable[["BattlePokemon", "BattlePokemon"], "int | None"]
 
 
 def always_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
-                  mechanics: str = 'legacy') -> bool:
+                  mechanics: str = 'new') -> bool:
     return defender.shields > 0
 
 def never_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
-                 mechanics: str = 'legacy') -> bool:
+                 mechanics: str = 'new') -> bool:
     return False
 
 def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
@@ -510,7 +510,7 @@ def _is_instant(move: dict) -> bool:
 
 
 def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
-                           mechanics: str = 'legacy') -> bool:
+                           mechanics: str = 'new') -> bool:
     """
     PvPoke's simulate-mode shield policy (Battle.js line 1077).
 
@@ -675,7 +675,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
 
 def pogodives_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                  *, bait_shields: bool = True,
-                 mechanics: str = 'legacy') -> "int | None":
+                 mechanics: str = 'new') -> "int | None":
     """The "PoGoDives strat" charged policy (tier 3): pvpoke_dp with the
     tuned Cramorant rules active for the side it is passed for.
 
@@ -694,7 +694,7 @@ pogodives_dp._pogodives_marker = True
 
 
 def pogodives_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
-                     move: dict, mechanics: str = 'legacy') -> bool:
+                     move: dict, mechanics: str = 'new') -> bool:
     """The "PoGoDives strat" shield policy (tier 3) -- see pogodives_dp."""
     return pvpoke_simulate_shield(attacker, defender, move,
                                   mechanics=mechanics)
@@ -704,7 +704,7 @@ pogodives_shield._pogodives_marker = True
 
 
 def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon",
-                        mechanics: str = 'legacy') -> "int | None":
+                        mechanics: str = 'new') -> "int | None":
     """Throw the first charged move we have enough energy for."""
     for i, move in enumerate(attacker.charged_moves):
         if attacker.energy >= move['energy']:
@@ -712,7 +712,7 @@ def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon",
     return None
 
 def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon",
-                       mechanics: str = 'legacy') -> "int | None":
+                       mechanics: str = 'new') -> "int | None":
     """
     Bait-shield heuristic: if defender has shields, prefer the cheapest charged
     move first; otherwise use the highest-damage move available.
@@ -731,7 +731,7 @@ def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon",
         return max(affordable, key=lambda im: im[1]['power'])[0]
 
 def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon",
-            mechanics: str = 'legacy') -> "int | None":
+            mechanics: str = 'new') -> "int | None":
     """
     Never bait: always fire the affordable move with the highest actual
     damage-per-energy, regardless of whether the defender has shields.
@@ -749,7 +749,7 @@ def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon",
     return max(affordable, key=actual_dpe)[0]
 
 def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon",
-              mechanics: str = 'legacy') -> "int | None":
+              mechanics: str = 'new') -> "int | None":
     """
     Mimic PvPoke's ActionLogic AI:
     - When defender has shields: throw the cheapest affordable move (bait).
@@ -775,7 +775,7 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon",
 def _calc_turns_to_live(
     attacker: "BattlePokemon",
     defender: "BattlePokemon",
-    mechanics: str = 'legacy',
+    mechanics: str = 'new',
 ) -> float:
     """
     Port of PvPoke's turnsToLive sub-DP (ActionLogic.js lines 38-138).
@@ -936,7 +936,7 @@ def _calc_turns_to_live(
 
 
 def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
-                 mechanics: str = 'legacy') -> bool:
+                 mechanics: str = 'new') -> bool:
     """
     Port of PvPoke's ActionLogic.wouldShield.
 
@@ -1112,7 +1112,7 @@ class _DPState:
 
 
 def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
-                          mechanics: str = 'legacy') -> bool:
+                          mechanics: str = 'new') -> bool:
     """
     Port of ActionLogic.js lines 237-344 (optimizeMoveTiming).
 
@@ -1574,7 +1574,7 @@ def _dp_insert_not_ready(queue: list, ns: "_DPState") -> None:
 
 
 def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
-              *, bait_shields: bool = True, mechanics: str = 'legacy') -> "int | None":
+              *, bait_shields: bool = True, mechanics: str = 'new') -> "int | None":
     """
     PvPoke's DP charged-move AI (ActionLogic.js port, no-buff case).
 
@@ -2489,7 +2489,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
 
 def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
-                   mechanics: str = 'legacy') -> "int | None":
+                   mechanics: str = 'new') -> "int | None":
     """
     Fire a charged move only on the optimal fast-move counts, as determined by
     the OPTIMAL_TIMING table keyed on (your_fast_turns, their_fast_turns).
@@ -3340,7 +3340,7 @@ def _apply_move_buffs(
 # PRIME-DIRECTIVE NOTE: every 'new'-mode behavior is guarded by an explicit
 # `if mechanics == 'new':` branch (or a _new_-prefixed helper called only
 # from such a branch). The legacy path is the unguarded existing code and is
-# byte-for-byte unchanged; the default mechanics='legacy' keeps every
+# byte-for-byte unchanged; the default mechanics='new' keeps every
 # current caller (oracle harness, tests, CLI, dives) on it.
 
 def simulate(

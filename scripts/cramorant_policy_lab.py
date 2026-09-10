@@ -107,7 +107,7 @@ def make_bp(species, league, shadow, fast_id, charged_ids, ivs=None):
 def make_withhold_policy():
     """Plan H5 counter-policy: the opponent withholds non-lethal charged
     moves while Cramorant holds prey (denying the missile a trigger)."""
-    def withhold(attacker, defender, mechanics='legacy'):
+    def withhold(attacker, defender, mechanics='new'):
         idx = pvpoke_dp(attacker, defender, mechanics=mechanics)
         if idx is not None and B._holding_prey(defender):
             move = attacker.charged_moves[idx]
@@ -207,7 +207,7 @@ def make_adaptive_shield_policy(choose_mult):
     then delegate to pvpoke_simulate_shield under it."""
     from gopvpsim.battle import pvpoke_simulate_shield
 
-    def policy(attacker, defender, move, mechanics='legacy'):
+    def policy(attacker, defender, move, mechanics='new'):
         old = B._CRAM_TANK_MULT
         B._CRAM_TANK_MULT = choose_mult(attacker, defender, move)
         try:
@@ -257,7 +257,7 @@ def make_round6_shield_policy(rule):
     from battle state, delegate to the real pogodives_shield."""
     from gopvpsim.battle import pogodives_shield
 
-    def policy(attacker, defender, move, mechanics='legacy'):
+    def policy(attacker, defender, move, mechanics='new'):
         saved = (B._POGODIVES_TANK_AGGRESSIVE, B._POGODIVES_TANK_LEAD)
         try:
             rule(attacker, defender, move)
@@ -320,7 +320,7 @@ def make_round7_policies(tank_revert=True, gate_revert=True,
     def ahead(cram, opp):
         return cram.shields > opp.shields
 
-    def charged(attacker, defender, *, bait_shields=True, mechanics='legacy'):
+    def charged(attacker, defender, *, bait_shields=True, mechanics='new'):
         saved = B._POGODIVES_DIVE_GATE_DPE
         try:
             if gate_revert and ahead(attacker, defender):
@@ -335,7 +335,7 @@ def make_round7_policies(tank_revert=True, gate_revert=True,
             B._POGODIVES_DIVE_GATE_DPE = saved
     charged._pogodives_marker = True
 
-    def shield(attacker, defender, move, mechanics='legacy'):
+    def shield(attacker, defender, move, mechanics='new'):
         saved = B._POGODIVES_TANK_AGGRESSIVE
         try:
             if tank_revert and ahead(defender, attacker):

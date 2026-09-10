@@ -245,11 +245,32 @@ def test_the_gamemaster_roster_matches_the_tag_rule():
     assert len(supers) >= 13, len(supers)
     assert len(mega_moves) >= 13, len(mega_moves)
 
-    # Every supermega is a mega, and carries exactly one extra charged move.
+    # Every supermega is level 4. Nearly all carry exactly one extra charged
+    # move -- but as of 2026-09-09 PvPoke ships ONE that does not:
+    # staraptor_mega is tagged `supermega` with no `extraChargedMoves`. It is
+    # the species the gamemaster ADDED this refresh, so this reads as an
+    # incomplete rollout upstream rather than a rule change. Our engine copes
+    # (`.get('extraChargedMoves') or []`), so it simply runs with two charged
+    # moves instead of three.
+    #
+    # Banded rather than xfailed, per the testing policy: the exception is
+    # allowed but may not GROW, and each one still has to be a real _PLUS move
+    # when present.
+    missing_extra = []
     for p in supers:
         assert mega_level_from_tags(p['tags']) == 4
-        assert len(p.get('extraChargedMoves') or []) == 1, p['speciesId']
-        assert p['extraChargedMoves'][0].endswith('_PLUS'), p['speciesId']
+        extra = p.get('extraChargedMoves') or []
+        if not extra:
+            missing_extra.append(p['speciesId'])
+            continue
+        assert len(extra) == 1, p['speciesId']
+        assert extra[0].endswith('_PLUS'), p['speciesId']
+    assert len(missing_extra) <= 1, (
+        f'more supermegas now lack extraChargedMoves than the one known gap: '
+        f'{missing_extra}. If PvPoke has filled staraptor_mega in, tighten '
+        f'this back to == 0 rather than raising the band.')
+    assert missing_extra in ([], ['staraptor_mega']), (
+        f'a DIFFERENT supermega lacks extraChargedMoves: {missing_extra}')
 
     # Positive control: the mega roster is not silently empty and the
     # supermega set is a strict subset.
