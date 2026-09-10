@@ -1104,8 +1104,13 @@ def main() -> int:
     # The matchup web lives at the site root (userdata/website/matchups/) with
     # no meta.toml, so load_entries() picks it up as a "dive". It is not a
     # per-species dive, so split it out by slug into its own section.
-    matchup_web = [d for d in dives if d['slug'] == 'matchups']
-    dives = [d for d in dives if d['slug'] != 'matchups']
+    # Prefix match, not equality: there is one matchup web PER LEAGUE as of
+    # 2026-09-10 ('matchups' = Great, 'matchups-ultra' = Ultra). An exact
+    # 'matchups' test would let the UL page fall through and render as if it
+    # were a per-species dive.
+    _is_mw = lambda d: d['slug'] == 'matchups' or d['slug'].startswith('matchups-')
+    matchup_web = [d for d in dives if _is_mw(d)]
+    dives = [d for d in dives if not _is_mw(d)]
     # Limited-cup dives (`<species>-<cup>-cup`) route onto a SEPARATE cup-index
     # page, not the evergreen league lists. Split them out by slug so they
     # neither pollute the main "Dives" list nor silently fall through as

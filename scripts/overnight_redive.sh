@@ -172,6 +172,15 @@ step "Rendering Kanto Ninetales regular-vs-Shadow comparison" \
 step "Building Great League matchup web" \
     python scripts/build_matchup_web.py
 
+# 6b. Ultra League matchup web. Added 2026-09-10. build_matchup_web.py RE-SIMS
+#     from a pool file at PvPoke default IVs and consumes no dive output, so
+#     this is independent of the dives above -- it is sequenced here only to
+#     keep the site's pages built in one place.
+step "Building Ultra League matchup web" \
+    python scripts/build_matchup_web.py --league ultra \
+        --pool opponent_pools/ul_top60.txt \
+        --out userdata/website/matchups-ultra/index.html
+
 # 7b. Master-league ML IV guides (run_iv_guides.py, whole master_top60 pool).
 #     Independent COLD job (the float32 engine fix + fresh PvPoke pull orphaned
 #     the caches), sequenced AFTER the dives so the two never oversubscribe the
