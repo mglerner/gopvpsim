@@ -36,10 +36,16 @@ lines of mostly-completed chronological batches. -->
   (2,1) is exempt again -- every firing setting was negative, and exempting
   is strictly better than the v4 rule (same total wins, better mean).
   ONE ACCEPTED EXCEPTION remains: UL 0v1 is -2 win cells (both Dondozo) with
-  +8.3 mean, kept because the -2 is exactly offset by +2 in GL. Root cause is
-  the new TURN ORDERING, not move data (Dondozo's moves were not
-  rebalanced) -- finding it is the only way to keep the GL gain without the
-  UL loss. Original failure notes:
+  +8.3 mean, kept because the -2 is exactly offset by +2 in GL.
+
+  CORRECTED 2026-09-10: this is PRE-EXISTING, not a rebalance regression, and
+  an earlier note here wrongly blamed the turn ordering. Measured: the cell is
+  byte-identical under legacy and new mechanics; neither side's kit changed in
+  any sim-relevant field (Cramorant's only Gulp Missile diff is an `unlisted`
+  display flag); and the whole slice is the SAME -2 against the June 2026 pool
+  that predates the August campaign. The strat simply turns a 515 win into a
+  500/500 tie vs Dondozo -- a standing cost of dive-early into a bulky
+  opponent. NOT a re-fit input. Original failure notes:
 - REBALANCE re-verify: **RUN 2026-09-10, and it FAILED the bar.** Still
   net-positive overall (+76 win-cells vs baseline) but UL 2v1 is NEGATIVE
   (-1.325 mean, all of it Jellicent) and UL 0v1 loses two win cells (both
