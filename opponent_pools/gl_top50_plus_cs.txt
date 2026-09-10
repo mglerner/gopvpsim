@@ -1,5 +1,5 @@
-# Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 71 unique species.
-# Generated 2026-09-09 by scripts/build_opponent_pool.py
+# Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 73 unique species.
+# Generated 2026-09-10 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 Tinkaton
@@ -62,6 +62,8 @@ Spidops
 Dragonair (Shadow)
 Turtonator
 Charjabug
+Sableye (Mega)
+Malamar (Mega)
 Rillaboom
 Aegislash (Shield)
 Aegislash (Blade)
