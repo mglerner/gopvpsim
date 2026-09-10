@@ -29,6 +29,8 @@ def tinkaton_mantine_reach():
                           focal_ranked, opp_cohort), entries
 
 
+@pytest.mark.skip(reason=(
+    "Worlds surface is DORMANT until the 2027 cycle (Michael, 2026-09-10). These regenerate Worlds artifacts and diff them against copies built under the LEGACY engine with a pinned gamemaster -- see the standing rules in TODO.md. Re-deriving them against the new turn system would not just be wasted work, it would overwrite a record of what was actually published. Un-skip when Worlds prep resumes, or if the IV-robustness work lands first and needs them."))
 def test_reach_reproduces_dragapultsim_guarantee(tinkaton_mantine_reach):
     reach, _ = tinkaton_mantine_reach
     rows = {(r['move'], r['n_charged']): r for r in reach['rows']}
