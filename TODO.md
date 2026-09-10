@@ -1015,15 +1015,32 @@ DIFFERENT fight:
     our sim                 662 / hp [51, 0] / shields [0, 0]
     PvPoke replaying it     573 / hp [23, 0] / shields [0, 1]
 
-Two things say encoder, not engine. Lapras still holds a shield in the
-replay that our sim spends. And dropping the cancelled-charged action from
-the URL changes NOTHING -- both scripts replay identically at 573 -- where
-before the 2026-08-27 encoder fix that action was worth 656 vs 662. So the
-action is still written into the URL but no longer alters the fight it
-produces, which is a round-trip failure rather than a scoring drift. The
-likely cause is that the new system resolves charged moves in the turn they
-are thrown and the URL grammar cannot express that ordering (or the shield
-decision attached to it). NOT confirmed.
+DIAGNOSED 2026-09-10 -- it IS the encoder, and the mechanism is a
+TURN-CLOCK MISMATCH, not the URL grammar.
+
+First, a correction: the 662-vs-573 gap is NOT engine divergence. The
+fixture runs the PoGoDives strat, so 662 is the strat's dive-early line
+while plain PvPoke's AI (573, confirmed via pvpoke_trace.js) never throws
+Dive at all. The replay lands on 573 because when our actions are dropped
+the fight degrades toward PvPoke's own AI.
+
+What actually breaks: TWO actions are silently dropped, both Cramorant FLY
+(T24 and T37). Our timeline logs a fast move's RESOLUTION one turn before
+PvPoke logs the same move -- ours has "T23 fast -> energy 48" then "T24 uses
+Fly", while PvPoke logs that PECK at T24. So the encoded charged action
+lands on a turn PvPoke cannot execute, gets dropped, and the loss cascades
+(T24's absence changes the state T37 depended on). Under the legacy clock
+the two numberings coincided; the new same-turn charged resolution pulled
+them apart.
+
+Confirmed by construction: shifting ONLY the T24 action to T25 makes the
+Fly fire and the shields go [0,1] -> [0,0], matching our sim. Shifting ALL
+actions +1 gives 417, so the correction is conditional on a fast move
+resolving that turn, not a uniform offset.
+
+FIX = a turn-mapping from our clock to PvPoke's action-script clock in
+timeline_to_actions. Not attempted yet; writing it without deriving the
+rule would be guessing.
 
 Matters beyond the test: the same encoder builds the shareable "replay this
 on pvpoke.com" links on published Cramorant pages, so those links currently
