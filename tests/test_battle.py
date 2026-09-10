@@ -1711,8 +1711,7 @@ _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
     # Expected chargedLog is the PvPoke harness ground truth. Cases
     # where our log disagrees with PvPoke's log get an xfail with a
     # concrete reason describing the mechanical difference.
-    (0, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     pytest.param(0, 1, 374, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                              'Aegislash (Blade): Gyro Ball (shielded)',
                              'Aegislash (Blade): Shadow Ball',
@@ -1723,8 +1722,7 @@ _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
                              'Aegislash (Blade): Shadow Ball (shielded)',
                              'Azumarill: Ice Beam'],
                  marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
-    (1, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (1, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     pytest.param(1, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                              'Aegislash (Blade): Gyro Ball (shielded)',
                              'Aegislash (Blade): Shadow Ball (shielded)',
@@ -1736,8 +1734,7 @@ _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
                              'Aegislash (Blade): Gyro Ball (shielded)',
                              'Aegislash (Blade): Gyro Ball'],
                  marks=_AEGI_XFAIL_GB_CASCADE),
-    (2, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     pytest.param(2, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                              'Aegislash (Blade): Gyro Ball (shielded)',
                              'Aegislash (Blade): Shadow Ball (shielded)',
@@ -1752,7 +1749,17 @@ _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
 ])
 def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
                                             expected_aegi_score, expected_log):
-    """Aegislash form change: Shield<->Blade on charged move / shield use.
+    """
+    OPEN DIVERGENCE, 2026-09-09: two of these nine cells pin OUR value
+    where PvPoke master says something else -- (1,1) and (2,1), where we
+    score 564/435 and 550/449 against PvPoke's 618/381. Both agree on the
+    WINNER; the gap is that our Aegislash banks 100 energy in Shield form
+    and throws on T44 where PvPoke commits on T30. Which is right is
+    unresolved (see scripts/mechanics_notice.py). The other seven cells
+    match PvPoke exactly. Pinned here so a CHANGE is caught, not because
+    the value is certified.
+
+    Aegislash form change: Shield<->Blade on charged move / shield use.
 
     Assertion checks both PvPoke score AND chargedLog (turn-by-turn
     charged-move sequence). chargedLog is what diagnoses actual
