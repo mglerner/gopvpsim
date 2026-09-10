@@ -73,7 +73,7 @@ def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
 def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
               shields_opp, atk_iv, def_iv, sta_iv, shadow,
               opp_species, opp_fast, opp_charged, opp_shadow=False,
-              opp_iv_mode='pvpoke', threshold_registry=None, mechanics='legacy'):
+              opp_iv_mode='pvpoke', threshold_registry=None, mechanics='new'):
     """Run one sim and return the focal mon's PvPoke score (0-1000)."""
     bp0 = make_battle_pokemon(focal_species, fast_id, charged_ids, league,
                               shields_focal, atk_iv, def_iv, sta_iv, shadow)
@@ -120,7 +120,7 @@ _REF_TIE_MARGIN = 10.0
 
 def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                     shield_scenarios, top_n, opp_iv_mode='pvpoke',
-                    threshold_registry=None, mechanics='legacy',
+                    threshold_registry=None, mechanics='new',
                     reference_moveset=None):
     """
     Quick screen: sim rank-1 IVs for each moveset against opponents.
@@ -404,7 +404,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0, mechanics='legacy',
+                       focal_energy=0, mechanics='new',
                        capture_metrics=False, policy_tier='pvpoke'):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
@@ -537,7 +537,7 @@ class SweepConfig:
     reserve_cpus: int = 0
     signature_dedup: bool = True
     use_sweep_cache: bool = False
-    mechanics: str = 'legacy'
+    mechanics: str = 'new'
 
     @classmethod
     def from_args(cls, args, log_path=None, threshold_registry=None):
@@ -568,7 +568,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
-             use_sweep_cache=False, mechanics='legacy',
+             use_sweep_cache=False, mechanics='new',
              focal_max_level=None, opp_max_level=None, capture_energy=False,
              capture_metrics=False):
     """
