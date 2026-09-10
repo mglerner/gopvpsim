@@ -133,6 +133,18 @@ def _cs_names():
 
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
+        # BOTH Thievul movesets (Michael, 2026-09-10): "it's legit with both".
+        # PvPoke's default is ICY_WIND; we rank PLAY_ROUGH higher, and the two
+        # play differently enough that a dive should face each. Written out
+        # explicitly -- letting the bare `Thievul` line mean "whatever PvPoke
+        # defaults to today" would silently swap which variant is in the pool
+        # the next time the rankings move. The bare entry is excluded below.
+        'Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,ICY_WIND':
+            "PvPoke's current GL default moveset for Thievul.",
+        'Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,PLAY_ROUGH':
+            'The PLAY_ROUGH variant, which we rank above Icy Wind. A separate '
+            'opponent rather than a replacement: a focal that beats one may '
+            'lose to the other.',
         'Sableye (Mega)': (
             'Michael, 2026-09-10. MEGAS CANNOT REACH ANY RANK CUT: PvPoke '
             'ranks them in their own cup, so a mega is absent from the open '
@@ -193,6 +205,10 @@ CURATED_INCLUSIONS = {
             'pool independent of where any given ranking pass puts it.'),
     },
     'gl_top30_plus_cs_top100': {
+        'Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,ICY_WIND':
+            'same as gl_top50_plus_cs -- the fast-dive GL pool',
+        'Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,PLAY_ROUGH':
+            'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Sableye (Mega)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Malamar (Mega)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
         'Aegislash (Shield)': 'same as gl_top50_plus_cs -- the fast-dive GL pool',
@@ -237,6 +253,13 @@ CURATED_INCLUSIONS = {
 # drift, not an exclusion.
 
 CURATED_EXCLUSIONS = {
+    'gl_top50_plus_cs': {
+        'Thievul': ('Not a removal -- REPLACED by the two explicit '
+                    'moveset variants in CURATED_INCLUSIONS. The bare '
+                    'line would resolve to whatever PvPoke defaults to, '
+                    'duplicating one of them.')},
+    'gl_top30_plus_cs_top100': {
+        'Thievul': 'same as gl_top50_plus_cs -- replaced by the variants'},
     # AEGISLASH WAS EXCLUDED HERE ON 2026-09-09 AND THE EXCLUSION WAS
     # WITHDRAWN THE SAME DAY. Recorded because the reasoning is the point:
     #

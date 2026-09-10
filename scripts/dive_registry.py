@@ -195,13 +195,24 @@ def read_pool(league):
 
 
 def derive_dives(league):
-    """Build the dive list for a league from its opponent pool."""
+    """Build the dive list for a league from its opponent pool.
+
+    ONE dive per species, not per pool LINE. A species can appear on several
+    lines with different inline movesets -- both Thievul variants are in the
+    GL pool as separate OPPONENTS -- but that is a statement about who a dive
+    faces, not about how many pages the species gets. Without the dedupe those
+    lines mint two dives with the same slug.
+    """
     dives = []
+    seen_slugs = set()
     for name in read_pool(league):
         shadow = '(Shadow)' in name
         species = name.replace('(Shadow)', '').strip()
         key = (species, league, shadow)
         slug = SLUG_EXCEPTIONS.get(key) or dive_slug(species, league, shadow)
+        if slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
         d = dict(species=species, league=league, slug=slug,
                  html_base=HTML_BASE, opponents_file=_pool_path(league))
         if shadow:

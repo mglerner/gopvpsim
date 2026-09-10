@@ -161,10 +161,12 @@ def test_a_missing_curated_inclusion_fails_the_guard():
         r = rows.get(pool) or rows.get(pool.removesuffix('.txt'))
         if r is None or r['status'] == 'SKIP':
             continue
-        committed = set(vp._read_pool(
-            __import__('os').path.join(vp.POOL_DIR,
-                                       pool if pool.endswith('.txt')
-                                       else pool + '.txt')))
+        # Raw lines, not vp._read_pool: that strips inline moveset overrides,
+        # and a moveset-carrying inclusion has to be checked verbatim.
+        _p = __import__('os').path.join(
+            vp.POOL_DIR, pool if pool.endswith('.txt') else pool + '.txt')
+        committed = {ln.split('#')[0].strip()
+                     for ln in open(_p) if ln.split('#')[0].strip()}
         for species in entries:
             if species not in committed:
                 assert r['status'] == 'DRIFT', (
@@ -188,7 +190,10 @@ def test_recipes_actually_apply_their_inclusions():
             continue
         result = bop.RECIPES[pool]()
         names = result[0] if isinstance(result, tuple) else result
-        produced = {n.split('|', 1)[0].strip() for n in names}
+        # Compare FULL entries, not species-only: an inclusion may carry an
+        # inline moveset override (both Thievul variants), and stripping it
+        # here would let the recipe emit a bare `Thievul` and still pass.
+        produced = {n.strip() for n in names}
         for species in required:
             assert species in produced, (
                 f'recipe {pool} does not emit required {species}; it is '
@@ -207,7 +212,7 @@ def test_extras_alone_never_fail_a_pool(tmp_path, monkeypatch):
     key = 'gl_top50_plus_cs'
     produced = bop.RECIPES[key]()
     names = produced[0] if isinstance(produced, tuple) else produced
-    names = [n.split('|', 1)[0].strip() for n in names]
+    # keep any inline moveset override verbatim -- the recipe emits some
     pool = tmp_path / f'{key}.txt'
     pool.write_text('# synthetic\n' + '\n'.join(names) + '\nBulbasaur\n')
     monkeypatch.setattr(vp, 'POOL_DIR', str(tmp_path))
