@@ -218,12 +218,19 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     # both shields spent; replaying the SAME timeline through PvPoke's engine
     # gives 573 / [23, 0] with Lapras still holding a shield.
     #
-    # The shield discrepancy is the tell, and it points at the ENCODER rather
-    # than the engine: timeline_to_actions has to express our timeline in the
-    # sandbox URL grammar, and the new turn system resolves charged moves in
-    # the same turn they are thrown. If that ordering (or the shield decision
-    # attached to it) does not round-trip through the URL, the replay is a
-    # different fight and the score gap follows. Not yet confirmed.
+    # DIAGNOSED 2026-09-10: a TURN-CLOCK MISMATCH in timeline_to_actions.
+    # Our timeline logs a fast move's RESOLUTION one turn before PvPoke logs
+    # the same move (ours: "T23 fast -> energy 48" then "T24 uses Fly";
+    # PvPoke logs that PECK at T24). The encoded charged action therefore
+    # lands on a turn PvPoke cannot execute and is silently dropped -- two
+    # of them here, both Cramorant Fly. Shifting ONLY the T24 action to T25
+    # makes it fire and the shields match; shifting all actions +1 does not,
+    # so the correction is conditional on a fast move resolving that turn.
+    #
+    # NB the 662-vs-573 gap is not engine divergence: this fixture runs the
+    # PoGoDives strat, and plain PvPoke's AI independently returns 573
+    # without ever throwing Dive. The replay reaches 573 because dropped
+    # actions let it degrade toward PvPoke's own AI.
     #
     # Tracked in TODO.md. Matters beyond this test: the same encoder builds
     # the shareable links on Cramorant pages.
