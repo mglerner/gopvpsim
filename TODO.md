@@ -364,6 +364,62 @@ that hard-fails when the pools' recorded rankings vintage does not
 match live (per the lens-grid rule: a cheap lens becomes a code-level
 guard, not a checklist sentence).
 
+## HIGH PRIORITY: dives run serially, so ~2/3 of a bake sits on 1 of 18 cores
+
+Measured 2026-09-10 during the Twilight Trails bake. Michael noticed the box
+was quiet and asked; the waste is real and it is the single biggest lever on
+bake wall-clock. Deferred only because building it mid-bake would have cost
+tokens he did not want to spend -- **the measurements below are the expensive
+part and are already done, so picking this up is cheap.**
+
+**The finding.** `run_website_dives.py:278` launches each dive with a plain
+blocking `subprocess.run` in a loop -- strictly serial, and there is no
+`--jobs` option. Each dive alternates between:
+
+* a **sweep** phase that saturates the machine (measured: 20-proc tree,
+  summed 1626% CPU = ~16.3 of 18 cores, `0.0% idle` system-wide), and
+* a **render/analysis tail** that is strictly ONE core (measured: parent at
+  99-100% CPU with no workers alive, for minutes at a stretch).
+
+Serial tail as a fraction of each dive, from the cold 2026-09-10 13:27 run:
+
+| dive               | total | sweep (parallel) | tail (1 core) | serial |
+| ------------------ | ----- | ---------------- | ------------- | ------ |
+| Tinkaton           | 682s  | 474s             | 208s          | 30%    |
+| Ninetales          | 256s  | 81s              | 175s          | 68%    |
+| Corsola (Galarian) | 481s  | 69s              | 412s          | 86%    |
+| Corviknight        | 394s  | 135s             | 259s          | 66%    |
+
+**The prize.** `chain_status.py` put the 2026-09-10 bake at **~36h** for 135
+dives + ML tail. Overlapping 2-3 dives fills each other's render tails; the
+dive step plausibly drops from ~17h to ~7-8h. Roughly a day per bake.
+
+**Implementation gotchas already identified** (do not re-derive):
+
+1. **Per-dive log capture is required.** Dive stdout is currently INHERITED
+   straight into the chain log, so concurrent dives would interleave into
+   mush -- and `chain_status.py` parses that log's `[N/M] slug` banners and
+   `Done in X.X min` markers, so interleaving breaks the watcher too.
+2. **Split `--reserve-cpus`.** The chain passes `--reserve-cpus 0`, and
+   `sweep.py:798` is `min(cpu_count() - reserve, len(chunks))`, so each dive
+   asks for all 18. Three concurrent dives would ask for 54.
+3. **`put_column` is safe across columns, NOT within one.** Sidecar writes
+   are atomic (tmp + `os.replace`, `sweep_cache.py:202-210`) but the tmp
+   filename is fixed (`<name>.tmp`), so two writers to the SAME column
+   collide. Concurrent dives have different focals -> different columns ->
+   safe. Verify that still holds for mirror-slayer/signature-dedup paths.
+4. **Memory is not the constraint.** 0.8 GB per dive process, 64 GB machine.
+5. **Do NOT also parallelize the ML guide tail.** `run_iv_guides.py --jobs 1`
+   is serial ON PURPOSE -- it is the fix for the 2026-06-27 oversubscription
+   bug, and its preflight hard-fails if `jobs x per-guide workers > cores`.
+   Only the dive step is the target.
+
+**Measurement pitfall, for whoever verifies the speedup:** counting workers
+by grepping `deep_dive.py` in `ps` output MISSES the forked pool children and
+reports `procs=1 cpu%=0` during sweeps, i.e. it makes a saturated machine look
+idle. Count the process tree by ppid instead. (This bit me on 2026-09-10 and I
+reported a wrong reading before catching it.)
+
 ## Re-dive runbook
 
 **Twilight Trails (2026-09-08) one-shot gate:** before any
