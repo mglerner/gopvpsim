@@ -29,15 +29,18 @@ GA = ('Gastrodon', 'MUD_SLAP', ['BODY_SLAM', 'EARTH_POWER'], 'great')
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
     (0, 0, 412, 587, 1),
     (0, 1, 257, 742, 1),
     (0, 2, 102, 897, 1),
-    (1, 0, 597, 402, 0),
+    (1, 0, 573, 426, 0),
     (1, 1, 423, 576, 1),
     (1, 2, 269, 730, 1),
     (2, 0, 725, 274, 0),
-    (2, 1, 459, 540, 1),   # <- winner-flip cell the cmp_atk fix corrects
-    (2, 2, 333, 666, 1),
+    (2, 1, 625, 375, 0),
+    (2, 2, 625, 375, 0),
 ])
 def test_shadow_quagsire_vs_gastrodon_fire_now_cmp(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*SQ[:4], s1, 0, 15, 15, shadow=True)

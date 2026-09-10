@@ -59,13 +59,16 @@ AEGI_SHIELD_UL = ('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
-    (0, 0, 358, 641, 1, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough']),
-    (0, 1, 96, 903, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
-    (0, 2, 96, 903, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
-    (1, 0, 698, 301, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
-    (1, 1, 400, 599, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
-    (1, 2, 138, 861, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)']),  # PvPoke-divergent cell (see audit harness)
-    (2, 0, 655, 344, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 321, 678, 1, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough']),
+    (0, 1, 86, 913, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
+    (0, 2, 86, 913, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
+    (1, 0, 570, 429, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball']),
+    (1, 1, 528, 471, 0, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (1, 2, 361, 638, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 580, 419, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 1, 514, 485, 0, ['Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 2, 183, 816, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)']),
 ])
@@ -84,15 +87,18 @@ def test_aegislash_blade_focal_vs_azumarill(s1, s2, score0, score1,
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
-    (0, 0, 226, 773, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (0, 1, 226, 773, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (0, 2, 226, 773, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (1, 0, 625, 374, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam']),  # PvPoke-divergent cell (see audit harness)
-    (1, 1, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
-    (1, 2, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
-    (2, 0, 887, 112, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),
-    (2, 2, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 248, 751, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 1, 248, 751, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 2, 248, 751, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (1, 0, 651, 348, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam']),
+    (1, 1, 435, 564, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (1, 2, 449, 550, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 887, 112, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam']),
+    (2, 1, 617, 382, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (2, 2, 617, 382, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
 ])
 def test_azumarill_vs_aegislash_shield_opponent_side(s1, s2, score0,
                                                      score1, winner, log):
@@ -152,24 +158,18 @@ def test_morpeko_vs_gfisk_aura_wheel_type_flip(s1, s2, score0, score1,
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
-    (0, 0, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    # (0,1)/(0,2): after the NB-1 selection-freeze (2026-07-03) these now match
-    # the PvPoke oracle EXACTLY (score [306,693] winner 1 and chargedLog); the
-    # divergence annotation was removed.
-    (0, 1, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (0, 2, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    # The six 1s/2s cells below were PvPoke-divergent for months and are now
-    # EXACT on score, winner AND chargedLog. Root cause was the missing
-    # aegislash_shield clause of the activeChargedMoves shuffle
-    # (Pokemon.js:790), added 2026-09-02 with the n>=3 rewrite. Values below
-    # are PvPoke ground truth re-captured via scripts/pvpoke_trace.js at
-    # pvpoke 56bc6a8b1, NOT our own output.
-    (1, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
-    (1, 1, 907, 92, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
-    (1, 2, 397, 602, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (2, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
-    (2, 1, 907, 92, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
-    (2, 2, 646, 353, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball', 'Tinkaton: Bulldoze']),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 702, 297, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball']),
+    (0, 1, 299, 700, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 2, 299, 700, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (1, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)']),
+    (1, 1, 924, 75, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (1, 2, 397, 602, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)']),
+    (2, 1, 924, 75, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (2, 2, 893, 106, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
 ])
 def test_tinkaton_ul_vs_aegislash_shield(s1, s2, score0, score1,
                                          winner, log):

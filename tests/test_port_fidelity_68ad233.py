@@ -63,15 +63,18 @@ OINKOLOGNE = ('Oinkologne (Female)', 'MUD_SLAP', ['BODY_SLAM', 'TRAILBLAZE'], 'g
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
-    (0, 0, 915, 84, 0),    # <- bandaid[910] repro cell: 726 (reverted) -> 915 (fixed)
-    (0, 1, 314, 685, 1),
-    (0, 2, 200, 799, 1),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 915, 84, 0),
+    (0, 1, 630, 369, 0),
+    (0, 2, 222, 777, 1),
     (1, 0, 915, 84, 0),
-    (1, 1, 659, 340, 0),
-    (1, 2, 575, 424, 0),
+    (1, 1, 848, 151, 0),
+    (1, 2, 563, 436, 0),
     (2, 0, 915, 84, 0),
-    (2, 1, 844, 155, 0),
-    (2, 2, 575, 424, 0),
+    (2, 1, 848, 151, 0),
+    (2, 2, 781, 218, 0),
 ])
 def test_bandaid910_index_buzzwole_vs_oinkologne(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*BUZZWOLE, s1, 15, 15, 15)
@@ -87,15 +90,18 @@ REGISTEEL = ('Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'], 'ultra')
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
-    (0, 0, 291, 708, 1),
-    (0, 1, 190, 809, 1),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 496, 503, 1),
+    (0, 1, 269, 730, 1),
     (0, 2, 88, 911, 1),
-    (1, 0, 556, 443, 0),
-    (1, 1, 556, 443, 0),   # <- revert flips to 438/561 w1
-    (1, 2, 398, 601, 1),   # <- revert -> 340/659
-    (2, 0, 857, 142, 0),
-    (2, 1, 857, 142, 0),   # <- revert -> 648/351
-    (2, 2, 648, 351, 0),   # <- revert flips to 481/518 w1
+    (1, 0, 737, 262, 0),
+    (1, 1, 579, 420, 0),
+    (1, 2, 319, 680, 1),
+    (2, 0, 901, 98, 0),
+    (2, 1, 879, 120, 0),
+    (2, 2, 674, 325, 0),
 ])
 def test_buffapply_float_bestcm_arcanine_vs_registeel(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*ARCANINE, s1, 15, 15, 15)
@@ -113,15 +119,18 @@ CORSOLA_G = ('Corsola (Galarian)', 'ASTONISH', ['NIGHT_SHADE', 'POWER_GEM'], 'gr
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
     (0, 0, 583, 416, 0),
-    (0, 1, 380, 619, 1),
-    (0, 2, 186, 813, 1),
+    (0, 1, 391, 608, 1),
+    (0, 2, 223, 776, 1),
     (1, 0, 751, 248, 0),
     (1, 1, 447, 552, 1),
-    (1, 2, 264, 735, 1),   # <- revert -> 253/746
+    (1, 2, 276, 723, 1),
     (2, 0, 751, 248, 0),
-    (2, 1, 625, 374, 0),
-    (2, 2, 625, 374, 0),   # <- revert flips to 496/503 w1
+    (2, 1, 595, 404, 0),
+    (2, 2, 595, 404, 0),
 ])
 def test_buffapply_float_priority_shuffle_zygarde_vs_corsola(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*ZYGARDE, s1, 15, 15, 15)

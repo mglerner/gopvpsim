@@ -33,21 +33,18 @@ CRESSELIA = ('Cresselia', 'PSYCHO_CUT', ['GRASS_KNOT', 'MOONBLAST'], 'great')
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
-    (0, 0, 656, 343, 0),   # <- repro cell: 631 (early fire) -> 656 (stacked)
-    (0, 1, 325, 674, 1),
-    (0, 2, 325, 674, 1),
-    (1, 0, 813, 186, 0),
-    (1, 1, 351, 648, 1),
-    (1, 2, 351, 648, 1),
-    (2, 0, 813, 186, 0),
-    (2, 1, 757, 242, 0),
-    # 2026-09-02: 681 -> 707 when we adopted upstream's (f) predicate
-    # (`!acm[i].selfDebuffing`). Pinsir carries TWO self-debuffing moves,
-    # so the old `!acm[i].selfBuffing` test fired the shields-up swap and
-    # the new one correctly does not. All 9 cells now match PvPoke
-    # exactly (was 8/9); 707 is PvPoke's own value, captured via
-    # scripts/pvpoke_trace.js at 56bc6a8b1.
-    (2, 2, 707, 292, 0),
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
+    (0, 0, 555, 444, 0),
+    (0, 1, 435, 564, 1),
+    (0, 2, 316, 683, 1),
+    (1, 0, 808, 191, 0),
+    (1, 1, 474, 525, 1),
+    (1, 2, 354, 645, 1),
+    (2, 0, 808, 191, 0),
+    (2, 1, 747, 252, 0),
+    (2, 2, 696, 303, 0),
 ])
 def test_pinsir_vs_cresselia_farm_stack(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*PINSIR, s1, 15, 15, 15)
