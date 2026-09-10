@@ -997,6 +997,23 @@ overwrite a record of what was actually published under the engine that
 produced it. Un-skip when the 2027 Worlds cycle starts, or earlier if the
 IV-robustness work needs them.
 
+DUP DOM IDS: measured 2026-09-10, NOT a blocker, but the de-dupe item that
+the pre-dive checklist says "TODO carries" is no longer in this file, so it is
+restored here.
+
+Live-DOM state on a 5-moveset dive page (Melmetal GL, after stripping BOTH
+`<script>` and `<template>` -- see the checklist's Lens 4):
+
+    duplicated ids            240   all of the form af-<hash>
+    multiplicity              2-5   (tracks the moveset count)
+    duplicated anchor targets   0   of 60 -- navigation is UNAFFECTED
+    referenced by href=#/JS/aria  0 -- nothing looks them up
+
+So they are invalid HTML that nothing depends on. Emitted by
+deep_dive_rendering.anchor_group_id once per moveset section. Worth cleaning
+for standards-compliance, not for behaviour; do it when the renderer is next
+open, and re-measure with the template-stripping trigger.
+
 DEAD CODE in the Cramorant strat, found 2026-09-10 by the sensitivity
 sweep, cleanup deferred (Michael). None of it is reachable from the shipped
 sheet, so removing it is safe but should be its own commit:

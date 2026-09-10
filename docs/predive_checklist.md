@@ -208,7 +208,16 @@ auditing or whether anyone remembers the lens.
   `scripts/deep_dive_lib/` in every code-location trigger.
 - Lens 4 (duplicate DOM ids): strip `<script>` bodies before the
   dup-id uniq or the score-pack decoder template drowns the signal in
-  false positives. Known pre-existing dup shape: `af-<hash>`
+  false positives. **ALSO STRIP `<template>` BLOCKS (added 2026-09-10).**
+  The best-buddy L51 pass renders a SECOND full copy of the dive body
+  into `<template>`s and deliberately resets the opponent-anchor
+  registry so that copy gets its own ids (deep_dive.py, the
+  `_bb_active` branch). Template content is inert -- it is not in the
+  active DOM -- so those ids are legal, but a naive dup-id count reads
+  them as duplicates. On the 2026-09-09 Melmetal page that is the
+  difference between "484 duplicated ids, 59 of 60 anchor targets
+  broken" (wrong, and alarming) and "240 duplicated, 0 anchor targets
+  affected" (right, and pre-existing). Known pre-existing dup shape: `af-<hash>`
   anchor-group ids x3 per page (deep_dive_rendering.py
   anchor_group_id emissions) + `dd-recommendations`/
   `dd-threshold-tiers` x2 -- shipped that way since at least the July
