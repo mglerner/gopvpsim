@@ -161,6 +161,8 @@ def test_resolve_moveset_restores_dive_order():
                                          forre['charged_move_ids'])
 
 
+@pytest.mark.skip(reason=(
+    "Worlds surface is DORMANT until the 2027 cycle (Michael, 2026-09-10). These regenerate Worlds artifacts and diff them against copies built under the LEGACY engine with a pinned gamemaster -- see the standing rules in TODO.md. Re-deriving them against the new turn system would not just be wasted work, it would overwrite a record of what was actually published. Un-skip when Worlds prep resumes, or if the IV-robustness work lands first and needs them."))
 def test_one_pair_bake_is_idempotent_and_clean(tmp_path):
     """End-to-end on one real pair at k=6, 2 scenarios: first bake sims
     and writes npz+manifest; second bake is a pure skip (0 tasks); the

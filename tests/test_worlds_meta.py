@@ -418,6 +418,8 @@ def test_great_toml_glob_positive_control(tmp_path):
 # mark -- they belong in the fast tier where the ship gate sees them.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason=(
+    "Worlds surface is DORMANT until the 2027 cycle (Michael, 2026-09-10). These regenerate Worlds artifacts and diff them against copies built under the LEGACY engine with a pinned gamemaster -- see the standing rules in TODO.md. Re-deriving them against the new turn system would not just be wasted work, it would overwrite a record of what was actually published. Un-skip when Worlds prep resumes, or if the IV-robustness work lands first and needs them."))
 def test_generator_is_idempotent():
     """Regenerating must reproduce the committed file byte-for-byte."""
     text, _usage, _resolver = wm.generate()

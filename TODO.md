@@ -960,6 +960,20 @@ What is already in place so the wait is safe:
 - The PVPOKE-ENGINE tripwire fires on the merge and its message now names
   these follow-ups.
 
+WORLDS TESTS SKIPPED 2026-09-10 (Michael: "no need to rederive any worlds
+stuff, that'll come again in a year"). Three tests regenerate Worlds
+artifacts and diff them against copies built under the LEGACY engine with a
+pinned gamemaster:
+
+    tests/test_worlds_meta.py::test_generator_is_idempotent
+    tests/test_worlds_bake_guards.py::test_one_pair_bake_is_idempotent_and_clean
+    tests/test_build_worlds_pair_pages.py::test_reach_reproduces_dragapultsim_guarantee
+
+They are @pytest.mark.skip, not deleted or re-derived. Re-deriving would
+overwrite a record of what was actually published under the engine that
+produced it. Un-skip when the 2027 Worlds cycle starts, or earlier if the
+IV-robustness work needs them.
+
 OPEN, found 2026-09-09: THE SANDBOX LINK ENCODER NO LONGER ROUND-TRIPS.
 `scripts/pvpoke_sandbox.py`'s `timeline_to_actions` turns one of our battle
 timelines into a pvpoke.com/battle/sandbox URL, so a reader can replay our
