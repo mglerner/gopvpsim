@@ -983,6 +983,21 @@ overwrite a record of what was actually published under the engine that
 produced it. Un-skip when the 2027 Worlds cycle starts, or earlier if the
 IV-robustness work needs them.
 
+DEAD CODE in the Cramorant strat, found 2026-09-10 by the sensitivity
+sweep, cleanup deferred (Michael). None of it is reachable from the shipped
+sheet, so removing it is safe but should be its own commit:
+
+  * `_POGODIVES_TANK_CHEAP_FRAC` -- read only under tank_rule 'cheap';
+    the sheet uses only 'lead' and 'lead_ready'.
+  * `_POGODIVES_GATE_DPT_MAX` -- shadowed at its sole consumer, cell (2,1),
+    which supplies its own `dpt_max: 0.015`.
+  * the `'cheap'` tank rule branch in `_cram_tank_mult`.
+  * the `cmp_dpt` and `cmp_dpt_e` gate branches in `_cram_dive_gate_dpe`,
+    including the hardcoded 55-energy bound inside `cmp_dpt_e`.
+
+Keep `scripts/cramorant_sensitivity.py` -- it is how this was found and how
+to re-ask after the next rebalance.
+
 OPEN, found 2026-09-09: THE SANDBOX LINK ENCODER NO LONGER ROUND-TRIPS.
 `scripts/pvpoke_sandbox.py`'s `timeline_to_actions` turns one of our battle
 timelines into a pvpoke.com/battle/sandbox URL, so a reader can replay our
