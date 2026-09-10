@@ -82,14 +82,17 @@ def test_minus_one_def_increases_incoming_damage():
 # PvPoke direct-build comparison. Locks score+winner+chargedLog against
 # regressions in the starts-busted path.
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
+    # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
+    # system; verified against the oracle harness (229/243 cells match
+    # PvPoke exactly). See the step-B commit for the warrant.
     (0, 0, 337, 662, 1, ['Mimikyu (Busted): Play Rough', 'Azumarill: Play Rough']),
-    (0, 1, 172, 827, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Play Rough']),
-    (0, 2, 172, 827, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Play Rough']),
+    (0, 1, 311, 688, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Play Rough', 'Mimikyu (Busted): Shadow Sneak']),
+    (0, 2, 175, 824, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Play Rough', 'Mimikyu (Busted): Shadow Sneak (shielded)']),
     (1, 0, 714, 285, 0, ['Mimikyu (Busted): Play Rough', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Play Rough']),
-    (1, 1, 337, 662, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak', 'Azumarill: Ice Beam']),
+    (1, 1, 324, 675, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak', 'Azumarill: Ice Beam']),
     (1, 2, 188, 811, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam']),
     (2, 0, 714, 285, 0, ['Mimikyu (Busted): Play Rough', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak']),
-    (2, 1, 626, 373, 0, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak', 'Azumarill: Play Rough (shielded)', 'Mimikyu (Busted): Shadow Sneak']),
+    (2, 1, 654, 345, 0, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak', 'Azumarill: Play Rough (shielded)', 'Mimikyu (Busted): Shadow Sneak']),
     (2, 2, 460, 539, 1, ['Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Shadow Sneak (shielded)', 'Azumarill: Ice Beam (shielded)', 'Mimikyu (Busted): Play Rough', 'Azumarill: Ice Beam']),
 ])
 def test_starts_busted_vs_azumarill_snapshot(s1, s2, score0, score1, winner, log):
