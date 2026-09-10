@@ -291,3 +291,49 @@ def test_the_resolvable_name_helper_actually_rewrites_display_names():
     assert checked, (
         'neither known display-name case is present in the GL rankings any '
         'more; find a current one or this control is dead')
+
+
+def test_active_variants_are_not_duplicates_of_the_default_moveset():
+    """A variant equal to the current default double-counts its species.
+
+    active_variants.toml is auto-merged onto every non-cup pool, adding an
+    opponent under a generated display name ("Cradily (Acid)") alongside the
+    base pool entry ("Cradily"). If the variant's moveset has since BECOME the
+    default -- which is what the Twilight Trails rankings did to Cradily and
+    both Quagsire on 2026-09-10 -- the dive loads the same Pokemon twice and
+    every per-opponent aggregate weights it double. It is invisible in the
+    pool file, and the only symptom is two rows with identical numbers.
+
+    Checked per league, because a variant can duplicate the default in one and
+    not the other (Forretress BUG_BITE differs from VOLT_SWITCH in both, so it
+    is a real alternate).
+    """
+    import tomllib
+    from gopvpsim.data import get_default_moveset
+    path = REPO / 'opponent_pools' / 'active_variants.toml'
+    variants = tomllib.loads(path.read_text())['variants']
+    assert variants, 'no active variants; this test is not discriminating'
+
+    pools = {}
+    for league, fname in (('great', 'gl_top50_plus_cs.txt'),
+                          ('ultra', 'ul_top60.txt')):
+        pools[league] = {
+            ln.split('#')[0].split('|')[0].strip()
+            for ln in (REPO / 'opponent_pools' / fname).read_text().splitlines()
+            if ln.split('#')[0].strip()}
+
+    redundant = []
+    for v in variants:
+        species, shadow = v['species'], bool(v.get('shadow', False))
+        display = f'{species} (Shadow)' if shadow else species
+        for league in ('great', 'ultra'):
+            if display not in pools[league]:
+                continue          # loader skips it; not merged in
+            fast, charged = get_default_moveset(species, league, shadow=shadow)
+            if (v.get('fast') or fast) == fast and \
+                    set(v.get('charged') or charged) == set(charged):
+                redundant.append(f'{display} [{league}]')
+    assert not redundant, (
+        f'active variants that now equal the default moveset, so the dive '
+        f'sims the species twice: {redundant}. Either drop the entry or '
+        f'point it at a moveset that is actually different.')

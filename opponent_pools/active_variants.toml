@@ -21,6 +21,23 @@
 # To toggle a variant off without losing the entry, comment its block.
 # To toggle the whole file off for a single dive: --no-active-variants.
 
+# REMOVED 2026-09-10 (pre-dive input-freshness lens):
+#
+#   Cradily (ACID), Quagsire and Quagsire (Shadow) (AQUA_TAIL/STONE_EDGE)
+#     -- these variants now DUPLICATE PvPoke's default moveset for the same
+#     species, so the dive loaded each of them TWICE under two display names
+#     ("Cradily" and "Cradily (Acid)") with byte-identical results. That
+#     double-weights the species in every per-opponent aggregate, and the
+#     Tinkaton pre-dive page shows it plainly: both rows read
+#     mean_delta=+0.54 spread=2.33 n=2505. The alt moveset is not lost --
+#     it IS the default now, so the base pool entry covers it.
+#
+#   Primeape x2 -- the species is in neither the GL nor the UL pool, so the
+#     loader skipped them silently. Dead weight.
+#
+# Kept: Forretress (BUG_BITE) and Annihilape (CLOSE_COMBAT/RAGE_FIST), both
+# still genuinely different from the current default.
+
 [[variants]]
 species = "Forretress"
 fast = "BUG_BITE"
@@ -39,33 +56,7 @@ note = "Shadow Forretress also has a meta-relevant Bug Bite variant; see the fou
 # userdata/moveset_pool_audit_2026-06-12.html pending per-stanza review.
 
 [[variants]]
-species = "Cradily"
-fast = "ACID"
-note = "CS 2026 field: 79% of 75 Cradily entries across 7 events run Acid + Grass Knot / Rock Tomb (moveset pool audit 2026-06-12)."
-
-[[variants]]
-species = "Primeape"
-charged = ["CLOSE_COMBAT", "RAGE_FIST"]
-note = "CS 2026 field: 78% of 36 Primeape entries across 7 events run Karate Chop + Close Combat / Rage Fist (moveset pool audit 2026-06-12)."
-
-[[variants]]
-species = "Primeape"
-shadow = true
-charged = ["CLOSE_COMBAT", "RAGE_FIST"]
-note = "CS 2026 field: Shadow Primeape splits the same way as regular (CC+RF dominant; n=14 small sample) (moveset pool audit 2026-06-12)."
-
-[[variants]]
 species = "Annihilape"
 charged = ["CLOSE_COMBAT", "RAGE_FIST"]
 note = "CS 2026 field: 59% of 29 Annihilape entries across 7 events run Low Kick + Close Combat / Rage Fist (moveset pool audit 2026-06-12)."
 
-[[variants]]
-species = "Quagsire"
-shadow = true
-charged = ["AQUA_TAIL", "STONE_EDGE"]
-note = "CS 2026 field: 45% of 248 Quagsire (Shadow) entries run Mud Shot + Aqua Tail / Stone Edge - both sets are meta (moveset pool audit 2026-06-12)."
-
-[[variants]]
-species = "Quagsire"
-charged = ["AQUA_TAIL", "STONE_EDGE"]
-note = "CS 2026 field: 35% of 88 Quagsire entries run Mud Shot + Aqua Tail / Stone Edge (moveset pool audit 2026-06-12)."
