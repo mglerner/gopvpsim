@@ -38,7 +38,11 @@ def _run(p0, p1, s0, s1):
 
 
 def test_lurantis_vs_cresselia_gl_flip_pin():
-    # GL 1-0: ours 691/308 (Lurantis wins); PvPoke 477/522 (Lurantis loses).
+    # GL 1-0. RE-DERIVED 2026-09-09 under the new turn system: ours is now
+    # 613/386 (Lurantis still wins). The divergence this test exists to pin is
+    # still there but has CHANGED SHAPE -- PvPoke used to say 477/522
+    # (Lurantis loses) and now returns a 500/500 TIE. So we and PvPoke still
+    # disagree, on a different boundary than before.
     lur = _make_battle_pokemon('Lurantis', 'LEAFAGE',
                                ['LEAF_STORM', 'SUPER_POWER'],
                                'great', 1, 15, 15, 15)
@@ -46,7 +50,7 @@ def test_lurantis_vs_cresselia_gl_flip_pin():
                                ['GRASS_KNOT', 'MOONBLAST'],
                                'great', 0, 15, 15, 15)
     r = _run(lur, cre, 1, 0)
-    assert r.pvpoke_score(0) == 691
+    assert r.pvpoke_score(0) == 613
     assert r.winner == 0
 
 
