@@ -51,6 +51,10 @@ from deep_dive import make_battle_pokemon, _parse_opponent_pool_line
 # side only would push the other side's text below the AA floor.
 from deep_dive_matchup_clusters import WR_RAMP_MIN_PCT, WR_RAMP_MAX_PCT
 
+# Default only -- overridden by --league. Was a hard-coded constant until
+# 2026-09-10, which made "build the UL matchup web" look like a code change
+# gated on the UL dive. It is neither: this script RE-SIMS from a pool file
+# and consumes no dive output, so a UL page needs only --league ultra --pool.
 LEAGUE = 'great'
 SHIELD_SCENARIOS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 DEFAULT_POOL = os.path.join(os.path.dirname(__file__), '..',
@@ -59,7 +63,7 @@ DEFAULT_OUT = os.path.join(os.path.dirname(__file__), '..',
                            'userdata', 'website', 'matchups', 'index.html')
 
 
-def load_pool(pool_path, limit=None):
+def load_pool(pool_path, limit=None, league=LEAGUE):
     """Parse the opponents-file into resolved sim entries.
 
     Returns (entries, skipped) where each entry is a dict with display,
@@ -76,7 +80,7 @@ def load_pool(pool_path, limit=None):
             try:
                 if fast_ov is None or charged_ov is None:
                     d_fast, d_charged = get_default_moveset(
-                        base, league=LEAGUE, shadow=is_shadow)
+                        base, league=league, shadow=is_shadow)
                 else:
                     d_fast, d_charged = None, None
                 fast_id = fast_ov if fast_ov is not None else d_fast
@@ -87,7 +91,7 @@ def load_pool(pool_path, limit=None):
                 # opponent uses its OWN PvPoke default IVs, which differ from the
                 # base for ~37 species).
                 _lv, a_iv, d_iv, s_iv = pvpoke_default_ivs(
-                    base, league=LEAGUE, shadow=is_shadow)
+                    base, league=league, shadow=is_shadow)
             except (KeyError, ValueError) as exc:
                 skipped.append((display, str(exc)))
                 continue
@@ -101,7 +105,7 @@ def load_pool(pool_path, limit=None):
     return entries, skipped
 
 
-def run_matrix(entries):
+def run_matrix(entries, league=LEAGUE):
     """Sim all ordered pairs x 9 shield scenarios.
 
     Returns (scores, n_sims, elapsed) where scores['a-b'][i][j] is the
@@ -115,7 +119,7 @@ def run_matrix(entries):
     # Build each BattlePokemon once and reuse it via reset_for_battle()
     # (the sweep-worker pattern) — from_pokemon is ~20x the cost of a
     # single sim, so per-sim reconstruction dominates the runtime.
-    bps = [make_battle_pokemon(e['base'], e['fast'], e['charged'], LEAGUE,
+    bps = [make_battle_pokemon(e['base'], e['fast'], e['charged'], league,
                                1, *e['ivs'], shadow=e['shadow'])
            for e in entries]
     t0 = time.time()
@@ -479,6 +483,11 @@ def main():
     parser.add_argument('--out', default=DEFAULT_OUT,
                         help='output HTML path '
                              '(default: userdata/website/matchups/index.html)')
+    parser.add_argument('--league', default=LEAGUE,
+                        choices=['great', 'ultra', 'master'],
+                        help='League to sim at (default: great). Pair with a '
+                             'matching --pool; the script re-sims from the '
+                             'pool and needs no dive output.')
     parser.add_argument('--limit', type=int, default=None,
                         help='only use the first N resolvable pool entries '
                              '(quick correctness/timing check)')
@@ -489,7 +498,8 @@ def main():
                              'matrix with exit 0)')
     args = parser.parse_args()
 
-    entries, skipped = load_pool(args.pool, limit=args.limit)
+    entries, skipped = load_pool(args.pool, limit=args.limit,
+                                 league=args.league)
     pool_name = os.path.basename(args.pool)
     print(f'Pool {pool_name}: {len(entries)} species resolved'
           + (f' (limit {args.limit})' if args.limit else ''), flush=True)
@@ -512,7 +522,7 @@ def main():
               f'--allow-skipped to override.', file=sys.stderr)
         return 1
 
-    scores, n_sims, elapsed = run_matrix(entries)
+    scores, n_sims, elapsed = run_matrix(entries, league=args.league)
     print(f'Done: {n_sims:,} sims in {elapsed:.1f}s '
           f'({n_sims / elapsed:,.0f} sims/s)', flush=True)
 
