@@ -1,11 +1,13 @@
 {
  "digests": {
   "../pokemon/Pokemon.js": "3270783ce337ba748a2596a5ae9ae71d9fe07c2a6b6facfe32ffbd6c14139927",
-  "Battle.js": "cf2bfbbfd5e769549a3427733f3006f2cad115aa58711553bb16f22e075bd825",
+  "Battle.js": "52e423ab0d876ac265c61b68b33cce4cc6781ff97e6c58743486472e59437a63",
   "DamageCalculator.js": "557b9345367a272e7822b47d346b67ae05d4124050e9d3876fb2446246915f31",
   "actions/ActionLogic.js": "3847c2329c86b6bfe843f06d4b1c3b680155eb2ef8bdce65706727712cdf94e4"
  },
  "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: docs/validations/2026-09-02_pvpoke_mega_revet.md",
  "pinned_at": "2026-09-02",
- "pvpoke_commit": "79d04af74"
+ "pvpoke_commit": "a93147bf1",
+ "vetted": "2026-09-10",
+ "vetted_note": "Re-vetted per docs/rebalance_checklist.md section B after the Twilight Trails rebalance + the new-mechanics merge. Only Battle.js drifted from 79d04af74; Pokemon.js, DamageCalculator.js and ActionLogic.js are byte-identical, so PvPoke AI/strategy did NOT change and pvpoke_dp remains a valid baseline for the PoGoDives tier. Oracle audit at re-pin: 229/243 cells match exactly; the 14 that differ are 6 open Aegislash form-change cells + 8 documented xfails."
 }
