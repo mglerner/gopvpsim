@@ -116,3 +116,48 @@ def test_the_new_default_cannot_collide_with_cached_legacy_columns():
                  base_stats={'atk': 1, 'def': 1, 'hp': 1})
     assert (compute_cache_key(**sbase, mechanics='new')
             != compute_cache_key(**sbase, mechanics='legacy'))
+
+def _mechanics_help(path):
+    """The `help=` string on the --mechanics add_argument, read via ast.
+
+    ast rather than a raw regex because the help is an implicitly-concatenated
+    multi-line string literal, which a line-oriented regex reads only the first
+    fragment of -- and the first fragment is exactly where the stale
+    "legacy (default)" claim lived.
+    """
+    import ast
+    tree = ast.parse((REPO / path).read_text())
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and getattr(node.func, 'attr', None) == 'add_argument'
+                and node.args
+                and getattr(node.args[0], 'value', None) == '--mechanics'):
+            for kw in node.keywords:
+                if kw.arg == 'help':
+                    return ast.literal_eval(kw.value)
+    raise AssertionError(f'no --mechanics help found in {path}')
+
+
+@pytest.mark.parametrize('path', [
+    'scripts/battle.py',
+    'scripts/deep_dive.py',
+    'scripts/audit_oracle_harness.py',
+])
+def test_mechanics_help_does_not_contradict_its_own_default(path):
+    """Help text that names the wrong default is a lie the user reads first.
+
+    scripts/battle.py said "legacy (default)" for six weeks after the default
+    flipped to new (2026-09-09), so `--help` told everyone the opposite of what
+    the tool does. The argparse `default=` is the ground truth; this pins the
+    prose to it.
+
+    Positive control: the length floor fails if the help is emptied or the ast
+    walk silently returns something trivial, so this cannot pass vacuously.
+    """
+    help_text = _mechanics_help(path)
+    assert len(help_text) > 50, 'help text is missing or trivial'
+    default = _argparse_default(path)
+    other = 'legacy' if default == 'new' else 'new'
+    assert f'{other} (default)' not in help_text, (
+        f'{path} --help calls {other!r} the default, but argparse uses '
+        f'{default!r}')
