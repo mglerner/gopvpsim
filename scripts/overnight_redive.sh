@@ -64,6 +64,15 @@ echo "overnight chain PID $$ starting at $(date)" > "$STATUS"
 # pre-launch trigger on docs/predive_checklist.md, not a software fix.
 caffeinate -is -w $$ &
 
+# Reset the data-cache TTL at launch (added 2026-09-10). CACHE_TTL is 24h and
+# a full bake is ~13.5h, so a fresh clock leaves ~10h of slack for a sleep
+# stall; starting partway through the window throws that slack away. Touching
+# here rather than remembering to do it means the slack is always maximal.
+# NB this only moves the mtime -- it does not refetch, so the pinned content is
+# unchanged, and userdata/_preserved/gamemaster_vintages/ holds the blob this
+# bake runs against if a mixed-vintage recovery is ever needed.
+touch "$HOME/Documents/gopvpsim_cache/"*.json 2>/dev/null || true
+
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" | tee -a "$LOG"
 }
