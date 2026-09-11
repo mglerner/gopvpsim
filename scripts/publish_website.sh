@@ -156,10 +156,20 @@ echo
 # not rebuilt yet). Under --partial those failures are expected, so skip the
 # gates but say so loudly rather than silently lowering the bar.
 if [ "$PARTIAL" = true ] && [ "$SKIP_VERIFY" = false ]; then
-  echo "Skipping ship gates (--partial: they assume a complete corpus)."
-  echo "  Known-failing on a partial bake: test_article_slug_wiring"
-  echo "  (Cramorant dive -> strategy article link; the article is rebuilt"
-  echo "  after the bake). Re-run gates on the full publish."
+  # Skip ONLY verify_tests.py, not the whole roster. A partial publish is
+  # exactly when links break (deleted articles, not-yet-baked pages), so the
+  # link and dash gates are the ones you most want -- an earlier version of
+  # this branch skipped everything and silently shipped an unverified tree.
+  echo "Running ship gates (--partial: verify_tests.py excluded)..."
+  echo "  verify_tests.py is skipped because test_article_slug_wiring asserts"
+  echo "  the Cramorant dive links its strategy article, which a partial bake"
+  echo "  has not rebuilt. Link + dash gates still run."
+  if ! python "${REPO_ROOT}/scripts/verify_article_links.py" --ship; then
+    echo "error: link gate failed" >&2; exit 1
+  fi
+  if ! python "${REPO_ROOT}/scripts/verify_no_unicode_dashes.py" --ship -q; then
+    echo "error: dash gate failed" >&2; exit 1
+  fi
   echo
 elif [ "$SKIP_VERIFY" = true ]; then
   echo "Skipping ship gates (--skip-verify)."
