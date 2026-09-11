@@ -64,14 +64,35 @@ echo "overnight chain PID $$ starting at $(date)" > "$STATUS"
 # pre-launch trigger on docs/predive_checklist.md, not a software fix.
 caffeinate -is -w $$ &
 
-# Reset the data-cache TTL at launch (added 2026-09-10). CACHE_TTL is 24h and
-# a full bake is ~13.5h, so a fresh clock leaves ~10h of slack for a sleep
-# stall; starting partway through the window throws that slack away. Touching
-# here rather than remembering to do it means the slack is always maximal.
+# Keep the data-cache TTL fresh for the WHOLE run (touch-at-launch added
+# 2026-09-10; made periodic the same day). CACHE_TTL is 24h. A launch-only
+# touch was sized for a ~13.5h bake, but the 2026-09-10 Twilight Trails run
+# projected ~46h -- nearly two full TTL windows -- so a single touch is not
+# enough and "remember to re-touch tomorrow" is exactly the step that gets
+# missed overnight. That miss is what produced the 2026-08-06 mixed-gamemaster
+# bake (recovered by luck: the vintage delta happened to be purely additive).
+#
 # NB this only moves the mtime -- it does not refetch, so the pinned content is
 # unchanged, and userdata/_preserved/gamemaster_vintages/ holds the blob this
 # bake runs against if a mixed-vintage recovery is ever needed.
-touch "$HOME/Documents/gopvpsim_cache/"*.json 2>/dev/null || true
+CACHE_TOUCH_INTERVAL="${CACHE_TOUCH_INTERVAL:-7200}"   # 2h
+touch_data_cache() { touch "$HOME/Documents/gopvpsim_cache/"*.json 2>/dev/null || true; }
+touch_data_cache
+
+# Refresher runs in a subshell so a `sleep` cannot block the chain. `$$` is the
+# PID of this script even when read inside `( )`, so `kill -0 $$` is a liveness
+# check on the chain: the loop self-terminates within one interval if the chain
+# dies unexpectedly, and the EXIT trap kills it promptly on a normal finish.
+# Forked BEFORE the trap is installed, so the subshell does not inherit it.
+(
+    while kill -0 $$ 2>/dev/null; do
+        sleep "$CACHE_TOUCH_INTERVAL"
+        kill -0 $$ 2>/dev/null || break
+        touch_data_cache
+    done
+) &
+CACHE_TOUCH_PID=$!
+trap 'kill "$CACHE_TOUCH_PID" 2>/dev/null || true' EXIT
 
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" | tee -a "$LOG"
