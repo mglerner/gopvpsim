@@ -364,6 +364,30 @@ that hard-fails when the pools' recorded rankings vintage does not
 match live (per the lens-grid rule: a cheap lens becomes a code-level
 guard, not a checklist sentence).
 
+## POST-BAKE REMINDER (Michael, 2026-09-10): Shadow Sableye GL bands are wild
+
+Michael asked to be reminded, after the Twilight Trails bake finishes, to
+look at **Shadow Sableye in Great League** because "the bands are wild".
+
+His words, unelaborated -- the specific anomaly was NOT described, so do not
+assume which bands or which direction. Ask before theorising.
+
+Context for whoever picks this up:
+
+* The dive already ran in this bake: `deep_dive.py Sableye ... --shadow`
+  at 00:20:48 on 2026-09-11, page written 00:54 to
+  `userdata/website/shadow-sableye-great-league/index.html`.
+* It ran under the NEW turn system and the post-rebalance gamemaster, so a
+  comparison against any pre-2026-09-09 reading of this species is
+  apples-to-oranges.
+* "Bands" is most likely the envelope-crosser vocabulary from the dive
+  output (`Envelope [elevated-band-crosser] / [depressed-band-crosser] ...
+  mean_delta=... spread=... (n=..., anchors=...)`), which is NOT defined in
+  `docs/concepts.md`. If that reading is right, this is worth a glossary
+  entry there regardless of what the Sableye anomaly turns out to be.
+* Sableye has two sibling dives in the same bake for comparison:
+  `sableye-great-league` (non-shadow) and `sableye-mega-great-league`.
+
 ## HIGH PRIORITY: dives run serially, so ~2/3 of a bake sits on 1 of 18 cores
 
 Measured 2026-09-10 during the Twilight Trails bake. Michael noticed the box
