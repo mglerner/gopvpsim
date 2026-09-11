@@ -75,20 +75,49 @@ caffeinate -is -w $$ &
 # NB this only moves the mtime -- it does not refetch, so the pinned content is
 # unchanged, and userdata/_preserved/gamemaster_vintages/ holds the blob this
 # bake runs against if a mixed-vintage recovery is ever needed.
-CACHE_TOUCH_INTERVAL="${CACHE_TOUCH_INTERVAL:-7200}"   # 2h
-touch_data_cache() { touch "$HOME/Documents/gopvpsim_cache/"*.json 2>/dev/null || true; }
+CACHE_DIR_PATH="$HOME/Documents/gopvpsim_cache"
+CACHE_TOUCH_POLL="${CACHE_TOUCH_POLL:-300}"          # re-check every 5 min
+CACHE_TOUCH_MAX_AGE="${CACHE_TOUCH_MAX_AGE:-21600}"  # touch once older than 6h
+
+touch_data_cache() { touch "$CACHE_DIR_PATH/"*.json 2>/dev/null || true; }
+
+# Age of the OLDEST cache file in seconds (0 if the dir is empty). Oldest, not
+# newest, because data.py checks each file independently -- one lagging file is
+# enough to trigger a refetch.
+cache_age_secs() {
+    local now oldest m
+    now=$(date +%s)
+    oldest=$now
+    for f in "$CACHE_DIR_PATH"/*.json; do
+        if [ -e "$f" ]; then
+            m=$(stat -f %m "$f" 2>/dev/null) || continue
+            if [ "$m" -lt "$oldest" ]; then oldest=$m; fi
+        fi
+    done
+    echo $(( now - oldest ))
+}
+
 touch_data_cache
 
-# Refresher runs in a subshell so a `sleep` cannot block the chain. `$$` is the
-# PID of this script even when read inside `( )`, so `kill -0 $$` is a liveness
-# check on the chain: the loop self-terminates within one interval if the chain
-# dies unexpectedly, and the EXIT trap kills it promptly on a normal finish.
-# Forked BEFORE the trap is installed, so the subshell does not inherit it.
+# AGE-BASED, not interval-based (tightened 2026-09-10). data.py computes
+# staleness as `time.time() - mtime` -- WALL CLOCK, which keeps advancing while
+# the machine is asleep. A plain `sleep N` timer may not advance across system
+# sleep, so an interval-based refresher can stay frozen while the cache ages
+# past the TTL underneath it. Re-reading the real age on a short poll removes
+# that dependency: however long the machine was out, the first wakeup after it
+# sees the true age and touches immediately.
+#
+# `$$` is this script's PID even when read inside `( )`, so `kill -0 $$` is a
+# liveness check on the chain: the loop self-terminates within one poll if the
+# chain dies, and the EXIT trap kills it promptly on a normal finish. Forked
+# BEFORE the trap is installed, so the subshell does not inherit it.
 (
     while kill -0 $$ 2>/dev/null; do
-        sleep "$CACHE_TOUCH_INTERVAL"
+        sleep "$CACHE_TOUCH_POLL"
         kill -0 $$ 2>/dev/null || break
-        touch_data_cache
+        if [ "$(cache_age_secs)" -gt "$CACHE_TOUCH_MAX_AGE" ]; then
+            touch_data_cache
+        fi
     done
 ) &
 CACHE_TOUCH_PID=$!
