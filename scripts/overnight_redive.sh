@@ -196,16 +196,14 @@ step "Running website dives via run_website_dives.py" \
 step "Rendering Aegislash Blade-vs-Shield GL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield.toml
 
-# 5. Forretress 4-way comparison: fast-move x shadow. Reads data from
-#    the 4 Forretress dive dirs the chain produced in step 1.
-step "Rendering Forretress fast-move x shadow comparison" \
-    python scripts/compare_loadouts.py comparisons/forretress-fast-move-shadow.toml
-
-# 5a. Jumpluff regular-vs-Shadow comparison (added 2026-06-03). Reads
-#     from the jumpluff-great-league and shadow-jumpluff-great-league
-#     dive dirs the chain produced in step 1.
-step "Rendering Jumpluff regular-vs-Shadow comparison" \
-    python scripts/compare_loadouts.py comparisons/jumpluff-regular-vs-shadow.toml
+# 5 / 5a. The Forretress fast-move x shadow and Jumpluff regular-vs-Shadow
+#    comparisons were REMOVED 2026-09-12. Both read from dive dirs the
+#    Twilight Trails dive-list rebuild retired
+#    (forretress-shadow-volt-switch-great-league, shadow-jumpluff-great-
+#    league), so compare_loadouts.py raised FileNotFoundError -- "No dive
+#    HTML in <dir> matches loadout". Michael's call: fine not to carry them
+#    as standard. The TOMLs are kept in comparisons/ and still run by hand
+#    if those dives are ever re-added; see comparisons/RETIRED.md.
 
 # 5b. Kanto Ninetales regular-vs-Shadow comparison (added 2026-06-03).
 #     Reads from the ninetales-great-league and shadow-ninetales-great-

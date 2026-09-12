@@ -161,3 +161,35 @@ def test_mechanics_help_does_not_contradict_its_own_default(path):
     assert f'{other} (default)' not in help_text, (
         f'{path} --help calls {other!r} the default, but argparse uses '
         f'{default!r}')
+
+@pytest.mark.parametrize('path', [
+    'scripts/battle.py',
+    'scripts/deep_dive.py',
+])
+def test_mechanics_help_oracle_count_matches_the_canonical_caveat(path):
+    """A stale validation COUNT is the failure the default-check misses.
+
+    deep_dive.py's help claimed `new` was "still UNVALIDATED (104/243 oracle
+    cells disagree ... unmerged new-mechanics branch)" for three days after the
+    2026-09-09 merge made it 237/243 matching. Both halves were wrong and
+    test_mechanics_help_does_not_contradict_its_own_default passed the whole
+    time, because the DEFAULT was named correctly.
+
+    scripts/mechanics_notice.py is the canonical wording, so any oracle-cell
+    count appearing in a --mechanics help string must agree with it. Pins the
+    numbers, not the prose: rewording either is free, disagreeing is not.
+    """
+    import re
+    help_text = _mechanics_help(path)
+    canonical = mechanics_caveat('new')
+    canon_nums = set(re.findall(r'\b(\d{2,3})\b(?=\s*(?:of|/)\s*243)',
+                                canonical))
+    assert canon_nums, 'no "N of 243" figure found in mechanics_notice'
+    help_nums = set(re.findall(r'\b(\d{2,3})\b(?=\s*(?:of|/)\s*243)',
+                               help_text))
+    if not help_nums:
+        pytest.skip(f'{path} help cites no oracle-cell count')
+    assert help_nums <= canon_nums, (
+        f'{path} --help cites oracle counts {sorted(help_nums - canon_nums)} '
+        f'of 243, which mechanics_notice.py does not; it says '
+        f'{sorted(canon_nums)}. Update the help or the caveat so they agree.')
