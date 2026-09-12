@@ -364,6 +364,47 @@ that hard-fails when the pools' recorded rankings vintage does not
 match live (per the lens-grid rule: a cheap lens becomes a code-level
 guard, not a checklist sentence).
 
+## BUILD BRIEF (2026-09-12): decisions taken, what is next, Cramorant hand-off
+
+Status: `scripts/deep_dive_brief.py` + tests merged to main (b6e6263), standalone
+only (HTML + JSON + sweep under `userdata/analysis/2026-09-12_build_brief/`).
+Report: `~/coding/reports/gopvpsim-build-brief-2026-09-12.html`. Design of
+record: `docs/expert_verdict_plan.md`.
+
+Michael's answers, 2026-09-12 evening:
+
+1. **Bulk floors (Def / HP lines) = v3, standalone, before integration.** Same
+   three primitives (exact / one-sided gate / near-exact) on Def and HP with
+   bulkpoint mechanism labels. Altaria (Def >= 148.29 vs 2v2 Clodsire) and
+   Furret (Def >= 102.06 vs 1v1 Lapras) are the acceptance cases.
+2. **Placement (D11): split by outcome.** Above the scatter as the first IV
+   Recommendations block when a line (or a cost-demoted line) exists; inside
+   the collapsed Dive Analysis block on pure negatives.
+3. **Flavor guide (D10): retire BOTH** the `[Recommended]` badge and the
+   "almost any will do" catch phrase when the brief ships, as separate commits.
+4. **Sequencing: Cramorant first.** Page integration of the brief WAITS until
+   the Cramorant strategy reinvestigation lands. v3 (standalone) may proceed.
+
+Cramorant reinvestigation hand-off (for the session that picks it up):
+
+- Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
+  ~/coding/gopvpsim-cramorant`, branch `cramorant-reinvestigate`), the way
+  the moveset-rules and build-brief work was done. Read blobs / policy-lab
+  corpus from the main repo by absolute path; write outputs under the clone's
+  own `userdata/`. Python: `/Users/mglerner/coding/gopvpsim/.venv/bin/python`
+  run from the clone (direnv is not loaded there).
+- The strat lives in engine-hashed code. Do NOT edit engine files in the main
+  tree while a bake runs (mixed-vintage bake). Merge engine changes only after
+  the current rebake is published, then decide migration (localized predicate
+  vs cold re-dive) per the CLAUDE.md cache rules.
+- CPU: the dive rebake launched 2026-09-12 18:02 uses all cores
+  (`userdata/logs/2026-09/rebake_movesets_20260912.log`). Reading, analysis
+  and small lab runs are fine; full-resolution policy-lab corpus runs should
+  wait for it to finish.
+- Start from the Cramorant section above, `docs/strat_development_playbook.md`,
+  `docs/cramorant_policy_plan.md`, and
+  `docs/validations/2026-09-10_cramorant_strat_reverify.md`.
+
 ## POST-BAKE RUNBOOK (2026-09-11): moveset rules -> rebake dives -> publish
 
 Decided by Michael 2026-09-11: the old movesets, old meta and old mechanics
