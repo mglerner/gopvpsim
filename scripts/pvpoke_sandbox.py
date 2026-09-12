@@ -65,6 +65,21 @@ Consequences:
   not log buff procs, so :func:`timeline_to_actions` REFUSES a moveset
   containing a partial-chance charged move rather than emit a link that
   may silently diverge.
+* **pvpoke.com runs a sandbox link TWICE and shows the second run.**
+  ``Interface.js loadGetData()`` calls ``runSandboxSim()`` synchronously
+  (setActions + simulate + display), and the ``.battle-btn`` click it
+  triggered just before fires ``startBattle()``'s ``setTimeout``
+  afterwards, simulating again on the same Pokemon objects and
+  re-rendering.  The runs differ whenever a Pokemon acted on run 1's
+  final turn: ``Pokemon.reset()`` (Pokemon.js:1924) never clears
+  ``hasActed``, so that Pokemon skips its turn-1 action in run 2 and its
+  whole fast-move cycle shifts one turn, after which scripted actions on
+  the old parity no longer match (``Battle.js:724,745``) and are silently
+  dropped.  Found 2026-09-12 (a link replaying 690 in one run shows 547
+  on the site; the Lapras KO-edge link below shows 446, a loss, not its
+  single-run 662).  :func:`verify_url` therefore emulates the page (two
+  runs) by default; pass ``page=False`` for the engine-level round trip.
+  Upstream report: docs/pvpoke_bug_reports.md, Report 9.
 * ``wait`` (type 2) suppresses that Pokemon's fast move for one turn.
   **Its turn number is the turn the fast move would be INITIATED, not the
   turn it would land** -- unlike charged actions, whose turn is the
@@ -511,6 +526,7 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
     _move_names = sorted(set(slots[0]) | set(slots[1]), key=len, reverse=True)
 
     parsed, auto, saw_uses = [], [], False
+    resolved_turns = set()   # our-clock turns on which a thrown charged move RESOLVED
     for line in result.timeline:
         if ' uses ' in line:
             saw_uses = True
@@ -522,6 +538,7 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
                 auto.append((turn, move))
                 continue
             parsed.append((turn, who, move, tail == 'SHIELDED'))
+            resolved_turns.add(turn)
             continue
 
         # A charged move that was DECIDED and then cancelled.  It must still
@@ -583,16 +600,22 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
         actions.append(Action(turn=turn, actor=actor,
                               value=slots[actor].index(move), shielded=shielded))
 
-    # TURN-CLOCK CORRECTION (2026-09-10). Our turn counter and PvPoke's run at
-    # different rates once charged moves start landing: PvPoke gives the
-    # thrower a 1000 ms (= one turn) cooldown after a charged move
-    # (pvpoke commit 442a4afe8, "added one turn delay after Charged Attacks to
-    # resolve Fast Attack damage"), and our engine does not count that turn.
+    # TURN-CLOCK CORRECTION (2026-09-10, rule corrected 2026-09-12). Our turn
+    # counter and PvPoke's run at different rates once charged moves start
+    # landing: after a ROUND in which any charged move was used, Battle.js
+    # gives BOTH Pokemon a 500 ms (= one turn) cooldown
+    # (Battle.js:540, `if(roundChargedMoveUsed){ poke.cooldown = 500; }`
+    # inside the per-Pokemon loop; on master since the 2026-09-08 Twilight
+    # Trails merge acb3ce461), and our engine does not count that turn.
     #
-    # So PvPoke's clock runs one turn later per charged move ALREADY RESOLVED,
-    # counting both sides and counting the auto-fired ones. Measured on two
-    # independent all-agreeing fights, deltas came out exactly 0, +1, +2, +3,
-    # +4 over five charged moves in both:
+    # So PvPoke's clock runs one turn later per DISTINCT PRIOR TURN on which
+    # a thrown charged move resolved -- a same-turn pair (CMP double throw)
+    # costs ONE turn, not two. The 2026-09-10 version counted prior ACTIONS
+    # and so over-shifted everything after a same-turn pair by +1 per pair;
+    # a 2026-09-12 skeptic measured 17/17 such cells mis-encoded (e.g.
+    # Cramorant vs Swampert UL 0-0: sim 703 [64,0], link 815 [99,0]) and
+    # 17/17 fixed by counting distinct turns. Measured on two all-agreeing
+    # fights with no same-turn pairs, deltas are 0,+1,+2,+3,+4 either way:
     #
     #   Medicham/Azu  ours 15,25,28,38,41   pvpoke 15,26,30,41,45
     #   Registeel/Azu ours 15,22,28,41,42   pvpoke 15,23,30,44,46
@@ -601,17 +624,16 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
     # SILENTLY dropped, and the replay degrades toward PvPoke's own AI --
     # which is what broke the UL Cramorant/Lapras link after the turn-system
     # merge (tests/test_pvpoke_sandbox.py).
-    # AUTO-FIRED moves are excluded from the count. Battle.js fires them
-    # itself as part of the form-change mechanic (Cramorant's Gulp Missile)
-    # rather than as a charged move the Pokemon throws, so they do NOT incur
-    # the post-charge cooldown. Counting them over-shifts everything after the
-    # first one -- measured: including auto put the KO'ing Fly at turn 42 and
-    # replayed 656/[49,0]; excluding it puts the Fly at 41 and replays
-    # 662/[51,0], matching our sim exactly.
-    thrown = sorted(a.turn for a in actions)
+    # Only RESOLVED throws count: AUTO-FIRED moves (Cramorant's Gulp Missile,
+    # fired by Battle.js as part of the form-change mechanic) and CANCELLED
+    # decisions never set roundChargedMoveUsed. In practice a missile fires
+    # on the turn of the charged hit that triggered it and a CMP-cancelled
+    # move shares its turn with the KO that cancelled it, so those turns are
+    # already counted; measured 2026-09-10 on the Lapras cell, counting the
+    # missile separately replayed 656/[49,0] against the sim's 662/[51,0].
     shifted = []
     for a in actions:
-        prior = sum(1 for t in thrown if t < a.turn)
+        prior = sum(1 for t in resolved_turns if t < a.turn)
         shifted.append(dataclasses.replace(a, turn=a.turn + prior))
     return shifted, auto
 
@@ -827,8 +849,16 @@ def sandbox_url(cp, p1: PokeSpec, p2: PokeSpec, shields, actions, *,
 # ---------------------------------------------------------------------------
 
 def verify_url(url, *, pvpoke_root=None, default_ivs='gamemaster',
-               driver=URL_DRIVER):
+               driver=URL_DRIVER, page=True):
     """**The pre-publish gate.**  Run a URL string through PvPoke's engine.
+
+    ``page=True`` (the default, and the only setting that gates a
+    publish) reproduces what pvpoke.com DISPLAYS: for a sandbox link the
+    page simulates twice on the same Pokemon objects and shows the second
+    run, which can differ from the first because ``Pokemon.reset()`` does
+    not clear ``hasActed`` (see SANDBOX SEMANTICS).  ``page=False`` runs
+    the engine once -- the encoder-level round trip, useful for isolating
+    an encoder question from that upstream bug, never for publishing.
 
     Decodes ``url`` independently of everything above -- ``src/.htaccess``
     routing, then ``Interface.js loadGetData()``, with the dropdown option
@@ -846,9 +876,11 @@ def verify_url(url, *, pvpoke_root=None, default_ivs='gamemaster',
     mis-indexed link obvious.  Raises on a URL that matches no rewrite
     rule (i.e. would 404).
     """
+    cmd = ['node', str(driver), url, '--default-ivs', default_ivs]
+    if not page:
+        cmd.append('--single-run')
     out = subprocess.run(
-        ['node', str(driver), url, '--default-ivs', default_ivs],
-        capture_output=True, text=True,
+        cmd, capture_output=True, text=True,
         env={**os.environ,
              'PVPOKE_ROOT': str(pvpoke_root or DEFAULT_PVPOKE_ROOT)})
     if out.returncode:
