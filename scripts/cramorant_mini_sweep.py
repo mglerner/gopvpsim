@@ -48,7 +48,9 @@ sys.path.insert(0, str(REPO / 'src'))
 sys.path.insert(0, str(REPO / 'scripts'))
 
 import gopvpsim.battle as B  # noqa: E402
-from gopvpsim.battle import pogodives_dp, pvpoke_dp, simulate  # noqa: E402
+from gopvpsim.battle import BattlePokemon, pogodives_dp, pvpoke_dp, simulate  # noqa: E402
+from gopvpsim.moves import get_moves  # noqa: E402
+from gopvpsim.pokemon import Pokemon  # noqa: E402
 from cramorant_policy_lab import make_bp  # noqa: E402
 from cramorant_certify import SCENARIOS, load_page, species_from_link  # noqa: E402
 
@@ -77,8 +79,21 @@ def restore(saved, saved_sheet):
     B._POGODIVES_SHEET.update(saved_sheet)
 
 
+def make_focal(league, fast_id, charged_ids, ivs, cap):
+    """Cramorant at the given level cap (50 = league default; 51 = the
+    best-buddy '@51' twin tensors, focal-only -- opponents stay at their
+    page level), built the way deep_dive_lib.sweep builds the focal."""
+    fm, cm = get_moves()
+    p = Pokemon.at_best_level('Cramorant', *ivs, league=league,
+                              max_level=float(cap))
+    cp_cap = {'great': 1500, 'ultra': 2500}[league]
+    return BattlePokemon.from_pokemon(
+        p, dict(fm[fast_id]), [dict(cm[c]) for c in charged_ids],
+        league_cp=cp_cap)
+
+
 def run_slice(data, league, scenario, opp_ivs, bait, ivs, opponents=None,
-              log_cells=()):
+              log_cells=(), cap=50):
     """Return {(iv, oi): (pv, pg)} plus timelines for log_cells."""
     ms = data['movesets'][0]
     si = SCENARIOS.index(scenario)
@@ -97,8 +112,9 @@ def run_slice(data, league, scenario, opp_ivs, bait, ivs, opponents=None,
         opp = make_bp(clean, league, shadow, mv[0], mv[1:],
                       ivs=tuple(link['byMode'][opp_ivs]['ivs']))
         for iv in ivs:
-            cram = make_bp('Cramorant', league, False, ms['fast'], ms['charged'],
-                           ivs=(data['ivA'][iv], data['ivD'][iv], data['ivS'][iv]))
+            cram = make_focal(league, ms['fast'], ms['charged'],
+                              (data['ivA'][iv], data['ivD'][iv], data['ivS'][iv]),
+                              cap)
             want_log = (iv, oi) in log_cells
             scores = []
             for pol in (pv_pol, pg_pol):
@@ -140,6 +156,8 @@ def main():
     ap.add_argument('--scenario', required=True, choices=SCENARIOS)
     ap.add_argument('--opp-ivs', default='pvpoke', choices=['pvpoke', 'rank1'])
     ap.add_argument('--bait', default='bait', choices=['bait', 'nobait'])
+    ap.add_argument('--cap', default='50', choices=['50', '51'],
+                    help="focal level cap: 50 (league) or 51 (the '@51' twin)")
     ap.add_argument('--stride', type=int, default=13,
                     help='IV index stride (use a coprime of 16; 1 = all 4096)')
     ap.add_argument('--iv-offset', type=int, default=0)
@@ -181,15 +199,17 @@ def main():
     t0 = time.time()
     try:
         cells, logs = run_slice(data, args.league, args.scenario, args.opp_ivs,
-                                args.bait, ivs, opponents, log_cells)
+                                args.bait, ivs, opponents, log_cells,
+                                cap=int(args.cap))
     finally:
         restore(saved, saved_sheet)
     elapsed = time.time() - t0
 
     si = SCENARIOS.index(args.scenario)
     bsuf = '' if args.bait == 'bait' else ':nobait'
-    pv_t = tensors[f'0_{args.opp_ivs}{bsuf}'].reshape(4096, 9, n_opp)
-    pg_t = tensors[f'0_{args.opp_ivs}{bsuf}:pogodives'].reshape(4096, 9, n_opp)
+    csuf = '' if args.cap == '50' else '@51'
+    pv_t = tensors[f'0_{args.opp_ivs}{bsuf}{csuf}'].reshape(4096, 9, n_opp)
+    pg_t = tensors[f'0_{args.opp_ivs}{bsuf}:pogodives{csuf}'].reshape(4096, 9, n_opp)
     tensor_cells = {k: (int(pv_t[k[0], si, k[1]]), int(pg_t[k[0], si, k[1]])) for k in cells}
     mism = [k for k in cells if cells[k] != tensor_cells[k]]
     # Baseline plain-PvPoke tier must ALWAYS match the tensor (knobs only touch pogodives).
@@ -198,7 +218,7 @@ def main():
     live = summarize(cells, names)
     shipped = summarize(tensor_cells, names)
     print(f'{args.league} {data["movesets"][0]["label"]} {args.scenario} '
-          f'{args.opp_ivs}/{args.bait}: {live["n"]} cells in {elapsed:.1f}s '
+          f'{args.opp_ivs}/{args.bait}/@{args.cap}: {live["n"]} cells in {elapsed:.1f}s '
           f'(stride {args.stride if not args.ivs else "explicit"})')
     if knobs or sheet:
         print(f'  overrides: knobs={dict(knobs)} sheet={sheet}')
