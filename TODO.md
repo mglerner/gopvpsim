@@ -32,6 +32,32 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+- **FILE PvPoke Report 9** (Michael 2026-09-12: "make report 9 a TODO for
+  later"): the `hasActed`-survives-`Pokemon.reset()` bug, drafted and
+  browser-verified in `docs/pvpoke_bug_reports.md`. Follows that file's
+  filing conventions; check the issue tracker for a duplicate first.
+- **DEEP RE-VERIFICATION CAMPAIGN (started 2026-09-12, Fable's first look
+  at the strat; Michael: "we're free to vet things deeply").** Instruments:
+  `scripts/cramorant_certify.py` (strict bar over the FULL 720-cell grid
+  from the dive tensors, seconds; `--selftest N` proves the tensors are
+  today's engine) and `scripts/cramorant_mini_sweep.py` (one tensor slice
+  re-simmed through the production path with knob / sheet-row overrides;
+  `--check-tensor` must be integer-exact at shipped knobs before any
+  variant is trusted; coprime `--stride` for screens, 1 for certification).
+  First full-grid read (GL page baked 2026-09-12, UL page 2026-09-11, both
+  new engine): 716/720 cells pass, 4 FAIL -- GL Peck/Hydro Pump+Surf 2v2
+  no-bait (both opp-IV modes, both caps), mean -3.3/-4.2, driven by
+  Corviknight (-3835 flips, -324 mean) and Shadow Corviknight; the v5
+  certification never had that build in GL. The UL 0v1 Dondozo "-2" does
+  NOT exist at full resolution (only Jellicent is negative there, on
+  rating); it was a single-spread artefact of the PvPoke-default IV run.
+  Sequence: (1) mechanism-trace the failures and the big hidden
+  per-opponent losers (GL 1v1 Mandibuzz/Umbreon on Dive+HP, GL 1v2
+  Snorlax / Shadow Corviknight, UL 1v1 Snorlax / Miltank), (2) propose
+  mechanism-not-names row changes, screen at coprime stride, (3) certify
+  changed rows at stride 1 once the rebake frees the cores, (4) THEN new
+  showcases and the article prose pass. Full-res compute waits for the
+  rebake; tensor reads and stride screens do not.
 - **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
   2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
   links showed the same 642 win. Audit
