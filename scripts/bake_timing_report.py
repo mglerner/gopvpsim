@@ -46,6 +46,7 @@ def classify(path):
     """-> {dive: {'parallel': s, 'serial': s, 'other': s}} in wall-clock seconds."""
     out = defaultdict(lambda: defaultdict(float))
     cur, prev_t, prev_kind = None, None, None
+    seen_keys = {}
     for line in Path(path).read_text(errors='replace').splitlines():
         m = STAMP.search(line)
         if not m:
@@ -59,7 +60,20 @@ def classify(path):
                 out[cur][prev_kind] += dt
         d = DIVE.search(line)
         if d:
-            cur = d.group(1)
+            # Key on species + LEAGUE, not species alone. Keying on the name
+            # collapsed a species' GL and UL dives into one summed row (81
+            # rows for 135 dives on the 2026-09-10 bake). The totals stayed
+            # correct -- every interval was still counted once -- but the
+            # per-dive breakdown silently merged two different dives.
+            lg = re.search(r'--league (\w+)', line)
+            cur = f'{d.group(1)} [{lg.group(1)[:2]}]' if lg else d.group(1)
+            # Same species+league can legitimately appear twice (a re-run, or
+            # the split-moveset passes), so disambiguate rather than merge.
+            if cur in seen_keys:
+                seen_keys[cur] += 1
+                cur = f'{cur}#{seen_keys[cur]}'
+            else:
+                seen_keys[cur] = 1
         kind = ('parallel' if PARALLEL.search(line)
                 else 'serial' if SERIAL.search(line) else None)
         if kind:
@@ -76,7 +90,7 @@ def main():
     assert data, f'parsed 0 dives from {log} -- markers may have drifted'
 
     print(f'{log}\n')
-    print(f"{'dive':<30}{'parallel':>10}{'serial':>9}{'other':>8}{'serial%':>9}")
+    print(f"{'dive':<34}{'parallel':>10}{'serial':>9}{'other':>8}{'serial%':>9}")
     tot = defaultdict(float)
     for dive, b in data.items():
         p, s, o = b['parallel'], b['serial'], b[None]
@@ -84,7 +98,7 @@ def main():
         for k, v in (('parallel', p), ('serial', s), ('other', o)):
             tot[k] += v
         pct = f'{100 * s / known:.0f}%' if known else '--'
-        print(f'{dive[:29]:<30}{p:>9.0f}s{s:>8.0f}s{o:>7.0f}s{pct:>9}')
+        print(f'{dive[:33]:<34}{p:>9.0f}s{s:>8.0f}s{o:>7.0f}s{pct:>9}')
 
     known = tot['parallel'] + tot['serial']
     print(f'\n  {len(data)} dive(s); '

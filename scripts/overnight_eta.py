@@ -86,14 +86,54 @@ FALLBACKS = {
     'ul_full':    25.0,
     'forretress': 10.0,
     'post_dive':  5.0,   # comparison renders + matchup web + index + verify (steps 4-9, sans ML)
-    # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides, serial /
-    # all-cores-each). A ~7h cold tail per overnight_redive.sh's own header; the
-    # single biggest post-dive cost, so omitting it made the whole-script ETA
-    # under-report by hours. Loose fallback only -- once the bake STARTS,
-    # chain_status.py shows the data-driven ML block (in_ml_phase) instead of
-    # this line, so this number only ever covers the not-yet-reached ML step.
+    # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides).
+    #
+    # This 420m figure is a LAST-RESORT fallback and is known to be far too
+    # large: measured 2026-09-12, the whole tail ran in 3.9 min (60 ok, 0
+    # failed). 420m predates the 2026-06-27 cache-rework, when each guide was
+    # single-process on one core; guides now fan across all cores via
+    # deep_dive.iv_sweep, and the ML IV space is tiny anyway (48 profiles at
+    # DEFAULT_IV_FLOOR=12, against 4096 IVs x 76 opponents x 9 scenarios for a
+    # GL dive). Left in only for a machine with no ML history at all.
+    #
+    # measured_ml_tail_min() below supersedes it whenever a past run can be
+    # found, which is why every ETA during the Twilight Trails bake
+    # over-reported by ~7h.
     'ml_tail':    420.0,
 }
+
+
+def measured_ml_tail_min(logs_dir=None):
+    """Minutes the ML guide bake actually took, most recent run, or None.
+
+    Self-calibration for the one bucket that had none. gl_full / ul_full /
+    forretress already learn from the dives completed in the CURRENT run;
+    the ML tail runs once per chain, so there is nothing to average within a
+    run -- it has to learn across runs instead.
+
+    Reads run_iv_guides.py's own completion line, `Done in 12.3 min: 60 ok, 0
+    failed.`, which is a stable print in that script. Only counts a run with
+    at least one success, so an instant all-fail does not train the estimate
+    to zero.
+    """
+    root = Path(logs_dir) if logs_dir else (
+        Path(__file__).resolve().parent.parent / 'userdata' / 'logs')
+    if not root.is_dir():
+        return None
+    pat = re.compile(r'Done in ([\d.]+) min: (\d+) ok, (\d+) failed')
+    best = None
+    for log in root.glob('*/*.log'):
+        try:
+            text = log.read_text(errors='replace')
+        except OSError:
+            continue
+        for m in pat.finditer(text):
+            if int(m.group(2)) <= 0:
+                continue
+            mtime = log.stat().st_mtime
+            if best is None or mtime > best[0]:
+                best = (mtime, float(m.group(1)))
+    return best[1] if best else None
 
 
 def classify(slug: str) -> str:
@@ -309,7 +349,9 @@ def main(wrapper_log_path: str) -> int:
     # data-driven ML block instead of this SCRIPT line, so adding it then would
     # double-count. Guarded so standalone overnight_eta runs stay honest too.
     ml_started = 'ML IV guides' in text
-    ml_tail_min = 0.0 if ml_started else FALLBACKS['ml_tail']
+    _ml_measured = measured_ml_tail_min()
+    ml_tail_min = 0.0 if ml_started else (
+        _ml_measured if _ml_measured is not None else FALLBACKS['ml_tail'])
     total_remaining_min += ml_tail_min
 
     now = datetime.now()
@@ -324,7 +366,8 @@ def main(wrapper_log_path: str) -> int:
     for b in ('gl_full', 'ul_full', 'forretress'):
         bucket_bits.append(f'{b}={bucket_avg[b]:.0f}m ({bucket_source[b]})')
     if ml_tail_min:
-        bucket_bits.append(f'ml_tail={ml_tail_min:.0f}m (fallback)')
+        _src = 'measured' if _ml_measured is not None else 'fallback'
+        bucket_bits.append(f'ml_tail={ml_tail_min:.1f}m ({_src})')
 
     ml_note = ' (incl. ~ML tail)' if ml_tail_min else ''
     print(f'SCRIPT: ~{eta_str} remaining{ml_note}, done ~{done_str}')
