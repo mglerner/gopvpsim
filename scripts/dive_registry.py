@@ -22,8 +22,26 @@ editorial content lives in the tables below -- moveset pins, non-default
 reference lines, strategy-policy choices, how many movesets to show, and
 whether hand-authored thresholds apply.
 
-NOT WIRED IN YET. run_website_dives.DIVES is still the live list; this module
-is built alongside it so the two can be diffed before the swap.
+WIRED IN 2026-09-10 (run_website_dives.DIVES = all_dives()).
+
+MOVESET RULES (2026-09-11). "Bake" must mean "bake with a legit set of
+moves", so how many movesets a page renders is a RULE, not a per-slug fact:
+
+1. Every dive renders DEFAULT_TOP_MOVESETS screened movesets. The old
+   literal carried 42 per-slug ``top_movesets`` overrides (35 of them ``1``,
+   a cheap-coverage setting from a 2026-06-25 bulk add) that were copied
+   verbatim into this table by the equivalence gate. They made Sableye
+   render ONE moveset and Shadow Sableye FOUR, so the two pages shared no
+   moveset at all. ``top_movesets`` is no longer an override key.
+2. PvPoke's default moveset is always a rendered page: deep_dive.py sweeps
+   the ``--reference auto`` moveset and appends it when the screen prunes
+   it (deep_dive.py "Reference sweep"). Nothing to configure here.
+3. A shadow/plain PAIR renders the UNION of both members' screened sets
+   (``pair_partner`` below; run_website_dives passes ``--union-with-form``
+   plus the partner's pins so each dive can reproduce the partner's screen
+   deterministically). Pairing requires the same species and league and
+   either the same ``--fast`` pin or one side unpinned, so the Forretress
+   fast-move split pages pair only with their like-fast shadow sibling.
 """
 from __future__ import annotations
 
@@ -72,18 +90,19 @@ EXTRA_DIVES = [
     dict(species='Forretress', league='great', shadow=False,
          slug='forretress-bug-bite-great-league',
          extra_args=['--fast', 'BUG_BITE', '--charged', 'SAND_TOMB,ROCK_TOMB'],
-         reference='BUG_BITE,SAND_TOMB,ROCK_TOMB', top_movesets=1),
+         reference='BUG_BITE,SAND_TOMB,ROCK_TOMB'),
     dict(species='Forretress', league='great', shadow=True,
          slug='forretress-shadow-bug-bite-great-league',
          extra_args=['--fast', 'BUG_BITE', '--charged', 'SAND_TOMB,ROCK_TOMB'],
-         reference='BUG_BITE,SAND_TOMB,ROCK_TOMB', top_movesets=1),
+         reference='BUG_BITE,SAND_TOMB,ROCK_TOMB'),
 ]
 
 # Editorial per-dive settings, keyed by slug. Anything absent is derived.
 #   extra_args    -- pin a specific moveset (form splits, off-meta builds)
 #   reference     -- the comparison line on the page
 #   policy        -- 'both' renders pvpoke AND pogodives strategy tiers
-#   top_movesets  -- how many movesets to render (default 5)
+#   (top_movesets is deliberately NOT an override key: every dive renders
+#    the same DEFAULT_TOP_MOVESETS, see the moveset rules below)
 #   thresholds    -- True where hand-authored thresholds/*.toml apply; the old
 #                    literal spelled this as no_thresholds=True on 90 of 95
 #                    entries, i.e. thresholds are the EXCEPTION, not the rule
@@ -91,92 +110,88 @@ DIVE_OVERRIDES = {'aegislash-blade-great-league': {'extra_args': ['--fast',
                                                  'PSYCHO_CUT',
                                                  '--charged',
                                                  'SHADOW_BALL,GYRO_BALL'],
-                                  'reference': 'PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
-                                  'top_movesets': 5},
+                                  'reference': 'PSYCHO_CUT,SHADOW_BALL,GYRO_BALL'},
  'aegislash-shield-great-league': {'extra_args': ['--fast',
                                                   'AEGISLASH_CHARGE_PSYCHO_CUT',
                                                   '--charged',
                                                   'SHADOW_BALL,GYRO_BALL'],
-                                   'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
-                                   'top_movesets': 1},
- 'altaria-great-league': {'top_movesets': 1},
- 'azumarill-great-league': {'top_movesets': 1},
- 'corviknight-great-league': {'top_movesets': 1},
+                                   'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL'},
  'cradily-great-league': {'extra_args': ['--fast',
                                          'ACID',
                                          '--charged',
                                          'GRASS_KNOT,ROCK_TOMB'],
-                          'reference': 'ACID,GRASS_KNOT,ROCK_TOMB',
-                          'top_movesets': 1},
+                          'reference': 'ACID,GRASS_KNOT,ROCK_TOMB'},
  'cramorant-great-league': {'policy': 'both'},
  'cramorant-ultra-league': {'policy': 'both'},
- 'dewgong-great-league': {'thresholds': True, 'top_movesets': 3},
- 'empoleon-great-league': {'top_movesets': 1},
+ 'dewgong-great-league': {'thresholds': True},
  'fearow-great-league': {'reference': 'PECK,DRILL_PECK,DRILL_RUN'},
- 'feraligatr-great-league': {'top_movesets': 1},
  'forretress-shadow-volt-switch-great-league': {'extra_args': ['--fast',
                                                                'VOLT_SWITCH',
                                                                '--charged',
                                                                'SAND_TOMB,ROCK_TOMB'],
-                                                'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB',
-                                                'top_movesets': 1},
+                                                'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB'},
  'forretress-volt-switch-great-league': {'extra_args': ['--fast',
                                                         'VOLT_SWITCH',
                                                         '--charged',
                                                         'SAND_TOMB,ROCK_TOMB'],
-                                         'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB',
-                                         'top_movesets': 1},
- 'galarian-corsola-great-league': {'top_movesets': 1},
- 'galarian-moltres-ultra-league': {'top_movesets': 1},
- 'galarian-stunfisk-great-league': {'top_movesets': 1},
- 'grumpig-great-league': {'top_movesets': 1},
- 'jumpluff-great-league': {'top_movesets': 1},
- 'kingdra-great-league': {'top_movesets': 1},
- 'lickilicky-great-league': {'top_movesets': 1},
- 'lickilicky-ultra-league': {'top_movesets': 1},
- 'medicham-great-league': {'top_movesets': 1},
- 'melmetal-great-league': {'top_movesets': 4},
- 'melmetal-ultra-league': {'top_movesets': 4},
+                                         'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB'},
  'mimikyu-busted-great-league': {'extra_args': ['--fast',
                                                 'SHADOW_CLAW',
                                                 '--charged',
                                                 'SHADOW_SNEAK,PLAY_ROUGH'],
-                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH',
-                                 'top_movesets': 1},
+                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH'},
  'mimikyu-busted-ultra-league': {'extra_args': ['--fast',
                                                 'SHADOW_CLAW',
                                                 '--charged',
                                                 'SHADOW_SNEAK,PLAY_ROUGH'],
-                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH',
-                                 'top_movesets': 1},
- 'mimikyu-great-league': {'top_movesets': 1},
- 'mimikyu-ultra-league': {'top_movesets': 1},
- 'ninetales-great-league': {'top_movesets': 1},
+                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH'},
  'oinkologne-female-great-league': {'reference': 'MUD_SLAP,BODY_SLAM,TRAILBLAZE',
                                     'thresholds': True},
- 'sableye-great-league': {'top_movesets': 1},
- 'seismitoad-great-league': {'top_movesets': 1},
- 'shadow-altaria-great-league': {'top_movesets': 1},
- 'shadow-corviknight-great-league': {'top_movesets': 1},
- 'shadow-empoleon-great-league': {'top_movesets': 1},
- 'shadow-feraligatr-great-league': {'top_movesets': 1},
- 'shadow-jumpluff-great-league': {'top_movesets': 1},
- 'shadow-kingdra-great-league': {'top_movesets': 1},
- 'shadow-ninetales-great-league': {'top_movesets': 1},
- 'shadow-sableye-great-league': {'extra_args': ['--fast',
-                                                'SHADOW_CLAW',
-                                                '--charged',
-                                                'FOUL_PLAY'],
-                                 'reference': 'SHADOW_CLAW,DRAIN_PUNCH,FOUL_PLAY',
-                                 'top_movesets': 4},
- 'shadow-sealeo-great-league': {'top_movesets': 1},
- 'stunfisk-great-league': {'thresholds': True, 'top_movesets': 3},
- 'talonflame-great-league': {'top_movesets': 1},
+ 'shadow-sableye-great-league': {'reference': 'SHADOW_CLAW,DRAIN_PUNCH,FOUL_PLAY'},
+ 'stunfisk-great-league': {'thresholds': True},
  'thievul-great-league': {'reference': 'SUCKER_PUNCH,NIGHT_SLASH,PLAY_ROUGH',
-                          'thresholds': True,
-                          'top_movesets': 6},
- 'tinkaton-great-league': {'thresholds': True},
- 'zygarde-complete-ultra-league': {'top_movesets': 1}}
+                          'thresholds': True},
+ 'tinkaton-great-league': {'thresholds': True}}
+
+
+# Rule 1: one moveset count for every dive (deep_dive.py's own default is 5;
+# named here so the chain and the tests read one number).
+DEFAULT_TOP_MOVESETS = 5
+
+
+def _pin(dive, flag):
+    """Value of a pinned ``--fast`` / ``--charged`` in a dive's extra_args."""
+    args = dive.get('extra_args') or []
+    return args[args.index(flag) + 1] if flag in args else None
+
+
+def pair_partner(dive, dives):
+    """The shadow/plain sibling of ``dive`` in ``dives``, or None (rule 3).
+
+    Same species and league, opposite shadow flag, and compatible fast-move
+    pins: equal, or at most one side pinned. Cup dives never pair (their
+    pools are cup-specific). Exactly one partner is expected; more than one
+    is a registry error, not a choice to make silently.
+    """
+    if dive.get('cup'):
+        return None
+    my_fast = _pin(dive, '--fast')
+    hits = []
+    for other in dives:
+        if other is dive or other.get('cup'):
+            continue
+        if (other['species'], other['league']) != (dive['species'], dive['league']):
+            continue
+        if bool(other.get('shadow')) == bool(dive.get('shadow')):
+            continue
+        their_fast = _pin(other, '--fast')
+        if my_fast and their_fast and my_fast != their_fast:
+            continue
+        hits.append(other)
+    if len(hits) > 1:
+        raise ValueError(f"{dive['slug']}: {len(hits)} pair partners "
+                         f"({[h['slug'] for h in hits]}); pins must disambiguate")
+    return hits[0] if hits else None
 
 
 def _pool_path(league):
@@ -230,7 +245,7 @@ def derive_dives(league):
         if extra.get('shadow'):
             d['shadow'] = True
         d['no_thresholds'] = True
-        for f in ('extra_args', 'reference', 'top_movesets', 'policy'):
+        for f in ('extra_args', 'reference', 'policy'):
             if extra.get(f) is not None:
                 d[f] = extra[f]
         dives.append(d)
