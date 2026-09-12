@@ -164,11 +164,10 @@ if [ "$PARTIAL" = true ] && [ "$SKIP_VERIFY" = false ]; then
   echo "  verify_tests.py is skipped because test_article_slug_wiring asserts"
   echo "  the Cramorant dive links its strategy article, which a partial bake"
   echo "  has not rebuilt. Link + dash gates still run."
-  if ! python "${REPO_ROOT}/scripts/verify_article_links.py" --ship; then
-    echo "error: link gate failed" >&2; exit 1
-  fi
-  if ! python "${REPO_ROOT}/scripts/verify_no_unicode_dashes.py" --ship -q; then
-    echo "error: dash gate failed" >&2; exit 1
+  if ! python "${REPO_ROOT}/scripts/run_ship_gates.py" \
+       --exclude=verify_tests.py; then
+    echo "error: a ship gate failed (verify_tests.py excluded by --partial)" >&2
+    exit 1
   fi
   echo
 elif [ "$SKIP_VERIFY" = true ]; then
