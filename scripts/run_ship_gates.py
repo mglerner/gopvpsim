@@ -48,10 +48,28 @@ SHIP_GATES = (
 )
 
 
-def run_gates(verbose=True):
-    """Run every gate; return list of (gate, returncode) failures."""
+def run_gates(verbose=True, exclude=()):
+    """Run every gate; return list of (gate, returncode) failures.
+
+    ``exclude`` names gates to SKIP, by script filename. Added 2026-09-12 for
+    ``publish_website.sh --partial``: a mid-bake publish legitimately fails
+    verify_tests.py (rendered-artifact assertions about pages the bake has not
+    produced), but the link and dash gates are exactly the ones you want then.
+    Before this, --partial called those two gates directly and broke the
+    "entry points route through the roster" invariant in
+    tests/test_ship_gate_roster.py -- the whole point of which is that gates
+    cannot silently drift out of an entry point's coverage. Skipping BY NAME
+    through the roster keeps that property: the roster is still the single
+    list, and a skip is visible in the output.
+    """
+    skipped = [g for g in exclude if g not in dict(SHIP_GATES)]
+    if skipped:
+        raise SystemExit(f'unknown gate(s) in exclude: {skipped}')
     failures = []
     for gate, argv in SHIP_GATES:
+        if gate in exclude:
+            print(f'SHIP GATE SKIPPED: {gate}')
+            continue
         r = subprocess.run(
             [sys.executable, str(SCRIPTS / gate), *argv],
             capture_output=not verbose, text=True)
@@ -64,7 +82,12 @@ def run_gates(verbose=True):
 
 
 def main():
-    failures = run_gates(verbose='-q' not in sys.argv[1:])
+    argv = sys.argv[1:]
+    exclude = []
+    for a in argv:
+        if a.startswith('--exclude='):
+            exclude += [g for g in a.split('=', 1)[1].split(',') if g]
+    failures = run_gates(verbose='-q' not in argv, exclude=tuple(exclude))
     for gate, rc in failures:
         print(f'SHIP GATE FAILED: {gate} (rc={rc})', file=sys.stderr)
     return 1 if failures else 0
