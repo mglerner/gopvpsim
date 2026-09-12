@@ -646,8 +646,8 @@ def test_render_rejects_an_injected_banned_word(sableye_shadow_facts,
     state, facts, path = sableye_shadow_facts
     real = B.build_headline
 
-    def poisoned(f):
-        paras = real(f)
+    def poisoned(f, **kw):
+        paras = real(f, **kw)
         return [paras[0] + ' This is the definitive line.'] + paras[1:]
 
     monkeypatch.setattr(B, 'build_headline', poisoned)
@@ -661,7 +661,7 @@ def test_render_rejects_injected_non_ascii(sableye_shadow_facts, monkeypatch):
     state, facts, path = sableye_shadow_facts
     real = B.build_headline
     monkeypatch.setattr(B, 'build_headline',
-                        lambda f: [real(f)[0] + ' 148.10 → 2220'])
+                        lambda f, **kw: [real(f, **kw)[0] + ' 148.10 → 2220'])
     with pytest.raises(B.GuardError) as exc:
         B.render_facts(state, 0, path, facts)
     assert 'not ASCII' in str(exc.value)
@@ -705,11 +705,19 @@ def test_deoxys_defense_has_no_floor_and_says_why():
     # build instead, and the closest rule in its own numbers. Round 3's
     # wording is the pre-fix value for each of these.
     assert 'nothing on this arm is a build line to hunt for' not in joined
-    assert joined.startswith('No single stat threshold decides a matchup')
+    # V2 round 2: the claim is scoped to the axis the floor pool searches.
+    # "No single stat threshold decides a matchup" (the round-4 wording, and
+    # the pre-fix value here) is FALSE on any page whose closest rule is a Def
+    # or HP threshold wrong on one spread in 4096.
+    assert joined.startswith('No single attack threshold decides a matchup')
+    assert 'No single stat threshold decides' not in joined      # pre-fix
     assert 'build for stat product' in joined
+    # V2 round 2: the rule and its two sides are two sentences (as one it ran
+    # to 32-37 words). Pre-fix: "... rank 44: nothing below it wins, and ...".
     assert 'The closest thing to a line is 100.65 attack in the 0v0 against '\
-           'Araquanid (Shadow), rank 44: nothing below it wins, and 2284 of '\
+           'Araquanid (Shadow), rank 44. Nothing below it wins, and 2284 of '\
            'the 2301 spreads at or above it do.' in joined
+    assert 'rank 44: nothing below it wins' not in joined          # pre-fix
     assert 'is a one-sided gate' not in joined      # round-3 wording, G-voice
     assert 'ATK >= 100.65' not in joined            # round-3 wording
     # Pre-fix wording: the headline said "no attack, Def or HP value is a
@@ -1053,9 +1061,15 @@ def test_bulk_fork_is_stated_as_a_trade_when_it_is_not_exclusive(
     # exclusive-versus-grid retraction that round 3 put in the headline
     # ("is not exclusive") is field 8's wording now.
     text = ' '.join(B.build_headline(facts))
-    assert 'gives up 7 matchups the line holds and picks up 9 it gives away' \
-        in text
-    assert 'is not exclusive' not in text                                # pre-fix
+    # V2 round 2: the gross count no longer reads as an exclusive gain. The
+    # round-4 sentence -- "gives up 7 matchups the line holds and picks up 9
+    # it gives away" -- is the pre-fix value; with n_exclusive 0 the headline
+    # now says so in the same breath.
+    assert 'gives up 7 matchups the line holds and picks up 9 matchups the '\
+           'line gives away' in text
+    assert 'Spreads on neither side of the trade win those too, so this is '\
+           'a trade and not an exclusive claim.' in text
+    assert 'picks up 9 it gives away' not in text                        # pre-fix
     assert 'It guarantees 9 contested cells the line cannot' not in text  # pre-fix
     f8 = ' '.join(B._f8_alternative(facts)['lines'])
     assert '0 of them' in f8 or 'not exclusive' in f8 or '9' in f8
@@ -1159,11 +1173,17 @@ def test_page_lead_block_names_the_arm_that_carries_the_line(tmp_path):
     path = require_blob(MELMETAL)
     html_path, _json_path, all_facts = B.run_blob(str(path), str(tmp_path))
     page = Path(html_path).read_text()
-    assert 'Arms on this page' in page
+    # V2 round 2: the lead block drops the vocabulary the headline is barred
+    # from, and agrees with its own count. Pre-fix: "Arms on this page" and
+    # "1 of 4 arms rendered here carry a build line: arm 3 at Atk >= ...".
+    assert 'Movesets on this page' in page
+    assert 'Arms on this page' not in page                          # pre-fix
     with_floor = [f for f in all_facts if f['floor'] is not None]
     assert len(with_floor) == 1
     arm_no = with_floor[0]['header']['arm'] + 1
-    assert f'carry a build line: arm {arm_no} at Atk &gt;=' in page
+    assert f'carries a build line: moveset {arm_no} at Atk &gt;=' in page
+    assert 'arms rendered here carry' not in page                   # pre-fix
+    assert 'one-sided gate)' not in page                            # pre-fix
 
 
 @pytest.mark.local_artifacts
@@ -1584,9 +1604,16 @@ def test_furret_near_exact_rule_leads_its_headline():
     assert d['one_sided'] is True
     assert d['gate_side'] == 'sufficient'
     text = ' '.join(B.build_headline(facts))
-    assert 'The closest thing to a line is 102.063 defense in the 1v1 '\
-           'against Lapras (rank 37): every one of the 1614 spreads at or '\
-           'above it wins, and 1 of the 2482 below it wins too.' in text
+    # V2 round 2: item 5's precision rule applies wherever a threshold is
+    # spoken (pre-fix: the bare "102.063 defense"), and the rule is followed
+    # by the reason it is not the line -- here, that the floor pool is the
+    # attack axis.
+    assert 'The closest thing to a line is 102.06 (102.063) defense in the '\
+           '1v1 against Lapras (rank 37). Every one of the 1614 spreads at '\
+           'or above it wins, and 1 of the 2482 below it wins too.' in text
+    assert 'is 102.063 defense' not in text                          # pre-fix
+    assert 'This page prints attack lines only, so that one is evidence, '\
+           'not a target.' in text
     assert 'nothing on this arm is a build line to hunt for' not in text
 
 
@@ -1978,8 +2005,8 @@ def test_render_rejects_an_audit_word_injected_into_the_headline(
     real = B.build_headline
     monkeypatch.setattr(
         B, 'build_headline',
-        lambda f: [real(f)[0] + ' It partitions the cell exactly.']
-                  + real(f)[1:])
+        lambda f, **kw: [real(f, **kw)[0] + ' It partitions the cell exactly.']
+                        + real(f, **kw)[1:])
     with pytest.raises(B.GuardError) as exc:
         B.render_facts(state, 0, path, facts)
     assert 'G-voice' in str(exc.value)
@@ -2052,3 +2079,322 @@ def test_the_evidence_block_audits_each_primitive(sableye_shadow_facts):
     assert 'Floor pool by primitive' in text
     assert 'exact -> Atk >= 148.10' in text
     assert 'Selected: the exact at Atk >= 148.10' in text
+
+
+# ---------------------------------------------------------------------------
+# V2 round 2: the expert review's fatal + majors
+# ---------------------------------------------------------------------------
+
+CORVIKNIGHT = '20260911_134629_Corviknight_ultra.replay.pkl.gz'
+AZUMARILL = '20260910_212507_Azumarill_great.replay.pkl.gz'
+
+
+def test_variant_opponents_resolve_to_their_base_species_rank():
+    """load_blob replays the blob's own moveset-variant registry.
+
+    Pre-fix the registry was empty in a standalone run, so every variant
+    opponent parsed as a species of its whole display name and came back
+    UNRANKED -- which silently dropped it from every rank-gated claim on the
+    page. The Melmetal bulk rectangle lost its highest-ranked matchup that
+    way.
+    """
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    reg = state.get('opponent_variant_registry') or {}
+    assert reg, "positive control: this blob has variant opponents"
+    names = state['opponent_names']
+    ranks = B.build_opp_meta_ranks(names, state['league'],
+                                   cup=state.get('cup'))
+    variants = [i for i, n in enumerate(names) if n in reg]
+    assert variants
+    for i in variants:
+        species, _v, _s = B.parse_opponent_spec(names[i])
+        assert species == reg[names[i]][0]
+        assert ranks[i] is not None, (names[i], 'pre-fix: None')
+
+
+def test_near_exact_admits_a_one_sided_candidate_under_the_gate_bar():
+    """E2 and E2b are independent routes, not one classification.
+
+    Pre-fix a candidate whose dirty side happened to be one-sided was tested
+    ONLY against the gate bar, so a one-sided split misclassifying 2 spreads
+    in 4096 was refused while a two-sided one misclassifying 20 was admitted.
+    """
+    n = 4096
+    half = n // 2
+    wins = np.zeros(n, dtype=bool)
+    wins[half:] = True
+    wins[n - 200:] = False            # 200 losers above -> 90.2% pure
+    _w, stat = _one_cell_cube(wins)
+    c = next(c for c in B.gate_cuts(stat, wins)
+             if c['kind'] == 'gate' and c['gate_side'] == 'necessary')
+    assert c['n_win_below'] == 0 and c['rate_above'] < B.GATE_MIN_ABOVE
+    assert B.effective_kind(c, n) is None          # too dirty for either bar
+    assert B.primitive_ok(c, n) is False
+    # Same shape, few enough wrong in TOTAL to be near-exact even though the
+    # rate above the line misses the gate bar: only 200 spreads sit above it,
+    # so 10 losers up there are 5% of that side and a quarter of a percent of
+    # the grid. Pre-fix this was refused outright.
+    wins = np.zeros(n, dtype=bool)
+    wins[n - 200:] = True
+    wins[n - 10:] = False
+    _w, stat = _one_cell_cube(wins)
+    c = next(c for c in B.gate_cuts(stat, wins)
+             if c['kind'] == 'gate' and c['gate_side'] == 'necessary')
+    assert c['n_above'] == 200 and c['n_win_above'] == 190
+    assert c['rate_above'] < B.GATE_MIN_ABOVE      # not a gate by the bar
+    assert c['n_wrong'] == 10 <= B.near_exact_limit(n)
+    assert B.effective_kind(c, n) == 'near_exact'  # pre-fix: rejected
+    assert B.primitive_ok(c, n) is True
+
+
+@pytest.mark.local_artifacts
+def test_azumarill_headline_demotes_a_line_that_costs_more_than_it_buys():
+    """The fatal: a build directive the page's own cost field contradicts.
+
+    No spread clearing 97.43 wins as many matchups as the stat-product rank-1
+    build, and none of them reaches 95% stat product. Pre-fix the headline
+    opened "Most Azumarill ... should have at least 97.43 attack".
+    """
+    path = require_blob(AZUMARILL)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    fc = facts['floor_cost']
+    assert fc['rank1_total'] == 370 and fc['best_total'] == 331
+    assert fc['net'] == -39 and fc['material'] is True
+    assert fc['top_sp_share'] < B.SP_FLOOR
+    text = ' '.join(B.build_headline(facts))
+    assert text.startswith('Azumarill running BUBBLE / ICE_BEAM, PLAY_ROUGH '
+                           'in Great League has an attack line at 97.43, and '
+                           'clearing it costs more than it buys.')
+    assert 'should have at least 97.43' not in text               # pre-fix
+    assert 'No spread that clears it matches that count' in text
+    assert 'takes 331 of 684, 39 fewer' in text
+    assert 'None of them reaches 95% of the top stat product either.' in text
+    assert 'Build 0/15/15 and concede the 0v0 against Araquanid.' in text
+    B.gate_voice(B.build_headline(facts), CTX)
+
+
+@pytest.mark.local_artifacts
+def test_a_cheap_line_keeps_its_directive_and_still_prints_the_price():
+    """The other side of the demotion switch: it is graded, not a veto."""
+    path = require_blob(SABLEYE_SHADOW)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    fc = facts['floor_cost']
+    assert fc['net'] > 0 and fc['material'] is False
+    text = ' '.join(B.build_headline(facts))
+    assert text.startswith('Most Sableye (Shadow) running')
+    assert 'Clearing it pays:' in text
+    assert 'Build ' not in text.split('Clearing it pays:')[1][:200]
+
+
+@pytest.mark.local_artifacts
+def test_shadow_headline_carries_the_priority_caveat_and_the_plain_value():
+    """The 148.10 line exists only because priority strips the x1.2.
+
+    The caveat sat in field 2; the result it qualifies is in the headline and
+    the strip. The non-shadow equivalent is derived on this page and must
+    match what the non-shadow page prints as its own floor, to the same
+    proven precision (123.419, not 123.41 -- the L51 check is what forces
+    the third place).
+    """
+    path = require_blob(SABLEYE_SHADOW)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    u = facts['floor']['unshadowed']
+    assert (u['printed'], u['dp']) == (123.419, 3)
+    text = B.build_headline(facts)[0]
+    assert 'The comparison uses your attack before the shadow bonus, which '\
+           "is our engine's convention and PvPoke's, not something checked "\
+           'against the live game.' in text
+    assert 'A non-shadow Sableye needs 123.42 (123.419) attack for the same '\
+           'fight.' in text
+    plain = require_blob(SABLEYE_PLAIN)
+    pf = B.compute_brief(B.load_blob(str(plain)), 0, str(plain))
+    assert (pf['floor']['printed'], pf['floor']['dp']) == (u['printed'],
+                                                           u['dp'])
+
+
+@pytest.mark.local_artifacts
+def test_medicham_names_the_better_ranked_rule_just_below_the_line():
+    """Michael's 108.39 was printed once, inside the collapsed evidence list.
+
+    It is 0.87 attack below the printed line, so every spread clearing the
+    printed one clears it too, and its opponent (rank 13) is the one a reader
+    opens a Medicham page for.
+    """
+    path = require_blob(MEDICHAM)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    nr = facts['floor']['near_rule']
+    assert nr['cell'] == '1v1 Snorlax' and nr['rank'] == 13
+    assert round(nr['printed'], 2) == 108.39
+    assert nr['T'] < facts['floor']['T'] <= nr['T'] + B.NEAR_FLOOR_WINDOW
+    assert (nr['modes_ok'], nr['modes_total']) == (3, 4)
+    text = ' '.join(B.build_headline(facts))
+    assert 'The 1v1 against Snorlax (rank 13) turns over just below, at '\
+           '108.39, so every spread clearing the printed line clears that '\
+           'one too.' in text
+    assert nr['modes_fail'] == ['pvpoke:nobait']
+    # Naming the setting is only honest if it names the one that failed: the
+    # first draft asserted which settings reverse from the COUNT alone.
+    assert 'It is not the printed line only because it reverses under '\
+           "PvPoke's defaults with no baiting." in text
+
+
+@pytest.mark.local_artifacts
+def test_a_negative_page_says_why_the_closest_rule_is_not_the_line():
+    """Corviknight named a rule wrong on 1 spread in 4096 and stopped there.
+
+    The disqualifier (it reverses under stat-product opponent IVs) is the
+    most useful sentence the page can print, and pre-fix it appeared nowhere
+    -- not in the headline, and not in the per-primitive audit, which
+    reported "one-sided gate -> nothing eligible".
+    """
+    path = require_blob(CORVIKNIGHT)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    assert facts['floor'] is None
+    d = facts['dirty_thresholds'][0]
+    assert d['cell'] == '1v2 Florges' and d['n_wrong'] == 1
+    dq = d['disqualified']
+    assert dq['reason'] == 'gates' and dq['failed'] == ['G-direction']
+    text = ' '.join(B.build_headline(facts))
+    assert dq['modes_fail'] == ['rank1', 'rank1:nobait']
+    assert 'The closest thing to a line is 140.99 attack in the 1v2 against '\
+           'Florges (rank 12). Every one of the 2108 spreads at or above it '\
+           'wins, and 1 of the 1988 below it wins too.' in text
+    assert 'It is not a build line because it reverses under a stat-product '\
+           'rank-1 opponent, baiting or not.' in text
+    audit = B._primitive_audit_sentence(facts)
+    assert 'nothing eligible' not in audit                        # pre-fix
+    assert 'rejected on G-direction' in audit
+    assert '140.99' in audit
+    ev = ' '.join(B.build_evidence(facts)['lines'])
+    assert 'one-sided gate and near-exact candidates' in ev
+    assert 'clear every gate' in ev or 'clears every gate' in ev
+
+
+@pytest.mark.local_artifacts
+def test_the_strip_never_names_an_alternative_the_headline_retracts():
+    """13 of 35 sections printed a bulk pair the prose calls "not a target"."""
+    path = require_blob(CORVIKNIGHT)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 1, str(path))
+    alt = facts['alternative']
+    assert facts['floor'] is None and alt['too_wide'] is True
+    strip = dict(B.build_strip(facts))
+    assert strip['Alternative'].startswith('none (the widest pair that buys '
+                                           'anything is already ')
+    assert not strip['Alternative'].startswith('Def >=')          # pre-fix
+    assert 'Bulk does not separate either' in ' '.join(
+        B.build_headline(facts))
+
+
+@pytest.mark.local_artifacts
+def test_the_strip_badge_says_which_way_a_gate_runs():
+    """"[gate]" covered two opposite pieces of advice."""
+    azu = require_blob(AZUMARILL)
+    f_a = B.compute_brief(B.load_blob(str(azu)), 0, str(azu))
+    assert f_a['floor']['gate_side'] == 'necessary'
+    assert '[gate: required]' in dict(B.build_strip(f_a))['Line']
+    lap = require_blob(LAPRAS)
+    f_l = B.compute_brief(B.load_blob(str(lap)), 0, str(lap))
+    assert f_l['floor']['gate_side'] == 'sufficient'
+    assert '[gate: enough]' in dict(B.build_strip(f_l))['Line']
+    assert B.strip_badge({'kind': 'exact', 'gate_side': 'both'}) == 'exact'
+
+
+@pytest.mark.local_artifacts
+def test_a_necessary_gate_says_at_or_above_on_a_ge_threshold():
+    azu = require_blob(AZUMARILL)
+    f_a = B.compute_brief(B.load_blob(str(azu)), 0, str(azu))
+    text = ' '.join(B.build_headline(f_a))
+    assert 'for all but 8 of the 1369 spreads at or above the line' in text
+    assert 'of the 1369 spreads above the line' not in text        # pre-fix
+
+
+@pytest.mark.local_artifacts
+def test_a_shared_line_is_not_re_explained_on_every_moveset(tmp_path):
+    """Four near-identical mechanism paragraphs on one page read as padding."""
+    path = require_blob(SABLEYE_SHADOW)
+    state = B.load_blob(str(path))
+    facts = [B.compute_brief(state, a, str(path))
+             for a in range(len(state['moveset_data']))]
+    assert len(facts) >= 2
+    assert B.shared_line_with(facts[0], []) is None
+    same = B.shared_line_with(facts[1], facts[:1])
+    assert same == facts[0]['header']['arm_label']
+    head = B.build_headline(facts[1], same_as=same)
+    assert head[0].startswith(f'Same line as {same}: at least 148.10 attack '
+                              f'for the 0v1 against Annihilape (rank 30)')
+    assert 'charge-move-priority line' not in head[0]
+    # The strip stays complete per moveset: dropping the paragraph must not
+    # drop the numbers.
+    assert len(B.build_strip(facts[1])) == 5
+    B.gate_voice(head, CTX)
+
+
+def test_matchup_list_collapses_one_opponents_shield_scenarios():
+    assert B._matchup_list(['1v1 Feraligatr', '2v2 Feraligatr']) == \
+        'the 1v1 and 2v2 against Feraligatr'
+    # Shadow and non-shadow are different opponents, not two scenarios.
+    assert B._matchup_list(['1v1 Feraligatr', '1v1 Feraligatr (Shadow)']) == \
+        'the 1v1 against Feraligatr and the 1v1 against Feraligatr (Shadow)'
+    assert B._matchup_list(['0v0 Rillaboom'], omitted=2) == \
+        'the 0v0 against Rillaboom and 2 more'
+
+
+@pytest.mark.local_artifacts
+def test_the_breakpoint_mechanism_is_re_derived_at_render_time():
+    """Positive control for the G-recompute branch v1 did not have.
+
+    The damage step is a headline sentence on two pages, and it was the one
+    printed mechanism nothing re-derived.
+    """
+    import copy
+    path = require_blob(MEDICHAM)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    assert facts['floor']['mech']['kind'] == 'breakpoint'
+    ctx = dict(CTX)
+    B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, ctx)
+    for key, bad in (('to', 6), ('from', 3), ('def_stage', 1)):
+        broken = copy.deepcopy(facts)
+        broken['floor']['mech'][key] = bad
+        with pytest.raises(B.GuardError) as exc:
+            B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', broken, ctx)
+        assert 'Floor mechanism' in str(exc.value)
+
+
+@pytest.mark.local_artifacts
+def test_not_claimed_only_counts_the_floors_own_cell_as_claimed():
+    """A sibling at the same value with a gate of its own is not an exact rule.
+
+    Furret arm 3 printed 122 where the exact-cut census says 123; the
+    difference is 2v1 Florges, which has no exact cut on any axis.
+    """
+    path = require_blob(FURRET)
+    state = B.load_blob(str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is not None)
+    facts = B.compute_brief(state, arm, str(path))
+    fl = facts['floor']
+    assert fl['other_cells_at_T'], "positive control: siblings at this value"
+    n_iv = facts['header']['n_iv']
+    scores, meta = B.arm_view(state, arm, 'pvpoke')
+    win = B.win_cube(scores)
+    a, d, hp = B.stat_planes(meta)
+    tri = B.stage1_triage(win)
+    exact = {(c['si'], c['oi'])
+             for c in B.stage2_clean_cuts(win, {'atk': a, 'def': d, 'hp': hp},
+                                          tri)}
+    contested = [(int(si), int(oi))
+                 for si, oi in zip(*np.nonzero(tri['contested_mask']))]
+    want = sum(1 for c in contested if c not in exact)
+    # The floor's own cell is claimed even when its rule is a gate.
+    si, oi = B._cell_index(state, fl['cell'])
+    if (si, oi) not in exact:
+        want -= 1
+    assert facts['not_claimed']['n_no_rule'] == want
