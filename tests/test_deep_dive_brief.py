@@ -20,6 +20,7 @@ store is not on the machine.
 """
 import importlib.util
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -700,7 +701,11 @@ def test_deoxys_defense_has_no_floor_and_says_why():
     headline = B.build_headline(facts)
     assert len(headline) == 2
     joined = ' '.join(headline)
-    assert 'nothing on this arm is a build line to hunt for' in joined
+    # Round 3: Deoxys' closest rule is a ONE-SIDED GATE (nothing below it
+    # wins), so the headline names it instead of opening with a denial the
+    # next sentence contradicts. The round-2 opener is gone.
+    assert 'nothing on this arm is a build line to hunt for' not in joined
+    assert 'is a one-sided gate' in joined
     assert 'contested matchups' in joined
     # Pre-fix wording: the headline said "no attack, Def or HP value is a
     # build line" and then, in the same sentence, that 24 clean cuts exist --
@@ -746,26 +751,38 @@ ALTARIA = '20260910_185430_Altaria_great.replay.pkl.gz'
 
 @pytest.mark.local_artifacts
 def test_plain_sableye_floor_is_clean_in_two_of_four_not_four():
-    """"Clean in N of M" counted DIRECTION, not cleanliness.
+    """"Clean in N of M" counted SEPARABILITY, not the printed line.
 
-    Plain Sableye's floor passes G-direction in all four opponent-IV settings
-    and has a clean cut in exactly two of them: the two rank-1 settings win
-    71.7% of the cell with no clean cut at all. The pre-fix page printed
-    "Holds: clean in 4 of 4 opponent-IV settings" and then, two lines below,
-    "rank1 no clean cut (71.7% win)".
+    Round 1 printed "Holds: clean in 4 of 4 opponent-IV settings" over a
+    floor whose per-setting table said "rank1 no clean cut (71.7% win)" two
+    lines below. Round 2 split direction from "cleanliness" but measured the
+    second at each view's OWN cut, so the count still did not describe the
+    printed line: this floor separates in all four settings, at 123.41 in
+    two of them and at 122.29 in the other two, and the printed line
+    partitions only the two.
     """
     path = require_blob(SABLEYE_PLAIN)
     state = B.load_blob(str(path))
     facts = B.compute_brief(state, 0, str(path))
     fl = facts['floor']
     assert fl['modes_ok'] == 4                    # pre-fix value, direction
-    assert fl['modes_clean'] == 2                 # the honest one
-    assert sorted(fl['modes_not_clean']) == ['rank1', 'rank1:nobait']
+    assert fl['modes_clean'] == 4                 # separability, any value
     clean_from_table = sum(1 for v in fl['per_mode_cuts'].values() if v['clean'])
     assert fl['modes_clean'] == clean_from_table
+    # The two rank-1 settings separate at 122.29, not at the printed line.
+    assert {m for m, v in fl['per_mode_cuts'].items()
+            if v['printed'] != pytest.approx(123.41)} == {'rank1',
+                                                          'rank1:nobait'}
+    # Round 3: the headline stopped printing SEPARABILITY (each view's own
+    # cut, at whatever value it sits) beside DIRECTION, because the two are
+    # measured at different thresholds and the strict-looking one can exceed
+    # the weak one. What it prints now is the partition of the SAME line.
+    assert fl['modes_partition'] == 2
+    assert fl['modes_partition'] <= fl['modes_ok']
     text = ' '.join(B.build_headline(facts))
-    assert 'exactly clean in 2 of them' in text
-    assert 'clean in 4 of 4' not in text
+    assert 'partitions the cell exactly in 2 of those settings' in text
+    assert 'exactly clean in 2 of them' not in text     # round-2 wording
+    assert 'clean in 4 of 4' not in text                # round-1 wording
 
 
 @pytest.mark.local_artifacts
@@ -777,7 +794,7 @@ def test_gate_recompute_catches_a_corrupted_clean_count():
     facts = B.compute_brief(state, 0, str(path))
     B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
     bad = copy.deepcopy(facts)
-    bad['floor']['modes_clean'] = 4               # the pre-fix number
+    bad['floor']['modes_clean'] = 1               # the table says 4
     with pytest.raises(B.GuardError) as exc:
         B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', bad, CTX)
     assert 'G-recompute' in str(exc.value) and 'field=Floor' in str(exc.value)
@@ -967,26 +984,40 @@ def test_rung_rows_print_the_opponent_rank_inline():
 
 @pytest.mark.local_artifacts
 def test_plain_sableye_annihilape_rung_keeps_its_priority_mechanism():
-    """One mechanism per CELL, not one per rung.
+    """One mechanism per CELL, not one per rung, and now it IS the floor.
 
-    The 123.41 rung owns 0v0 Marowak (a Foul Play breakpoint) and 0v1
+    The 123.41 value owns 0v0 Marowak (a Foul Play breakpoint) and 0v1
     Annihilape (the 1.0 x 123.3776 priority line that the Shadow Sableye page
-    prints as its own floor, on the same 2220 spreads). Labelling the whole
-    row from cells[0] made the two pages tell different stories.
+    prints as its own floor, on the same 2220 spreads). Labelling a whole row
+    from cells[0] made the two pages tell different stories about one line.
+
+    Round 3's rung merge (E3) promotes this value to the floor: the round-2
+    floor sat 21 spreads lower at 123.34 for a single rank-35 Electrode cell,
+    so the two Sableye pages headlined different opponents for what is one
+    physical priority line.
     """
     path = require_blob(SABLEYE_PLAIN)
     state = B.load_blob(str(path))
     facts = B.compute_brief(state, 0, str(path))
-    rung = next(r for r in facts['rungs_above']
-                if any('Annihilape' in n for n in r['names']))
-    assert rung['n_pass'] == 2220
-    assert rung['mech']['kind'] == 'breakpoint'          # pre-fix, whole row
-    idx = [i for i, n in enumerate(rung['names']) if n == '0v1 Annihilape'][0]
-    assert rung['mechs'][idx]['kind'] == 'cmp'
-    assert rung['mechs'][idx]['line'] == pytest.approx(123.3775648)
-    text = B._rung_mech_text(rung, facts['header']['shadow'])
-    assert 'charge-move priority' in text
-    assert 'FOUL_PLAY' in text, "the Marowak breakpoint is still named too"
+    fl = facts['floor']
+    assert fl['cell'] == '0v1 Annihilape'        # round-2: 2v2 Electrode (H.)
+    assert fl['n_pass'] == 2220                  # the shadow page's 2220
+    assert fl['mech']['kind'] == 'cmp'
+    assert fl['mech']['opp_cmp_atk'] == pytest.approx(123.3775648)
+    assert fl['mech']['line'] == pytest.approx(1.0 * 123.3775648)
+    assert fl['merged_from'][0]['n_pass'] == 2241
+    assert fl['merged_from'][0]['n_below_floor_win'] == 21
+    # The floor's SIBLINGS at the same value keep their own causes: 0v0
+    # Marowak turns over at 123.42 by a FOUL_PLAY damage step, not by the
+    # Annihilape priority line, and the page names each.
+    sibs = {s['label']: s['mech'] for s in fl['siblings_at_T']}
+    assert '0v0 Marowak' in sibs
+    assert sibs['0v0 Marowak']['kind'] == 'breakpoint'   # pre-fix: 'cmp'
+    assert sibs['0v0 Marowak']['move'] == 'FOUL_PLAY'
+    assert sibs['0v1 Annihilape (Shadow)']['kind'] == 'cmp'
+    html = B.render_facts(state, 0, str(path), facts)
+    assert 'charge-move priority against Annihilape' in html
+    assert 'FOUL_PLAY damage steps' in html
 
 
 @pytest.mark.local_artifacts
@@ -1151,7 +1182,11 @@ def test_cmp_line_exactly_on_the_cut_is_tagged_as_a_tie():
     assert mech['kind'] == 'cmp'
     assert mech['on_the_line'] is True
     text = B._mech_sentence(B._mech_facts(mech), True, 'Sableye (Shadow)')
-    assert 'lands inside the boundary' in text
+    # Round 3 prints the equation at a precision where it closes under its
+    # own digits; the round-2 text was "1.2 x 119.67 = 143.60 lands inside
+    # the boundary", whose printed operands multiply to 143.604.
+    assert '1.2 x 119.67 = 143.60' in text
+    assert 'lands inside the boundary' not in text      # round-2 wording
     strictly_inside = dict(cut, T=T + 0.05)
     mech2 = B.stage4_mechanism(strictly_inside, state, 'pvpoke', {0: build},
                                ('dark',), 'SHADOW_CLAW / FOUL_PLAY',
@@ -1226,3 +1261,467 @@ def test_a_priority_line_sitting_on_the_cut_is_tagged_on_the_page(
               for m in r['mechs']
               if m['kind'] == 'cmp' and not m['on_the_line']]
     assert strict
+
+
+# ---------------------------------------------------------------------------
+# Round-3 fixes. Each test below fails against the round-2 build
+# (commit f6cf5f5); the pre-fix value is recorded in the test or its docstring.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.local_artifacts
+def test_melmetal_partition_count_can_never_exceed_the_direction_count():
+    """The round-2 page printed a STRICTER test passing on MORE arms.
+
+    Melmetal's SUPER_POWER arm carries the floor Atk >= 122.36. Round 2
+    printed "Direction: ... 2 of 4 moveset arms" and, two lines below,
+    "the partition is exact in 4 of 4 settings and 3 of 4 arms" -- 3 > 2 is
+    impossible for two tests of one threshold. The 3 counted arms whose OWN
+    cut exists (117.97 / 123.97 / 122.37), not arms the printed line
+    partitions.
+    """
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is not None)
+    facts = B.compute_brief(state, arm, str(path))
+    fl = facts['floor']
+    assert (fl['arms_ok'], fl['arms_clean']) == (2, 3)    # the pre-fix pair
+    assert fl['arms_partition'] == 1                      # the honest number
+    assert fl['arms_partition'] <= fl['arms_ok']
+    assert fl['modes_partition'] <= fl['modes_ok']
+    text = ' '.join(B.build_headline(facts))
+    assert '1 of those arms' in text
+    assert 'exactly clean in 4 of them and 3 of 4 moveset arms' not in text
+
+
+@pytest.mark.local_artifacts
+def test_separability_is_printed_with_the_values_it_counted():
+    """E4: a bare count reads as corroboration; the values say what it is."""
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is not None)
+    facts = B.compute_brief(state, arm, str(path))
+    html = B.render_facts(state, arm, str(path), facts)
+    assert 'THIRD and non-comparable measurement' in html
+    # The Dynamic Punch arm wins this cell with 4095 of 4096 spreads, so its
+    # clean cut is not corroboration of anything.
+    assert 'not a contested cell there' in html
+
+
+@pytest.mark.local_artifacts
+def test_gate_recompute_rejects_a_partition_count_above_the_direction_count():
+    """Positive control for the ordering the round-2 page violated."""
+    import copy
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is not None)
+    facts = B.compute_brief(state, arm, str(path))
+    B.gate_recompute(state, arm, str(path), 'pvpoke', 'l50', facts, CTX)
+    bad = copy.deepcopy(facts)
+    bad['floor']['arms_partition'] = bad['floor']['arms_ok'] + 1
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_recompute(state, arm, str(path), 'pvpoke', 'l50', bad, CTX)
+    assert 'G-recompute' in str(exc.value)
+
+
+def test_cmp_equation_closes_under_its_own_printed_digits():
+    """Round 2 rounded operand and product independently, so it did not.
+
+    "1.2 x 123.38 = 148.05" is false of its own printed numbers (the product
+    is 148.056, which renders 148.06), and the apparent rounding direction
+    flipped from line to line across the corpus.
+    """
+    for mult, cmp_atk in ((1.2, 123.3775648), (1.0, 123.29), (1.2, 123.88),
+                          (1.2, 125.19), (1.2, 120.07), (1.2, 119.6684986)):
+        line = mult * cmp_atk
+        dp, operand, product = B.cmp_equation(mult, cmp_atk, line)
+        assert f"{mult * float(operand):.{dp}f}" == product, (mult, cmp_atk)
+        assert f"{line:.{dp}f}" == product
+    # The round-2 rendering of the worked case, as a pre-fix value.
+    assert B.cmp_equation(1.2, 123.3775648, 1.2 * 123.3775648)[1:] == (
+        '123.3776', '148.0531')
+    assert f"{1.2 * 123.38:.2f}" == '148.06'    # what round 2 printed as 148.05
+
+
+def test_cmp_gap_clause_keeps_the_line_strictly_inside_the_printed_interval():
+    mech = {'line': 1.2 * 123.3775648, 'gap_lo': 148.010638212,
+            'gap_hi': 148.1039982}
+    text = B.cmp_gap_clause(mech, 4)
+    assert 'falls in the gap (148.0106, 148.1040]' in text
+    lo, hi = text.split('(')[1].split(']')[0].split(', ')
+    assert float(lo) < mech['line'] <= float(hi)
+    assert B.cmp_gap_clause({'line': 1.0, 'gap_lo': float('-inf'),
+                             'gap_hi': 2.0}, 2) == ''
+
+
+def test_reachable_mask_restricts_only_the_iv_floored_classes():
+    meta = np.zeros((4, 8))
+    meta[:, :3] = [[10, 10, 10], [9, 15, 15], [15, 15, 15], [0, 0, 0]]
+    for cls in ('wild', 'grunt'):
+        m, restricted = B.reachable_mask(meta, cls)
+        assert restricted is False and m.all()
+    m, restricted = B.reachable_mask(meta, 'none')
+    assert restricted is True
+    assert list(m) == [True, False, True, False]
+
+
+@pytest.mark.local_artifacts
+def test_deoxys_bulk_rectangle_is_unreachable_and_says_so():
+    """FATAL in round 2: the only actionable number on the page was a target
+    no encounter can produce, printed as "10 for a 50% chance" under a caveat
+    saying the 10/10/10 floor does NOT apply.
+
+    Deoxys forms come from raids, research and trades, all of which floor
+    every IV at 10. The rectangle Def >= 232.05 & HP >= 94 has 276 members
+    and shares none of them with the 216 spreads that floor allows.
+    """
+    path = require_blob(DEOXYS)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    model = facts['alt_catch_model']
+    assert model['restricted'] is True
+    assert model['n_grid'] == 216
+    assert model['n_reachable'] == 0                 # pre-fix: counted 276/4096
+    assert model['share'] == 0.0
+    html = B.render_facts(state, 0, str(path), facts)
+    assert 'No spread that can land inside this rectangle is reachable' in html
+    assert 'does NOT apply' not in html              # round-2 caveat wording
+    # And the HEADLINE carries it, not only the acquisition line six fields
+    # down, because the headline is the sentence a reader acts on.
+    assert 'No spread inside it is reachable' in ' '.join(B.build_headline(facts))
+
+
+@pytest.mark.local_artifacts
+def test_melmetal_floor_catch_counts_over_the_reachable_grid():
+    """The floor line takes the same restriction, in the other direction."""
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is not None)
+    facts = B.compute_brief(state, arm, str(path))
+    cm = facts['catch_model']
+    assert cm['restricted'] is True and cm['n_grid'] == 216
+    assert 0 < cm['n_reachable'] < 216
+    assert cm['share'] != facts['floor']['pool_share']   # pre-fix: equal
+    assert facts['catch'][0]['n'] == B._encounters(cm['share'], 0.50)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.parametrize('path_to_corrupt,new_value', [
+    (('rank1', 'n_cuts'), 41),
+    (('rank1', 'n_cuts_cleared'), 3),
+    (('rank1', 'shortfall'), 1.0),
+    (('not_claimed', 'of'), 162),
+    (('clean_counts',), {'atk': 39}),
+    (('gate_tally', 'n_cuts'), 41),
+    (('mirror', 'rows', 0, 'above'), 0.5),
+    (('rungs_above_tail', 'max_n_pass'), 8),
+    (('bulk', 'cogates', 0, 'rate_outside'), 0.5),
+    (('examples', 0, 'contested_cells'), 3),
+    (('examples', 0, 'sp_rank'), 3),
+    (('level_reach', 'n_in_low'), 3),
+    (('alternative', 'sp_share_lo'), 0.5),
+    (('alternative', 'atk_lo'), 1.0),
+    (('floor', 'energy', 'below'), [99]),
+    (('cost', 'diff', 'caveat_excluded'), 99),
+    (('grid_best', 'total'), 999),
+    (('catch_model', 'n_reachable'), 99),
+])
+def test_gate_recompute_covers_the_round_2_probe_gaps(
+        sableye_shadow_facts, path_to_corrupt, new_value):
+    """25 reader-facing numbers rendered with no guard failure in round 2.
+
+    A probe that corrupted one fact leaf at a time and re-rendered found
+    three numbers in the HEADLINE verdict (rank-1's cut counts, its
+    shortfall, the not-claimed denominator) and the whole of field 11 among
+    them. Each is now a one-line re-derivation from arrays the guard already
+    loads.
+    """
+    import copy
+    state, facts, path = sableye_shadow_facts
+    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    bad = copy.deepcopy(facts)
+    node = bad
+    for key in path_to_corrupt[:-1]:
+        node = node[key]
+    node[path_to_corrupt[-1]] = new_value
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+    assert str(exc.value).startswith('G-recompute:')
+
+
+@pytest.mark.local_artifacts
+def test_sweep_arm_label_matches_the_page(sableye_shadow_facts):
+    """Round 2 numbered arms 0-based in sweep.md and 1-based on the page."""
+    _state, facts, _path = sableye_shadow_facts
+    row = B.sweep_row(facts)
+    assert row[1] == 'arm 1 of 4'                  # pre-fix: 'arm 0'
+    fields = B.build_fields(facts)
+    header = ' '.join(fields[0]['lines'])
+    assert row[1] in header
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, MELMETAL, FURRET, DEOXYS])
+def test_hp_thresholds_print_as_integers_everywhere(blob):
+    """Round 2 put "HP >= 142" and "HP >= 142.00" on one Melmetal page."""
+    path = require_blob(blob)
+    state = B.load_blob(str(path))
+    out = []
+    for arm in range(len(state['moveset_data'])):
+        facts = B.compute_brief(state, arm, str(path))
+        out.append(B.render_facts(state, arm, str(path), facts))
+    text = '\n'.join(out)
+    assert 'HP &gt;=' in text, "positive control: the page prints HP lines"
+    assert not re.search(r'HP &gt;= \d+\.\d', text)
+
+
+def test_stat_threshold_str_uses_the_integer_branch_for_hp():
+    # It formats an ALREADY-FLOORED printed value (printed_cut does the
+    # flooring), so the Def case is fed 101.40, not the 101.4055 cut.
+    assert B.stat_threshold_str('hp', 142.0, 2) == 'HP >= 142'
+    assert B.stat_threshold_str('def', 101.40, 2) == 'DEF >= 101.40'
+    assert B.stat_threshold_str('atk', 148.103, 3) == 'ATK >= 148.103'
+
+
+@pytest.mark.local_artifacts
+def test_no_floor_arms_still_print_example_spreads():
+    """Round 2 printed a silence sentence on exactly the pages that need it.
+
+    "No floor on this arm, so there is no set of clearers to draw examples
+    from" was field 9 on all 14 no-floor arms in the corpus, so the negative
+    verdict never carried its positive half.
+    """
+    path = require_blob(DEOXYS)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    assert facts['floor'] is None
+    assert len(facts['examples']) >= 2               # pre-fix: 0
+    rules = [e['rule'] for e in facts['examples']]
+    assert 'most cells won on the whole grid' in rules
+    for e in facts['examples']:
+        assert e['by_scenario'] and sum(e['by_scenario']) == e['total']
+    html = B.render_facts(state, 0, str(path), facts)
+    assert 'no set of clearers to draw examples from' not in html
+    assert 'the whole IV decision on this arm is' in html
+
+
+@pytest.mark.local_artifacts
+def test_grid_best_sizes_the_decision_against_rank_1():
+    path = require_blob(DEOXYS)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    gb, r1 = facts['grid_best'], facts['rank1']
+    assert gb['total'] >= r1['total_won']
+    assert gb['n_tied'] >= 1
+    text = B._grid_best_sentence(facts)
+    assert f"{gb['total']}" in text and 'cells wide' in text
+
+
+def test_near_line_row_only_promotes_a_gate_or_a_near_miss():
+    """The classifier, not the blob: a merely-accurate split is not a line."""
+    assert B.near_line_row([]) is None
+    gate = {'one_sided': True, 'near_exact': False}
+    assert B.near_line_row([gate]) is gate
+    near = {'one_sided': False, 'near_exact': True}
+    assert B.near_line_row([near]) is near
+    assert B.near_line_row([{'one_sided': False, 'near_exact': False}]) is None
+
+
+@pytest.mark.local_artifacts
+def test_furret_near_exact_rule_leads_its_headline():
+    """A rule broken by ONE spread in 4096 is a verdict, not "nothing"."""
+    path = require_blob(FURRET)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    d = facts['dirty_thresholds'][0]
+    assert d['cell'] == '1v1 Lapras'
+    assert d['n_wrong'] == 1 and d['near_exact'] is True
+    assert d['one_sided'] is False
+    text = ' '.join(B.build_headline(facts))
+    assert 'for all but 1 of the 4096 spreads' in text
+    assert 'nothing on this arm is a build line to hunt for' not in text
+
+
+@pytest.mark.local_artifacts
+def test_furret_clean_cut_denominators_reconcile():
+    """Round 2 printed 28, 26 and 28 for one quantity, ten lines apart."""
+    path = require_blob(FURRET)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    cc = facts['clean_counts']
+    assert sum(cc.values()) == facts['gate_tally']['n_cuts']
+    assert facts['clean_claimed'] + facts['clean_excluded'] == sum(cc.values())
+    assert facts['clean_excluded'] == 2
+    joined = ' '.join(B.build_headline(facts)) + ' ' + \
+        facts['degradation']['sentence']
+    assert 'excluded for an open engine divergence' in joined
+    assert f"{facts['clean_claimed']} clean cuts" in joined
+
+
+@pytest.mark.local_artifacts
+def test_score_only_rows_are_ordered_by_distance_to_the_win_line(
+        sableye_shadow_facts):
+    """Round 2 sorted by step size, which leads with blowouts on both sides."""
+    _state, facts, _path = sableye_shadow_facts
+    rows = [r for r in facts['score_only'] if not r['caveat']]
+    assert rows, "positive control: there are non-caveat score rows"
+    dists = [r['to_win'] for r in rows]
+    assert dists == sorted(dists)
+    for r in rows:
+        assert r['to_win'] == min(abs(r['below'] - B.WIN_RATING),
+                                  abs(r['above'] - B.WIN_RATING))
+
+
+@pytest.mark.local_artifacts
+def test_not_claimed_names_the_coin_flips_one_per_species(
+        sableye_shadow_facts):
+    """Round 2 spent six slots on three opponents, four of them at 0% or 100%."""
+    _state, facts, _path = sableye_shadow_facts
+    field = B._f13_not_claimed(facts)
+    cells = [row[0] for row in field['rows']]
+    species = [c.split(' ', 1)[1].split(' (engine')[0] for c in cells]
+    assert len(set(species)) == len(species), species
+    rates = [float(row[2].rstrip('%')) for row in field['rows']]
+    assert rates == sorted(rates, key=lambda v: abs(v - 50.0))
+    assert abs(rates[0] - 50.0) <= abs(rates[-1] - 50.0)
+
+
+@pytest.mark.local_artifacts
+def test_alternative_target_prints_its_iv_envelope(sableye_shadow_facts):
+    """E12: the step the genre ends on -- what the spreads actually look like."""
+    _state, facts, _path = sableye_shadow_facts
+    env = facts['alternative']['envelope']
+    assert sum(c for _v, c in env['by_atk_iv']) == facts['alternative']['n']
+    assert env['atk_iv'][0] <= env['atk_iv'][1]
+    assert len(env['top_sp']) == 5
+    html = B.render_facts(_state, 0, _path, facts)
+    assert 'IV envelope of the members' in html
+
+
+def test_field_order_is_the_reader_order_and_renumbers_from_one():
+    assert sorted(B.FIELD_ORDER) == sorted(B.FIELD_DERIVATION_ORDER)
+    assert len(B.FIELD_ORDER) == 15
+    # Examples sits directly under Floor; Coverage moves back with the audit.
+    assert B.FIELD_ORDER[:3] == ('_f1_header', '_f2_floor', '_f9_examples')
+    assert B.FIELD_ORDER.index('_f3_coverage') > B.FIELD_ORDER.index('_f10_cost')
+
+
+@pytest.mark.local_artifacts
+def test_fields_render_in_the_reader_order(sableye_shadow_facts):
+    _state, facts, _path = sableye_shadow_facts
+    fields = B.build_fields(facts)
+    assert [f['n'] for f in fields] == list(range(1, 16))
+    titles = [f['title'] for f in fields]
+    assert titles[:3] == ['Header', 'Floor', 'Example spreads']
+    assert titles.index('Coverage') > titles.index('Cost')
+
+
+@pytest.mark.local_artifacts
+def test_coverage_column_prints_one_precision(sableye_shadow_facts):
+    """Round 2 printed five rows at 2 dp and one at 3 in the same column."""
+    _state, facts, _path = sableye_shadow_facts
+    field = B._f3_coverage(facts)
+    places = {len(row[1].split('.')[1]) for row in field['rows']}
+    assert len(places) == 1, field['rows']
+    assert max(r['dp'] for r in facts['coverage']['rows']) == places.pop()
+
+
+@pytest.mark.local_artifacts
+def test_dirty_table_prints_the_genre_precision_cost():
+    """E8: the exact selector stays, with what one decimal place costs."""
+    path = require_blob(FURRET)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    g = facts['dirty_thresholds'][0]['genre']
+    assert g['printed'] == pytest.approx(102.0, abs=0.1)
+    assert g['n_above'] >= facts['dirty_thresholds'][0]['n_above']
+    html = B.render_facts(state, 0, str(path), facts)
+    assert 'PvPoke and Poke Genie display' in html
+
+
+@pytest.mark.local_artifacts
+def test_both_sableye_pages_headline_the_same_priority_line():
+    """E3: D1's literal "lowest eligible rung" made the verdict opponent flap.
+
+    Round 2 headlined plain Sableye at 123.34 for ONE rank-35 Electrode cell
+    while the value 21 spreads up owns four cells against three top-31
+    opponents, and split the four Shadow Sableye arms between 148.01
+    (Electrode) and 148.10 (Annihilape). Both are the same physical priority
+    line against the same PvPoke-default Annihilape, 1.0x it on one page and
+    1.2x it on the other, over the same 2220 spreads.
+    """
+    shadow_path = require_blob(SABLEYE_SHADOW)
+    plain_path = require_blob(SABLEYE_PLAIN)
+    sh_state = B.load_blob(str(shadow_path))
+    pl_state = B.load_blob(str(plain_path))
+    plain = B.compute_brief(pl_state, 0, str(plain_path))['floor']
+    assert plain['cell'] == '0v1 Annihilape'
+    assert plain['n_pass'] == 2220
+    shadow_cells = set()
+    for arm in range(len(sh_state['moveset_data'])):
+        fl = B.compute_brief(sh_state, arm, str(shadow_path))['floor']
+        assert fl is not None
+        assert fl['n_pass'] == 2220                  # round-2: 2220 / 2239
+        assert fl['printed'] == pytest.approx(148.10)
+        shadow_cells.add(fl['cell'])
+    assert shadow_cells == {'0v1 Annihilape'}        # round-2: two opponents
+    assert (plain['mech']['opp_cmp_atk']
+            == pytest.approx(B.compute_brief(sh_state, 0, str(shadow_path))
+                             ['floor']['mech']['opp_cmp_atk']))
+
+
+def test_stage6_merges_only_rungs_whose_clearer_sets_nearly_agree():
+    """The merge rule itself, on hand-built rungs: no blob, no thresholds."""
+    def rung(T, n, label):
+        return {'T': T, 'n_pass': n, 'pool_share': n / 4096.0,
+                'eligible': True, 'cells': [{'label': label}]}
+    near = [rung(100.0, 2241, 'a'), rung(100.1, 2220, 'b')]
+    got = B.stage6_select(near, n_iv=4096)
+    assert got['T'] == 100.1                       # the HIGHER value
+    assert [m['T'] for m in got['merged_from']] == [100.0]
+    far = [rung(100.0, 2241, 'a'), rung(100.1, 2000, 'b')]
+    got = B.stage6_select(far, n_iv=4096)
+    assert got['T'] == 100.0                       # 241 apart: no merge
+    assert 'merged_from' not in got
+    # A merge may not walk the floor out of the decision band.
+    out = [rung(100.0, 2241, 'a'), rung(100.1, 900, 'b')]
+    assert B.stage6_select(out, n_iv=4096)['T'] == 100.0
+    # Three in a row merge transitively while each step stays inside tol.
+    chain = [rung(100.0, 2241, 'a'), rung(100.1, 2220, 'b'),
+             rung(100.2, 2200, 'c')]
+    got = B.stage6_select(chain, n_iv=4096)
+    assert got['T'] == 100.2 and len(got['merged_from']) == 2
+
+
+@pytest.mark.local_artifacts
+def test_merged_cells_are_stated_as_bought_and_not_as_partitioned():
+    """The merged-in cell turns over BELOW the line, so it is a weaker claim."""
+    path = require_blob(SABLEYE_PLAIN)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    fl = facts['floor']
+    m = fl['merged_from'][0]
+    assert m['cells'][0]['label'] == '2v2 Electrode (Hisuian)'
+    assert m['n_below_floor_win'] == 21
+    text = ' '.join(B.build_headline(facts))
+    assert 'also buys' in text
+    assert 'bought, not partitioned' in text
+    assert 'up to 21 of the 1876 spreads under it win it as well' in text
+
+
+@pytest.mark.local_artifacts
+def test_gate_recompute_rejects_a_merge_outside_the_tolerance():
+    """Positive control: a merged rung that is not actually close."""
+    import copy
+    path = require_blob(SABLEYE_PLAIN)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
+    bad = copy.deepcopy(facts)
+    bad['floor']['merged_from'][0]['n_pass'] = 4000
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', bad, CTX)
+    assert 'Floor merge' in str(exc.value)

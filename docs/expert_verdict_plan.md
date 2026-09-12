@@ -136,6 +136,44 @@ sentence (in the last column) rather than nothing.
 | 14  | How sure           | Mechanical only: clean counts, per-mode cuts, per-moveset cuts, coverage percentile, the CMP shadow-strip caveat, single-owner sentence when it applies, cohorts checked, corroboration line                | Always printed                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 15  | Provenance         | "clean cut" defined; how it relates to the page's "flips at" and "best rule" numbers, with this dive's three values for one opponent; the engine's CMP tie convention with line references                  | Always printed                                                                                                                                                                                                                                                                                                                                                                                                              |
 
+Corrections and refinements, 2026-09-12 (round 3). The table above is the
+DERIVATION order and remains the field identity; the renderer prints the same
+fifteen fields in a reader-question order (Header, Floor, Example spreads,
+Rank-1 check, Alternative target, Cost, Rungs above, Rungs below, Bulk,
+Coverage, Mirror, Score only, Not claimed, How sure, Provenance) and renumbers
+them 1-15 by print position. No field's content moved. Four further
+corrections to the text above:
+
+- Field 2's "modes and movesets it holds in" is THREE measurements, not one,
+  and they must be named apart. DIRECTION asks whether the printed line still
+  points the right way in another view; PARTITION asks whether the printed
+  line splits that view exactly; SEPARABILITY asks whether the view has a
+  clean cut for that cell at ANY value. Partition implies direction;
+  separability implies neither. Printing separability under the word
+  "cleanliness" beside the direction count made the strict-looking number
+  exceed the weak one on Melmetal ("exact in 3 of 4 arms" under "points the
+  same way in 2 of 4"). Separability is now printed with the VALUES it
+  counted and the win rate at each, so an arm that wins the cell with 4095 of
+  4096 spreads cannot read as corroboration.
+- Field 2's and field 8's catch counts are a model of a SOURCE, so they are
+  taken over the grid that source can produce. A raid, research or trade
+  encounter floors every IV at 10; counting over all 4096 spreads printed
+  "10 encounters for a 50% chance" for a Deoxys rectangle whose 276 members
+  include none of the 216 spreads that floor allows. Where the reachable
+  count is zero the page says so instead of printing a number, and the
+  reachability travels with the rectangle wherever it is named, headline
+  included.
+- D12's negative needs a second admissible primitive below the clean cut: a
+  ONE-SIDED GATE (no spread below the value wins the cell) or a NEAR-EXACT
+  rule (at most 0.5% of the grid on the wrong side). Both are build lines by
+  the genre's standard, and a headline that opens "nothing here is a build
+  line" and prints one two sentences later tells the reader the opposite of
+  what the numbers say. The exactness distinction stays, in the clause about
+  what an exact line has to do to carry a FLOOR label.
+- Field 9 runs over the whole grid when there is no floor, and the negative
+  headline ends with the size of the decision: the cells the grid's
+  most-winning spread takes against rank-1's count.
+
 Confidence language: none. No adjective (strong, solid, definitive, best,
 recommended, consistent, reliable, worth) and no comparative about which
 build is better. Confidence is the printed fraction with the failing modes
