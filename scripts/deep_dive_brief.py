@@ -53,7 +53,7 @@ from gopvpsim.moves import damage, get_moves, parse_types
 from gopvpsim.pokemon import Pokemon, find_pokemon_entry
 from deep_dive_lib.opponents import (
     resolve_opp_ivs, parse_opponent_spec, build_opp_meta_ranks,
-    rankings_snapshot_date,
+    rankings_snapshot_date, register_opponent_variant,
 )
 
 # ---------------------------------------------------------------------------
@@ -86,6 +86,18 @@ NEAR_EXACT_SHARE = 0.005          # E2: "near-exact" = this share of the grid
 GATE_MIN_ABOVE = 0.97             # E2b: a one-sided gate wins this share above
 PRIMITIVE_TIE_WINDOW = 0.50       # attack points: kind preference inside this
 MERGE_SPREAD_TOL = 0.01           # E3: rungs this close share one printed line
+# V2 round 2. What clearing the line COSTS, measured as the exact matchup diff
+# between the clearer field 10 costs out and the stat-product rank-1 spread.
+# Under this share of the focal's matchups a net loss is inside the noise of a
+# single example spread and the page keeps its directive opening; beyond it the
+# directive is demoted, because "there is a line and clearing it loses you
+# matchups" is the honest reading and is itself a result.
+FLOOR_COST_MATERIAL = 0.01
+# A rule on a BETTER-ranked opponent this close below the printed line is
+# named in the headline: every spread clearing the line clears it too, so the
+# reader gets both for free (Medicham: rank-13 Snorlax at 108.39 under a
+# rank-42 Shadow Snorlax line at 109.27).
+NEAR_FLOOR_WINDOW = 1.00          # attack points
 NAME_CAP = 3                      # G-names
 LIST_CAP = 12                     # names printed in a field-8 list
 SCORE_ROW_CAP = 12                # stage 10 table length
@@ -178,9 +190,24 @@ def guard_fail(guard, field, cell, printed, recomputed, ctx):
 # ---------------------------------------------------------------------------
 
 def load_blob(path):
-    """Read a deep-dive replay blob (gzip + pickle) into its state dict."""
+    """Read a deep-dive replay blob (gzip + pickle) into its state dict.
+
+    The blob's moveset-variant opponents are re-registered on the way out.
+    ``parse_opponent_spec`` resolves a display name like "Thievul (Sucker
+    Punch / Night Slash+Icy Wind)" back to its base species ONLY through the
+    process-global registry that the dive filled at bake time, and a
+    standalone brief run starts with that registry empty. Without this replay
+    every variant opponent parses as a species of the whole literal name, its
+    rank comes back None, and G-rank silently drops it: the Melmetal page
+    counted a rank-16 Thievul cell as unranked and printed a bulk rectangle
+    worth one matchup where it is worth two.
+    """
     with gzip.open(path, 'rb') as fh:
-        return pickle.load(fh)
+        state = pickle.load(fh)
+    for name, (base, is_shadow) in (
+            state.get('opponent_variant_registry') or {}).items():
+        register_opponent_variant(name, base, is_shadow)
+    return state
 
 
 def arm_view(state, arm, mode, level='l50'):
@@ -342,21 +369,37 @@ def near_exact_limit(n_iv):
     return max(1, int(round(NEAR_EXACT_SHARE * n_iv)))
 
 
-def primitive_ok(c, n_iv):
-    """Does a candidate clear the bar for the primitive it IS?
+def effective_kind(c, n_iv):
+    """Which primitive a candidate qualifies AS, or None if it qualifies as none.
 
-    The dirty side has to be at least GATE_MIN_ABOVE pure in the direction the
-    line claims: a "necessary" gate whose spreads above win only half the time
-    is not a line, and neither is a "sufficient" one that half the grid
-    already wins without it.
+    The three routes are INDEPENDENT tests, not a classification. ``kind`` in
+    ``cut_counts`` names the shape of the candidate's dirty side; eligibility
+    then asks each bar in turn. A candidate whose dirty side happens to be
+    one-sided but only 91% pure is still near-exact when few enough spreads
+    are on the wrong side in total -- E2b widens the pool, it does not narrow
+    what E2 already admits -- and it is BADGED near-exact, because that is the
+    claim its numbers support.
+
+    The gate bar: the dirty side has to be at least GATE_MIN_ABOVE pure in the
+    direction the line claims. A "necessary" gate whose spreads above win only
+    half the time is not a line, and neither is a "sufficient" one that half
+    the grid already wins without it.
     """
     if c['kind'] == 'exact':
-        return True
+        return 'exact'
     if c['kind'] == 'gate':
-        return (c['rate_above'] >= GATE_MIN_ABOVE
-                if c['gate_side'] == 'necessary'
-                else c['rate_below_loss'] >= GATE_MIN_ABOVE)
-    return c['n_wrong'] <= near_exact_limit(n_iv)
+        rate = (c['rate_above'] if c['gate_side'] == 'necessary'
+                else c['rate_below_loss'])
+        if rate >= GATE_MIN_ABOVE:
+            return 'gate'
+    if c['n_wrong'] <= near_exact_limit(n_iv):
+        return 'near_exact'
+    return None
+
+
+def primitive_ok(c, n_iv):
+    """Does a candidate clear the bar for any of the three primitives?"""
+    return effective_kind(c, n_iv) is not None
 
 
 def gate_cuts(stat, wins):
@@ -447,9 +490,15 @@ def stage2_primitives(win, planes, triage, axis='atk'):
         for c in cands:
             if c['T'] in seen or c['kind'] == 'exact':
                 continue
-            if not primitive_ok(c, n_iv):
+            kind = effective_kind(c, n_iv)
+            if kind is None:
                 continue
             seen.add(c['T'])
+            # The badge follows the route it passed by, not the shape of its
+            # dirty side: a one-sided candidate admitted only because it is
+            # near-exact must not print the gate's stronger claim.
+            c = dict(c, kind=kind,
+                     gate_side=(c['gate_side'] if kind == 'gate' else None))
             out.append(dict(c, axis=axis, si=si, oi=oi))
     return out
 
@@ -1620,6 +1669,7 @@ def stage12b_dirty_thresholds(win, planes, contested_cells, claimed, ranks,
             genre = {'printed': g, 'n_above': int(g_above.sum()),
                      'n_extra': int((g_above & (stat_v < pick['t'])).sum())}
         pick.update({'genre': genre, 'printed': pr, 'dp': dp, 'rank': rank,
+                     'si': si, 'oi': oi,
                      'cell': cell_label(state, si, oi),
                      'near_exact': bool(pick['n_wrong']
                                         <= max(1, round(NEAR_EXACT_SHARE * n_iv))),
@@ -1627,6 +1677,78 @@ def stage12b_dirty_thresholds(win, planes, contested_cells, claimed, ranks,
         rows.append(pick)
     rows.sort(key=lambda r: (-r['gain'], r['cell']))
     return rows[:top_n]
+
+
+def disqualifier(d, prims):
+    """Why the closest rule is NOT the printed line, in the gate's own terms.
+
+    A no-line page that names a rule wrong on 1 spread in 4096 and then says
+    nothing about why it is not the line reads as the tool contradicting
+    itself. The reason is almost never the rule's own numbers: it is a gate
+    (usually G-direction -- the rule reverses when the opponent is built for
+    stat product instead of PvPoke's defaults), or it is that the floor pool
+    is the attack axis and this rule is on Def or HP.
+
+    Matched by CELL and by VALUE, so a row whose number was never a floor
+    candidate reports that rather than borrowing a neighbour's reason.
+    """
+    if d['axis'] != 'atk':
+        return {'reason': 'axis'}
+    for c in prims:
+        if (c['si'], c['oi']) == (d['si'], d['oi']) and abs(c['T'] - d['t']) <= 1e-9:
+            failed = [g for g, ok in c['gates'].items() if not ok]
+            return {'reason': 'gates', 'failed': failed,
+                    'modes_ok': c['holds']['modes_ok'],
+                    'modes_total': c['holds']['modes_total'],
+                    'modes_fail': list(c['holds']['modes_fail']),
+                    'kind': c['kind'], 'pool_share': c['pool_share'],
+                    'in_band': bool(DECISION_BAND[0] <= c['pool_share']
+                                    <= DECISION_BAND[1])}
+    return {'reason': 'not_a_candidate'}
+
+
+def near_floor_rule(floor_rung, floor_cell, floor_rungs, atk):
+    """A better-ranked rule just BELOW the printed line, dropped on direction.
+
+    Medicham's page named the 0v1 against a rank-42 Shadow Snorlax and buried
+    the rank-13 Snorlax rule 0.87 attack lower in a collapsed evidence list --
+    the number an expert opens a Medicham page to find. The two are close
+    enough that every spread clearing the printed line clears the other one
+    too, so naming it costs the reader nothing.
+
+    Only G-direction failures qualify. A rule dropped for a low-ranked
+    opponent, a degenerate scenario or no mechanism is not "the same line one
+    step down"; it is a rule the page already declined for a reason the
+    reader would have to re-litigate.
+    """
+    best = None
+    for r in floor_rungs:
+        if not (floor_rung['T'] - NEAR_FLOOR_WINDOW <= r['T'] <= floor_rung['T']):
+            continue
+        for c in r['cells']:
+            if c['eligible'] or c['rank'] is None:
+                continue
+            if floor_cell['rank'] is not None and c['rank'] >= floor_cell['rank']:
+                continue
+            if [g for g, ok in c['gates'].items() if not ok] != ['G-direction']:
+                continue
+            # Closest to BEING the line first (it holds in the most settings),
+            # then the opponent a reader is most likely to have opened the
+            # page for. Rank alone promoted a 2-of-4 rule over the 3-of-4 one
+            # Michael named.
+            key = (-c['holds']['modes_ok'], c['rank'], -c['T'])
+            if best is None or key < best[0]:
+                best = (key, c)
+    if best is None:
+        return None
+    c = best[1]
+    pr, dp = printed_cut(c['T'], atk, field='Near-floor rule',
+                         ctx={'cell': c['label']})
+    return {'T': c['T'], 'printed': pr, 'dp': dp, 'cell': c['label'],
+            'rank': c['rank'], 'kind': c['kind'], 'gate_side': c['gate_side'],
+            'modes_ok': c['holds']['modes_ok'],
+            'modes_total': c['holds']['modes_total'],
+            'modes_fail': list(c['holds']['modes_fail'])}
 
 
 def cell_cuts_by_view(si, oi, cubes, axis='atk'):
@@ -1775,15 +1897,42 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     primitive_picks = {}
     for kind in ('exact', 'gate', 'near_exact'):
         pick = stage6_select(floor_rungs, n_iv=n_iv, kinds=(kind,))
-        primitive_picks[kind] = None if pick is None else {
-            'T': pick['T'],
-            'printed': printed_cut(pick['T'], atk, field='Primitive audit',
-                                   ctx={'cell': pick['cells'][0]['label']})[0],
-            'dp': printed_cut(pick['T'], atk, field='Primitive audit',
-                              ctx={'cell': pick['cells'][0]['label']})[1],
-            'cell': floor_cell_of(pick)['label'],
-            'n_pass': pick['n_pass'], 'pool_share': pick['pool_share'],
-        }
+        if pick is not None:
+            primitive_picks[kind] = {
+                'T': pick['T'],
+                'printed': printed_cut(pick['T'], atk, field='Primitive audit',
+                                       ctx={'cell': pick['cells'][0]['label']})[0],
+                'dp': printed_cut(pick['T'], atk, field='Primitive audit',
+                                  ctx={'cell': pick['cells'][0]['label']})[1],
+                'cell': floor_cell_of(pick)['label'],
+                'n_pass': pick['n_pass'], 'pool_share': pick['pool_share'],
+                'rejected': None,
+            }
+            continue
+        # "nothing eligible" is the least useful thing this audit can say: on
+        # Corviknight the strongest non-exact candidate is visible on the page
+        # (a rule wrong on 1 spread in 4096) and the block that exists to make
+        # the new primitives checkable reported it as absent. Name the
+        # in-band candidate it rejected, and the gate it rejected it on.
+        in_band = [r for r in floor_rungs
+                   if rung_kind(r) == kind
+                   and DECISION_BAND[0] <= r['pool_share'] <= DECISION_BAND[1]]
+        rej = None
+        for r in sorted(in_band, key=lambda x: x['T']):
+            c = sorted(r['cells'],
+                       key=lambda x: (PRIMITIVE_RANK[x['kind']], x['T']))[0]
+            failed = [g for g, ok in r['gates'].items() if not ok]
+            rej = {'T': r['T'],
+                   'printed': printed_cut(r['T'], atk, field='Primitive audit',
+                                          ctx={'cell': c['label']})[0],
+                   'dp': printed_cut(r['T'], atk, field='Primitive audit',
+                                     ctx={'cell': c['label']})[1],
+                   'cell': c['label'], 'pool_share': r['pool_share'],
+                   'failed': failed,
+                   'modes_ok': c['holds']['modes_ok'],
+                   'modes_total': c['holds']['modes_total']}
+            break
+        primitive_picks[kind] = None if rej is None else {'rejected': rej}
 
     contested_cells = [(int(si), int(oi))
                        for si, oi in zip(*np.nonzero(triage['contested_mask']))]
@@ -1809,6 +1958,8 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     dirty = stage12b_dirty_thresholds(win, planes, contested_cells,
                                       claimed | floor_claimed,
                                       ranks, triage, state)
+    for d in dirty:
+        d['disqualified'] = disqualifier(d, prims)
     cmp_near_misses = [c['label'] for c in cuts
                        if c['mech'].get('cmp_near_miss')]
 
@@ -1870,14 +2021,33 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         for g, ok in c['gates'].items():
             if not ok:
                 tally[g] += 1
+    # The census used to cover exact cuts only, which left the two new
+    # primitives -- the ones whose eligibility the block exists to audit --
+    # outside the failure count entirely.
+    prim_tally = Counter()
+    for c in prims:
+        for g, ok in c['gates'].items():
+            if not ok:
+                prim_tally[g] += 1
     facts['gate_tally'] = {'n_cuts': len(cuts),
                            'n_eligible': sum(1 for c in cuts if c['eligible']),
-                           'failed': dict(tally)}
+                           'failed': dict(tally),
+                           'n_prims': len(prims),
+                           'n_prims_eligible': sum(1 for c in prims
+                                                   if c['eligible']),
+                           'prims_failed': dict(prim_tally)}
 
+    # The floor's OWN cell counts as claimed whatever primitive carried it.
+    # Its SIBLINGS at the same value do not: a cell that merely turns over at
+    # the printed number with a gate of its own has no exact rule, and
+    # counting it as claimed made field 13's "turn on no single stat at all"
+    # a stronger claim than the census behind it (Furret arm 3 printed 122
+    # where the exact-cut census says 123, the difference being 2v1 Florges).
+    _floor_own = ([floor_cell_of(floor_rung)]
+                  if floor_rung is not None
+                  and floor_cell_of(floor_rung)['kind'] != 'exact' else [])
     facts['not_claimed'] = _not_claimed(
-        win, triage,
-        cuts_claimed + [c for c in (floor_rung['cells'] if floor_rung else [])
-                        if c['kind'] != 'exact'],
+        win, triage, cuts_claimed + _floor_own,
         cuts_caveat, contested_cells, state, ranks, floor_rung, atk)
     # E5: the size of the decision, stated as a measured fact -- how many
     # cells the grid's most-winning spread takes, against rank-1's count. On
@@ -1919,6 +2089,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         facts['score_only'] = [_score_row(r, atk) for r in
                                stage10_score_only(scores, atk, triage, state, ranks)]
         facts['cost'] = {'reverse_cuts': len(reverse_cuts), 'diff': None}
+        facts['floor_cost'] = None
         facts['catch'] = []
         facts['catch_model'] = None
         facts['rank1']['by_scenario'] = per_scenario_wins(
@@ -2055,6 +2226,28 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         cov = stage5_coverage(floor_cell, state, mode, atk, league)
     facts['coverage'] = cov
 
+    # The same line without the shadow bonus. Stats in this blob are
+    # shadow-effective, so dividing the whole attack plane by the bonus IS
+    # the non-shadow grid, and the value is proved to the same precision the
+    # printed floor is -- which is what lets the headline say "a non-shadow
+    # Sableye needs 123.42 (123.419)" and land on the number the non-shadow
+    # page prints as its own floor.
+    facts['floor']['unshadowed'] = None
+    if state['shadow'] and floor_cell['mech']['kind'] == 'cmp':
+        # Printed through stage 7 with BOTH level grids, exactly as the floor
+        # itself is: the L51 ambiguity check is what makes the non-shadow
+        # Sableye page print 123.419 rather than 123.41, and a
+        # cross-referenced number that disagrees with the page it points at
+        # is worse than no cross-reference.
+        u = stage7_print_precision(floor_rung['T'] / SHADOW_ATK_BONUS,
+                                   atk / SHADOW_ATK_BONUS,
+                                   atk51 / SHADOW_ATK_BONUS,
+                                   field='Floor without the shadow bonus',
+                                   ctx=dict(ctx, cell=floor_cell['label']))
+        facts['floor']['unshadowed'] = {
+            'T': floor_rung['T'] / SHADOW_ATK_BONUS,
+            'printed': u['printed'], 'dp': u['dp']}
+
     above_rungs = [r for r in rungs
                    if r['T'] > floor_rung['T']
                    and r['pool_share'] >= RUNG_POOL_MIN
@@ -2125,6 +2318,9 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                            stage10_score_only(scores, atk, triage, state, ranks)]
     facts['cost'] = _cost(win, meta, facts, state, ranks, contested_cells,
                           reverse_cuts)
+    facts['floor_cost'] = _floor_cost(facts, win, meta, floor_mask)
+    facts['floor']['near_rule'] = near_floor_rule(floor_rung, floor_cell,
+                                                  floor_rungs, atk)
     facts['l51'] = _l51_view(state, arm, mode, floor_rung, floor_cell)
     return facts
 
@@ -2457,6 +2653,51 @@ def _cost(win, meta, facts, state, ranks, contested_cells, reverse_cuts):
     }
 
 
+def _floor_cost(facts, win, meta, floor_mask):
+    """What clearing the printed line COSTS, as a net matchup count.
+
+    v2 round 1 opened twelve of thirteen floor pages with a build directive
+    while the page's own cost field said the best spread clearing that line
+    wins FEWER matchups than the stat-product rank-1 build -- on Azumarill,
+    49 given up to gain 10, on a species whose canonical build is 0/15/15.
+    That is a known-wrong directive in the most prominent sentence on the
+    page. The number was already computed; it just never reached the verdict.
+
+    The count compared is a MAXIMUM over the clearers, not one example
+    spread: "the spread that clears the line and wins the most matchups takes
+    331 of 684, where rank-1 takes 370" cannot be argued with by picking a
+    different clearer, which an example-vs-example diff can.
+
+    ``material`` is the demotion switch: a net loss over FLOOR_COST_MATERIAL
+    of the focal's matchups is past anything one spread's noise explains, and
+    the headline drops the directive for a statement of the line and its
+    price. Under it the directive stands and the price is still printed.
+    """
+    if not floor_mask.any():
+        return None
+    total_won = win.reshape(win.shape[0], -1).sum(axis=1)
+    idx = np.nonzero(floor_mask)[0]
+    best_i = int(idx[np.argmax(total_won[idx])])
+    best = int(total_won[best_i])
+    r1_total = int(facts['rank1']['total_won'])
+    total = int(facts['header']['total_cells'])
+    return {
+        'best_i': best_i,
+        'best_ivs': tuple(int(v) for v in meta[best_i, :3]),
+        'best_total': best, 'rank1_total': r1_total,
+        'net': best - r1_total,
+        'n_tied': int((total_won[idx] == best).sum()),
+        'material': bool(best - r1_total < -FLOOR_COST_MATERIAL * total),
+        'share_of_matchups': FLOOR_COST_MATERIAL, 'total_cells': total,
+        # The other half of the Azumarill story: no spread clearing the line
+        # reaches the stat-product bar the example rules use, so "trade a
+        # little bulk for the line" is not on offer either.
+        'top_sp_share': max((e['sp_share'] for e in facts['examples']),
+                            default=None),
+        'sp_floor': SP_FLOOR,
+    }
+
+
 def _level_reach(meta, floor_mask):
     lv_in = meta[floor_mask, 3]
     lv_out = meta[~floor_mask, 3]
@@ -2688,20 +2929,42 @@ def _of_n(ok, total):
 
 
 def _stat_phrase(axis, printed, dp=2):
-    """'148.29 defense' / '121.83 attack' / '135 HP' -- the spoken form."""
+    """'148.29 defense' / '102.06 (102.063) defense' / '135 HP'.
+
+    Item 5 applies wherever a threshold is SPOKEN, not only to the printed
+    floor: a bare three-place value on a negative page reads as a typo beside
+    every two-place number around it, and the parenthesised form is the one
+    the floor sentence already uses.
+    """
     word = {'atk': 'attack', 'def': 'defense', 'hp': 'HP'}[axis]
-    value = _n(printed) if axis == 'hp' else fmt(printed, dp)
+    value = _n(printed) if axis == 'hp' else headline_value(printed, dp)
     return f"{value} {word}"
 
 
-def _headline_mech_clause(fl, opp):
+def _headline_mech_clause(facts, fl, opp):
     """One clause of cause, and the ONE inline definition of priority."""
     m = fl['mech']
+    h = facts['header']
     if m['kind'] == 'cmp':
-        return (f"That is the charge-move-priority line against a "
-                f"PvPoke-default {opp}, {_ivs(m['opp_ivs'])}: when both sides "
-                f"throw a charged move on the same turn, the higher attack "
-                f"goes first.")
+        out = (f"That is the charge-move-priority line against a "
+               f"PvPoke-default {opp}, {_ivs(m['opp_ivs'])}: when both sides "
+               f"throw a charged move on the same turn, the higher attack "
+               f"goes first.")
+        if h['shadow']:
+            # The load-bearing caveat, at the sentence that carries the
+            # result. 148.10 exists ONLY because the priority comparison
+            # strips the shadow x1.2; a reader who never opens field 2 was
+            # getting the number with none of that, and the two Sableye pages
+            # told one Annihilape story as two unrelated numbers.
+            out += (f" The comparison uses your attack before the shadow "
+                    f"bonus, which is our engine's convention and PvPoke's, "
+                    f"not something checked against the live game.")
+            u = fl.get('unshadowed')
+            if u:
+                out += (f" A non-shadow {h['species']} needs "
+                        f"{headline_value(u['printed'], u['dp'])} attack for "
+                        f"the same fight.")
+        return out
     if m['kind'] == 'breakpoint':
         build = (f" ({_ivs(m['opp_ivs'])})" if m.get('opp_ivs') else '')
         return (f"That is where {m['move']} starts doing {_n(m['to'])} damage "
@@ -2734,9 +2997,12 @@ def _headline_decides(fl, n_iv):
         return (f"It decides {m} outright: every spread at or above it wins "
                 f"that fight, and every spread below it loses.")
     if fl['gate_side'] == 'necessary':
+        # "above the line" on a >= threshold excludes the boundary value,
+        # which is the whole point of the line; every other sentence on the
+        # page says "at or above".
         return (f"No spread below it wins {m}, and it wins that fight for all "
                 f"but {_n(fl['n_above'] - fl['n_win_above'])} of the "
-                f"{_n(fl['n_above'])} spreads above the line.")
+                f"{_n(fl['n_above'])} spreads at or above the line.")
     if fl['gate_side'] == 'sufficient':
         return (f"Every one of the {_n(fl['n_above'])} spreads at or above it "
                 f"wins {m}; {_n(fl['n_win_below'])} of the "
@@ -2762,25 +3028,53 @@ def _headline_merged(fl):
             f"the {_n(fl['n_below'])} builds below it win {them} too."]
 
 
+def _matchup_list(names, omitted=0):
+    """Cell labels as prose, collapsing one opponent's shield scenarios.
+
+    "the 1v1 against Feraligatr, the 1v1 against Feraligatr (Shadow) and the
+    2v2 against Feraligatr" is three quarters of a 38-word sentence spent
+    re-naming one species. Grouping by opponent keeps every scenario named
+    and halves the words. Shadow and non-shadow stay separate: they are
+    different opponents, not different scenarios.
+    """
+    groups = []
+    for label in names:
+        scen, name = label.split(' ', 1)
+        for g in groups:
+            if g[0] == name:
+                g[1].append(scen)
+                break
+        else:
+            groups.append((name, [scen]))
+    bits = [f"the {_and_list(scens)} against {name}" for name, scens in groups]
+    if omitted:
+        bits.append(f"{_n(omitted)} more")
+    return _and_list(bits)
+
+
 def _headline_rungs(rungs):
-    """The next one or two steps up, each with what it adds."""
+    """The next one or two steps up, each with what it adds, one per sentence."""
     if not rungs:
         return (f"No higher line keeps {pct(RUNG_POOL_MIN, 0)} of the grid, "
                 f"so this is the last step this page names.")
-    bits = []
-    for r in rungs:
-        adds = _and_list([_matchup(n) for n in r['names']]
-                         + ([f"{_n(r['omitted'])} more"] if r['omitted']
-                            else []))
-        bits.append(f"{headline_value(r['printed'], r['dp'])} attack, which "
-                    f"adds {adds}")
-    if len(bits) == 1:
-        return f"The next step up is {bits[0]}."
-    return f"The next steps up are {bits[0]}; then {bits[1]}."
+    out = []
+    for i, r in enumerate(rungs):
+        value = headline_value(r['printed'], r['dp'])
+        adds = _matchup_list(r['names'], r['omitted'])
+        out.append(f"The next step up is {value} attack, which adds {adds}."
+                   if i == 0 else f"{value} adds {adds}.")
+    return ' '.join(out)
 
 
 def _headline_bulk(alt, facts):
-    """The bulk fork as a stat pair and the two counts it trades."""
+    """The bulk fork as a stat pair and the two counts it trades.
+
+    The gross ``n_guaranteed`` count read as an exclusive gain, so on Lapras
+    the sentence said the bulk build gives up 0 and picks up 11 -- which is
+    not a trade, it is a refutation of the line the page had just headlined.
+    Field 8 carried the caveat that makes the number honest; the headline is
+    what gets read, so it carries it now.
+    """
     reach = _reach_clause(facts.get('alt_catch_model'), noun='pair')
     if alt is None:
         return (f"No defense-and-HP pair of {_n(ALT_MIN_MEMBERS)} spreads or "
@@ -2788,14 +3082,79 @@ def _headline_bulk(alt, facts):
                 f"second target to name.")
     pair = (f"{fmt(alt['def_printed'], alt['def_dp'])} defense with "
             f"{_n(alt['hp_cut'])} HP")
+    given = ("nothing the line holds" if alt['n_given_up'] == 0 else
+             f"{_n(alt['n_given_up'])} "
+             f"{_noun(alt['n_given_up'], 'matchup')} the line holds")
+    n_g, n_x = alt['n_guaranteed'], alt['n_exclusive']
+    if n_g == 0:
+        picks, tail = "picks up nothing the line gives away", ''
+    else:
+        picks = (f"picks up {_n(n_g)} {_noun(n_g, 'matchup')} the line gives "
+                 f"away")
+        if n_x == 0:
+            them = 'that one' if n_g == 1 else 'those'
+            tail = (f" Spreads on neither side of the trade win {them} too, "
+                    f"so this is a trade and not an exclusive claim.")
+        elif n_x == n_g:
+            tail = (f" At most {pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads "
+                    f"outside the pair win any of them.")
+        else:
+            tail = (f" At most {pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads "
+                    f"outside the pair win {_n(n_x)} of those; the rest are "
+                    f"not exclusive to it.")
     return (f"Trading attack for bulk -- {pair}, {_n(alt['n'])} spreads -- "
-            f"gives up {_n(alt['n_given_up'])} "
-            f"{_noun(alt['n_given_up'], 'matchup')} the line holds and picks "
-            f"up {_n(alt['n_guaranteed'])} it gives away." + reach)
+            f"gives up {given} and {picks}." + tail + reach)
 
 
-def build_headline(facts):
+def _headline_cost(facts, floor, r1):
+    """What clearing the line costs, in the sentence that recommends it.
+
+    Michael's standing rule: a result that is known to break, even in an edge
+    case, is fixed, flagged where it appears, or not printed. "Most Azumarill
+    should have at least 97.43 attack" breaks for Azumarill, and the page's
+    own field 10 is where it broke.
+    """
+    fc = facts.get('floor_cost')
+    if not fc:
+        return ''
+    net = fc['net']
+    best = (f"the spread that clears the line and wins the most matchups, "
+            f"{_ivs(fc['best_ivs'])}, takes {_n(fc['best_total'])} of "
+            f"{_n(fc['total_cells'])}")
+    if net > 0:
+        out = (f"Clearing it pays: {best}, {_n(net)} more than rank-1.")
+    elif net == 0:
+        out = f"It costs nothing to clear: {best}, the same count as rank-1."
+    else:
+        out = (f"No spread that clears it matches that count: {best}, "
+               f"{_n(-net)} fewer.")
+    if fc['top_sp_share'] is not None and fc['top_sp_share'] < fc['sp_floor']:
+        out += (f" None of them reaches {pct(fc['sp_floor'], 0)} of the top "
+                f"stat product either.")
+    if fc['material']:
+        out += (f" Build {_ivs(r1['ivs'])} and concede "
+                f"{_matchup(floor['cell'])}.")
+    return out
+
+
+def _headline_near_rule(floor):
+    """The better-ranked rule just below the line, and why it is not the line."""
+    nr = floor.get('near_rule')
+    if not nr:
+        return ''
+    m = _matchup(nr['cell'], nr['rank'])
+    return (f"{m[0].upper()}{m[1:]} turns over just below, at "
+            f"{headline_value(nr['printed'], nr['dp'])}, so every spread "
+            f"clearing the printed line clears that one too. It is not the "
+            f"printed line only because " + _reverses_clause(nr) + ".")
+
+
+def build_headline(facts, same_as=None):
     """One or two paragraphs in the voice of an expert dive post.
+
+    ``same_as`` is the label of an earlier moveset on the same page that
+    prints the SAME line; the mechanism paragraph is then stated once and
+    this moveset opens with what it shares.
 
     V2. Rounds 1-3 wrote the verdict in the machinery's own vocabulary --
     partition counts, gap intervals, "cells", "clearers", the pool share of a
@@ -2815,29 +3174,47 @@ def build_headline(facts):
     nc = facts['not_claimed']
 
     if floor is None:
-        return _headline_no_floor(facts, who, league)
+        return _headline_no_floor(facts, who, league, same_as)
 
     opp = floor['cell'].split(' ', 1)[1]
-    first = [
-        f"Most {who} running {h['arm_label']} in {league} should have at "
-        f"least {headline_value(floor['printed'], floor['dp'])} attack.",
-        f"{_n(floor['n_pass'])} of the {_n(h['n_iv'])} IV spreads "
-        f"({pct(floor['pool_share'])}) reach it.",
-        _headline_decides(floor, h['n_iv']),
-        _headline_mech_clause(floor, opp),
-    ]
-    first.extend(_headline_merged(floor))
-    if floor['arms_total'] == 1:
-        movesets = ("the only moveset baked here" if floor['arms_ok']
-                    else "not in the only moveset baked here")
+    value = headline_value(floor['printed'], floor['dp'])
+    costly = bool((facts.get('floor_cost') or {}).get('material'))
+    if same_as:
+        # Four near-identical mechanism paragraphs on the Shadow Sableye page
+        # read as padding and hid the one thing that differs between the
+        # movesets. The strip above stays complete per moveset; the paragraph
+        # says what it shares and moves on.
+        first = [f"Same line as {same_as}: at least {value} attack for "
+                 f"{_matchup(floor['cell'], floor['rank'])}, reached by "
+                 f"{_n(floor['n_pass'])} of the {_n(h['n_iv'])} IV spreads "
+                 f"({pct(floor['pool_share'])})."]
     else:
-        movesets = (f"{_of_n(floor['arms_ok'], floor['arms_total'])} movesets "
-                    f"baked here")
-    first.append(
-        f"It points the same way in "
-        f"{_of_n(floor['modes_ok'], floor['modes_total'])} baked opponent-IV "
-        f"settings and in {movesets}.")
-    first.append(_headline_coverage_clause(facts, floor, opp))
+        if costly:
+            lead = (f"{who} running {h['arm_label']} in {league} has an attack "
+                    f"line at {value}, and clearing it costs more than it "
+                    f"buys.")
+        else:
+            lead = (f"Most {who} running {h['arm_label']} in {league} should "
+                    f"have at least {value} attack.")
+        first = [
+            lead,
+            f"{_n(floor['n_pass'])} of the {_n(h['n_iv'])} IV spreads "
+            f"({pct(floor['pool_share'])}) reach it.",
+            _headline_decides(floor, h['n_iv']),
+            _headline_mech_clause(facts, floor, opp),
+        ]
+        first.extend(_headline_merged(floor))
+        if floor['arms_total'] == 1:
+            movesets = ("the only moveset baked here" if floor['arms_ok']
+                        else "not in the only moveset baked here")
+        else:
+            movesets = (f"{_of_n(floor['arms_ok'], floor['arms_total'])} "
+                        f"movesets baked here")
+        first.append(
+            f"It points the same way in "
+            f"{_of_n(floor['modes_ok'], floor['modes_total'])} baked "
+            f"opponent-IV settings and in {movesets}.")
+        first.append(_headline_coverage_clause(facts, floor, opp))
 
     if r1['clears_floor']:
         second = [f"The stat-product rank-1 spread, {_ivs(r1['ivs'])}, already "
@@ -2847,12 +3224,15 @@ def build_headline(facts):
                   f"it by {fmt(r1['shortfall'])} attack, and wins "
                   f"{_n(r1['total_won'])} of its {_n(r1['total_cells'])} "
                   f"matchups."]
+    second.append(_headline_cost(facts, floor, r1))
+    second.append(_headline_near_rule(floor))
     second.append(_headline_rungs(facts['rungs_above'][:2]))
     second.append(_headline_bulk(alt, facts))
     second.append(
         f"{_n(nc['n_no_rule'])} of the {_n(nc['of'])} contested matchups turn "
         f"on no single stat at all, and this page does not claim them.")
-    return [' '.join(x for x in first if x), ' '.join(second)]
+    return [' '.join(x for x in first if x),
+            ' '.join(x for x in second if x)]
 
 
 def _merged_cell_names(m):
@@ -2887,7 +3267,7 @@ def _reach_clause(model, noun='rectangle'):
         return ''
     if model['n_reachable'] == 0:
         return (f" No spread inside it is reachable from a raid, research or "
-                f"trade encounter: all {_n(model['n_grid'])} spreads those "
+                f"trade encounter. All {_n(model['n_grid'])} spreads those "
                 f"sources can produce have every IV at {_n(IV_FLOOR)} or "
                 f"better, and none of them is in the {noun}.")
     return (f" {_n(model['n_reachable'])} of the {_n(model['n_grid'])} "
@@ -2914,31 +3294,96 @@ def near_line_row(dirty):
     return None
 
 
+# The four baked opponent-IV settings, in words short enough for a headline
+# clause. MODE_PROSE is the field-1 spelling and is too long to name two or
+# three of them in one sentence.
+HEADLINE_MODE_PROSE = {
+    'pvpoke': "PvPoke's default opponent IVs",
+    'pvpoke:nobait': "PvPoke's defaults with no baiting",
+    'rank1': 'a stat-product rank-1 opponent',
+    'rank1:nobait': 'a stat-product rank-1 opponent with no baiting',
+}
+
+
+def _reverses_clause(info):
+    """"it reverses under a stat-product rank-1 opponent" -- WHICH settings.
+
+    Naming the settings is only honest if it names the ones that actually
+    failed: the first draft of this sentence asserted "it holds against
+    PvPoke's defaults and not against a stat-product one" from the COUNT
+    alone, which is false on Melmetal (3 of the 4 settings reverse, PvPoke's
+    no-bait one among them).
+    """
+    bad = list(info.get('modes_fail') or [])
+    n_bad = info['modes_total'] - info['modes_ok']
+    for base in ('rank1', 'pvpoke'):
+        if set(bad) == {base, base + ':nobait'}:
+            return (f"it reverses under {HEADLINE_MODE_PROSE[base]}, baiting "
+                    f"or not")
+    if bad and len(bad) <= 2:
+        return ("it reverses under "
+                + _and_list([HEADLINE_MODE_PROSE.get(m, m) for m in bad]))
+    return (f"it reverses in {_n(n_bad)} of the {_n(info['modes_total'])} "
+            f"baked opponent-IV settings")
+
+
+def _closest_why_not(d):
+    """Why the closest rule is not the line -- the page's best missing sentence.
+
+    Without it a negative page names a rule wrong on 1 spread in 4096 against
+    a rank-12 opponent and never says why that is not the answer, which an
+    expert reads as the tool contradicting itself. The disqualifier is
+    computed beside the rule (``disqualifier``); this only says it.
+    """
+    dq = d.get('disqualified') or {}
+    if dq.get('reason') == 'axis':
+        return (" This page prints attack lines only, so that one is "
+                "evidence, not a target.")
+    if dq.get('reason') != 'gates':
+        return ''
+    failed = dq.get('failed') or []
+    if 'G-direction' in failed:
+        return " It is not a build line because " + _reverses_clause(dq) + "."
+    if 'G-rank' in failed:
+        return (" It is not a build line because its opponent is outside the "
+                f"top {_n(RANK_GATE)}.")
+    if 'G-attributed' in failed:
+        return (" It is not a build line because no priority line or damage "
+                "step lands in the interval it turns over in.")
+    if not dq.get('in_band'):
+        return (f" It is not a build line because it splits "
+                f"{pct(dq['pool_share'])} of the grid, outside the "
+                f"[{pct(DECISION_BAND[0], 0)}, {pct(DECISION_BAND[1], 0)}] "
+                f"band a build target has to sit in.")
+    return ''
+
+
 def _closest_sentence(d, n_iv):
     """The closest rule to a line, in words, with its own numbers (item 3)."""
     where = _matchup(d['cell'], d['rank'])
     rule = _stat_phrase(d['axis'], d['printed'], d['dp'])
+    why = _closest_why_not(d)
+    # Two sentences: the rule, then its two sides. As one it ran to 37 words,
+    # which is the longest thing on a negative page and its main content.
+    head = f"The closest thing to a line is {rule} in {where}."
     if near_line_row([d]) is not None and d.get('one_sided'):
         if d.get('gate_side') == 'sufficient':
-            return (f"The closest thing to a line is {rule} in {where}: every "
-                    f"one of the {_n(d['n_above'])} spreads at or above it "
-                    f"wins, and {_n(d['n_win_below'])} of the "
+            return (f"{head} Every one of the {_n(d['n_above'])} spreads at "
+                    f"or above it wins, and {_n(d['n_win_below'])} of the "
                     f"{_n(d['n_below'])} below it "
-                    f"{_verb(d['n_win_below'])} too.")
-        return (f"The closest thing to a line is {rule} in {where}: nothing "
-                f"below it wins, and {_n(d['n_win_above'])} of the "
-                f"{_n(d['n_above'])} spreads at or above it do.")
+                    f"{_verb(d['n_win_below'])} too.") + why
+        return (f"{head} Nothing below it wins, and "
+                f"{_n(d['n_win_above'])} of the {_n(d['n_above'])} spreads "
+                f"at or above it do." + why)
     if d.get('near_exact'):
-        return (f"The closest thing to a line is {rule} in {where}, which "
-                f"calls that fight right for all but {_n(d['n_wrong'])} of "
-                f"the {_n(n_iv)} spreads.")
-    return (f"The closest thing to a line is {rule} in {where}: "
-            f"{_n(d['n_win_above'])} of the {_n(d['n_above'])} spreads at or "
-            f"above it win, against {_n(d['n_win_below'])} of the "
-            f"{_n(d['n_below'])} below.")
+        return (f"{head} It calls that fight right for all but "
+                f"{_n(d['n_wrong'])} of the {_n(n_iv)} spreads." + why)
+    return (f"{head} {_n(d['n_win_above'])} of the {_n(d['n_above'])} "
+            f"spreads at or above it win, against {_n(d['n_win_below'])} of "
+            f"the {_n(d['n_below'])} below." + why)
 
 
-def _headline_no_floor(facts, who, league):
+def _headline_no_floor(facts, who, league, same_as=None):
     """D12 in plain English: the negative, what to do instead, the evidence.
 
     A "no line" page is a result, not an absence, so it opens by saying what
@@ -2951,14 +3396,16 @@ def _headline_no_floor(facts, who, league):
     r1 = facts['rank1']
     alt = facts['alternative']
     dirty = facts['dirty_thresholds']
-    gb = facts['grid_best']
-    lead = (f"No single stat threshold decides a matchup for {who} running "
-            f"{h['arm_label']} in {league}")
-    if gb['total'] - r1['total_won'] <= 0:
-        first = [lead + ", and no spread on this grid wins more matchups "
-                        "than the stat-product rank-1 one."]
-    else:
-        first = [lead + "; build for stat product."]
+    # "No single stat threshold decides a matchup" was false as written on
+    # every page whose closest rule is on Def or HP -- a defense threshold IS
+    # a single stat threshold, and 4095 of 4096 correct is "decides" by any
+    # player's standard. The claim is now scoped to what the floor pool
+    # actually searches, and the closest-rule sentence says when the rule it
+    # names is on another axis.
+    lead = (f"{'Same result as ' + same_as + ': no' if same_as else 'No'} "
+            f"single attack threshold decides a matchup for {who} running "
+            f"{h['arm_label']} in {league}; build for stat product.")
+    first = [lead]
     if dirty:
         first.append(_closest_sentence(dirty[0], h['n_iv']))
     else:
@@ -2983,14 +3430,17 @@ def _headline_no_floor(facts, who, league):
     else:
         pair = (f"{fmt(alt['def_printed'], alt['def_dp'])} defense with "
                 f"{_n(alt['hp_cut'])} HP")
+        # Two sentences, not one 38-word one: the pair and its size, then
+        # what it buys.
         second.append(
-            f"What bulk does carry is {pair}: {_n(alt['n'])} spreads "
-            f"({pct(alt['share'])}) that win "
-            f"{_n(alt['n_exclusive'])} contested "
+            f"What bulk does carry is {pair} -- {_n(alt['n'])} spreads, "
+            f"{pct(alt['share'])} of the grid.")
+        second.append(
+            f"They win {_n(alt['n_exclusive'])} contested "
             f"{_noun(alt['n_exclusive'], 'matchup')} -- "
             + _cap_list(alt['exclusive'])
-            + f" -- where at most {pct(ALT_MAX_CLEARER_RATE, 0)} of the "
-              f"spreads outside them do."
+            + f" -- that at most {pct(ALT_MAX_CLEARER_RATE, 0)} of the "
+              f"spreads outside them win."
             + _reach_clause(facts.get('alt_catch_model'), noun='pair'))
     second.append(
         f"The stat-product rank-1 spread, {_ivs(r1['ivs'])} at "
@@ -3028,6 +3478,20 @@ def _grid_best_sentence(facts):
 # The at-a-glance strip (item 4): five labelled values above the headline
 # ---------------------------------------------------------------------------
 
+def strip_badge(fl):
+    """The primitive in the strip's own words, with the DIRECTION of the gate.
+
+    "[gate]" covered both shapes, so a reader could not tell from the strip
+    whether clearing the line is REQUIRED (Azumarill: necessary) or ENOUGH
+    (Lapras, Medicham: sufficient) -- which are opposite pieces of advice.
+    Field 2 always distinguished them; the strip did not.
+    """
+    if fl['kind'] == 'gate':
+        return ('gate: required' if fl['gate_side'] == 'necessary'
+                else 'gate: enough')
+    return PRIMITIVE_HEADLINE_BADGE[fl['kind']]
+
+
 STRIP_LABELS_FLOOR = ('Line', 'Decides', 'Rank-1', 'Alternative',
                       'Not claimed')
 STRIP_LABELS_NONE = ('Line', 'Closest', 'Rank-1', 'Alternative',
@@ -3050,9 +3514,16 @@ def build_strip(facts):
             f"Def >= {fmt(alt['def_printed'], alt['def_dp'])}, HP >= "
             f"{_n(alt['hp_cut'])} ({_n(alt['n'])} spreads, "
             f"{pct(alt['share'])})")
+    # A five-line values-only strip cannot afford to name a target the prose
+    # two lines below retracts. The headline calls a pair over
+    # ALT_SHARE_REFRAME of the grid "bulk does not separate either"; the strip
+    # printed it as a recommendation.
+    if fl is None and alt is not None and alt['too_wide']:
+        rect = (f"none (the widest pair that buys anything is already "
+                f"{pct(alt['share'])} of the grid)")
     if fl is not None:
         line = (f"Atk >= {headline_value(fl['printed'], fl['dp'])} "
-                f"[{PRIMITIVE_HEADLINE_BADGE[fl['kind']]}] -- "
+                f"[{strip_badge(fl)}] -- "
                 f"{_n(fl['n_pass'])} of {_n(h['n_iv'])} spreads "
                 f"({pct(fl['pool_share'])})")
         decides = f"{fl['cell']}, rank {fl['rank']}"
@@ -3066,10 +3537,16 @@ def build_strip(facts):
     dirty = facts['dirty_thresholds']
     if dirty:
         d = dirty[0]
-        closest = (f"{stat_threshold_str(d['axis'], d['printed'], d['dp'])} "
+        # Same casing as the Line row, and the same item-5 precision rule:
+        # the strip printed "DEF >= 102.063" two sections from
+        # "Atk >= 148.10".
+        axis_word = {'atk': 'Atk', 'def': 'Def', 'hp': 'HP'}[d['axis']]
+        d_value = (_n(d['printed']) if d['axis'] == 'hp'
+                   else headline_value(d['printed'], d['dp']))
+        closest = (f"{axis_word} >= {d_value} "
                    f"-- {d['cell']}, rank {d['rank']}, "
-                   f"{_n(d['n_wrong'])} of {_n(h['n_iv'])} spreads on the "
-                   f"wrong side")
+                   f"{_plural(d['n_wrong'], 'spread')} of {_n(h['n_iv'])} on "
+                   f"the wrong side")
     else:
         closest = 'none'
     gb = facts['grid_best']
@@ -4302,10 +4779,22 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
         check('Floor primitive', fl['cell'], fl['n_wrong'], int(n_wrong_r))
         check('Floor primitive', fl['cell'], fl['rate_above'],
               n_win_above_r / n_above_r if n_above_r else 0.0, tol=1e-12)
-        kind_r = ('exact' if n_wrong_r == 0
-                  else 'gate' if (n_win_below_r == 0
-                                  or n_win_above_r == n_above_r)
-                  else 'near_exact')
+        # Re-derive the badge through the same three independent bars the
+        # pool used, not from the shape of the dirty side alone: a one-sided
+        # candidate under the gate bar is admitted (and printed) as
+        # near-exact, and a shape-only recompute would call that a mismatch.
+        shape_r = ('exact' if n_wrong_r == 0
+                   else 'gate' if (n_win_below_r == 0
+                                   or n_win_above_r == n_above_r)
+                   else 'near_exact')
+        n_below_r = int(below.sum())
+        kind_r = effective_kind(
+            {'kind': shape_r,
+             'gate_side': ('necessary' if n_win_below_r == 0 else 'sufficient'),
+             'rate_above': (n_win_above_r / n_above_r) if n_above_r else 0.0,
+             'rate_below_loss': (1.0 - n_win_below_r / n_below_r)
+                                if n_below_r else 0.0,
+             'n_wrong': int(n_wrong_r)}, n_iv)
         check('Floor primitive', fl['cell'], fl['kind'], kind_r)
         check('Floor primitive', fl['cell'], fl['badge'],
               PRIMITIVE_BADGE[kind_r])
@@ -4346,6 +4835,42 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                            ctx)
             check('Floor mechanism', fl['cell'], bool(m.get('on_the_line')),
                   bool(m['line'] == fl['T']))
+        if m['kind'] == 'breakpoint':
+            # The damage step is a headline sentence on two pages in this
+            # corpus ("PSYCHO_CUT starts doing 5 damage instead of 4"), and
+            # v1 guarded only the CMP arithmetic, so these were the one
+            # printed mechanism nobody re-derived. Recompute both ends from
+            # the stored move, stages and opponent build.
+            build_r = opponent_build(state['opponent_names'][oi], league, mode)
+            if build_r is None:
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'no opponent build to step against', ctx)
+            check('Floor mechanism', fl['cell'], tuple(m['opp_ivs']),
+                  tuple(build_r['ivs']))
+            check('Floor mechanism', fl['cell'], float(m['opp_level']),
+                  float(build_r['level']), tol=1e-9)
+            _f, _c = get_moves()
+            mv = _f.get(m['move']) or _c.get(m['move'])
+            if mv is None:
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'not a move in the gamemaster', ctx)
+            opp_def_r = build_r['def'] * _stat_stage_mult(int(m['def_stage']))
+            atk_mult_r = _stat_stage_mult(int(m['atk_stage']))
+            f_types = _species_types(state['species'])
+            o_types = _species_types(
+                parse_opponent_spec(state['opponent_names'][oi])[0])
+            for value, printed_dmg, where in (
+                    (fl['prev_attained'], m['from'], 'below the line'),
+                    (fl['T'], m['to'], 'at the line')):
+                got = damage(mv['power'], value * atk_mult_r, opp_def_r,
+                             mv['type'], f_types, o_types)
+                if int(got) != int(printed_dmg):
+                    guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                               f"{m['move']} {printed_dmg} {where}",
+                               f"{int(got)} damage", ctx)
+            if int(m['from']) == int(m['to']):
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'no damage step across the line', ctx)
         # Direction and cleanliness are separate printed counts (see
         # stage3_holds); each is re-derived from the cubes it describes.
         for key, src in (('modes_clean', 'per_mode_cuts'),
@@ -4832,9 +5357,22 @@ def _primitive_audit_sentence(facts):
     for kind in ('exact', 'gate', 'near_exact'):
         p = picks.get(kind)
         label = PRIMITIVE_BADGE[kind]
-        bits.append(f"{label} -> " + ('nothing eligible' if p is None else
-                                      f"Atk >= {fmt(p['printed'], p['dp'])} "
-                                      f"({p['cell']}, {pct(p['pool_share'])})"))
+        if p is None:
+            bits.append(f"{label} -> no candidate in the band")
+        elif p.get('rejected'):
+            # "nothing eligible" made the strongest non-exact candidate
+            # invisible in the very block that exists to make the widened
+            # pool auditable -- on Corviknight a reader can see the rule on
+            # the page and the audit said it was not there.
+            r = p['rejected']
+            why = (', '.join(r['failed']) if r['failed'] else 'no gate')
+            bits.append(f"{label} -> Atk >= {fmt(r['printed'], r['dp'])} "
+                        f"({r['cell']}, {pct(r['pool_share'])}) rejected on "
+                        f"{why} ({_n(r['modes_ok'])} of "
+                        f"{_n(r['modes_total'])} settings)")
+        else:
+            bits.append(f"{label} -> Atk >= {fmt(p['printed'], p['dp'])} "
+                        f"({p['cell']}, {pct(p['pool_share'])})")
     fl = facts['floor']
     chosen = ('no floor' if fl is None else
               f"the {fl['badge']} at Atk >= {fmt(fl['printed'], fl['dp'])}")
@@ -4887,11 +5425,25 @@ def build_evidence(facts):
     gt = facts['gate_tally']
     if gt['failed']:
         lines.append(
-            f"Of {_n(gt['n_cuts'])} clean cuts, {_n(gt['n_eligible'])} clear "
-            f"every gate. Gate failures: "
+            f"Of {_n(gt['n_cuts'])} clean cuts, {_n(gt['n_eligible'])} "
+            f"{'clears' if gt['n_eligible'] == 1 else 'clear'} every gate. "
+            f"Gate failures: "
             + ', '.join(f"{g} {_n(v)}" for g, v in
                         sorted(gt['failed'].items(), key=lambda kv: -kv[1]))
             + ".")
+    # The census covered exact cuts only, so the two primitives the block is
+    # there to audit never appeared in a failure count.
+    if gt.get('n_prims'):
+        lines.append(
+            f"Of {_n(gt['n_prims'])} one-sided gate and near-exact "
+            f"candidates, {_n(gt['n_prims_eligible'])} "
+            f"{'clears' if gt['n_prims_eligible'] == 1 else 'clear'} every "
+            f"gate."
+            + (" Gate failures: "
+               + ', '.join(f"{g} {_n(v)}" for g, v in
+                           sorted(gt['prims_failed'].items(),
+                                  key=lambda kv: -kv[1]))
+               + "." if gt.get('prims_failed') else ''))
     rows = []
     for s in facts['sensitivity']:
         rows.append([f"[{pct(s['band'][0], 0)}, {pct(s['band'][1], 0)}]",
@@ -4927,7 +5479,8 @@ def build_evidence(facts):
             "Closest dirty thresholds on cells with no clean rule: "
             + '; '.join(f"{d['cell']} "
                         f"{stat_threshold_str(d['axis'], d['printed'], d['dp'])} "
-                        f"({_n(d['n_wrong'])} spreads on the wrong side)"
+                        f"({_plural(d['n_wrong'], 'spread')} on the wrong "
+                        f"side)"
                         for d in facts['dirty_thresholds']) + ".")
     return {'lines': lines,
             'head': ['band', 'floor it selects', 'cell'], 'rows': rows}
@@ -5070,33 +5623,44 @@ def lead_block(all_facts):
         if fl is not None:
             outcome = (f"Atk >= {fmt(fl['printed'], fl['dp'])} "
                        f"({pct(fl['pool_share'])} of the grid, {fl['cell']}, "
-                       f"{fl['badge']})")
+                       f"{strip_badge(fl)})")
             with_floor.append((h['arm'] + 1, fmt(fl['printed'], fl['dp'])))
         else:
             outcome = "no line"
         alt = f['alternative']
         rect = ('-' if alt is None else
                 f"Def >= {fmt(alt['def_printed'], alt['def_dp'])}, "
-                f"HP >= {_n(alt['hp_cut'])} ({pct(alt['share'])})")
-        rows.append([f"arm {h['arm'] + 1} of {h['n_arms']}", h['arm_label'],
-                     outcome, rect])
+                f"HP >= {_n(alt['hp_cut'])} ({pct(alt['share'])})"
+                + (' -- not a target' if alt['too_wide'] and fl is None
+                   else ''))
+        rows.append([f"moveset {h['arm'] + 1} of {h['n_arms']}",
+                     h['arm_label'], outcome, rect])
+    # The block a reader hits FIRST used the vocabulary the headline is
+    # barred from ("arm", "one-sided gate", "bulk rectangle"), so the page got
+    # more jargon-heavy the further up you scrolled.
+    n = len(all_facts)
     if not with_floor:
-        lines.append(f"None of the {_n(len(all_facts))} arms rendered here "
-                     f"carries a build line.")
-    elif len(with_floor) == len(all_facts):
-        lines.append(f"All {_n(len(all_facts))} arms rendered here carry a "
+        lines.append("The only moveset on this page carries no build line."
+                     if n == 1 else
+                     f"None of the {_n(n)} movesets rendered here carries a "
                      f"build line.")
+    elif len(with_floor) == n:
+        lines.append("The only moveset on this page carries a build line."
+                     if n == 1 else
+                     f"All {_n(n)} movesets rendered here carry a build line.")
     else:
-        bits = ', '.join(f"arm {a} at Atk >= {v}" for a, v in with_floor)
+        bits = ', '.join(f"moveset {a} at Atk >= {v}" for a, v in with_floor)
+        carry = 'carries' if len(with_floor) == 1 else 'carry'
         lines.append(
-            f"{_n(len(with_floor))} of {_n(len(all_facts))} arms rendered here "
-            f"carry a build line: {bits}. The others print what separates and "
-            f"why none of it is a line.")
+            f"{_n(len(with_floor))} of {_n(n)} movesets rendered here "
+            f"{carry} a build line: {bits}. The others print what separates "
+            f"and why none of it is a line.")
     rows.sort(key=lambda r: (r[2] == 'no line', r[0]))
-    out = ['<section class="arm"><h2>Arms on this page</h2>']
+    out = ['<section class="arm"><h2>Movesets on this page</h2>']
     for line in lines:
         out.append(f'<p>{_esc(line)}</p>')
-    out.append(_table_html(['arm', 'moveset', 'build line', 'bulk rectangle'],
+    out.append(_table_html(['section', 'moveset', 'build line',
+                            'bulk alternative'],
                            rows, wrap_cols=(1, 2, 3)))
     out.append('</section>')
     return ''.join(out), lines + [c for r in rows for c in r]
@@ -5118,19 +5682,43 @@ def document_html(title, subtitle, sections):
 # One arm, end to end
 # ---------------------------------------------------------------------------
 
-def render_arm(state, arm, blob_path, mode='pvpoke', level='l50'):
+def render_arm(state, arm, blob_path, mode='pvpoke', level='l50', same_as=None):
     """Compute + render one arm. Returns (facts, html fragment)."""
     ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
     facts = compute_brief(state, arm, blob_path, mode=mode, level=level)
-    return facts, render_facts(state, arm, blob_path, facts, mode, level)
+    return facts, render_facts(state, arm, blob_path, facts, mode, level,
+                               same_as=same_as)
 
 
-def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50'):
+def shared_line_with(facts, earlier):
+    """Label of an earlier moveset on this page printing the SAME result.
+
+    Same printed line and same matchup, or (with no line) the same closest
+    rule. Only then is the second moveset's mechanism paragraph a copy.
+    """
+    fl = facts['floor']
+    for prev in earlier:
+        p = prev['floor']
+        if fl is not None and p is not None:
+            if (p['T'] == fl['T'] and p['cell'] == fl['cell']
+                    and p['kind'] == fl['kind']):
+                return prev['header']['arm_label']
+        elif fl is None and p is None:
+            a = facts['dirty_thresholds']
+            b = prev['dirty_thresholds']
+            if a and b and (a[0]['cell'], a[0]['axis'], a[0]['t']) == \
+                    (b[0]['cell'], b[0]['axis'], b[0]['t']):
+                return prev['header']['arm_label']
+    return None
+
+
+def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
+                 same_as=None):
     """Render an already-computed fact set, running every stage-15 gate."""
     ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
     gate_recompute(state, arm, blob_path, mode, level, facts, ctx)
     gate_names(facts, ctx)
-    headline = build_headline(facts)
+    headline = build_headline(facts, same_as=same_as)
     strip = build_strip(facts)
     fields = build_fields(facts)
     evidence = build_evidence(facts)
@@ -5187,7 +5775,10 @@ def run_blob(path, out_dir, arms='all', mode='pvpoke', level='l50'):
     indices = range(n_arms) if arms == 'all' else [int(arms)]
     sections, all_facts = [], []
     for arm in indices:
-        facts, frag = render_arm(state, arm, path, mode=mode, level=level)
+        facts = compute_brief(state, arm, path, mode=mode, level=level)
+        same = shared_line_with(facts, all_facts)
+        frag = render_facts(state, arm, path, facts, mode, level,
+                            same_as=same)
         sections.append(frag)
         all_facts.append(facts)
     h = all_facts[0]['header']
