@@ -99,8 +99,11 @@ shopt -u nullglob
 log "[DONE] ML IV guides re-rendered: ${ml_ok} ok, ${ml_fail} failed ($(( $(date +%s) - ml_t0 ))s)"
 
 # --- 4. Rebuild comparison pages + matchup web (footer + banner) --------
-for t in aegislash-blade-vs-shield forretress-fast-move-shadow \
-         jumpluff-regular-vs-shadow ninetales-regular-vs-shadow; do
+# forretress-fast-move-shadow and jumpluff-regular-vs-shadow dropped
+# 2026-09-12: their source dives were retired by the Twilight Trails
+# dive-list rebuild, so compare_loadouts.py hard-fails. See
+# comparisons/RETIRED.md.
+for t in aegislash-blade-vs-shield ninetales-regular-vs-shadow; do
     run "Rebuild comparison: $t" $PY scripts/compare_loadouts.py "comparisons/$t.toml"
 done
 run "Rebuild Great League matchup web (footer)" $PY scripts/build_matchup_web.py

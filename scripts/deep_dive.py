@@ -3789,15 +3789,18 @@ def main():
                              'scripts/replay_analysis.py re-render this '
                              'dive\'s HTML without re-simming.')
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
-                        help='Turn-resolution model. DEFAULT IS new as of '
-                             '2026-09-02: the legacy turn system is gone from '
-                             'the live game, so a dive must model the system '
-                             'people actually play. new is still UNVALIDATED '
-                             '(104/243 oracle cells disagree with PvPoke\'s '
-                             'unmerged new-mechanics branch) and says so at '
-                             'runtime. legacy remains available and is what '
-                             'the port-fidelity suite checks against PvPoke '
-                             'master. See scripts/mechanics_notice.py.')
+                        help='Turn-resolution model. DEFAULT IS new: the '
+                             'turn system the live game runs, and the one '
+                             'PvPoke master implements since 2026-09-09. It '
+                             'is cross-checked, matching master on 237 of '
+                             '243 oracle cells; the 6 that differ are all '
+                             'Aegislash vs Azumarill under form change and '
+                             'all agree on the winner. legacy models the '
+                             'pre-2026-09-02 system, which neither the game '
+                             'nor PvPoke master implements any more -- it is '
+                             'retained only to keep the port-fidelity '
+                             'history runnable. See '
+                             'scripts/mechanics_notice.py.')
 
     args = parser.parse_args()
 
