@@ -3575,6 +3575,24 @@ def main():
                              'top N by average score. Only the survivors go through '
                              'the full 4096-IV sweep. Set to 0 to skip screening '
                              'and sweep all candidate movesets.')
+    parser.add_argument('--union-with-form', choices=['shadow', 'plain'], default=None,
+                        help='Also screen the OTHER form of this species (shadow or '
+                             'plain) and render the union of both forms\' surviving '
+                             'movesets, own survivors first. Lets a shadow/plain '
+                             'pair of pages share one moveset set (dive_registry '
+                             '"MOVESET RULES", rule 3). The partner is screened '
+                             'under its own pins, given via --union-fast / '
+                             '--union-charged / --union-reference, so the partner '
+                             'page reproduces the same set from its side.')
+    parser.add_argument('--union-fast', default=None, metavar='MOVE',
+                        help='Partner form\'s pinned --fast for --union-with-form '
+                             '(omit when the partner is unpinned).')
+    parser.add_argument('--union-charged', default=None, metavar='MOVES',
+                        help='Partner form\'s pinned --charged (comma-separated) for '
+                             '--union-with-form (omit when unpinned).')
+    parser.add_argument('--union-reference', default='auto', metavar='REF',
+                        help='Partner form\'s --reference for --union-with-form '
+                             '(default: auto = its PvPoke default moveset).')
     parser.add_argument('--shield-scenario', default='1,1', metavar='S1,S2',
                         help='Shield scenario as focal,opponent (default: 1,1). '
                              'Use "all" for all 9 scenarios (0v0 through 2v2), '
@@ -4390,6 +4408,42 @@ def main():
         mechanics=args.mechanics,
         reference_moveset=_ref_for_screen,
     )
+
+    # Rule 3 (dive_registry "MOVESET RULES"): a shadow/plain pair renders the
+    # union of both forms' screened sets. Screen the partner form here, under
+    # the partner's own pins, exactly as its own dive does (same enumeration,
+    # same screen inputs, so the result is deterministic and the partner page
+    # lands on the same union from its side). Own survivors keep their order;
+    # the landing moveset (index 0) is unchanged.
+    if args.union_with_form:
+        _partner_shadow = args.union_with_form == 'shadow'
+        if _partner_shadow == bool(args.shadow):
+            sys.exit(f"--union-with-form {args.union_with_form} names this dive's "
+                     f"own form; the partner must be the other form")
+        _p_charged = ([c.strip() for c in args.union_charged.split(',')]
+                      if args.union_charged else None)
+        _p_movesets = enumerate_movesets(args.species, args.union_fast, _p_charged,
+                                         cd_prep_fast=_cd_prep_fast,
+                                         cd_prep_charged=_cd_prep_charged)
+        _p_ref = resolve_reference_moveset(
+            args.species, args.league, _partner_shadow, args.union_reference)
+        logger.info(f"  Union with {args.union_with_form} form: screening its "
+                    f"{len(_p_movesets)} candidate moveset(s)")
+        _p_surviving = screen_movesets(
+            args.species, _p_movesets, args.league, _partner_shadow,
+            screen_opponents, screen_opp_movesets, shield_scenarios,
+            args.top_movesets, opp_iv_mode=opp_iv_mode,
+            threshold_registry=threshold_registry,
+            mechanics=args.mechanics,
+            reference_moveset=_p_ref,
+        )
+        if _p_ref is not None:
+            _p_surviving = sweep.union_movesets(_p_surviving, [list(_p_ref)])
+        _before = len(surviving)
+        surviving = sweep.union_movesets(surviving, _p_surviving)
+        logger.info(f"  Union with {args.union_with_form} form: "
+                    f"{len(surviving) - _before} moveset(s) added "
+                    f"({_before} own + partner set of {len(_p_surviving)})")
 
     # D9 (DRY review 2026-08-05 entry 12): ONE resolved knob block for every
     # iv_sweep call below (Phase 2, the extra composite modes, the reference
