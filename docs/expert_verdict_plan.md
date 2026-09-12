@@ -839,3 +839,19 @@ taken in a modified form; the reason is one line each.
 | 1    | Taken as option (a), but the rectangle rule is "maximise cells guaranteed that the floor cannot, then member count, over rectangles with >= 100 members and no floor clearer" rather than "disjoint by >= 5 cells": the >= 5 wording is a threshold on the answer, not a selection rule, and cannot pick between the n=114 / 9-cell and n=54 / 10-cell rectangles; the printed cut is 101.41 (least attained), not 101.33. |
 | 10   | Taken, but the G-caveat positive control pins the COST totals (38 / 24 -> 40 / 25 when `CAVEAT_SPECIES` is emptied), not the NOT CLAIMED count: on the real blob the Aegislash cells are windows and sit in NOT CLAIMED with or without the caveat, so that count cannot move; the clean-cut-AND-caveat case is a synthetic cube.                                                                                          |
 | 11   | Taken (the mirror is a permitted-score field, and the 488 was the plain Sableye's number: corrected to "ties at 500"), but the gate is a typed-token check (G-scores), not a regex on bare 3-digit integers: pool counts (934, 923, 857), cell counts (367-382) and clearer counts (698, 558) are all 3-digit and would false-positive on every row.                                                                       |
+
+## Decisions taken 2026-09-12 (Michael)
+
+- D1 amended by v2: lowest eligible rung in [25%, 60%], merged upward within
+  1% of the grid; exact > gate > near-exact as a tie-break within 0.5 attack.
+  One-sided gates (0 below, >= 97% at or above) and near-exact rules (<= 0.5%
+  of the grid wrong) are floor-eligible. A line whose best clearer wins >= 1%
+  fewer matchups than rank-1 keeps the line and drops the directive.
+- D10: retire both the flavor guide's `[Recommended]` badge and "almost any
+  will do", separate commits, when the brief ships to pages.
+- D11: split by outcome (above the scatter when a line exists; inside Dive
+  Analysis on pure negatives).
+- D12: build regardless; negatives carry evidence.
+- NEW: floors extend to Def and HP (bulkpoints) as v3, standalone, before any
+  page integration. Page integration waits for the Cramorant strategy
+  reinvestigation to land.
