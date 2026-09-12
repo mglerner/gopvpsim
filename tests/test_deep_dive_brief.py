@@ -701,18 +701,28 @@ def test_deoxys_defense_has_no_floor_and_says_why():
     headline = B.build_headline(facts)
     assert len(headline) == 2
     joined = ' '.join(headline)
-    # Round 3: Deoxys' closest rule is a ONE-SIDED GATE (nothing below it
-    # wins), so the headline names it instead of opening with a denial the
-    # next sentence contradicts. The round-2 opener is gone.
+    # V2: the negative opens in plain English -- what is not there, what to
+    # build instead, and the closest rule in its own numbers. Round 3's
+    # wording is the pre-fix value for each of these.
     assert 'nothing on this arm is a build line to hunt for' not in joined
-    assert 'is a one-sided gate' in joined
-    assert 'contested matchups' in joined
+    assert joined.startswith('No single stat threshold decides a matchup')
+    assert 'build for stat product' in joined
+    assert 'The closest thing to a line is 100.65 attack in the 0v0 against '\
+           'Araquanid (Shadow), rank 44: nothing below it wins, and 2284 of '\
+           'the 2301 spreads at or above it do.' in joined
+    assert 'is a one-sided gate' not in joined      # round-3 wording, G-voice
+    assert 'ATK >= 100.65' not in joined            # round-3 wording
     # Pre-fix wording: the headline said "no attack, Def or HP value is a
     # build line" and then, in the same sentence, that 24 clean cuts exist --
     # with the clean-cut-versus-floor distinction that reconciles them never
-    # stated. It is stated now, and the gate tally is out of the headline.
+    # stated. It is stated in field 2 now, and the gate tally in the evidence.
     assert 'no attack, Def or HP value is a build line' not in joined
     assert 'G-direction' not in joined and 'G-material' not in joined
+    # The exact-cut census moved OUT of the headline and INTO field 2.
+    assert '18 on attack' not in joined
+    f2 = ' '.join(B._f2_floor(facts)['lines'])
+    assert '24 single-stat values do separate a cell exactly (18 on attack, '\
+           '5 on Def, 1 on HP' in f2
     assert facts['dirty_thresholds'], "a negative must carry its evidence"
     for d in facts['dirty_thresholds']:
         assert d['rate_above'] > d['rate_below'], "a split must separate"
@@ -779,10 +789,17 @@ def test_plain_sableye_floor_is_clean_in_two_of_four_not_four():
     # the weak one. What it prints now is the partition of the SAME line.
     assert fl['modes_partition'] == 2
     assert fl['modes_partition'] <= fl['modes_ok']
+    # V2: the partition count is a field-2 measurement, not a headline one
+    # (G-voice bars the word from the verdict). Round 3's headline sentence,
+    # "partitions the cell exactly in 2 of those settings", is the pre-fix
+    # value; the same claim is made in full in field 2.
     text = ' '.join(B.build_headline(facts))
-    assert 'partitions the cell exactly in 2 of those settings' in text
-    assert 'exactly clean in 2 of them' not in text     # round-2 wording
-    assert 'clean in 4 of 4' not in text                # round-1 wording
+    assert 'partitions the cell exactly in 2 of those settings' not in text
+    assert 'partition' not in text
+    f2 = ' '.join(B._f2_floor(facts)['lines'])
+    assert 'in 2 of 4 settings' in f2
+    assert 'exactly clean in 2 of them' not in f2      # round-2 wording
+    assert 'clean in 4 of 4' not in f2                 # round-1 wording
 
 
 @pytest.mark.local_artifacts
@@ -1032,9 +1049,16 @@ def test_bulk_fork_is_stated_as_a_trade_when_it_is_not_exclusive(
     _state, facts, _path = sableye_shadow_facts
     alt = facts['alternative']
     assert (alt['n_guaranteed'], alt['n_exclusive']) == (9, 0)
+    # V2: the headline states the trade as two counts in one sentence; the
+    # exclusive-versus-grid retraction that round 3 put in the headline
+    # ("is not exclusive") is field 8's wording now.
     text = ' '.join(B.build_headline(facts))
-    assert 'is not exclusive' in text
+    assert 'gives up 7 matchups the line holds and picks up 9 it gives away' \
+        in text
+    assert 'is not exclusive' not in text                                # pre-fix
     assert 'It guarantees 9 contested cells the line cannot' not in text  # pre-fix
+    f8 = ' '.join(B._f8_alternative(facts)['lines'])
+    assert '0 of them' in f8 or 'not exclusive' in f8 or '9' in f8
 
 
 @pytest.mark.local_artifacts
@@ -1086,7 +1110,9 @@ def test_no_floor_alternative_is_rank_gated_and_reframed_when_wide():
     facts2 = B.compute_brief(state2, 0, str(path2))
     assert facts2['alternative']['too_wide'] is True
     text = ' '.join(B.build_headline(facts2))
-    assert 'already satisfy' in text
+    assert 'Bulk does not separate either' in text
+    assert 'is already 75.1% of the grid' in text
+    assert 'already satisfy' not in text             # round-3 wording
 
 
 @pytest.mark.local_artifacts
@@ -1289,9 +1315,15 @@ def test_melmetal_partition_count_can_never_exceed_the_direction_count():
     assert fl['arms_partition'] == 1                      # the honest number
     assert fl['arms_partition'] <= fl['arms_ok']
     assert fl['modes_partition'] <= fl['modes_ok']
+    # V2: both counts live in field 2; the headline says only that the line
+    # points the same way, in words. "1 of those arms" is the pre-fix
+    # headline string.
     text = ' '.join(B.build_headline(facts))
-    assert '1 of those arms' in text
-    assert 'exactly clean in 4 of them and 3 of 4 moveset arms' not in text
+    assert '1 of those arms' not in text
+    assert 'points the same way' in text
+    f2 = ' '.join(B._f2_floor(facts)['lines'])
+    assert '1 of 4 arms' in f2
+    assert 'exactly clean in 4 of them and 3 of 4 moveset arms' not in f2
 
 
 @pytest.mark.local_artifacts
@@ -1505,7 +1537,9 @@ def test_no_floor_arms_still_print_example_spreads():
         assert e['by_scenario'] and sum(e['by_scenario']) == e['total']
     html = B.render_facts(state, 0, str(path), facts)
     assert 'no set of clearers to draw examples from' not in html
-    assert 'the whole IV decision on this arm is' in html
+    # V2 wording; "on this arm" is the pre-fix string (G-voice bars "arm").
+    assert 'the whole IV decision here is' in html
+    assert 'the whole IV decision on this arm is' not in html
 
 
 @pytest.mark.local_artifacts
@@ -1517,7 +1551,9 @@ def test_grid_best_sizes_the_decision_against_rank_1():
     assert gb['total'] >= r1['total_won']
     assert gb['n_tied'] >= 1
     text = B._grid_best_sentence(facts)
-    assert f"{gb['total']}" in text and 'cells wide' in text
+    # V2 says "matchups"; "cells wide" is the pre-fix string.
+    assert f"{gb['total']}" in text and 'matchups wide' in text
+    assert 'cells wide' not in text
 
 
 def test_near_line_row_only_promotes_a_gate_or_a_near_miss():
@@ -1539,9 +1575,18 @@ def test_furret_near_exact_rule_leads_its_headline():
     d = facts['dirty_thresholds'][0]
     assert d['cell'] == '1v1 Lapras'
     assert d['n_wrong'] == 1 and d['near_exact'] is True
-    assert d['one_sided'] is False
+    # V2: one_sided covers BOTH clean-sided shapes, and this row is the
+    # second one -- every spread at or above the line wins, and a single
+    # spread below it wins too. Pre-fix this read False, because only the
+    # "nothing below wins" shape counted, which is why Medicham's 108.39
+    # (1978 of 1978 above, 56 of 2118 below) was printed as a plain dirty
+    # split rather than as the gate it is.
+    assert d['one_sided'] is True
+    assert d['gate_side'] == 'sufficient'
     text = ' '.join(B.build_headline(facts))
-    assert 'for all but 1 of the 4096 spreads' in text
+    assert 'The closest thing to a line is 102.063 defense in the 1v1 '\
+           'against Lapras (rank 37): every one of the 1614 spreads at or '\
+           'above it wins, and 1 of the 2482 below it wins too.' in text
     assert 'nothing on this arm is a build line to hunt for' not in text
 
 
@@ -1706,10 +1751,19 @@ def test_merged_cells_are_stated_as_bought_and_not_as_partitioned():
     m = fl['merged_from'][0]
     assert m['cells'][0]['label'] == '2v2 Electrode (Hisuian)'
     assert m['n_below_floor_win'] == 21
+    # V2: the headline names the second matchup and says the claim is
+    # weaker, in words; the "bought, not partitioned" pair of sentences is
+    # field 2's, which is where the full claim is made. Those two strings are
+    # the pre-fix headline values.
     text = ' '.join(B.build_headline(facts))
-    assert 'also buys' in text
-    assert 'bought, not partitioned' in text
-    assert 'up to 21 of the 1876 spreads under it win it as well' in text
+    assert 'The same line also takes the 2v2 against Electrode (Hisuian), '\
+           'rank 35, though up to 21 of the 1876 builds below it win it too.'\
+           in text
+    assert 'bought, not partitioned' not in text
+    assert 'up to 21 of the 1876 spreads under it win it as well' not in text
+    f2 = ' '.join(B._f2_floor(facts)['lines'])
+    assert 'Also buys: 2v2 Electrode (Hisuian) (rank 35)' in f2
+    assert '21 spreads below the printed line win it too' in f2
 
 
 @pytest.mark.local_artifacts
@@ -1725,3 +1779,276 @@ def test_gate_recompute_rejects_a_merge_outside_the_tolerance():
     with pytest.raises(B.GuardError) as exc:
         B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', bad, CTX)
     assert 'Floor merge' in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# V2: the two inexact floor primitives, their bars, and their badges
+# ---------------------------------------------------------------------------
+
+MEDICHAM = '20260911_071541_Medicham_great.replay.pkl.gz'
+LAPRAS = '20260911_015923_Lapras_great.replay.pkl.gz'
+
+
+def _one_cell_cube(wins):
+    """A 1-cell win cube and an attack plane of 0..n-1, for the primitives.
+
+    Synthetic on purpose: the eligibility bars are arithmetic over one
+    column, and a blob would make the test a re-derivation of the same
+    arrays the code just read.
+    """
+    wins = np.asarray(wins, dtype=bool)
+    return wins, np.arange(wins.size, dtype=float)
+
+
+def test_gate_primitive_takes_three_percent_dirt_and_refuses_four():
+    """E2's bar: >= 97% of the dirty side has to point the right way."""
+    n = 4096
+    half = n // 2
+    # NECESSARY shape: nothing below the line wins; 3% of the spreads above
+    # it lose. That is a line. 4% is not.
+    for dirt, want in ((int(0.03 * half), True), (int(0.04 * half), False)):
+        wins = np.zeros(n, dtype=bool)
+        wins[half:] = True
+        # The losers have to sit at the TOP of the above side, not at its
+        # bottom edge: contiguous dirt against the boundary just moves the
+        # boundary, and the cell comes out exact.
+        wins[n - dirt:] = False
+        _w, stat = _one_cell_cube(wins)
+        cands = [c for c in B.gate_cuts(stat, wins) if c['kind'] == 'gate']
+        assert cands, "the gate value itself must always be found"
+        c = next(c for c in cands if c['gate_side'] == 'necessary')
+        assert c['n_win_below'] == 0
+        assert B.primitive_ok(c, n) is want, (dirt, c['rate_above'])
+
+
+def test_sufficient_gate_takes_three_percent_dirt_and_refuses_four():
+    """The other clean-sided shape: Medicham's 1v1 Snorlax, as arithmetic."""
+    n = 4096
+    half = n // 2
+    for dirt, want in ((int(0.03 * half), True), (int(0.04 * half), False)):
+        wins = np.zeros(n, dtype=bool)
+        wins[half:] = True                       # everything above wins
+        wins[:dirt] = True                       # winners BELOW the line
+        _w, stat = _one_cell_cube(wins)
+        c = next(c for c in B.gate_cuts(stat, wins)
+                 if c['kind'] == 'gate' and c['gate_side'] == 'sufficient')
+        assert c['n_win_above'] == c['n_above']
+        assert B.primitive_ok(c, n) is want, (dirt, c['rate_below_loss'])
+
+
+def test_near_exact_takes_point_four_percent_and_refuses_point_six():
+    """E2's other bar: at most 0.5% of the GRID on the wrong side in total."""
+    n = 4096
+    half = n // 2
+    assert B.near_exact_limit(n) == 20           # 0.5% of 4096, rounded
+    for share, want in ((0.004, True), (0.006, False)):
+        wrong = int(round(share * n))
+        lo = wrong // 2
+        hi = wrong - lo
+        wins = np.zeros(n, dtype=bool)
+        wins[half:] = True
+        # Dirt on BOTH sides, and away from the boundary on both, so the row
+        # is near-exact rather than one of the two clean-sided shapes.
+        wins[:lo] = True                         # winners at the very bottom
+        wins[n - hi:] = False                    # losers at the very top
+        _w, stat = _one_cell_cube(wins)
+        T, n_wrong = B.best_split(stat, wins)
+        c = B.cut_counts(stat, wins, T)
+        assert c['kind'] == 'near_exact'
+        assert c['n_wrong'] == n_wrong == wrong
+        assert B.primitive_ok(c, n) is want, (wrong, c['n_wrong'])
+
+
+def test_exact_cut_outranks_a_gate_within_half_an_attack_point():
+    """The tie-break, on hand-built rungs: no blob, no thresholds."""
+    def rung(T, n, label, kind):
+        return {'T': T, 'n_pass': n, 'pool_share': n / 4096.0, 'kind': kind,
+                'eligible': True, 'cells': [{'label': label}]}
+    close = [rung(100.0, 2000, 'a', 'gate'), rung(100.4, 1990, 'b', 'exact')]
+    assert B.stage6_select(close, n_iv=4096)['T'] == 100.4      # exact wins
+    far = [rung(100.0, 2000, 'a', 'gate'), rung(100.6, 1990, 'b', 'exact')]
+    assert B.stage6_select(far, n_iv=4096)['T'] == 100.0        # D1 wins
+    # Restricting the pool to one primitive is what the evidence block audits.
+    assert B.stage6_select(close, n_iv=4096, kinds=('exact',))['T'] == 100.4
+    assert B.stage6_select(close, n_iv=4096, kinds=('gate',))['T'] == 100.0
+    assert B.stage6_select(close, n_iv=4096, kinds=('near_exact',)) is None
+    # A non-exact pick never merges: the merged-in claim needs an exact
+    # partition to prove it, and a gate cannot supply one.
+    merge = [rung(100.0, 2241, 'a', 'gate'), rung(100.05, 2220, 'b', 'gate')]
+    assert 'merged_from' not in B.stage6_select(merge, n_iv=4096)
+
+
+@pytest.mark.local_artifacts
+def test_medicham_now_carries_a_gate_floor_and_badges_it():
+    """Michael's round-4 re-check, and what the other gates do with it.
+
+    The 1v1 Snorlax value he named, 108.3987 (1978 of 1978 above win, 56 of
+    2118 below win), IS a sufficient gate and is now in the floor pool -- and
+    it fails G-direction, holding in 3 of the 4 baked opponent-IV settings.
+    The line the page prints is the next one up that holds in all four.
+    """
+    path = require_blob(MEDICHAM)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    fl = facts['floor']
+    assert fl is not None                        # pre-fix: None, rung c
+    assert fl['kind'] == 'gate' and fl['gate_side'] == 'sufficient'
+    assert fl['badge'] == 'one-sided gate'
+    assert fl['cell'] == '0v1 Snorlax (Shadow)'
+    assert (fl['n_win_above'], fl['n_above']) == (1455, 1455)
+    assert fl['n_win_below'] == 55
+    assert fl['modes_ok'] == fl['modes_total'] == 4
+    html = B.render_facts(state, 0, str(path), facts)
+    assert 'Primitive: ONE-SIDED GATE (sufficient)' in html
+    # The negative-page wording must not survive anywhere on a page that now
+    # carries a line. ("no floor clearer" is field 8's rule text and is about
+    # the rectangle, not about this arm.)
+    for dead in ('no floor on this arm', 'No floor on this arm',
+                 'no attack floor on this arm',
+                 'nothing on this arm is a build line',
+                 'No single stat threshold decides',
+                 'and none is a floor'):
+        assert dead not in html, dead
+
+
+@pytest.mark.local_artifacts
+def test_a_gate_floors_page_never_claims_an_exact_partition():
+    """A badge is a claim about the wrong side, so it gates the sentences."""
+    path = require_blob(LAPRAS)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    fl = facts['floor']
+    assert fl['kind'] == 'gate' and fl['n_win_below'] == 56
+    f2 = ' '.join(B._f2_floor(facts)['lines'])
+    assert 'Primitive: ONE-SIDED GATE' in f2
+    assert 'Decides: 2v2 Jellicent' in f2         # not "Owns:"
+    assert 'Owns:' not in f2
+    # The v1 template printed "At or above: N of N win" unconditionally.
+    assert f"At or above: {fl['n_win_above']} of {fl['n_above']} win" in f2
+
+
+@pytest.mark.local_artifacts
+def test_gate_recompute_rejects_a_wrong_primitive_badge(sableye_shadow_facts):
+    """Positive control for G-primitive."""
+    import copy
+    state, facts, path = sableye_shadow_facts
+    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)
+    for key, bad_value in (('kind', 'gate'), ('n_wrong', 7),
+                           ('n_win_below', 3)):
+        bad = copy.deepcopy(facts)
+        bad['floor'][key] = bad_value
+        with pytest.raises(B.GuardError) as exc:
+            B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+        assert 'Floor primitive' in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# V2: G-voice -- the headline is written for a reader, not for the audit
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('word', ['partition', 'partitions', 'one-sided gate',
+                                  'constant rule', 'separability', 'gap (',
+                                  'carry a floor label', 'arm', 'arms',
+                                  'cell', 'cells', 'clearers'])
+def test_gate_voice_rejects_every_barred_headline_word(word):
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_voice([f"The line is 148.10 attack and the {word} is here."],
+                     CTX)
+    assert 'G-voice' in str(exc.value)
+
+
+def test_gate_voice_passes_the_voice_it_is_there_to_protect():
+    """Positive control: the sentence Michael wrote as the target."""
+    B.gate_voice(["Most Annihilape should have at least 148.10 attack; that "
+                  "is the priority line against a typical Annihilape and it "
+                  "decides the 0v1 outright; rank-1 misses it by 6.35."], CTX)
+
+
+def test_gate_voice_does_not_fire_on_a_move_name_containing_arm():
+    """CHARM is a fast move; \\barm\\b must not match inside it."""
+    B.gate_voice(["Most Clefable running CHARM / MOONBLAST should have at "
+                  "least 100.00 attack."], CTX)
+
+
+@pytest.mark.local_artifacts
+def test_render_rejects_an_audit_word_injected_into_the_headline(
+        sableye_shadow_facts, monkeypatch):
+    """Positive control at render time, not only on the gate in isolation."""
+    state, facts, path = sableye_shadow_facts
+    real = B.build_headline
+    monkeypatch.setattr(
+        B, 'build_headline',
+        lambda f: [real(f)[0] + ' It partitions the cell exactly.']
+                  + real(f)[1:])
+    with pytest.raises(B.GuardError) as exc:
+        B.render_facts(state, 0, path, facts)
+    assert 'G-voice' in str(exc.value)
+
+
+@pytest.mark.local_artifacts
+def test_every_rendered_headline_in_the_corpus_passes_the_voice_gate():
+    """The gate is only worth having if it runs on the real pages."""
+    seen = 0
+    for name in (SABLEYE_SHADOW, SABLEYE_PLAIN, DEOXYS, MELMETAL, FURRET,
+                 ALTARIA, MEDICHAM, LAPRAS):
+        path = find_blob(name)
+        if path is None:
+            continue
+        state = B.load_blob(str(path))
+        for arm in range(len(state['moveset_data'])):
+            facts = B.compute_brief(state, arm, str(path))
+            head = B.build_headline(facts)
+            assert len(head) == 2
+            B.gate_voice(head, CTX)
+            strip = B.build_strip(facts)
+            assert len(strip) == 5
+            B.gate_voice([f"{k}: {v}" for k, v in strip], CTX)
+            seen += 1
+    if seen == 0:
+        pytest.skip('no replay blob on this machine')
+    assert seen >= 8
+
+
+# ---------------------------------------------------------------------------
+# V2: the at-a-glance strip
+# ---------------------------------------------------------------------------
+
+@pytest.mark.local_artifacts
+def test_strip_labels_switch_with_the_result(sableye_shadow_facts):
+    _state, facts, _path = sableye_shadow_facts
+    assert [k for k, _v in B.build_strip(facts)] == list(B.STRIP_LABELS_FLOOR)
+    path = require_blob(DEOXYS)
+    state = B.load_blob(str(path))
+    none = B.compute_brief(state, 0, str(path))
+    strip = B.build_strip(none)
+    assert [k for k, _v in strip] == list(B.STRIP_LABELS_NONE)
+    assert dict(strip)['Line'] == 'none'
+    assert dict(strip)['Decision width'] == '6 matchups'
+
+
+@pytest.mark.local_artifacts
+def test_strip_line_carries_the_headline_precision(sableye_shadow_facts):
+    """Item 5: the exact selector shows only where the guard forced 3 dp."""
+    _state, facts, _path = sableye_shadow_facts
+    assert dict(B.build_strip(facts))['Line'].startswith(
+        'Atk >= 148.10 [exact]')
+    assert B.headline_value(148.10, 2) == '148.10'
+    path = require_blob(SABLEYE_PLAIN)
+    state = B.load_blob(str(path))
+    plain = B.compute_brief(state, 0, str(path))
+    assert plain['floor']['dp'] == 3
+    assert B.headline_value(plain['floor']['printed'], 3) == '123.42 (123.419)'
+    assert '123.42 (123.419)' in dict(B.build_strip(plain))['Line']
+
+
+@pytest.mark.local_artifacts
+def test_the_evidence_block_audits_each_primitive(sableye_shadow_facts):
+    """E2: the page shows what each primitive alone would have chosen."""
+    _state, facts, _path = sableye_shadow_facts
+    picks = facts['primitive_picks']
+    assert set(picks) == {'exact', 'gate', 'near_exact'}
+    assert picks['exact']['cell'] == '0v1 Annihilape'
+    text = ' '.join(B.build_evidence(facts)['lines'])
+    assert 'Floor pool by primitive' in text
+    assert 'exact -> Atk >= 148.10' in text
+    assert 'Selected: the exact at Atk >= 148.10' in text
