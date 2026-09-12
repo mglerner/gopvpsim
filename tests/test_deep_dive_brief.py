@@ -2560,6 +2560,14 @@ def test_cross_axis_tie_prefers_the_exact_rule_over_a_gate():
         assert pick['axis'] == 'def', def_net
         assert pick['decided_by'] == 'primitive'
         assert pick['runner_up']['axis'] == 'atk'
+    # But a line that ALSO took the larger net outright is reported as
+    # winning on net, not as winning a tie-break, even though the weaker
+    # rival sits inside the window.
+    pick = B.stage6_cross_axis([_cand('atk', 3, 'gate', 1000),
+                                _cand('def', 5, 'exact', 2000)], 684)
+    assert pick['axis'] == 'def'
+    assert pick['decided_by'] == 'net'
+    assert pick['runner_up'] is None
 
 
 def test_cross_axis_tie_between_two_exact_rules_takes_the_smaller_pool():

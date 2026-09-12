@@ -1147,20 +1147,26 @@ def stage6_cross_axis(candidates, total_cells, tie=CROSS_AXIS_TIE):
     # line is NOT always the one with the larger net -- inside the tie window
     # a smaller-net exact rule beats a larger-net gate, and two exact rules
     # are separated by pool size -- and a sentence claiming otherwise would be
-    # false on exactly the pages the rule exists for.
-    if len(window) == 1:
+    # false on exactly the pages the rule exists for. The converse matters
+    # too: a line that took the larger net outright must not be reported as
+    # having won a tie-break, even when a weaker rival sits inside the window.
+    rivals = [c for c in window if c['axis'] != pick['axis']]
+    if not rivals or all(r['net'] < pick['net'] for r in rivals):
         pick['decided_by'] = 'net'
-    elif PRIMITIVE_RANK[window[0]['kind']] != PRIMITIVE_RANK[window[1]['kind']]:
-        pick['decided_by'] = 'primitive'
-    elif window[0]['rung']['n_pass'] != window[1]['rung']['n_pass']:
-        pick['decided_by'] = 'pool'
+        rival = None
     else:
-        pick['decided_by'] = 'axis order'
+        rival = max(rivals, key=lambda c: (c['net'], -AXES.index(c['axis'])))
+        if PRIMITIVE_RANK[pick['kind']] != PRIMITIVE_RANK[rival['kind']]:
+            pick['decided_by'] = 'primitive'
+        elif pick['rung']['n_pass'] != rival['rung']['n_pass']:
+            pick['decided_by'] = 'pool'
+        else:
+            pick['decided_by'] = 'axis order'
     pick['tie_window'] = tie * total_cells
-    pick['runner_up'] = (None if len(window) == 1 else
-                         {'axis': window[1]['axis'], 'net': window[1]['net'],
-                          'kind': window[1]['kind'],
-                          'n_pass': window[1]['rung']['n_pass']})
+    pick['runner_up'] = (None if rival is None else
+                         {'axis': rival['axis'], 'net': rival['net'],
+                          'kind': rival['kind'],
+                          'n_pass': rival['rung']['n_pass']})
     return pick
 
 
@@ -6267,8 +6273,13 @@ def build_evidence(facts):
                         f"({_plural(d['n_wrong'], 'spread')} on the wrong "
                         f"side)"
                         for d in facts['dirty_thresholds']) + ".")
+    # The sensitivity table walks the FLOOR'S OWN axis, so its column says
+    # which stat the values in it are; a bare "148.29" beside an attack page's
+    # "148.10" two sections up is two different stats spelled the same way.
+    axis_v = AXIS_WORD[facts.get('floor_axis', 'atk')]
     return {'lines': lines,
-            'head': ['band', 'floor it selects', 'cell'], 'rows': rows}
+            'head': ['band', f"{axis_v} line it selects", 'cell'],
+            'rows': rows}
 
 
 # ---------------------------------------------------------------------------
