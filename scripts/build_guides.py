@@ -79,13 +79,27 @@ from gopvpsim.theme import (  # noqa: E402
 DEV_COUNTS_SOURCE_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 
 # Reference dive used for data-token resolution when a guide TOML
-# doesn't override. The Male GL dive + CD article were retired
-# 2026-06-25 (see TODO.md); Female Oinkologne GL is the surviving
-# Oinkologne dive, so readers can click through and see the numbers.
+# doesn't override.
+#
+# CHANGED 2026-09-12: was Oinkologne (Female) GL, which the Twilight Trails
+# dive-list rebuild retired -- the dive stopped being baked, so every
+# `dive:top_tier_*` token resolved to None and build_guides.py hard-failed on
+# unresolved tokens, blocking the publish. That was a latent break: the
+# reference slug is a plain string with nothing tying it to the dive registry.
+#
+# Corviknight GL is chosen to fit the prose in guides/threshold-tiers/body.md,
+# which reads "cuts on bulk: `def >= X` with an HP floor of `Y`" -- so the
+# featured dive's top tier needs BOTH cutoffs populated. Corviknight's top
+# tier has def 135.47 AND sta 145.00. Altaria and Azumarill also resolve every
+# token but carry sta 0, which would render "an HP floor of `0`".
+#
+# If you retire Corviknight, pick another dive whose top tier has both cutoffs
+# and re-read that paragraph; test_guides_reference_dive_is_baked pins the
+# registry half of this.
 DEFAULT_REFERENCE = {
-    'species': 'Oinkologne (Female)',
+    'species': 'Corviknight',
     'league': 'great',
-    'dive_slug': 'oinkologne-female-great-league',
+    'dive_slug': 'corviknight-great-league',
 }
 
 
