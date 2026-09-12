@@ -38,7 +38,18 @@ found by per-opponent score deltas between strands:
 | 148.67               | Feraligatr win flip (+286), Shadow Feraligatr +113 no flip | yes (the top-end split)         |
 
 The first row is invisible to the current method by construction (a damage
-tier change with no win flip). The 1v1 section's root split is 148.67, which
+tier change with no win flip).
+
+Mechanism, pinned later the same day (expert-verdict workflow, re-verified
+by hand): 148.06 is NOT a damage breakpoint. It is a Charge Move Priority
+(CMP) line against the PvPoke-default Annihilape (4/13/13, L17, 123.378
+attack); CMP compares shadow-stripped attack, so a shadow focal needs
+1.2 x 123.378 = 148.053 shadow-effective attack, and the first attained
+value above that is 148.10. Plain Sableye flips the same cell at 123.42,
+the first attained value above 123.378, with the same 2220 winners. Damage
+into Annihilape does not change across the line. 148.67 is CMP against a
+default Shadow Feraligatr (1.2 x 123.88 = 148.65); the 148.55 mirror rung
+is a Foul Play 58 -> 59 breakpoint. See docs/expert_verdict_plan.md. The 1v1 section's root split is 148.67, which
 is why "Color by: matchup cluster" on the page already looks close.
 
 ### All nine scenarios for Shadow Sableye (`sab_scen_avg.png`, `sab_scen_wins.png`)
