@@ -855,3 +855,63 @@ taken in a modified form; the reason is one line each.
 - NEW: floors extend to Def and HP (bulkpoints) as v3, standalone, before any
   page integration. Page integration waits for the Cramorant strategy
   reinvestigation to land.
+
+## V3, 2026-09-12: floors extend to Def and HP
+
+Michael's decision, implemented on branch `build-brief-v3`. The v2 floor pool
+was the attack axis alone, so a bulk-first species ended its page with "build
+for stat product" while the real verdict sat in its evidence table (Altaria:
+Def >= 148.29 vs the 2v2 Clodsire; Furret: Def >= 102.063 vs the 1v1 Lapras,
+wrong on 1 spread of 4096). What changed:
+
+1. **Floor axes.** The three primitives (exact clean cut / one-sided gate at
+   >= 97% / near-exact at <= 0.5%) run on atk, def and hp. Floor selection --
+   the D1 band [25%, 60%], the 1%-of-grid merge, and the gates G-material /
+   G-rank / G-attributed / G-direction / G-scenario / G-caveat -- runs once
+   PER AXIS on that axis's own rung ladder. One headline line is then chosen
+   across the three by `stage6_cross_axis`: (a) the larger NET matchup gain of
+   its best clearer over the stat-product rank-1 build (the number field 10
+   already computed, and the only measure the three axes share); (b) a tie
+   inside `CROSS_AXIS_TIE` = 1% of the focal's matchups goes to the stronger
+   primitive, then to the smaller clearer pool. Which clause decided is
+   carried in `facts['axis_choice']['decided_by']` and printed, because the
+   printed line is NOT always the larger-net one and a sentence claiming
+   otherwise would be false on exactly the pages the rule exists for.
+2. **Bulkpoint mechanism labels.** A Def cut is a BULKPOINT iff the
+   opponent's damage INTO us steps down by an integer across it, searched over
+   every move it carries (fast and charged), every attack stage its own kit
+   can buff itself to and every Def stage its debuffs can impose on us -- the
+   attack axis's breakpoint test with the seats swapped. An HP cut is an
+   HP-BULKPOINT iff the number of hits one of those moves needs to KO us
+   changes across it. Damage into us depends on our Def as well as our HP, so
+   the HP test holds the defense at ONE stated value -- the grid's median
+   attained Def -- and prints it; searching every attained Def would fire the
+   label on almost any HP value. Otherwise UNATTRIBUTED, and G-attributed
+   still bars an unattributed cut from carrying a line on any axis.
+3. **Everything that assumed attack is now axis-aware**: the headline lead
+   ("should have at least 102.06 (102.063) defense"), rank-1's shortfall, the
+   rung ladder and its tail, the strip's Line row, field 2's threshold row,
+   the co-gate search, the print-precision rule (the bulk axes may escalate
+   past 3 dp; attack keeps the plan's strict two-rung abort), G-recompute, and
+   the sweep row. The coverage ladder is CMP-only and therefore attack-only:
+   a bulk line prints "No ladder: not a priority line."
+4. **The alternative target forks on the two axes the line does NOT use**: an
+   attack line keeps the v2 (Def, HP) rectangle; a Def line gets (HP, attack)
+   and an HP line (Def, attack). Where the search leaves one of the two at its
+   grid minimum the page says the target is a single stat.
+5. **The negative page's "attack lines only" disqualifier is gone.** A rule
+   that is not the line now fails a GATE or one of the three primitive bars,
+   and the sentence says which -- Altaria's Def 148.29 is 90.9% pure above the
+   line against a 97% bar and 190 of 4096 on the wrong side against a
+   near-exact limit of 20.
+6. **One new field**, the sixteenth: "Lines on the other stats", printed
+   directly under the line it lost to, with value, matchup, primitive badge,
+   pool share, net and mechanism for each.
+
+Open question for Michael, flagged rather than decided: the tie-break's
+"smaller pool" clause moves three of the four Shadow Sableye arms off the
+148.10 Annihilape priority line (net +9) and onto a Def bulkpoint at 99.11
+(net +4), because 5 matchups is inside the 1% window and 2193 < 2220. That is
+the rule as written; whether "smaller pool" should instead read "larger pool"
+(D1 elsewhere minimises the ask) is a calibration question the corpus sweep
+now has numbers for.
