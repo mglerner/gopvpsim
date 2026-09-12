@@ -32,6 +32,97 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+- **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
+  2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
+  links showed the same 642 win. Audit
+  (`userdata/analysis/2026-09-12_cramorant_showcase_audit/` in the clone):
+  the ENGINE is fine -- our plain-PvPoke sim reproduces PvPoke's AI exactly
+  on all four showcase cells (481 / 642 / 427 / 297) -- the ARTICLE is stale
+  in three independent ways: (1) the four sandbox links were hardcoded
+  2026-08-27 with the pre-e6827a0 turn clock, so on today's pvpoke.com they
+  replay 634 / 642 / 493 (a LOSS) / 614 instead of the advertised 674 / 666
+  / 541 / 573; (2) the Jellicent 2-1 premise is gone -- PvPoke's own plan
+  now WINS it (Shadow Ball 100->90) and the sheet exempts (2,1), so "our
+  line" IS PvPoke's there; (3) Blastoise's PvPoke default moveset moved
+  Rollout -> Bite, so that showcase simmed an off-meta fight. Fixed in the
+  renderer (computed + gated showcases, see the encoder note below; GL
+  replacement = Mandibuzz 1-1, 460 -> 686, PROPOSED, Michael to confirm or
+  pick another from the candidate list in the audit dir). STILL STALE and
+  NOT touched (ship-mode prose, Michael's editorial pass): the cheat-sheet
+  2-1 row (describes the retired ready-nuke window; the sheet now plays
+  plain PvPoke there), the 1-1/1-2 row's "lead of 40+ percentage points"
+  (constant is inert), the hero's "certified never worse ... in any of the
+  nine shield scenarios ... on both win rate and average battle rating"
+  (UL 0v1 is -2 win cells, the accepted Dondozo exception), the Methods
+  "no negative cell shipped", and the UL "honest flags" paragraph's 2-1
+  headroom framing. Per the 2026-08-31 rule (no staleness markers; a
+  no-regen article is REMOVED), the live page should either be re-rendered
+  after Michael's prose pass or taken down until then. Re-render also
+  refreshes every tensor-derived number from the rebaked dives.
+
+  SECOND FINDING, same day, browser-verified: pvpoke.com runs a sandbox
+  link's battle TWICE (runSandboxSim, then startBattle's setTimeout) and
+  `Pokemon.reset()` never clears `hasActed`, so the Pokemon that acted on
+  run 1's KO turn loses its turn-1 action in run 2 and every scripted
+  action on the old parity is dropped. Our verify_url gate ran the engine
+  ONCE, so it passed links the site renders differently (Azumarill 690
+  -> site 547; Blastoise 624 -> 515; the 09-10 Lapras "fixed" link 662 ->
+  site 446, a loss). verify_url now emulates the page (two runs) by
+  default (`page=False` = engine-level); the Lapras test pins BOTH
+  numbers so a PvPoke fix is noticed; upstream draft = Report 9 in
+  docs/pvpoke_bug_reports.md (NOT filed; likely also explains Report 3's
+  unresolved 429-vs-510). Showcases were re-picked from the cells that
+  survive the faithful gate (scan_candidates_faithful.py in the audit
+  dir): GL Toxapex 0-0, GL Feraligatr 1-1, UL Shadow Feraligatr 2-2, UL
+  Talonflame 1-2 -- all PROPOSED, Michael to confirm. All eight links were
+  opened on pvpoke.com in Chrome on 2026-09-12 and show the advertised
+  numbers (630/478, 630/492, 598/477, 573/297).
+
+  Three more things the adversarial pass (5 agents + critic) turned up:
+
+  * HOT -- the rebake running in the MAIN tree re-rendered the article at
+    10:23 on 2026-09-12 from main's renderer, i.e. WITH the stale hardcoded
+    block. `publish_website.sh` after this bake would republish the broken
+    links. Land `cramorant-reinvestigate` (or at least its renderer +
+    driver commits) and re-render the article before any publish that
+    includes it; or exclude the article from the publish.
+  * The article's NUMBERS were rendered under `mechanics='legacy'`: its
+    surviving values (494/674, 427/541, 297/573) are today's legacy-clock
+    values byte-for-byte, and none of showcase 1's or 3's moves changed
+    in the rebalance. The default flipped to 'new' on 2026-09-09 (7e6a82b),
+    13 days after the block was hardcoded. So EVERY number on the page
+    (ledger tables, deltas, correlations, staircases) is a legacy-clock
+    number; the re-render from the rebaked (new-clock) dive pages fixes
+    all of them at once. The links, by contrast, broke because of PvPoke's
+    post-charge cooldown (on master since the 2026-09-08 Twilight Trails
+    merge acb3ce461, 500 ms), and Jellicent because of Shadow Ball 100->90
+    (same merge).
+  * ENCODER RULE CORRECTED (scripts/pvpoke_sandbox.py, timeline_to_actions):
+    the 2026-09-10 fix shifted by the COUNT of prior charged actions, but
+    Battle.js:540 applies ONE 500 ms cooldown per ROUND with any charged
+    move, so a same-turn pair (CMP double throw) over-shifted everything
+    after it by +1 -- 17/17 such cells mis-encoded (Cramorant vs Swampert
+    UL 0-0: sim 703, link 815). Now shifts by DISTINCT prior resolved
+    turns; pinned by test_same_turn_charged_pair_shifts_one_turn_not_two.
+    None of the four showcases had a same-turn pair, so no published link
+    was wrong because of this.
+  * CERTIFICATION TOOL WAS BROKEN IN GL: `cramorant_policy_lab.load_pool(
+    'great')` raised AttributeError on the two Thievul `charged=` rows
+    added 2026-09-10 (the parser returns a list; the lab split it as a
+    string). Fixed + tests/test_cramorant_policy_lab_pool.py. Note for the
+    reinvestigation: the 2026-09-10 re-verify covered ONE moveset
+    (Peck/Dive+Fly) and ONE IV spread (PvPoke default) against a GL pool
+    that has since changed (rank cut 50->60, megas admitted, Thievul split),
+    while the article claims certification over all five movesets x 4096
+    spreads. Re-certifying at the article's own resolution is the first
+    task of the reinvestigation once the rebake frees the cores.
+  * Other stale surfaces found: ~/coding/reports/pogo-reports.html's
+    Cramorant card and gopvpsim-cramorant-pogodives-vs-pvpoke-2026-08-25.html
+    still claim "certified, no negative cells" (UL 0v1 Dondozo says
+    otherwise); the article's meta.toml description says "All numbers
+    recomputed from the dive tensors at render time" (true only once the
+    branch lands). Dive pages carry no sandbox links and no prose claims,
+    so they self-heal on rebake.
 - REBALANCE re-verify: **RUN 2026-09-10; failed, then FIXED (option A).**
   (2,1) is exempt again -- every firing setting was negative, and exempting
   is strictly better than the v4 rule (same total wins, better mean).
@@ -1285,12 +1376,15 @@ turn it would have occupied. It is still emitted (harmless, and may matter in
 fights that continue past the cancellation), but the test's positive control
 was rewritten to corrupt a REAL action instead -- asserting the cancelled one
 changes this fight would now be asserting something false.
-Matters beyond the test: the same encoder builds the shareable "replay this
-on pvpoke.com" links on published Cramorant pages, so those links currently
-show readers a different fight from the one the page describes. Fix or
-remove the links before the next publish. Pinned by
-tests/test_pvpoke_sandbox.py, whose controls are inverted to assert the
-broken state so a fix is detected.
+Matters beyond the test: the "See it for yourself" links on the published
+Cramorant strategy article were built with the pre-fix encoder and HARDCODED
+(commit 8fc7ec4), so the encoder fix did not reach them. RESOLVED 2026-09-12
+on branch `cramorant-reinvestigate`: `render_pogodives_strategy_article.py`
+now computes the showcases at render time from the dive tensor and gates
+them (premise / re-sim == tensor / verify_url of both links == our engine);
+`tests/test_pogodives_article_showcases.py` pins the rendered artifact and
+fails 4/4 on the live page. The dive pages themselves carry no sandbox links
+(grep of userdata/website: only the article does).
 
 IDEA, parked 2026-09-09 (Michael: re-think after more dives land): a
 "does IV choice still matter once you're bulky?" number for the dive page.
