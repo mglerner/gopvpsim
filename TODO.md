@@ -388,85 +388,91 @@ Context for whoever picks this up:
 * Sableye has two sibling dives in the same bake for comparison:
   `sableye-great-league` (non-shadow) and `sableye-mega-great-league`.
 
-## HIGH PRIORITY: dives run serially, so ~2/3 of a bake sits on 1 of 18 cores
+## HIGH PRIORITY: parallelize the dive step (~13h/bake on the table)
 
-Measured 2026-09-10 during the Twilight Trails bake. Michael noticed the box
-was quiet and asked; the waste is real and it is the single biggest lever on
-bake wall-clock. Deferred only because building it mid-bake would have cost
-tokens he did not want to spend -- **the measurements below are the expensive
-part and are already done, so picking this up is cheap.**
+**PLAN ONLY -- do not implement without Michael's go** (his call 2026-09-12:
+"make a plan for it, but don't implement").
 
-**The finding.** `run_website_dives.py:278` launches each dive with a plain
-blocking `subprocess.run` in a loop -- strictly serial, and there is no
-`--jobs` option. Each dive alternates between:
+### Measured, on the completed 2026-09-10/12 Twilight Trails bake
 
-* a **sweep** phase that saturates the machine (measured: 20-proc tree,
-  summed 1626% CPU = ~16.3 of 18 cores, `0.0% idle` system-wide), and
-* a **render/analysis tail** that is strictly ONE core (measured: parent at
-  99-100% CPU with no workers alive, for minutes at a stretch).
+`scripts/bake_timing_report.py <chain log>` over all 135 dives:
 
-Serial share per dive, cold 2026-09-10 13:27 run, via
-`scripts/bake_timing_report.py`:
+| bucket                | time      |
+| --------------------- | --------- |
+| parallel (sweeps)     | 28.4h     |
+| serial (render tails) | **13.4h** |
+| **serial share**      | **32%**   |
 
-| dive               | parallel | serial | serial% |
-| ------------------ | -------- | ------ | ------- |
-| Tinkaton           | 502s     | 180s   | 26%     |
-| Ninetales          | 193s     | 63s    | 25%     |
-| Corsola (Galarian) | 329s     | 152s   | 32%     |
-| Corviknight        | 277s     | 117s   | 30%     |
-|                    |          |        | **28%** |
+Totals reconcile with the step's own 150,385s = 41.8h, so the split is
+trustworthy. Two hard CPU readings behind the buckets: a sweep phase showed a
+20-process tree at 1626% CPU (~16.3 of 18 cores, 0% system idle); a render
+tail showed the parent alone at 99-100% with no workers alive.
 
-**CORRECTED 2026-09-10.** The first pass at this reported 30-86% serial
-(Corsola 86%) and was WRONG -- it used one cut point per dive, counting
-everything after the last "Running <moveset>..." line as tail. The
-mirror-slayer rounds emit heavy PARALLEL sim work after that cut ("Round 2:
-... 1,142,784 sims to run", "sim progress: N/100 chunks"), so that time was
-misfiled as serial. `bake_timing_report.py` classifies each interval by its
-own marker instead. Anything quoting 65% or 86% predates the fix.
+`run_website_dives.py:278` launches each dive with a blocking
+`subprocess.run` in a loop -- strictly serial, no `--jobs`. So for ~13.4h of a
+41.8h bake, 17 of 18 cores idle.
 
-Method caveat: an interval inherits the last marker seen (carry-forward), so
-a long silent stretch is attributed to the phase that preceded it. The
-script's unclassified bucket is therefore near-zero by construction and is
-NOT evidence the markers are healthy -- re-read them if the shape looks off.
+Report caveats (fix while you are in there): rows are keyed by species NAME,
+so a species with both a GL and a UL dive collapses into one summed row (81
+rows for 135 dives) -- totals are right, per-dive rows are not. And intervals
+inherit the last marker seen, so the unclassified bucket is near-zero by
+construction and is NOT evidence the markers are healthy.
 
-**The prize, resized.** At 28% serial the ceiling is ~28% of the dive step,
-not the ~65% the bad numbers implied: roughly 5h off a ~17h dive step, not a
-full day. Still real, still the biggest single lever, but no longer
-obviously worth interrupting a running bake for.
+### The prize
 
-**RE-EVALUATE ON THE FULL LOG** (Michael, 2026-09-10): these four dives are
-all early Great League from a run that CRASHED at dive 6, and are the cheap
-end -- Cramorant alone ran 18m against a 3m baseline. Re-run
-`scripts/bake_timing_report.py` against the completed chain log once the
-2026-09-10 bake finishes; UL, Forretress and the ML tail are unrepresented
-here, and `chain_status.py`'s own ETA flags `ul_full`/`forretress`/`ml_tail`
-as hardcoded fallbacks rather than measured.
+Overlapping 2-3 dives fills each other's render tails. Ceiling is the serial
+share: ~13h off a 41.8h dive step, so roughly 28-30h instead of 41.8h. Not the
+"~5h" an earlier estimate here claimed -- that was computed against a projected
+17h dive step, and the real one ran 41.8h.
 
-**Implementation gotchas already identified** (do not re-derive):
+### Implementation plan
 
-1. **Per-dive log capture is required.** Dive stdout is currently INHERITED
-   straight into the chain log, so concurrent dives would interleave into
-   mush -- and `chain_status.py` parses that log's `[N/M] slug` banners and
-   `Done in X.X min` markers, so interleaving breaks the watcher too.
-2. **Split `--reserve-cpus`.** The chain passes `--reserve-cpus 0`, and
-   `sweep.py:798` is `min(cpu_count() - reserve, len(chunks))`, so each dive
-   asks for all 18. Three concurrent dives would ask for 54.
-3. **`put_column` is safe across columns, NOT within one.** Sidecar writes
-   are atomic (tmp + `os.replace`, `sweep_cache.py:202-210`) but the tmp
-   filename is fixed (`<name>.tmp`), so two writers to the SAME column
-   collide. Concurrent dives have different focals -> different columns ->
-   safe. Verify that still holds for mirror-slayer/signature-dedup paths.
-4. **Memory is not the constraint.** 0.8 GB per dive process, 64 GB machine.
-5. **Do NOT also parallelize the ML guide tail.** `run_iv_guides.py --jobs 1`
-   is serial ON PURPOSE -- it is the fix for the 2026-06-27 oversubscription
-   bug, and its preflight hard-fails if `jobs x per-guide workers > cores`.
-   Only the dive step is the target.
+1. **Per-dive log capture (do this FIRST, it is load-bearing).** Dive stdout is
+   currently inherited straight into the chain log. Concurrent dives would
+   interleave into mush AND break `chain_status.py`, which parses that log's
+   `[N/M] slug` banners and `Done in X.X min` markers. Give each dive its own
+   file, then have the parent emit the banner lines itself.
+2. **Split `--reserve-cpus` across workers.** The chain passes
+   `--reserve-cpus 0` and `sweep.py:798` computes
+   `min(cpu_count() - reserve, len(chunks))`, so each dive asks for all 18.
+   Three concurrent dives would ask for 54. Divide the budget by the job count
+   (18 cores / 3 jobs -> `--reserve-cpus 12` each), and note the render tail
+   uses ONE core regardless, so the ideal is oversubscribing slightly.
+3. **Add `--jobs N` to `run_website_dives.py`**, defaulting to 1 so nothing
+   changes until asked for. A small process pool over the DIVES list.
+4. **Verify cache safety before trusting it.** `put_column`'s sidecar write is
+   atomic (tmp + `os.replace`, `sweep_cache.py:202-210`) but the tmp filename
+   is FIXED (`<name>.tmp`), so two writers to the SAME column collide.
+   Concurrent dives have different focals -> different columns -> safe today.
+   Confirm that still holds for the mirror-slayer and signature-dedup paths,
+   which are the ones that write outside the plain focal column.
+5. **Do NOT touch the ML guide tail.** `run_iv_guides.py --jobs 1` is serial ON
+   PURPOSE -- it is the fix for the 2026-06-27 oversubscription bug, and its
+   preflight hard-fails when `jobs x per-guide workers > cores`. Also pointless
+   now: the whole ML tail measured **3.9 min** for 60 guides on 2026-09-12
+   (48 profiles x 60 opponents at `DEFAULT_IV_FLOOR = 12`, vs 4096 IVs x 76
+   opponents x 9 scenarios for a GL dive). See the ml_tail note below.
+6. **Memory is not a constraint:** 0.8 GB per dive process, 64 GB machine.
 
-**Measurement pitfall, for whoever verifies the speedup:** counting workers
-by grepping `deep_dive.py` in `ps` output MISSES the forked pool children and
-reports `procs=1 cpu%=0` during sweeps, i.e. it makes a saturated machine look
-idle. Count the process tree by ppid instead. (This bit me on 2026-09-10 and I
-reported a wrong reading before catching it.)
+### Measurement pitfall
+
+Counting workers by grepping `deep_dive.py` in `ps` output MISSES the forked
+pool children and reports `procs=1 cpu%=0` during sweeps -- i.e. it makes a
+saturated machine look idle. Count the process tree by ppid. (This produced a
+wrong reading on 2026-09-10 that had to be retracted.)
+
+## chain_status.py ml_tail fallback is wrong by ~100x
+
+`ml_tail=420m` is a hardcoded fallback in `chain_status.py`'s ETA. The measured
+value on 2026-09-12 was **3.9 min** for all 60 guides (0.1 min each, 0 failed).
+So every ETA the watcher printed during the Twilight Trails bake was inflated
+by ~7h.
+
+The 420m figure predates the 2026-06-27 cache-rework, when each guide ran
+single-process on one core; guides now fan across all cores via
+`deep_dive.iv_sweep`. Fix the fallback (or better, measure it like `gl_full`
+and `ul_full` already are -- those self-calibrate from the running log, and
+`ml_tail` should too).
 
 ## Re-dive runbook
 
