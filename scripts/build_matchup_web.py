@@ -144,7 +144,8 @@ def run_matrix(entries, league=LEAGUE):
     return scores, sims, time.time() - t0
 
 
-def render_html(entries, scores, pool_name, n_sims, elapsed):
+def render_html(entries, scores, pool_name, n_sims, elapsed,
+                league=LEAGUE):
     names = [e['display'] for e in entries]
     movesets = [
         '{} / {}'.format(e['fast'], ' + '.join(e['charged']))
@@ -164,7 +165,7 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
 <head>
 <meta charset="utf-8">
 {THEME_HEAD}
-<title>Great League matchup web</title>
+<title>{LEAGUE_DISPLAY} matchup web</title>
 <style>
 {THEME_CSS}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -227,7 +228,7 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
 </head>
 <body>
 {THEME_PICKER}
-<h1>Great League matchup web</h1>
+<h1>{LEAGUE_DISPLAY} matchup web</h1>
 <p class="subtitle">Generated {gen_date} &middot; pool:
 <code>{pool_name}</code> &middot; {n} species &middot; {n_sims:,} sims
 ({elapsed:.0f}s) &middot; PvPoke-default movesets &amp; IVs</p>
@@ -454,6 +455,14 @@ render();
 </body>
 </html>
 """.format(
+        # Was hardcoded "Great League" in both <title> and <h1>, so the
+        # Ultra page shipped mislabelled -- and because matchups/ and
+        # matchups-ultra/ carry no meta.toml, build_website_index.py falls
+        # back to the <title>, rendering TWO identical "Great League matchup
+        # web" cards on the landing page (spotted by Michael 2026-09-12).
+        LEAGUE_DISPLAY={'great': 'Great League', 'ultra': 'Ultra League',
+                        'master': 'Master League'}.get(league,
+                                                       league.title()),
         gen_date=gen_date, pool_name=escape(pool_name), n=n,
         n_sims=n_sims, elapsed=elapsed,
         scenario_options=scenario_options,
@@ -526,11 +535,33 @@ def main():
     print(f'Done: {n_sims:,} sims in {elapsed:.1f}s '
           f'({n_sims / elapsed:,.0f} sims/s)', flush=True)
 
-    html_text = render_html(entries, scores, pool_name, n_sims, elapsed)
+    html_text = render_html(entries, scores, pool_name, n_sims,
+                            elapsed, league=args.league)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, 'w') as f:
         f.write(html_text)
     print(f'Wrote {args.out}', flush=True)
+
+    # Write meta.toml alongside the page. Without it build_website_index.py
+    # falls back to the HTML <title> for the name and to a GENERIC DIVE blurb
+    # for the description -- which is how the landing page ended up showing
+    # two matchup-web cards both describing "a scatter plot of 4,096 IVs by
+    # stat product" (a dive's description, not a matchup web's).
+    league_display = {'great': 'Great League', 'ultra': 'Ultra League',
+                      'master': 'Master League'}.get(args.league,
+                                                     args.league.title())
+    meta_path = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                             'meta.toml')
+    with open(meta_path, 'w') as f:
+        f.write(f'title = "{league_display} matchup web"\n')
+        f.write(f'description = "Every {league_display} meta pick simulated '
+                f'against every other, across all nine shield scenarios. '
+                f'{len(entries)} species, {n_sims:,} simulations. Pick a '
+                f'shield scenario and read a row to see what one Pokemon '
+                f'beats, or a column to see what beats it. PvPoke default '
+                f'IVs and movesets throughout."\n')
+        f.write('landing = "index.html"\n')
+    print(f'Wrote {meta_path}', flush=True)
     return 0
 
 
