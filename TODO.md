@@ -364,6 +364,51 @@ that hard-fails when the pools' recorded rankings vintage does not
 match live (per the lens-grid rule: a cheap lens becomes a code-level
 guard, not a checklist sentence).
 
+## POST-BAKE RUNBOOK (2026-09-11): moveset rules -> rebake dives -> publish
+
+Decided by Michael 2026-09-11: the old movesets, old meta and old mechanics
+are dead; "bake" must mean "bake with a legit set of moves". The rules are
+in `scripts/dive_registry.py` ("MOVESET RULES") on branch `moveset-rules`
+(built in a separate clone while the 2026-09-10 bake ran, so nothing in the
+bake's working tree moved):
+
+1. every dive renders `DEFAULT_TOP_MOVESETS` (5) screened movesets; the 42
+   per-slug `top_movesets` overrides are gone (Sableye was 1, Shadow
+   Sableye 4, so the two pages shared no moveset; Cradily 1 vs 5);
+2. PvPoke's default moveset is always a page (already true via
+   `--reference auto`, now documented and relied on);
+3. shadow/plain pairs render the UNION of both forms' screened sets
+   (`pair_partner`, `--union-with-form` mirrored by run_website_dives).
+   Pinned by `tests/test_dive_registry_movesets.py`.
+
+Sequence once the chain is green (ETA ~15:30 2026-09-12 incl. the ML tail):
+
+1. Do NOT publish the 2026-09-10 bake; it is the warm-cache baseline.
+2. `git merge moveset-rules` on main (fast-forward expected), then
+   `rm -rf ~/coding/gopvpsim-moveset-rules`.
+3. Rebake DIVES ONLY with the cache on: `direnv exec . python
+   scripts/run_website_dives.py --reserve-cpus 0` (detached, logged). The ML
+   IV guides, comparisons and matchup webs do not read the registry and are
+   not re-run. Cost = the added moveset columns (26 dives x ~4 movesets, plus
+   the union extras on 30 pairs) + a re-render of all 135; measure, do not
+   guess. Every existing column serves warm (same engine hash, same
+   gamemaster stamp).
+4. Verify: `verify_overnight.py`, ship gates, and eyeball Sableye vs Shadow
+   Sableye: both pages must now list SC/DP+FP and SC/FP+PG.
+5. Publish only on Michael's explicit go.
+
+Known pre-existing red in the fast tier (not from this branch):
+`tests/test_ship_gate_roster.py::test_entry_points_route_through_the_roster`
+fails on main too, tripped by the `verify_article_links.py --ship` line that
+`publish_website.sh --partial` (986cc01) added outside the roster. The other
+session owns that change.
+
+Dead registry entries noticed while doing this (left alone, pre-existing):
+`DIVE_OVERRIDES['forretress-shadow-volt-switch-great-league']` and the
+matching `SLUG_EXCEPTIONS` row never derive, because Shadow Forretress is not
+in the GL pool; the only shadow Forretress GL page is the EXTRA_DIVES
+bug-bite one.
+
 ## POST-BAKE REMINDER (Michael, 2026-09-10): Shadow Sableye GL bands are wild
 
 Michael asked to be reminded, after the Twilight Trails bake finishes, to

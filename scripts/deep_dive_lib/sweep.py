@@ -215,6 +215,26 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
     return [(fast_id, charged_ids) for _, fast_id, charged_ids in scored[:_keep]]
 
 
+def union_movesets(own, partner):
+    """Own screened movesets, then the partner form's that own lacks.
+
+    Movesets compare as (fast, sorted charged). Own order is preserved so the
+    landing page (index 0) is unchanged; partner-only entries are appended in
+    the partner's screened order. Used by deep_dive.py --union-with-form so a
+    shadow/plain pair renders the same moveset set from both pages
+    (dive_registry "MOVESET RULES", rule 3).
+    """
+    def key(ms):
+        return (ms[0], tuple(sorted(ms[1])))
+    seen = {key(ms) for ms in own}
+    out = list(own)
+    for ms in partner:
+        if key(ms) not in seen:
+            seen.add(key(ms))
+            out.append(ms)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Phase 2: Full IV sweep (parallelized, deduped by stat profile)
 # ---------------------------------------------------------------------------

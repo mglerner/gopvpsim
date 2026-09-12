@@ -33,7 +33,8 @@ from gopvpsim.data import (  # noqa: E402
 # Optional overrides (defaults shown):
 #   opponents: 20            (top N from rankings)
 #   opponents_file: None     (overrides opponents)
-#   top_movesets: 5
+#   (top_movesets is NOT per-dive: every dive renders
+#    dive_registry.DEFAULT_TOP_MOVESETS; see its MOVESET RULES)
 #   opp_ivs: 'both'
 #   bait: 'both'
 #   reference: 'auto'
@@ -58,7 +59,8 @@ from gopvpsim.data import (  # noqa: E402
 # two-fast-move split, non-default reference lines, Cramorant's policy,
 # per-species top_movesets, which dives use hand-authored thresholds) lives
 # in dive_registry.DIVE_OVERRIDES / EXTRA_DIVES / SLUG_EXCEPTIONS.
-from dive_registry import all_dives as _all_dives
+from dive_registry import (DEFAULT_TOP_MOVESETS, all_dives as _all_dives,
+                           pair_partner)
 
 DIVES = _all_dives()
 
@@ -69,8 +71,14 @@ DIVES = _all_dives()
 _RESERVE_OVERRIDE = None
 
 
-def build_command(dive):
-    """Build the deep_dive.py command list from a dive config dict."""
+def build_command(dive, dives=None):
+    """Build the deep_dive.py command list from a dive config dict.
+
+    ``dives`` is the full registry list; when given, a shadow/plain pair
+    partner (dive_registry.pair_partner) is mirrored into ``--union-with-form``
+    so the page renders the union of both forms' screened movesets
+    (dive_registry "MOVESET RULES", rule 3).
+    """
     html_path = os.path.join(WEBSITE_DIR, dive['slug'], dive['html_base'])
 
     cmd = [sys.executable, DEEP_DIVE, dive['species'],
@@ -81,7 +89,9 @@ def build_command(dive):
     elif 'opponents' in dive:
         cmd += ['--opponents', str(dive['opponents'])]
 
-    cmd += ['--top-movesets', str(dive.get('top_movesets', 5))]
+    # Rule 1: one count for every dive; a per-entry 'top_movesets' is not a
+    # registry key any more and is deliberately ignored here.
+    cmd += ['--top-movesets', str(DEFAULT_TOP_MOVESETS)]
     cmd += ['--opp-ivs', dive.get('opp_ivs', 'both')]
     cmd += ['--bait', dive.get('bait', 'both')]
     if dive.get('policy', 'pvpoke') != 'pvpoke':
@@ -125,6 +135,16 @@ def build_command(dive):
 
     if 'extra_args' in dive:
         cmd += dive['extra_args']
+
+    partner = pair_partner(dive, dives) if dives is not None else None
+    if partner is not None:
+        cmd += ['--union-with-form', 'shadow' if partner.get('shadow') else 'plain']
+        pargs = partner.get('extra_args') or []
+        if '--fast' in pargs:
+            cmd += ['--union-fast', pargs[pargs.index('--fast') + 1]]
+        if '--charged' in pargs:
+            cmd += ['--union-charged', pargs[pargs.index('--charged') + 1]]
+        cmd += ['--union-reference', partner.get('reference', 'auto')]
 
     return cmd
 
@@ -264,7 +284,9 @@ def main():
     print()
 
     for i, dive in enumerate(dives):
-        cmd = build_command(dive)
+        # Pair partners are looked up in the FULL registry, not the
+        # possibly-filtered run list, so --only one page still unions.
+        cmd = build_command(dive, DIVES)
         cmd_str = ' '.join(cmd)
         print(f"{'='*60}")
         print(f"[{i+1}/{len(dives)}] {dive['slug']}")
