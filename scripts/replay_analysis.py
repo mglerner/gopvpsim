@@ -51,6 +51,14 @@ def main():
     args = parser.parse_args()
 
     state = deep_dive.load_replay_state(args.blob)
+    # Which blob this render came from. The build brief behind the "Which one
+    # to build?" section is computed straight out of the blob and quotes it by
+    # name and date in its provenance field, so render_dive_html needs the
+    # path as well as the contents. Set HERE rather than inside
+    # load_replay_state: that function's contract is that it returns exactly
+    # what dump_replay_state was handed (tests/test_sweep_cache.py pins the
+    # round trip), and a key it invented would break it.
+    state['replay_blob_path'] = os.path.abspath(args.blob)
     init_logger(state['species'], state['league'],
                 shadow=state.get('shadow', False), log_file='/dev/null')
 
