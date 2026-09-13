@@ -2578,6 +2578,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '</div>\n'
     )
     if n_scenarios > 1:
+        # Caption first, then the grid. The minis plot the AVERAGED score on
+        # y (that is what this strip has always shown) while their colors
+        # come from the Matchup clusters section, whose bands are horizontal
+        # only on a win-count axis -- so the caption says where to look for
+        # the bands rather than letting the smear read as the clustering.
+        html += ('<p id="allscen-note" style="display:none;font-size:11px;'
+                 'color:var(--text-muted);margin:6px 0 0 0">Each mini plots '
+                 'average score against stat-product rank, colored by that '
+                 'scenario\'s own matchup clusters (title: K, silhouette '
+                 'and the first stat split). On this y-axis the clusters '
+                 'smear rather than band -- the Matchup clusters section '
+                 'below, and the main plot on a win-count y-axis, show them '
+                 'as bands. Click a mini to select that shield scenario.'
+                 '</p>\n')
         html += ('<div id="allscen-grid" style="display:none;'
                  'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
                  '</div>\n')

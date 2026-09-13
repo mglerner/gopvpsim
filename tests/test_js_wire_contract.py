@@ -472,7 +472,8 @@ console.log(JSON.stringify(out));
 # the real JS helper in node against a real Python payload.
 
 _MC_TOP_FIELDS = ("palette", "default", "allKey", "scens", "degenerate")
-_MC_SCEN_FIELDS = ("k", "labels", "sizes", "sil", "root", "rules", "display")
+_MC_SCEN_FIELDS = ("k", "labels", "sizes", "sil", "split", "rules",
+                   "display")
 
 
 def _mc_payload_fixture():
@@ -518,8 +519,11 @@ def test_cluster_payload_carries_every_field_the_js_reads():
     # "per-IV labels exist"), and carry their reason for the mini titles
     assert "0v0" not in pay["scens"]
     assert "0v0" in pay["degenerate"]
-    assert pay["degenerate"]["0v0"]["reason"].startswith("degenerate:")
+    # the reason leads with the FINDING; the machine flag is the boolean,
+    # and the mini-grid title reads the short form
     assert pay["degenerate"]["0v0"]["degenerate"] is True
+    assert pay["degenerate"]["0v0"]["reason"].startswith("every spread wins ")
+    assert pay["degenerate"]["0v0"]["short"].startswith("degenerate (")
 
 
 def test_js_reads_those_exact_payload_field_names():
@@ -527,7 +531,8 @@ def test_js_reads_those_exact_payload_field_names():
     comment does not wire anything up)."""
     text = strip_js(_js())
     for field in ("allKey", "scens", "degenerate", "palette",
-                  "labels", "sizes", "rules", "root", "sil", "display"):
+                  "labels", "sizes", "rules", "split", "sil", "display",
+                  "short"):
         assert re.search(r"\.%s\b" % field, text), (
             f"no JS site reads payload field {field!r} any more")
     # self-test: a field that was never in the payload must NOT be found,
@@ -547,9 +552,48 @@ console.log(JSON.stringify([_mcHeadline(pay, '1v1'), _mcHeadline(pay, '0v0'),
 """ % json.dumps(pay)
     got = _node(program)
     sc = pay["scens"]["1v1"]
-    assert got[0] == f"K={sc['k']}, sil {sc['sil']:.2f}, {sc['root']}"
-    assert got[1] == "degenerate"         # under the degeneracy floor
+    assert got[0] == (f"K={sc['k']}, silhouette {sc['sil']:.2f}, "
+                      f"split {sc['split']}")
+    # the no-cluster title carries its counts, not the bare word
+    assert got[1] == pay["degenerate"]["0v0"]["short"]
+    assert got[1].startswith("degenerate (")
     assert got[2] == ""                   # unknown label
+
+
+def test_mini_grid_title_is_gated_on_the_same_predicate_as_its_colors():
+    """B3: `_mcLabelsApply()` guards the COLORS and the TITLE together.
+
+    state.oppIvMode is composed from the Opponent IVs and Bait dropdowns, so
+    one click off either default makes the baked labels not describe the
+    displayed grid. The colors always fell back to neutral there; the title
+    kept asserting "K=2, silhouette 0.65, split atk 148.06" over data those
+    labels do not describe.
+    """
+    raw = _js()
+    assert "var mApply = _mcLabelsApply();" in raw
+    assert "var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;" \
+        in raw
+    assert "var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';" in raw
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_mini_grid_headline_is_empty_when_labels_do_not_apply():
+    """Run the gate itself: with the predicate false, no headline text."""
+    program = """
+var applies = false;
+function _mcLabelsApply() { return applies; }
+""" + _js_fn(_js(), "_mcHeadline") + """
+var pay = %s;
+var out = [];
+[true, false].forEach(function(v) {
+  applies = v;
+  out.push(applies ? _mcHeadline(pay, '1v1') : '');
+});
+console.log(JSON.stringify(out));
+""" % json.dumps(_mc_payload_fixture())
+    got = _node(program)
+    assert got[0].startswith("K=")
+    assert got[1] == ""
 
 
 def test_js_maps_the_avg_shields_state_to_the_combined_clusters():

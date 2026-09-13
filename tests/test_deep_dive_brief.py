@@ -3200,27 +3200,80 @@ def test_cluster_corroboration_line_is_gated_on_the_silhouette(
         sableye_shadow_facts):
     """One sentence, evidence block only, and only when separated.
 
-    Shadow Sableye's all-scenario partition measures silhouette 0.395, just
-    UNDER the 0.40 bar -- so this page prints nothing, which is the point of
-    the gate. Both sides are exercised by moving the fact, not the bar.
+    Shadow Sableye's all-scenario partition measures silhouette 0.451, over
+    the 0.40 bar, so this page prints it. Both sides of the gate are
+    exercised by moving the FACT, not the bar.
+
+    The gate reads the silhouette as PRINTED (2dp), so it cannot suppress a
+    line beside a dive-page headline reading "silhouette 0.40": 0.3954 is
+    under the raw bar and over the printed one, and it prints.
     """
     state, facts, path = sableye_shadow_facts
     cc = facts['cluster_corroboration']
-    assert cc['sil'] < B.CLUSTER_SIL_MIN                  # measured 0.3954
-    text = ' '.join(B._f14_how_sure(facts)['lines'])
-    assert 'cluster partition' not in text
-
-    good = copy.deepcopy(facts)
-    good['cluster_corroboration']['sil'] = B.CLUSTER_SIL_MIN
-    lines = B._f14_how_sure(good)['lines']
-    hits = [ln for ln in lines if 'cluster partition' in ln]
+    assert cc['sil'] >= B.CLUSTER_SIL_MIN                 # measured 0.4506
+    marker = "the dive page's Matchup clusters section"
+    lines = B._f14_how_sure(facts)['lines']
+    hits = [ln for ln in lines if marker in ln]
     assert len(hits) == 1
-    assert hits[0] == (
-        f"The all-scenario cluster partition splits this grid at "
-        f"{cc['stat']} {cc['value']:.2f} (K={cc['k']}, silhouette "
-        f"{B.CLUSTER_SIL_MIN:.2f}).")
-    # never in the headline, at either silhouette
-    assert 'cluster' not in ' '.join(B.build_headline(good)).lower()
+    # it names its source, and its RELATION to the printed line
+    fl = facts['floor']
+    assert hits[0].startswith('Independent check: ')
+    assert f"{cc['value']:.2f}" in hits[0]
+    assert f"K={cc['k']}, silhouette {cc['sil']:.2f}" in hits[0]
+    assert str(cc['n_scens']) in hits[0]
+    if fl is not None and cc['stat'] == fl['axis']:
+        assert 'also splits it on ' + B.AXIS_WORD[cc['stat']] in hits[0]
+        assert f"{abs(cc['value'] - fl['printed']):.2f}" in hits[0]
+    elif fl is not None:
+        assert 'do not agree' in hits[0]
+
+    # under the bar it says nothing at all
+    weak = copy.deepcopy(facts)
+    weak['cluster_corroboration']['sil'] = B.CLUSTER_SIL_MIN - 0.006
+    assert not [ln for ln in B._f14_how_sure(weak)['lines'] if marker in ln]
+    # ... but a value that PRINTS as the bar does print (0.3954 -> "0.40")
+    edge = copy.deepcopy(facts)
+    edge['cluster_corroboration']['sil'] = 0.3954
+    edge_hits = [ln for ln in B._f14_how_sure(edge)['lines'] if marker in ln]
+    assert len(edge_hits) == 1 and 'silhouette 0.40' in edge_hits[0]
+
+    # a disagreement on the STAT reads differently from an agreement
+    other = copy.deepcopy(facts)
+    other['cluster_corroboration']['stat'] = (
+        'hp' if cc['stat'] != 'hp' else 'atk')
+    other_hits = [ln for ln in B._f14_how_sure(other)['lines'] if marker in ln]
+    if facts['floor'] is not None:
+        assert len(other_hits) == 1 and 'do not agree' in other_hits[0]
+
+    # never in the headline, at any silhouette
+    assert 'cluster' not in ' '.join(B.build_headline(facts)).lower()
+
+
+@pytest.mark.local_artifacts
+def test_brief_does_not_reuse_the_pages_word_for_its_own_floor(
+        sableye_shadow_facts):
+    """Same 6 / 8 bar, different count, so it must not say "degenerate".
+
+    The brief screens CONTESTED cells (any spread wins and any loses); the
+    dive page screens SHARP MARGINALS (2%-98%), a subset. Printing one word
+    over two numbers for one scenario is a contradiction to anyone holding
+    both documents.
+    """
+    state, facts, path = sableye_shadow_facts
+    if not facts['triage']['degenerate']:
+        pytest.skip('no barred scenario on this blob')
+    lines = B._f14_how_sure(facts)['lines']
+    hits = [ln for ln in lines if 'barred from carrying a floor' in ln]
+    assert len(hits) == 1
+    assert 'flagged degenerate' not in hits[0]
+    assert 'contested cells' in hits[0]
+    # the second count is columns, not IV fingerprints (the page's word for
+    # its own second count), and the two are not ordered: measured on this
+    # blob's 0v2, the page sees 16 fingerprints over 5 sharp cells where
+    # this screen sees 8 columns over 7 contested ones.
+    assert 'distinct opponent columns' in hits[0]
+    assert 'distinct win patterns' not in hits[0]
+    assert 'its own stricter counts' in hits[0]
 
 
 @pytest.mark.local_artifacts

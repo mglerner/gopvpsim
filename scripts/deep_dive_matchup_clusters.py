@@ -664,17 +664,23 @@ def root_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
       * ``root_text`` is the root split written the way the rule block
         writes it (``'atk < 148.06'``), or None when the tree did not split
         at all.
-      * ``per_cluster[c]`` is ``'atk >= 148.06'`` when EVERY IV in cluster c
-        lies on one side of that single split, and None when the cluster
-        straddles it.  "The root separates this cluster cleanly" is the only
-        claim a one-line legend can carry honestly: a cluster that needs the
-        depth-2/3 splits to be described is left unlabelled rather than
-        labelled with a rule that is wrong for some of its members.
+      * ``per_cluster[c]`` is ``'atk >= 148.06'`` only when that split is an
+        IFF for cluster c: every IV in c is on that side AND every IV on that
+        side is in c.  Nothing weaker can be printed as a legend NAME, which
+        is how a reader reads "C1: atk >= 148.06".  A merely NECESSARY
+        condition ("every member of C1 is below the line", with other
+        clusters below it too) is true and useless: on Shadow Sableye GL's
+        1v0 the necessary-only form gave three different clusters the
+        identical name "atk < 151.20".  Those clusters are left unlabelled
+        -- "C1 (n=1105)" -- and the full depth-3 rules block below the
+        panels is where their description lives.
+      * ``root_split`` is the same split with no direction ('atk 148.06'),
+        for prose that says "splits at" and supplies its own comparison.
     """
     tree, X, y = cluster_tree(res, atk, def_, hp, max_depth, min_leaf)
     k = res["k"]
     if "feat" not in tree:
-        return None, [None] * k
+        return None, [None] * k, None
     f = tree["feat"]
     thr = tree["thr"]
     name = TREE_FEATURES[f]
@@ -685,13 +691,13 @@ def root_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
         m = y == c
         if not m.any():
             per.append(None)
-        elif bool(left[m].all()):
+        elif bool(left[m].all()) and bool((y[left] == c).all()):
             per.append(f"{name} < {thr_txt}")
-        elif bool((~left[m]).all()):
+        elif bool((~left[m]).all()) and bool((y[~left] == c).all()):
             per.append(f"{name} >= {thr_txt}")
         else:
             per.append(None)
-    return f"{name} < {thr_txt}", per
+    return f"{name} < {thr_txt}", per, f"{name} {thr_txt}"
 
 
 # ---------------------------------------------------------------------------
@@ -774,12 +780,29 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
     Every reason string in this module carries the numbers it is a claim
     about, so the section can print it verbatim: "not enough structure" on
     its own is the kind of sentence a reader cannot check.
+
+    Written FINDING FIRST.  "No IV choice moves this shield state" is the
+    strongest sentence in the block and the reason the absence is worth
+    printing at all; the floor arithmetic that made us stop clustering is
+    the explanation that follows it, not the headline.
     """
-    return (f"degenerate: {n_sharp} sharp marginal "
-            f"{'opponent' if n_sharp == 1 else 'opponents'} and {n_patterns} "
-            f"distinct win {'pattern' if n_patterns == 1 else 'patterns'}, "
-            f"below the {DEGEN_MIN_SHARP} / {DEGEN_MIN_PATTERNS} floor; "
-            f"every spread wins {wins_lo}-{wins_hi} of {nO} here")
+    if wins_lo == wins_hi:
+        finding = (f"every spread wins exactly {wins_lo} of {nO} opponents "
+                   f"here -- no IV choice changes this shield state")
+    else:
+        moved = wins_hi - wins_lo
+        finding = (f"every spread wins {wins_lo}-{wins_hi} of {nO} opponents "
+                   f"here, so the IV choice moves at most {moved} "
+                   f"{'matchup' if moved == 1 else 'matchups'} in this "
+                   f"shield state")
+    subj = ("opponent is a sharp marginal" if n_sharp == 1
+            else "opponents are sharp marginals")
+    pat = "pattern" if n_patterns == 1 else "patterns"
+    return (f"{finding}. Only {n_sharp} {subj} ({n_patterns} distinct win "
+            f"{pat}), below the {DEGEN_MIN_SHARP}-opponent / "
+            f"{DEGEN_MIN_PATTERNS}-pattern floor, so no clustering is "
+            f"attempted here and these bits stay out of the "
+            f"{ALL_SCEN_DISPLAY} fingerprint")
 
 
 def fragmented_reason(n_sharp, n_patterns, min_cluster_ivs,
@@ -793,10 +816,12 @@ def fragmented_reason(n_sharp, n_patterns, min_cluster_ivs,
     fingerprint -- it is fragmented, and saying "degenerate" there would be
     a false claim about the data.
     """
-    return (f"structure too fragmented: {n_sharp} {what} "
-            f"and {n_patterns} distinct win patterns, but no cluster count "
-            f"in {KMIN}-{KMAX} keeps every cluster at or above "
-            f"{min_cluster_ivs} spreads")
+    return (f"no clusters here: {n_sharp} {what} and {n_patterns} distinct "
+            f"win patterns clear the floor, but no cluster count in "
+            f"{KMIN}-{KMAX} keeps every cluster at or above "
+            f"{min_cluster_ivs} spreads -- the structure is too fragmented. "
+            f"These bits still count toward the {ALL_SCEN_DISPLAY} "
+            f"fingerprint")
 
 
 def screen_scenario(W):
@@ -824,14 +849,31 @@ def concat_fingerprint(win_by_scen):
     fewer than two scenarios qualify), ``bit_scen`` / ``bit_opp`` (what each
     column is), ``scens`` (included labels), ``excluded`` and ``n_bits``.
 
+    COLUMN ORDER IS A DELIBERATE CHOICE, not the order the bits were
+    collected in.  Hamming distance is exactly permutation-invariant in the
+    columns, so reordering cannot move a single point -- but it does change
+    ``np.unique(axis=0)``'s lexicographic ordering of the unique patterns,
+    which is this module's linkage TIE-BREAK, and Hamming on short
+    fingerprints ties constantly (2117 unique patterns over 113 bits share
+    only 85 distinct distances; 1437 pairs tie at the first merge).  On a
+    combined fingerprint that tie-break can move K.  So the columns are
+    sorted MOST-DISCRIMINATING FIRST (|win-rate - 0.5| ascending, stable, so
+    ties keep grid order) -- the same order ``sharp_marginals`` already hands
+    every per-scenario entry, which makes the combined view break ties by the
+    bits that separate spreads most rather than by the shield grid's layout.
+    Measured on Shadow Sableye GL (113 bits): sharpest-first gives K=2,
+    silhouette 0.45, tree accuracy 0.98; raw grid order gives K=3, silhouette
+    0.40, accuracy 0.96 -- same geometry, different valid average-linkage
+    partition.  tests/test_matchup_clusters.py pins the order.
+
     Shared with scripts/deep_dive_brief.py, which prints a one-line
     corroboration of this partition: the brief must cluster the SAME bits the
     section's combined view clusters, or the page and the brief would quote
     two different partitions of one grid under one name.
     """
-    cols, bit_scen, bit_opp, included, excluded = [], [], [], [], []
+    cols, bit_scen, bit_opp, bit_wr, included, excluded = [], [], [], [], [], []
     for lbl, W in win_by_scen:
-        sharp, _wr, _ns, _np_, degenerate = screen_scenario(W)
+        sharp, wr, _ns, _np_, degenerate = screen_scenario(W)
         if degenerate:
             excluded.append(lbl)
             continue
@@ -839,12 +881,19 @@ def concat_fingerprint(win_by_scen):
         included.append(lbl)
         bit_scen.extend([lbl] * len(sharp))
         bit_opp.extend(int(o) for o in sharp)
+        bit_wr.extend(float(x) for x in wr[sharp])
     # One scenario is not a combination; it would be a copy under a second
     # name, with a second silhouette to argue with.
-    W_all = np.hstack(cols) if len(cols) >= 2 else None
-    return {"W": W_all, "bit_scen": bit_scen, "bit_opp": bit_opp,
+    if len(cols) < 2:
+        return {"W": None, "bit_scen": bit_scen, "bit_opp": bit_opp,
+                "scens": included, "excluded": excluded, "n_bits": 0}
+    order = np.argsort(np.abs(np.asarray(bit_wr) - 0.5), kind="stable")
+    W_all = np.hstack(cols)[:, order]
+    return {"W": W_all,
+            "bit_scen": [bit_scen[i] for i in order],
+            "bit_opp": [bit_opp[i] for i in order],
             "scens": included, "excluded": excluded,
-            "n_bits": 0 if W_all is None else int(W_all.shape[1])}
+            "n_bits": int(W_all.shape[1])}
 
 
 def _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats, is_named):
@@ -853,13 +902,14 @@ def _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats, is_named):
     if res is None:
         return None
     tree_acc, tree_lines = stat_rules(res, atk, def_, hp)
-    root, per_cluster = root_rules(res, atk, def_, hp)
+    root, per_cluster, root_split = root_rules(res, atk, def_, hp)
     return {
         "res": res,
         "defining": None,   # filled by renderer with display names
         "tree_acc": tree_acc,
         "tree_rules": tree_lines,
         "root_rule": root,
+        "root_split": root_split,
         "cluster_rules": per_cluster,
         "flips": flip_table(W, sharp, wr, stats, is_named),
         "wr": wr,
@@ -940,16 +990,20 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
     #
     # MEASURED, and the one judgement call in this function: degenerate
     # scenarios contribute NO bits. Their bits are real win/loss data, so
-    # including them is defensible and was what the plan's offline run did;
-    # the two differ on Shadow Sableye GL. With the floor (7 scenarios, 113
-    # bits) the combined view is K=3, silhouette 0.395, root atk < 148.67,
-    # tree accuracy 0.96. Including 0v2's 5 extra bits (118 bits, the plan's
-    # number) gives K=2, silhouette 0.452, root atk < 148.06, accuracy
-    # 0.9995 -- i.e. it recovers the 0v1 headline. The floor wins here
-    # anyway: a scenario whose own data cannot support a partition should
-    # not get a vote in the combined one, and letting it in makes the
-    # combined view sensitive to exactly the fake-perfect fingerprints the
-    # floor exists to keep out. Flipping this is one predicate.
+    # including them is defensible and was what the plan's offline run did.
+    # On Shadow Sableye GL the two readings agree on the partition and
+    # differ only on where the line lands: with the floor (7 scenarios, 113
+    # bits) K=2, silhouette 0.451, root atk < 148.68, tree accuracy 0.983;
+    # with every scenario's bits (119 bits) K=2, silhouette 0.459, root
+    # atk < 147.96, accuracy 0.997. The floor is the shipped decision: a
+    # scenario whose own data cannot support a partition should not get a
+    # vote in the combined one, and letting it in makes the combined view
+    # sensitive to exactly the fake-perfect fingerprints the floor exists to
+    # keep out. Flipping it is one predicate. (Both numbers are with the
+    # sharpest-first column order concat_fingerprint documents; in raw grid
+    # order the 113-bit reading is K=3 / 0.395 / atk < 148.68 / 0.961, which
+    # is the same geometry under a different linkage tie-break and is why
+    # that order is not left to chance.)
     cf = concat_fingerprint(wins_by_scen)
     if cf["W"] is not None:
         W_all = cf["W"]
@@ -1064,22 +1118,40 @@ def _scen_display(label):
     return ALL_SCEN_DISPLAY if label == ALL_SCEN_KEY else f'{label} shields'
 
 
-def _scen_option_note(entry):
-    """The short "why not" a dropdown option can carry.
+def _scen_short_note(entry):
+    """The short "why not" for an <option> label and a mini-grid title.
 
     The full reason is printed in the scenario's own block; an <option> long
     enough to hold it is unreadable. This keeps the counts that make the
-    absence informative -- "0v2 shields - degenerate (5 marginals / 16
-    patterns)" tells a reader why without opening it.
+    absence informative -- "degenerate (5 marginals / 16 patterns)" tells a
+    reader why without opening it. The combined entry counts BITS, not
+    opponents, so it says so.
     """
-    if "res" in entry:
-        return ""
     n, p = entry["n_sharp"], entry["n_patterns"]
-    marg = "marginal" if n == 1 else "marginals"
+    if entry.get("combined"):
+        unit = "bit" if n == 1 else "bits"
+    else:
+        unit = "marginal" if n == 1 else "marginals"
     pat = "pattern" if p == 1 else "patterns"
     if entry.get("degenerate"):
-        return f' - degenerate ({n} {marg} / {p} {pat})'
-    return f' - no clusters ({n} {marg}, too fragmented)'
+        return f'degenerate ({n} {unit} / {p} {pat})'
+    return f'no clusters ({n} {unit} / {p} {pat}, too fragmented)'
+
+
+def _scen_option_note(entry):
+    """What a dropdown option carries after the scenario name.
+
+    A clustered scenario carries its QUALITY (K and silhouette), so the list
+    itself is the one-glance "where is the structure on this page" view --
+    the section's default is the combined entry, which is routinely the
+    least separated partition on the page, and without this a reader has no
+    signal that a single scenario separates twice as cleanly one click away.
+    A scenario with no clusters carries its counts instead.
+    """
+    if "res" in entry:
+        return (f' (K={entry["res"]["k"]}, silhouette '
+                f'{entry["res"]["silhouette"]:.2f})')
+    return f' - {_scen_short_note(entry)}'
 
 
 def _entry_opp_names(entry, disp):
@@ -1101,17 +1173,18 @@ def _entry_opp_names(entry, disp):
 def _scen_headline(label, entry, nO):
     disp = _scen_display(label)
     if "reason" in entry:
-        # Every reason string carries its own counts (see degenerate_reason
-        # / fragmented_reason), so nothing is appended here.
+        # Every reason string is a finding-first sentence carrying its own
+        # counts (see degenerate_reason / fragmented_reason), so nothing is
+        # prepended or appended here.
         return (f'<p style="font-size:13px;color:var(--text-muted)">'
-                f'<b>{disp}</b>: no cluster view -- '
-                f'{_esc(entry["reason"])}.</p>')
+                f'<b>{disp}</b>: {_esc(entry["reason"])}.</p>')
     res = entry["res"]
     comb = entry.get("combined")
     if comb:
         excl = (' (' + _esc(', '.join(comb["excluded"])) +
                 ' excluded as degenerate)') if comb["excluded"] else ''
-        head = (f'{comb["n_bits"]} marginal-matchup bits concatenated across '
+        head = (f'{comb["n_bits"]} win/loss bits (one per sharp marginal '
+                f'opponent per scenario) concatenated across '
                 f'{len(comb["scens"])} of {comb["n_total"]} shield '
                 f'scenarios{excl}')
     else:
@@ -1125,12 +1198,58 @@ def _scen_headline(label, entry, nO):
     sil_txt = f'silhouette {sil:.2f}'
     if sil < WEAK_SIL:
         sil_txt += ' - weak separation'
-    root = entry.get("root_rule")
-    root_txt = f'; splits at {_esc(root)}' if root else ''
+    # "splits at atk < 148.68" read as a binary split with a stray direction
+    # on it. A two-cluster partition IS that one split; three or more need
+    # the depth-2/3 rules, so the root is named as the FIRST split and the
+    # reader is sent to the block that finishes the description.
+    split = entry.get("root_split")
+    if not split:
+        root_txt = ''
+    elif res["k"] == 2:
+        root_txt = f'; split at {_esc(split)}'
+    else:
+        root_txt = f'; first split at {_esc(split)} (full rules below)'
     return (f'<p style="font-size:13px">'
             f'<b>{disp}</b>: {head}; '
             f'{res["n_patterns"]} distinct win patterns; '
             f'K={res["k"]} clusters ({sil_txt}){root_txt}.</p>')
+
+
+def _sharpest_signpost(computed):
+    """Point the reader at the sharpest SINGLE scenarios, from the combined block.
+
+    The combined view is the section's default and is routinely the LEAST
+    separated partition on the page (it is one fingerprint over every shield
+    state, so it has the most ways to disagree). The page's cleanest result
+    is then one dropdown click away with nothing pointing at it -- on Shadow
+    Sableye GL, 2v1 at silhouette 0.68 and 0v1 at 0.65 against the combined
+    0.45. This line is rendered from the same payload the headlines are, so
+    it cannot name a scenario the page does not show.
+
+    Each entry carries the number of opponents its silhouette was measured
+    over. "Sharpest" is a comparative claim and a silhouette rises as the
+    fingerprints get shorter: plain Sableye GL's 0v1 tops that page at 0.76,
+    measured over 7 sharp marginals against 0v0's 28. Both clear the
+    degeneracy floor, and the difference is the reader's to weigh -- but not
+    if the sentence hides it.
+    """
+    ranked = sorted(((e["res"]["silhouette"], lbl, e)
+                     for lbl, e in computed.items()
+                     if "res" in e and lbl != ALL_SCEN_KEY),
+                    key=lambda t: (-t[0], t[1]))
+    if not ranked:
+        return ''
+    bits = []
+    for sil, lbl, e in ranked[:2]:
+        split = e.get("root_split")
+        n = len(e["res"]["sharp"])
+        bits.append(f'{_esc(_scen_display(lbl))} (K={e["res"]["k"]}, '
+                    f'silhouette {sil:.2f} over {n} sharp '
+                    f'{"marginal" if n == 1 else "marginals"}'
+                    + (f', split {_esc(split)}' if split else '') + ')')
+    return (f'<p style="font-size:12px;color:var(--text-muted)">Sharpest '
+            f'single scenarios on this page: {" and ".join(bits)} -- pick '
+            f'them in the dropdown above.</p>')
 
 
 def _cluster_table(entry, opp_names):
@@ -1328,7 +1447,10 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                 "display": disp_lbl, "reason": entry["reason"],
                 # the two no-cluster kinds read differently on the page: one
                 # says "too little data here", the other "too much variety"
-                "degenerate": bool(entry.get("degenerate"))}
+                "degenerate": bool(entry.get("degenerate")),
+                # short form for the mini-grid title, same string the
+                # dropdown option carries
+                "short": _scen_short_note(entry)}
             continue
         res = entry["res"]
         payload["scens"][lbl] = {
@@ -1336,7 +1458,12 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             "labels": [int(x) for x in res["labels"]],
             "sizes": [c["size"] for c in res["clusters"]],
             "sil": round(float(res["silhouette"]), 4),
-            "root": entry.get("root_rule"),
+            # The depth-1 split with NO direction ('atk 148.06'). The
+            # directed form ('atk < 148.06') was carried here too and read
+            # by nobody: the titles that quote it supply their own word
+            # ("split atk 148.06"), and the per-cluster `rules` below carry
+            # direction where it is an iff.
+            "split": entry.get("root_split"),
             # Per-cluster legend text, emitted from Python so the JS never
             # formats a threshold: null where the depth-1 root does not
             # separate that cluster cleanly (see root_rules).
@@ -1358,8 +1485,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'trading others away.</p>')
     parts.append(
         '<p style="font-size:13px">Every shield scenario the dive baked is '
-        'clustered separately -- including the lopsided ones, which on '
-        'several dives carry the cleanest structure -- plus an '
+        'clustered separately -- including the lopsided ones, which are '
+        'often the sharpest partition on the page; compare the silhouettes '
+        'in the dropdown below -- plus an '
         f'<b>{ALL_SCEN_DISPLAY}</b> view that concatenates every '
         'non-degenerate scenario\'s marginal-matchup bits into one '
         'fingerprint. That combined view is not an average of scores: it is '
@@ -1428,6 +1556,8 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         parts.append(f'<div class="dd-mc-scen-block" data-scen="{lbl}" '
                      f'style="display:{vis}">')
         parts.append(_scen_headline(lbl, entry, nO))
+        if lbl == ALL_SCEN_KEY:
+            parts.append(_sharpest_signpost(computed))
         if "res" in entry:
             names = _entry_opp_names(entry, disp)
             parts.append(_cluster_table(entry, names))
@@ -1447,15 +1577,22 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'else is settled and can\'t distinguish IVs). Each IV\'s '
         'fingerprint is its win/loss vector over those opponents; '
         'fingerprints are clustered bottom-up (agglomerative, Hamming '
-        'distance, average linkage), with the cluster count chosen by '
-        'silhouette under a parsimony floor (a split must keep every '
-        'cluster above a minimum size, and the smallest K in '
-        f'{knobs["kmin"]}-{knobs["kmax"]} within {knobs["sil_epsilon"]} '
-        'of the best silhouette wins). Clusters are ordered weakest to '
+        'distance, average linkage). The number of clusters, <b>K</b>, is '
+        'chosen by <b>silhouette</b> -- a 0-to-1 score of how cleanly the '
+        'fingerprints separate, where above about 0.5 the clusters are '
+        'distinct groups and below '
+        f'{knobs["weak_sil"]} the headline says "weak separation" and the '
+        'clusters are tendencies rather than tiers -- under a parsimony '
+        'floor (a split must keep every cluster above a minimum size, and '
+        f'the smallest K in {knobs["kmin"]}-{knobs["kmax"]} within '
+        f'{knobs["sil_epsilon"]} of the best silhouette wins). Silhouettes '
+        'are comparable between the scenarios on this page, not between '
+        'species. Clusters are ordered weakest to '
         'strongest by mean marginal wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
         'that overlap completely in score separate cleanly there. A '
-        'scenario is skipped as <b>degenerate</b> when it has fewer than '
+        'scenario is reported as <b>degenerate</b> (no clustering '
+        'attempted) when it has fewer than '
         f'{knobs["degen_min_sharp"]} sharp marginals or fewer than '
         f'{knobs["degen_min_patterns"]} distinct win patterns -- on that '
         'little data every candidate K scores near-perfectly, which is a '
@@ -1463,7 +1600,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         f'out of the {ALL_SCEN_DISPLAY} fingerprint. A scenario that clears '
         'the floor but has no split keeping every cluster above the minimum '
         'size is reported as fragmented instead, and its bits still count '
-        'toward the combined view. Replaces '
+        f'toward the combined view. The {ALL_SCEN_DISPLAY} bits are ordered '
+        'most-discriminating first, which is the tie-break the linkage uses '
+        'when several merges are equally close. Replaces '
         'the retired score-gap cluster heuristic (2026-07), which usually '
         '(~77% of sampled runs) fired on float-level jitter in the '
         'opponent-averaged score, and even when it did catch a real tier '
