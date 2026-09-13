@@ -228,3 +228,50 @@ section (it already does for the current position; verify after the move).
 3. `python -m pytest tests -q -m "not slow"` green; guide re-render.
 4. Do NOT re-render into `userdata/website/` while the Twilight Trails bake
    is running (it is, as of this writing); replay to a scratch path.
+
+## 7. What shipped (2026-09-13, branch `scenario-clusters`)
+
+Phases A and B, with Michael's calls on section 5: default view = "all
+scenarios"; "all" = the concatenated fingerprint; degenerate scenarios shown
+with their reason; layout (Phase C) and the method upgrades (Phase D) not
+touched. Plus the deferred build-brief corroboration line (stage 14).
+
+Three things came out differently from the plan above, and each is recorded
+where the code lives:
+
+1. **"all" on Shadow Sableye GL is K=3, silhouette 0.395, root `atk < 148.68`
+   over 113 bits -- not the K=2 / 0.45 / `atk < 148.06` / 118 bits in the
+   section-1 table.** The two are the same computation over different inputs:
+   the table's offline run predates the degeneracy floor and included 0v2's 5
+   bits. Section 3's floor (item 3) excludes them, and the decision "'all' =
+   every NON-DEGENERATE scenario's bits" is what shipped. Both measurements
+   are in the comment beside the exclusion in
+   `deep_dive_matchup_clusters.compute_matchup_clusters`, so flipping it is
+   one predicate if the 118-bit reading is preferred on a corpus look.
+2. **Two no-cluster outcomes, not one.** "Degenerate" (under the 6 sharp / 8
+   pattern floor; bits excluded from "all") is now distinct from
+   "fragmented" (clears the floor, but no K keeps every cluster above the
+   min-cluster size -- the Feraligatr UL 0v0 case in section 1; its bits
+   still count toward "all"). Calling the second one degenerate would be a
+   false claim about the data.
+3. **The concatenated fingerprint was 30x too expensive as written.** It
+   produces ~2100 unique patterns against ~280 for a single scenario, and
+   both the pairwise-distance build and the merge loop were quadratic in
+   that: `compute_matchup_clusters` went from ~0.2 s to 15.5 s per call at a
+   4.9 GB peak (the plan budgeted 0.5 s). Two changes bring it to 0.8-1.6 s
+   and ~40 MB, and are asserted BIT-IDENTICAL rather than "close":
+   `_hamming` via `A.B' + B.A'` instead of a (u, u, d) broadcast, and a
+   row-minimum cache instead of re-scanning the active submatrix each merge.
+   Verified against the old implementations on 7 species x GL/UL and on all
+   16 (moveset, mode) views of the Shadow Sableye blob -- identical labels,
+   silhouettes, tree rules and flip tables everywhere -- and pinned by
+   equivalence tests that carry the old code as the oracle.
+
+Also noted while wiring the brief: the section fits its stat-rule tree on
+the PAGE's 2dp-rounded `DATA.ivAtk`/`ivDef`, so a consumer starting from the
+full-precision blob meta lands 0.01 off on some splits (this grid: 148.67 vs
+148.68). `SECTION_STAT_DP` names the rounding and the brief rounds the same
+way; a test pins it against `deep_dive.py`.
+
+Not done here and still open: Phase C layout (a)+(b), Phase D, and the
+shipped-page re-render (`userdata/.cards_rerender_pending` stays set).

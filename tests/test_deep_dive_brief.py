@@ -3149,3 +3149,94 @@ def test_the_printed_line_says_what_one_decimal_would_cost(furret_facts):
     quiet['floor']['genre']['n_extra'] = 0
     assert ('At the one decimal place'
             not in ' '.join(B._f2_floor(quiet)['lines']))
+
+
+# ---------------------------------------------------------------------------
+# Stage 14 -- the cluster corroboration line (2026-09-13)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.local_artifacts
+def test_cluster_corroboration_is_the_dive_sections_own_partition(
+        sableye_shadow_facts):
+    """The brief must quote the SECTION's all-scenario partition of this
+    grid, not a second one of its own: same bits, same K, same silhouette,
+    same root split. Recomputed here through the section's public entry
+    point (compute_matchup_clusters), which is the surface a reader would
+    compare the line against on the page."""
+    import gzip
+    import pickle
+    import numpy as np
+    import deep_dive_matchup_clusters as clusters
+    state, facts, path = sableye_shadow_facts
+    cc = facts['cluster_corroboration']
+    assert cc is not None
+
+    with gzip.open(path, 'rb') as fh:
+        st = pickle.load(fh)
+    m = st['moveset_data'][0]
+    scen = [tuple(x) for x in st['shield_scenarios']]
+    nO, nS = len(st['opponent_names']), len(scen)
+    flat = np.asarray(m['scores']['pvpoke'], dtype=np.int32)
+    n_iv = flat.size // (nS * nO)
+    meta = np.array(m['meta'])
+    dp = clusters.SECTION_STAT_DP
+    section = clusters.compute_matchup_clusters(
+        flat, n_iv, nS, nO, scen, np.round(meta[:, 5], dp),
+        np.round(meta[:, 6], dp), meta[:, 7], lambda oi, stat: None)
+    allscen = section[clusters.ALL_SCEN_KEY]
+    assert cc['k'] == allscen['res']['k']
+    assert cc['sil'] == allscen['res']['silhouette']
+    assert cc['n_bits'] == allscen['combined']['n_bits']
+    assert cc['excluded'] == allscen['combined']['excluded']
+    # Same root split, formatted the section's way -- INCLUDING the page's
+    # 2dp rounding of the stat arrays, which moves this particular split from
+    # 148.67 to 148.68. A corroboration citing a number the reader cannot
+    # find on the page is worse than no corroboration.
+    assert allscen['root_rule'] == f"{cc['stat']} < {cc['value']:.2f}"
+
+
+@pytest.mark.local_artifacts
+def test_cluster_corroboration_line_is_gated_on_the_silhouette(
+        sableye_shadow_facts):
+    """One sentence, evidence block only, and only when separated.
+
+    Shadow Sableye's all-scenario partition measures silhouette 0.395, just
+    UNDER the 0.40 bar -- so this page prints nothing, which is the point of
+    the gate. Both sides are exercised by moving the fact, not the bar.
+    """
+    state, facts, path = sableye_shadow_facts
+    cc = facts['cluster_corroboration']
+    assert cc['sil'] < B.CLUSTER_SIL_MIN                  # measured 0.3954
+    text = ' '.join(B._f14_how_sure(facts)['lines'])
+    assert 'cluster partition' not in text
+
+    good = copy.deepcopy(facts)
+    good['cluster_corroboration']['sil'] = B.CLUSTER_SIL_MIN
+    lines = B._f14_how_sure(good)['lines']
+    hits = [ln for ln in lines if 'cluster partition' in ln]
+    assert len(hits) == 1
+    assert hits[0] == (
+        f"The all-scenario cluster partition splits this grid at "
+        f"{cc['stat']} {cc['value']:.2f} (K={cc['k']}, silhouette "
+        f"{B.CLUSTER_SIL_MIN:.2f}).")
+    # never in the headline, at either silhouette
+    assert 'cluster' not in ' '.join(B.build_headline(good)).lower()
+
+
+@pytest.mark.local_artifacts
+def test_gate_recompute_catches_a_corrupted_corroboration(
+        sableye_shadow_facts):
+    """G-recompute must cover the printed value (and the ones beside it)."""
+    state, facts, path = sableye_shadow_facts
+    for key, value in (('value', 1.0), ('k', 99), ('sil', 0.99),
+                       ('stat', 'hp'), ('n_bits', 7)):
+        bad = copy.deepcopy(facts)
+        bad['cluster_corroboration'][key] = value
+        with pytest.raises(B.GuardError) as exc:
+            B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+        assert 'cell=clusters' in str(exc.value), key
+    # and a page that claims no partition when there is one
+    bad = copy.deepcopy(facts)
+    bad['cluster_corroboration'] = None
+    with pytest.raises(B.GuardError):
+        B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)

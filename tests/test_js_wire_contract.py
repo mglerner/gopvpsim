@@ -32,7 +32,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_win_boundary import strip_js  # noqa: E402
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS = _ROOT / "scripts"
@@ -454,3 +458,106 @@ console.log(JSON.stringify(out));
 """
     gl_default, gl_alt = bestbuddy_caps("great")
     assert _node(program) == [50, 51, gl_default, gl_alt, MAX_CPM_LEVEL]
+
+
+# ---------------------------------------------------------------------------
+# 5. Matchup-cluster payload fields (scenario-clusters phase B, 2026-09-13)
+# ---------------------------------------------------------------------------
+#
+# The section's inline JSON grew four reader-facing fields the JS renders
+# verbatim -- `sil`, `root`, `rules` and `display` -- plus `allKey` and a
+# `degenerate` map. Every one of them fails SILENTLY on a rename: the legend
+# just drops the rule text, or a mini-grid title says nothing, with no error
+# anywhere. The JS cannot be run in a browser here, so the parity half runs
+# the real JS helper in node against a real Python payload.
+
+_MC_TOP_FIELDS = ("palette", "default", "allKey", "scens", "degenerate")
+_MC_SCEN_FIELDS = ("k", "labels", "sizes", "sil", "root", "rules", "display")
+
+
+def _mc_payload_fixture():
+    """A real render's payload: 8 sharp opponents in 1v1/2v2, 2 in 0v0.
+
+    Built through render_section rather than by hand so the schema under
+    test is the one that ships.
+    """
+    n_opp, block = 8, 40
+    n_iv = block * (n_opp + 1)
+    arr = np.full((n_iv, 9, n_opp), 200, dtype=np.int32)
+    for si in (4, 8):
+        for i in range(n_opp + 1):
+            arr[i * block:(i + 1) * block, si, :i] = 800
+    arr[n_iv // 2:, 0, :2] = 800                      # 0v0: degenerate
+    atk = np.linspace(100, 110, n_iv)
+    names = [f"Opp{i}" for i in range(n_opp)]
+    html = clusters.render_section(
+        arr.ravel().tolist(), n_iv, 9, n_opp,
+        [(a, b) for a in range(3) for b in range(3)], names,
+        {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+         "ivHp": np.full(n_iv, 135.0).tolist()},
+        "rank-1", "FAST / CM1, CM2", [])
+    m = re.search(r'<script type="application/json" class="dd-mc-data">'
+                  r'(.*?)</script>', html, re.S)
+    assert m, "the section emitted no payload"
+    return json.loads(m.group(1))
+
+
+def test_cluster_payload_carries_every_field_the_js_reads():
+    pay = _mc_payload_fixture()
+    assert set(_MC_TOP_FIELDS) <= set(pay)
+    assert pay["allKey"] == clusters.ALL_SCEN_KEY
+    assert pay["default"] == clusters.ALL_SCEN_KEY   # the combined view
+    sc = pay["scens"]["1v1"]
+    assert set(_MC_SCEN_FIELDS) <= set(sc)
+    assert len(sc["rules"]) == sc["k"] == len(sc["sizes"])
+    assert isinstance(sc["sil"], float)
+    assert sc["display"] == "1v1 shields"
+    assert pay["scens"][clusters.ALL_SCEN_KEY]["display"] == \
+        clusters.ALL_SCEN_DISPLAY
+    # degenerate scenarios are NOT in scens (the JS treats presence there as
+    # "per-IV labels exist"), and carry their reason for the mini titles
+    assert "0v0" not in pay["scens"]
+    assert "0v0" in pay["degenerate"]
+    assert pay["degenerate"]["0v0"]["reason"].startswith("degenerate:")
+    assert pay["degenerate"]["0v0"]["degenerate"] is True
+
+
+def test_js_reads_those_exact_payload_field_names():
+    """Source scan, comments and strings blanked (a field named only in a
+    comment does not wire anything up)."""
+    text = strip_js(_js())
+    for field in ("allKey", "scens", "degenerate", "palette",
+                  "labels", "sizes", "rules", "root", "sil", "display"):
+        assert re.search(r"\.%s\b" % field, text), (
+            f"no JS site reads payload field {field!r} any more")
+    # self-test: a field that was never in the payload must NOT be found,
+    # or the scan above passes for free
+    assert not re.search(r"\.notAPayloadField\b", text)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_mc_headline_renders_the_payload_in_node():
+    """The mini-grid titles and the scatter legend both read through
+    ``_mcHeadline``; run the real function over a real payload."""
+    pay = _mc_payload_fixture()
+    program = _js_fn(_js(), "_mcHeadline") + """
+var pay = %s;
+console.log(JSON.stringify([_mcHeadline(pay, '1v1'), _mcHeadline(pay, '0v0'),
+                            _mcHeadline(pay, 'nope')]));
+""" % json.dumps(pay)
+    got = _node(program)
+    sc = pay["scens"]["1v1"]
+    assert got[0] == f"K={sc['k']}, sil {sc['sil']:.2f}, {sc['root']}"
+    assert got[1] == "degenerate"         # under the degeneracy floor
+    assert got[2] == ""                   # unknown label
+
+
+def test_js_maps_the_avg_shields_state_to_the_combined_clusters():
+    """Phase B1: 'avg' used to fall through to the payload default (1v1) and
+    color by one scenario without saying so."""
+    raw = _js()
+    assert "state.scenarioMode === 'avg' && mcPay.scens[allKey0]" in raw
+    # the key itself comes from the payload, with the Python constant as the
+    # only hard-coded fallback
+    assert "mcPay.allKey || 'all'" in raw
+    assert clusters.ALL_SCEN_KEY == "all"

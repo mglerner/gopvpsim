@@ -86,11 +86,13 @@ from deep_dive_rendering import BEST_RULE_TIP, scenario_label  # noqa: E402
 CLUSTER_PALETTE = ["#3987e5", "#199e70", "#c98500",
                    "#008300", "#9085e9", "#e66767"]
 
-# The even-shield scenarios this section clusters. Named once so the
-# "not available" prose spells the same three labels the driver iterates,
-# and imported (not re-declared) so the guide/owned-breakdown surfaces that
-# follow the same XehrFelrose convention cannot drift from it.
-from deep_dive_lib.shields import EVEN_SHIELDS as EVEN_SHIELD_PAIRS  # noqa: E402
+# NB this section no longer restricts itself to the even-shield scenarios
+# (deep_dive_lib.shields.EVEN_SHIELDS, the XehrFelrose convention the ML IV
+# guide and the owned-collection breakdown still follow). It clusters every
+# scenario the dive baked: on several dives the ODD scenarios carry the
+# cleanest structure, and the even-only scope was hiding it. The Methods
+# "About these metrics (0v0 / 1v1 / 2v2 delta)" block and the slayer `even`
+# metric are separate uses of that set and are unaffected.
 
 # K-selection knobs (parsimony floor — see module docstring).
 KMIN = 2
@@ -102,6 +104,36 @@ DEFINING_MIN_DELTA = 0.15
 TREE_MAX_DEPTH = 3
 TREE_MIN_LEAF = 40
 WEAK_SIL = 0.30             # headlines below this say "weak separation"
+
+# Degeneracy floor (2026-09-13, scenario-clusters phase A2). A scenario with
+# too few sharp marginals, or too few distinct win patterns among them, does
+# not have a clustering problem to solve: every K "succeeds" at silhouette
+# ~1.0 on a handful of points, which is a measurement artifact and not
+# structure. Separation measured across 9 species x 9 scenarios
+# (docs/scenario_clusters_plan.md section 1): every fake-perfect result seen
+# (Feraligatr UL 0v1 K=6 sil 1.00 on 4 sharp / 7 patterns; Dondozo 0v2 and
+# 2v0 sil 1.00 on 2 sharp) sits below this bar and every real result above
+# it. Scenarios under the floor are REPORTED with their counts rather than
+# hidden -- the absence is informative ("0v2: every spread wins 0-5 of 76")
+# -- and are excluded from the concatenated "all scenarios" fingerprint.
+DEGEN_MIN_SHARP = 6
+DEGEN_MIN_PATTERNS = 8
+
+# The combined entry's key and display text. The key shares the scenario
+# keyspace of scenario_label() ('0v0', '1v1', ...) because it keys the SAME
+# payload `scens` map the JS overlay looks scenarios up in; 'all' cannot
+# collide with an '{a}v{b}' label.
+ALL_SCEN_KEY = "all"
+ALL_SCEN_DISPLAY = "all scenarios"
+
+# Decimal places the PAGE's stat arrays carry: deep_dive.py builds
+# DATA.ivAtk / ivDef as ``round(m[5], 2)``, and this section's tree is fitted
+# on those arrays, so its thresholds are midpoints between 2dp values. Named
+# here so a consumer quoting this section's split (scripts/deep_dive_brief.py's
+# corroboration line, which starts from the full-precision meta) can land on
+# the SAME number instead of one 0.01 off it. tests/test_matchup_clusters.py
+# pins deep_dive.py against this constant.
+SECTION_STAT_DP = 2
 
 
 def cluster_params():
@@ -121,6 +153,9 @@ def cluster_params():
         "weak_sil": f"{WEAK_SIL:.2f}",
         "kmin": str(KMIN),
         "kmax": str(KMAX),
+        "degen_min_sharp": str(DEGEN_MIN_SHARP),
+        "degen_min_patterns": str(DEGEN_MIN_PATTERNS),
+        "all_scen_display": ALL_SCEN_DISPLAY,
     }
 
 
@@ -199,8 +234,21 @@ def _hamming(patterns):
     would be measuring a different space than the merges it is judging.
     Returns a fresh (u, u) float array; callers that mutate it in place
     (the Lance-Williams update) must copy first.
+
+    Computed as ``A.B' + B.A'`` over the 0/1 rows (B = 1 - A) rather than by
+    broadcasting to a (u, u, d) comparison array. BIT-IDENTICAL, because
+    every product is 0 or 1 and every partial sum is an exact integer well
+    under 2**53, so the summation order cannot change the result -- and it
+    is what makes the "all scenarios" fingerprint affordable: at the 2117
+    unique patterns x 113 bits that Shadow Sableye GL produces, the
+    broadcast form allocated a 506 MB bool array and then a 4 GB float64
+    temporary inside ``.mean``, for 0.5 s of work that this does in 0.02 s
+    and 36 MB. Rows must be 0/1 (they are: every caller passes a win
+    matrix's uint8 view).
     """
-    return (patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)
+    a = patterns.astype(np.float64)
+    b = 1.0 - a
+    return (a @ b.T + b @ a.T) / patterns.shape[1]
 
 
 def _small_pop_floor(cap, n):
@@ -241,7 +289,21 @@ def _linkage_labels(patterns, counts, ks, diff=None):
 
     Tie-break on equal merge distances: first occurrence in the active
     ordering (argmin scan order), i.e. lowest (i, j) up to float64
-    accumulation in the Lance-Williams updates.
+    accumulation in the Lance-Williams updates.  The nearest active pair is
+    found through a per-row minimum cache rather than by re-scanning the
+    whole matrix each merge, which is what makes the concatenated
+    "all scenarios" fingerprint affordable (12.6 s -> 0.12 s at 2117 unique
+    patterns).  The cache reproduces the full-matrix scan EXACTLY:
+
+      * the global minimum is the lowest row index attaining it, and within
+        that row the lowest column -- which is row-major first occurrence;
+      * average linkage cannot push any row's minimum DOWN past its current
+        value (the merged distance lies between the two it averages, both of
+        which are at or above that row's minimum), so a cached minimum can
+        only go stale upward -- except that a merged distance can TIE a row's
+        minimum at a lower column index, so rows where the new column is at
+        or below their cached minimum are recomputed too, not only the rows
+        that pointed at either merged slot.
 
     ``diff`` is an optional precomputed ``_hamming(patterns)`` matrix (the
     caller shares one with the silhouette); it is never mutated -- the
@@ -263,16 +325,17 @@ def _linkage_labels(patterns, counts, ks, diff=None):
     active = np.ones(u, dtype=bool)
     # cluster id per pattern; merged clusters adopt the lower slot index.
     labels = np.arange(u, dtype=np.int32)
+    # Per-row nearest active neighbour. Inactive slots hold +inf in `dist`
+    # (the merge below fills their row and column), so they never win.
+    rowmin = dist.min(axis=1)
+    rowarg = dist.argmin(axis=1)
     n_active = u
     if n_active in ks:
         out[n_active] = labels.copy()
     while n_active > 2:
-        # find min distance among active pairs; ties -> lowest (i, j)
-        sub = np.where(active)[0]
-        block = dist[np.ix_(sub, sub)]
-        flat = np.argmin(block)          # first occurrence = lowest (i, j)
-        i_s, j_s = divmod(flat, block.shape[1])
-        i, j = int(sub[i_s]), int(sub[j_s])
+        # min distance among active pairs; ties -> lowest (i, j)
+        i = int(np.argmin(rowmin))       # lowest row attaining the minimum
+        j = int(rowarg[i])               # lowest column within that row
         if i > j:
             i, j = j, i
         # Lance-Williams average-linkage update into slot i
@@ -287,6 +350,20 @@ def _linkage_labels(patterns, counts, ks, diff=None):
         active[j] = False
         labels[labels == j] = i
         n_active -= 1
+        # refresh the cache: the merged slot, the retired slot, and every
+        # active row whose cached neighbour was either of them or whose
+        # minimum the new column now ties or beats (see the docstring).
+        rowmin[j] = np.inf
+        rowarg[j] = 0
+        rowmin[i] = dist[i].min()
+        rowarg[i] = dist[i].argmin()
+        stale = ((dist[:, i] <= rowmin) | (rowarg == i) | (rowarg == j)) & active
+        stale[i] = False
+        idx = np.where(stale)[0]
+        if idx.size:
+            blk = dist[idx]
+            rowmin[idx] = blk.min(axis=1)
+            rowarg[idx] = blk.argmin(axis=1)
         if n_active in ks:
             out[n_active] = labels.copy()
     if 2 in ks and 2 not in out:
@@ -543,6 +620,29 @@ def _tree_rules(node, feature_names, fmt="{:.2f}"):
     return lines
 
 
+# The tree's feature order, named once: the tree stores an integer feature
+# index and three surfaces turn it back into a word (the rule block, the
+# legend rule text, the mini-grid titles).
+TREE_FEATURES = ["atk", "def", "hp"]
+TREE_THR_FMT = "{:.2f}"
+
+
+def cluster_tree(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
+                 min_leaf=TREE_MIN_LEAF):
+    """Fit the depth-3 tree once. Returns (tree, X, y).
+
+    Split out so ``stat_rules`` (accuracy + printed rule block) and
+    ``root_rules`` (the depth-1 rule the legend and the mini-grid titles
+    carry) cannot fit two different trees and print two different root
+    thresholds for one scenario.
+    """
+    y = res["labels"].astype(np.int64)
+    X = np.column_stack([atk, def_, hp]).astype(np.float64)
+    min_leaf = _small_pop_floor(min_leaf, len(y))
+    tree = _build_tree(X, y, int(y.max()) + 1, 0, max_depth, min_leaf)
+    return tree, X, y
+
+
 def stat_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
                min_leaf=TREE_MIN_LEAF):
     """Depth-3 Gini tree cluster-labels ~ (atk, def, hp).
@@ -550,12 +650,48 @@ def stat_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
     Returns (in_sample_acc, rule_lines).  min_leaf is scaled down for small
     populations the same way the cluster floor is.
     """
-    y = res["labels"].astype(np.int64)
-    X = np.column_stack([atk, def_, hp]).astype(np.float64)
-    min_leaf = _small_pop_floor(min_leaf, len(y))
-    tree = _build_tree(X, y, int(y.max()) + 1, 0, max_depth, min_leaf)
+    tree, X, y = cluster_tree(res, atk, def_, hp, max_depth, min_leaf)
     acc = float((_tree_predict(tree, X) == y).mean())
-    return acc, _tree_rules(tree, ["atk", "def", "hp"])
+    return acc, _tree_rules(tree, TREE_FEATURES, TREE_THR_FMT)
+
+
+def root_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
+               min_leaf=TREE_MIN_LEAF):
+    """The depth-1 split, as headline text and as per-cluster rule text.
+
+    Returns ``(root_text, per_cluster)``:
+
+      * ``root_text`` is the root split written the way the rule block
+        writes it (``'atk < 148.06'``), or None when the tree did not split
+        at all.
+      * ``per_cluster[c]`` is ``'atk >= 148.06'`` when EVERY IV in cluster c
+        lies on one side of that single split, and None when the cluster
+        straddles it.  "The root separates this cluster cleanly" is the only
+        claim a one-line legend can carry honestly: a cluster that needs the
+        depth-2/3 splits to be described is left unlabelled rather than
+        labelled with a rule that is wrong for some of its members.
+    """
+    tree, X, y = cluster_tree(res, atk, def_, hp, max_depth, min_leaf)
+    k = res["k"]
+    if "feat" not in tree:
+        return None, [None] * k
+    f = tree["feat"]
+    thr = tree["thr"]
+    name = TREE_FEATURES[f]
+    thr_txt = TREE_THR_FMT.format(thr)
+    left = X[:, f] < thr
+    per = []
+    for c in range(k):
+        m = y == c
+        if not m.any():
+            per.append(None)
+        elif bool(left[m].all()):
+            per.append(f"{name} < {thr_txt}")
+        elif bool((~left[m]).all()):
+            per.append(f"{name} >= {thr_txt}")
+        else:
+            per.append(None)
+    return f"{name} < {thr_txt}", per
 
 
 # ---------------------------------------------------------------------------
@@ -632,16 +768,130 @@ def flip_table(W, sharp, wr, stats, is_named):
 # Top-level per-scenario driver
 # ---------------------------------------------------------------------------
 
+def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
+    """Why a scenario is below the degeneracy floor, with its own counts.
+
+    Every reason string in this module carries the numbers it is a claim
+    about, so the section can print it verbatim: "not enough structure" on
+    its own is the kind of sentence a reader cannot check.
+    """
+    return (f"degenerate: {n_sharp} sharp marginal "
+            f"{'opponent' if n_sharp == 1 else 'opponents'} and {n_patterns} "
+            f"distinct win {'pattern' if n_patterns == 1 else 'patterns'}, "
+            f"below the {DEGEN_MIN_SHARP} / {DEGEN_MIN_PATTERNS} floor; "
+            f"every spread wins {wins_lo}-{wins_hi} of {nO} here")
+
+
+def fragmented_reason(n_sharp, n_patterns, min_cluster_ivs,
+                      what="sharp marginal opponents"):
+    """The other honest no-clusters outcome: enough marginals, no partition.
+
+    Distinct from ``degenerate_reason`` on purpose (Feraligatr UL 0v0: 12
+    sharp marginals, 61 distinct patterns, and still no K in KMIN..KMAX
+    whose smallest cluster clears the anti-speck floor).  That scenario is
+    NOT degenerate -- its bits go into the concatenated "all scenarios"
+    fingerprint -- it is fragmented, and saying "degenerate" there would be
+    a false claim about the data.
+    """
+    return (f"structure too fragmented: {n_sharp} {what} "
+            f"and {n_patterns} distinct win patterns, but no cluster count "
+            f"in {KMIN}-{KMAX} keeps every cluster at or above "
+            f"{min_cluster_ivs} spreads")
+
+
+def screen_scenario(W):
+    """Degeneracy screen for one scenario's win matrix.
+
+    Returns (sharp, wr, n_sharp, n_patterns, degenerate).  Split out because
+    two callers need the SAME verdict: the per-scenario driver, and
+    ``concat_fingerprint`` deciding whose bits go into the combined view.
+    """
+    sharp, wr = sharp_marginals(W)
+    n_sharp = int(len(sharp))
+    if n_sharp:
+        n_patterns = int(len(np.unique(W[:, sharp].astype(np.uint8), axis=0)))
+    else:
+        n_patterns = 1
+    degenerate = (n_sharp < DEGEN_MIN_SHARP or n_patterns < DEGEN_MIN_PATTERNS)
+    return sharp, wr, n_sharp, n_patterns, degenerate
+
+
+def concat_fingerprint(win_by_scen):
+    """The "all scenarios" fingerprint: non-degenerate scenarios' bits, joined.
+
+    ``win_by_scen``: [(label, W)] in grid order, W the (nIvs, nO) win matrix.
+    Returns a dict with ``W`` (the (nIvs, n_bits) bool array, or None when
+    fewer than two scenarios qualify), ``bit_scen`` / ``bit_opp`` (what each
+    column is), ``scens`` (included labels), ``excluded`` and ``n_bits``.
+
+    Shared with scripts/deep_dive_brief.py, which prints a one-line
+    corroboration of this partition: the brief must cluster the SAME bits the
+    section's combined view clusters, or the page and the brief would quote
+    two different partitions of one grid under one name.
+    """
+    cols, bit_scen, bit_opp, included, excluded = [], [], [], [], []
+    for lbl, W in win_by_scen:
+        sharp, _wr, _ns, _np_, degenerate = screen_scenario(W)
+        if degenerate:
+            excluded.append(lbl)
+            continue
+        cols.append(W[:, sharp])
+        included.append(lbl)
+        bit_scen.extend([lbl] * len(sharp))
+        bit_opp.extend(int(o) for o in sharp)
+    # One scenario is not a combination; it would be a copy under a second
+    # name, with a second silhouette to argue with.
+    W_all = np.hstack(cols) if len(cols) >= 2 else None
+    return {"W": W_all, "bit_scen": bit_scen, "bit_opp": bit_opp,
+            "scens": included, "excluded": excluded,
+            "n_bits": 0 if W_all is None else int(W_all.shape[1])}
+
+
+def _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats, is_named):
+    """Cluster one already-screened scenario (or the combined view)."""
+    res = cluster_scenario(W, sharp, atk, def_, hp, sp_rank)
+    if res is None:
+        return None
+    tree_acc, tree_lines = stat_rules(res, atk, def_, hp)
+    root, per_cluster = root_rules(res, atk, def_, hp)
+    return {
+        "res": res,
+        "defining": None,   # filled by renderer with display names
+        "tree_acc": tree_acc,
+        "tree_rules": tree_lines,
+        "root_rule": root,
+        "cluster_rules": per_cluster,
+        "flips": flip_table(W, sharp, wr, stats, is_named),
+        "wr": wr,
+    }
+
+
 def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                              atk, def_, hp, is_named,
-                             scen_pairs=EVEN_SHIELD_PAIRS):
-    """Run the full pipeline for the even-shield scenarios present.
+                             scen_pairs=None):
+    """Run the full pipeline for EVERY shield scenario the dive baked, in
+    grid order, plus a combined "all scenarios" entry.
 
     scenarios: list of (my_shields, opp_shields) tuples in grid order.
-    atk/def_/hp: per-IV battle stats (shadow-effective).  is_named: see
-    flip_table.  Returns {scen_label: result} where result has keys
-    res/defining/tree_acc/tree_rules/flips or {'reason': ...} when the
-    scenario has no robust structure.  Scenario labels are '0v0' style.
+    scen_pairs: restrict to these pairs (default None = every scenario
+    present).  atk/def_/hp: per-IV battle stats (shadow-effective).
+    is_named: see flip_table.  Returns {scen_label: result} where result has
+    keys res/defining/tree_acc/tree_rules/root_rule/cluster_rules/flips, or
+    {'reason': ..., 'degenerate': ...} when the scenario carries no cluster
+    view.  Scenario labels are '0v0' style, plus ALL_SCEN_KEY.
+
+    Before 2026-09-13 this ran the three EVEN-shield scenarios only
+    (0v0 / 1v1 / 2v2) and had no combined entry.  The odd scenarios turned
+    out to be the cleanest ones on several dives (Shadow Sableye GL: 0v1
+    silhouette 0.65 and a 100%-accurate depth-1 rule, against 0.55 on 1v1),
+    so the section clustered everything except its best material.
+
+    The "all scenarios" entry is the CONCATENATED fingerprint: every
+    non-degenerate scenario's sharp-marginal bits side by side, clustered
+    with the same Hamming machinery.  It is deliberately not a mean score
+    across scenarios -- a mean above 500 is not a fight won, and this
+    section's identity is "which fights do you win", here asked across every
+    shield state at once.
     """
     atk = np.asarray(atk, dtype=np.float64)
     def_ = np.asarray(def_, dtype=np.float64)
@@ -651,36 +901,81 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
     sp_rank = np.empty(nIvs, dtype=np.int32)
     sp_rank[order] = np.arange(1, nIvs + 1)
     stats = {"atk": atk, "def": def_, "hp": hp, "sp": sp}
+    min_cluster_ivs = _small_pop_floor(MIN_CLUSTER_IVS, nIvs)
 
     out = {}
     scen_list = [tuple(s) for s in scenarios]
-    for pair in scen_pairs:
-        if pair not in scen_list:
-            continue
+    pairs = (scen_list if scen_pairs is None
+             else [p for p in scen_list if tuple(p) in
+                   {tuple(q) for q in scen_pairs}])
+    wins_by_scen = []  # (label, W) in grid order, for concat_fingerprint
+    for pair in pairs:
         si = scen_list.index(pair)
         label = scenario_label(pair)
         W = win_matrix(scores_flat, nIvs, nS, nO, si)
-        sharp, wr = sharp_marginals(W)
-        if len(sharp) < 2:
-            out[label] = {"reason": "fewer than 2 marginal matchups",
-                          "n_sharp": int(len(sharp))}
+        wins_by_scen.append((label, W))
+        sharp, wr, n_sharp, n_patterns, degenerate = screen_scenario(W)
+        if degenerate:
+            tot = W.sum(axis=1)
+            out[label] = {
+                "reason": degenerate_reason(n_sharp, n_patterns,
+                                            int(tot.min()), int(tot.max()), nO),
+                "degenerate": True,
+                "n_sharp": n_sharp, "n_patterns": n_patterns}
             continue
-        res = cluster_scenario(W, sharp, atk, def_, hp, sp_rank)
-        if res is None:
-            out[label] = {"reason": "no robust cluster structure "
-                                    "(all candidate splits fail the "
-                                    "minimum-cluster-size floor)",
-                          "n_sharp": int(len(sharp))}
+        entry = _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats,
+                                is_named)
+        if entry is None:
+            out[label] = {
+                "reason": fragmented_reason(n_sharp, n_patterns,
+                                            min_cluster_ivs),
+                "degenerate": False,
+                "n_sharp": n_sharp, "n_patterns": n_patterns}
             continue
-        tree_acc, tree_lines = stat_rules(res, atk, def_, hp)
-        out[label] = {
-            "res": res,
-            "defining": None,   # filled by renderer with display names
-            "tree_acc": tree_acc,
-            "tree_rules": tree_lines,
-            "flips": flip_table(W, sharp, wr, stats, is_named),
-            "wr": wr,
-        }
+        out[label] = entry
+
+    # ---- combined "all scenarios" entry ----
+    # Needs at least two scenarios to be a combination rather than a copy of
+    # one scenario under a second name.
+    #
+    # MEASURED, and the one judgement call in this function: degenerate
+    # scenarios contribute NO bits. Their bits are real win/loss data, so
+    # including them is defensible and was what the plan's offline run did;
+    # the two differ on Shadow Sableye GL. With the floor (7 scenarios, 113
+    # bits) the combined view is K=3, silhouette 0.395, root atk < 148.67,
+    # tree accuracy 0.96. Including 0v2's 5 extra bits (118 bits, the plan's
+    # number) gives K=2, silhouette 0.452, root atk < 148.06, accuracy
+    # 0.9995 -- i.e. it recovers the 0v1 headline. The floor wins here
+    # anyway: a scenario whose own data cannot support a partition should
+    # not get a vote in the combined one, and letting it in makes the
+    # combined view sensitive to exactly the fake-perfect fingerprints the
+    # floor exists to keep out. Flipping this is one predicate.
+    cf = concat_fingerprint(wins_by_scen)
+    if cf["W"] is not None:
+        W_all = cf["W"]
+        bit_opp = cf["bit_opp"]
+        sharp_all = np.arange(W_all.shape[1], dtype=np.int64)
+        wr_all = W_all.mean(axis=0)
+        entry = _scenario_entry(
+            W_all, sharp_all, wr_all, atk, def_, hp, sp_rank, stats,
+            lambda bit, stat: is_named(bit_opp[int(bit)], stat))
+        n_bits = cf["n_bits"]
+        n_patterns_all = int(len(np.unique(W_all.astype(np.uint8), axis=0)))
+        meta = {"scens": list(cf["scens"]),
+                "excluded": list(cf["excluded"]),
+                "n_bits": n_bits,
+                "bit_scen": list(cf["bit_scen"]), "bit_opp": list(bit_opp),
+                "n_total": len(pairs)}
+        if entry is None:
+            out[ALL_SCEN_KEY] = {
+                "reason": fragmented_reason(
+                    n_bits, n_patterns_all, min_cluster_ivs,
+                    what="concatenated marginal-matchup bits"),
+                "degenerate": False, "combined": meta,
+                "n_sharp": n_bits, "n_patterns": n_patterns_all}
+        else:
+            entry["combined"] = meta
+            out[ALL_SCEN_KEY] = entry
     return out
 
 
@@ -760,24 +1055,82 @@ def _swatch(c):
             f'margin-right:4px"></span>')
 
 
+def _scen_display(label):
+    """Dropdown / headline text for a scenario key.
+
+    One definition for both surfaces, so the selector and the block it
+    selects cannot spell the same scenario two ways.
+    """
+    return ALL_SCEN_DISPLAY if label == ALL_SCEN_KEY else f'{label} shields'
+
+
+def _scen_option_note(entry):
+    """The short "why not" a dropdown option can carry.
+
+    The full reason is printed in the scenario's own block; an <option> long
+    enough to hold it is unreadable. This keeps the counts that make the
+    absence informative -- "0v2 shields - degenerate (5 marginals / 16
+    patterns)" tells a reader why without opening it.
+    """
+    if "res" in entry:
+        return ""
+    n, p = entry["n_sharp"], entry["n_patterns"]
+    marg = "marginal" if n == 1 else "marginals"
+    pat = "pattern" if p == 1 else "patterns"
+    if entry.get("degenerate"):
+        return f' - degenerate ({n} {marg} / {p} {pat})'
+    return f' - no clusters ({n} {marg}, too fragmented)'
+
+
+def _entry_opp_names(entry, disp):
+    """Display names indexed the way THIS entry's opponent indices are.
+
+    A per-scenario entry indexes the opponent pool directly. The combined
+    entry's columns are (scenario, opponent) bits, so its names carry the
+    scenario they came from -- the flip table would otherwise print one
+    opponent several times with no way to tell which shield state each row
+    is about.
+    """
+    comb = entry.get("combined")
+    if not comb:
+        return disp
+    return [f'{disp[o]} [{lbl}]'
+            for o, lbl in zip(comb["bit_opp"], comb["bit_scen"])]
+
+
 def _scen_headline(label, entry, nO):
+    disp = _scen_display(label)
     if "reason" in entry:
+        # Every reason string carries its own counts (see degenerate_reason
+        # / fragmented_reason), so nothing is appended here.
         return (f'<p style="font-size:13px;color:var(--text-muted)">'
-                f'<b>{label}</b>: no cluster view -- {_esc(entry["reason"])} '
-                f'({entry["n_sharp"]} sharp marginal opponents of {nO}).</p>')
+                f'<b>{disp}</b>: no cluster view -- '
+                f'{_esc(entry["reason"])}.</p>')
     res = entry["res"]
-    wr = entry["wr"]
-    n_win = int((wr == 1.0).sum())
-    n_loss = int((wr == 0.0).sum())
+    comb = entry.get("combined")
+    if comb:
+        excl = (' (' + _esc(', '.join(comb["excluded"])) +
+                ' excluded as degenerate)') if comb["excluded"] else ''
+        head = (f'{comb["n_bits"]} marginal-matchup bits concatenated across '
+                f'{len(comb["scens"])} of {comb["n_total"]} shield '
+                f'scenarios{excl}')
+    else:
+        wr = entry["wr"]
+        n_win = int((wr == 1.0).sum())
+        n_loss = int((wr == 0.0).sum())
+        head = (f'{len(res["sharp"])} sharp marginal opponents '
+                f'of {nO} ({n_win} always-win / {n_loss} always-lose at '
+                f'every IV)')
     sil = res["silhouette"]
     sil_txt = f'silhouette {sil:.2f}'
     if sil < WEAK_SIL:
         sil_txt += ' - weak separation'
+    root = entry.get("root_rule")
+    root_txt = f'; splits at {_esc(root)}' if root else ''
     return (f'<p style="font-size:13px">'
-            f'<b>{label}</b>: {len(res["sharp"])} sharp marginal opponents '
-            f'of {nO} ({n_win} always-win / {n_loss} always-lose at every '
-            f'IV); {res["n_patterns"]} distinct win patterns; '
-            f'K={res["k"]} clusters ({sil_txt}).</p>')
+            f'<b>{disp}</b>: {head}; '
+            f'{res["n_patterns"]} distinct win patterns; '
+            f'K={res["k"]} clusters ({sil_txt}){root_txt}.</p>')
 
 
 def _cluster_table(entry, opp_names):
@@ -940,35 +1293,55 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         scores_flat, nIvs, nS, nO, scenarios,
         data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named)
     if not computed:
-        _even = ' / '.join(scenario_label(p) for p in EVEN_SHIELD_PAIRS)
         return ('<div class="dd-section" id="dd-matchup-clusters">'
                 '<!-- matchup-clusters:v1 -->'
                 '<h2 class="dd-h2">Matchup clusters</h2>'
                 '<p style="font-size:13px;color:var(--text-muted)">Not '
-                'available: this dive ran without the even-shield scenarios '
-                f'({_even}).</p></div>\n')
+                'available: this dive baked no shield scenarios to cluster.'
+                '</p></div>\n')
 
     scen_labels = list(computed.keys())
+    # Default view: the combined entry when it clustered (it is the
+    # section's own question -- which fights do you win across every shield
+    # state -- asked once), then 1v1 (the status quo default, and the
+    # scenario a reader arrives with in mind), then anything that clustered.
     _one_one = scenario_label((1, 1))
-    default_scen = _one_one if _one_one in computed else scen_labels[0]
-    # prefer a scenario that actually clustered for the default view
-    if "res" not in computed[default_scen]:
-        for lbl in scen_labels:
-            if "res" in computed[lbl]:
-                default_scen = lbl
-                break
+    _clustered = [lbl for lbl in scen_labels if "res" in computed[lbl]]
+    for _cand in (ALL_SCEN_KEY, _one_one):
+        if _cand in _clustered:
+            default_scen = _cand
+            break
+    else:
+        default_scen = _clustered[0] if _clustered else scen_labels[0]
 
     # ---- client payload: per-IV labels + legend meta per scenario ----
+    # `scens` holds only scenarios that CLUSTERED: the JS treats presence in
+    # that map as "labels exist here". Degenerate / fragmented scenarios go
+    # in `degenerate` so the mini-grid can title them honestly without the
+    # overlay ever finding a labelless entry.
     payload = {"palette": CLUSTER_PALETTE, "default": default_scen,
-               "scens": {}}
+               "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {}}
     for lbl, entry in computed.items():
+        disp_lbl = _scen_display(lbl)
         if "res" not in entry:
+            payload["degenerate"][lbl] = {
+                "display": disp_lbl, "reason": entry["reason"],
+                # the two no-cluster kinds read differently on the page: one
+                # says "too little data here", the other "too much variety"
+                "degenerate": bool(entry.get("degenerate"))}
             continue
         res = entry["res"]
         payload["scens"][lbl] = {
             "k": res["k"],
             "labels": [int(x) for x in res["labels"]],
             "sizes": [c["size"] for c in res["clusters"]],
+            "sil": round(float(res["silhouette"]), 4),
+            "root": entry.get("root_rule"),
+            # Per-cluster legend text, emitted from Python so the JS never
+            # formats a threshold: null where the depth-1 root does not
+            # separate that cluster cleanly (see root_rules).
+            "rules": list(entry.get("cluster_rules") or []),
+            "display": disp_lbl,
         }
 
     parts = ['<div class="dd-section dd-mc-root" id="dd-matchup-clusters">',
@@ -984,6 +1357,16 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'next cluster, gaining a named set of matchups and sometimes '
         'trading others away.</p>')
     parts.append(
+        '<p style="font-size:13px">Every shield scenario the dive baked is '
+        'clustered separately -- including the lopsided ones, which on '
+        'several dives carry the cleanest structure -- plus an '
+        f'<b>{ALL_SCEN_DISPLAY}</b> view that concatenates every '
+        'non-degenerate scenario\'s marginal-matchup bits into one '
+        'fingerprint. That combined view is not an average of scores: it is '
+        '"which fights do you win across every shield state", asked once. '
+        'Scenarios with too little structure to cluster are listed with '
+        'their counts rather than hidden.</p>')
+    parts.append(
         f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
         f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
         f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
@@ -994,7 +1377,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # scenario selector (server-side blocks + client panels both follow it)
     opts = "".join(
         f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
-        f'{lbl} shields</option>' for lbl in scen_labels)
+        f'{_esc(_scen_display(lbl))}'
+        f'{_esc(_scen_option_note(computed[lbl]))}</option>'
+        for lbl in scen_labels)
     parts.append(
         '<label style="font-size:13px">Shield scenario: '
         '<select class="dd-mc-scen" onchange="if(window.mcSelectScenario)'
@@ -1044,10 +1429,11 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                      f'style="display:{vis}">')
         parts.append(_scen_headline(lbl, entry, nO))
         if "res" in entry:
-            parts.append(_cluster_table(entry, disp))
-            parts.append(_winrate_grid(entry, disp))
+            names = _entry_opp_names(entry, disp)
+            parts.append(_cluster_table(entry, names))
+            parts.append(_winrate_grid(entry, names))
             parts.append(_rules_block(entry))
-            parts.append(_flip_table_html(entry, disp, bool(anchor_opps)))
+            parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
         parts.append('</div>')
 
     knobs = cluster_params()   # every number quoted below comes from them
@@ -1068,7 +1454,16 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'of the best silhouette wins). Clusters are ordered weakest to '
         'strongest by mean marginal wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
-        'that overlap completely in score separate cleanly there. Replaces '
+        'that overlap completely in score separate cleanly there. A '
+        'scenario is skipped as <b>degenerate</b> when it has fewer than '
+        f'{knobs["degen_min_sharp"]} sharp marginals or fewer than '
+        f'{knobs["degen_min_patterns"]} distinct win patterns -- on that '
+        'little data every candidate K scores near-perfectly, which is a '
+        'measurement artifact and not structure -- and its bits are left '
+        f'out of the {ALL_SCEN_DISPLAY} fingerprint. A scenario that clears '
+        'the floor but has no split keeping every cluster above the minimum '
+        'size is reported as fragmented instead, and its bits still count '
+        'toward the combined view. Replaces '
         'the retired score-gap cluster heuristic (2026-07), which usually '
         '(~77% of sampled runs) fired on float-level jitter in the '
         'opponent-averaged score, and even when it did catch a real tier '

@@ -68,11 +68,35 @@ clusters usually overlap completely on the main scatter's score axis,
 but fall into clean stat regions here, because crossing a breakpoint
 or bulkpoint is what moves a spread from one cluster to the next.
 
-The **Shield scenario** dropdown (0v0 / 1v1 / 2v2, defaulting to 1v1)
-switches everything in the section at once - panels and tables. There
-is deliberately no "average across scenarios" view: different shield
-counts reward different stats, and averaging them washes out exactly
-the structure this section exists to show.
+The **Shield scenario** dropdown switches everything in the section at
+once - panels and tables. It lists **every shield scenario the dive
+baked**, lopsided ones included: on a lot of dives the odd scenarios
+(0v1, 1v0, 2v1) carry the cleanest structure, and the section used to
+cluster only the even three and hide its best material.
+
+The last entry, **{{mc:all_scen_display}}**, is the default. It is the
+**concatenated fingerprint**: every non-degenerate scenario's
+marginal-matchup bits laid side by side into one long fingerprint,
+clustered with the same machinery. It is deliberately *not* an average
+of scores across scenarios - a mean score above 500 is not a fight
+won, and averaging washes out exactly the structure this section
+exists to show. Concatenating asks the section's own question once
+instead of nine times: *which fights do you win across every shield
+state?*
+
+Some scenarios have nothing to cluster, and they say so with their
+counts rather than disappearing. A scenario is **degenerate** when
+fewer than {{mc:degen_min_sharp}} opponents are sharp marginals, or
+when those opponents produce fewer than {{mc:degen_min_patterns}}
+distinct win patterns: on that little data every candidate cluster
+count scores near-perfectly, which is a property of the measurement
+and not of your IVs. Those scenarios are left out of the
+{{mc:all_scen_display}} fingerprint too. A scenario that clears the
+floor but still has no split keeping every cluster above the minimum
+size is reported as **fragmented** instead - different message, and
+its bits still count toward the combined view. The absence is
+informative either way: "0v2: every spread wins 0-5 of 76 here" tells
+you no IV choice saves that shield state.
 
 ## The tables under the panels
 

@@ -554,10 +554,40 @@ function renderAllScenarios() {
       grid.appendChild(d);
       var y = computeScenarioAvgPure(state.movesetIdx, si);
       if (!y) return;
-      Plotly.newPlot(d, [{x: Array.prototype.slice.call(DATA.spRanks),
-        y: Array.prototype.slice.call(y), mode: 'markers', type: 'scatter',
-        marker: {size: 2, opacity: 0.5}}],
-        {title: {text: labels[si] || ('scenario ' + si), font: {size: 12}},
+      // Each mini wears its OWN scenario's clusters, with that scenario's
+      // K / silhouette / root rule in the title -- the one-glance "which
+      // shield state actually has structure" view. Uncolored (and untitled
+      // beyond the label) when the baked labels do not describe this
+      // moveset/mode, or when that scenario carried no clusters.
+      var mLbl = scenLabel(si);
+      var mPay = _mcPayloadPage();
+      var mSc = (mPay && mPay.scens && _mcLabelsApply())
+        ? mPay.scens[mLbl] : null;
+      var mHead = _mcHeadline(mPay, mLbl);
+      var mTitle = (labels[si] || ('scenario ' + si)) +
+                   (mHead ? ' - ' + mHead : '');
+      var mTraces;
+      if (mSc && mSc.labels) {
+        mTraces = [];
+        for (var mc0 = 0; mc0 < mSc.k; mc0++) {
+          mTraces.push({x: [], y: [], mode: 'markers', type: 'scatter',
+            hoverinfo: 'skip',
+            marker: {size: 2, opacity: 0.55,
+                     color: mPay.palette[mc0 % mPay.palette.length]}});
+        }
+        for (var mIv = 0; mIv < nIvs; mIv++) {
+          var mc1 = mSc.labels[mIv];
+          if (mc1 == null || !mTraces[mc1]) continue;
+          mTraces[mc1].x.push(DATA.spRanks[mIv]);
+          mTraces[mc1].y.push(y[mIv]);
+        }
+      } else {
+        mTraces = [{x: Array.prototype.slice.call(DATA.spRanks),
+          y: Array.prototype.slice.call(y), mode: 'markers', type: 'scatter',
+          marker: {size: 2, opacity: 0.5}}];
+      }
+      Plotly.newPlot(d, mTraces,
+        {title: {text: mTitle, font: {size: 11}},
          margin: {l: 40, r: 6, t: 26, b: 28}, showlegend: false,
          xaxis: {autorange: 'reversed', title: {text: 'SP rank', font: {size: 9}}},
          font: {size: 9}},
@@ -2330,17 +2360,22 @@ function buildTraces() {
     // and DATA arrays level-consistent). On any other moveset/mode the
     // labels would not describe the displayed grid, so render neutral
     // points and say so in the legend instead of mis-coloring.
-    var mcRoot0 = document.querySelector('.dd-mc-root');
-    var mcPay = mcRoot0 ? _mcPayload(mcRoot0) : null;
+    var mcPay = _mcPayloadPage();
     var mcHasScens = !!(mcPay && mcPay.scens &&
                         Object.keys(mcPay.scens).length > 0);
-    var mcModeOk = state.movesetIdx === 0 &&
-                   (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
-    var mcOk = mcHasScens && mcModeOk;
+    var mcOk = mcHasScens && _mcLabelsApply();
     var mcScen = null;
     if (mcOk) {
+      // The Shields dropdown drives this. 'avg' (all scenarios at once) maps
+      // to the payload's combined entry -- the concatenated fingerprint over
+      // every non-degenerate scenario -- which is the same question the
+      // averaged y-axis is asking. It used to fall through to the payload
+      // default (1v1) and colored by a single scenario without saying so.
       var sis0 = getActiveScenarioIndices();
-      if (sis0.length === 1) {
+      var allKey0 = mcPay.allKey || 'all';
+      if (state.scenarioMode === 'avg' && mcPay.scens[allKey0]) {
+        mcScen = allKey0;
+      } else if (sis0.length === 1) {
         var lbl0 = scenLabel(sis0[0]);
         if (mcPay.scens[lbl0]) mcScen = lbl0;
       }
@@ -2349,10 +2384,27 @@ function buildTraces() {
     }
     if (mcOk) {
       var msc = mcPay.scens[mcScen];
+      var mcDisp = msc.display || mcScen;
       var ctr = [];
+      // Legend key naming which scenario's clusters are on screen (and the
+      // one-time y-axis switch, when it fired). Carries no points: the
+      // cluster names below carry the rule, not the scenario.
+      ctr.push({
+        name: wrapLegendName('Matchup clusters: ' + mcDisp +
+                             (_mcYAxisSwitched ? ' (y-axis switched to wins: ' +
+                              'the clusters are horizontal bands there)' : '')),
+        x: [], y: [], text: [],
+        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
+        marker: {size: 6, color: themeColor('--text-muted'), opacity: 0.55}
+      });
       for (var c0 = 0; c0 < msc.k; c0++) {
+        // B2: the legend carries the depth-1 stat rule when the tree root
+        // separates that cluster cleanly. Python emits the string (null
+        // otherwise); nothing here formats a threshold.
+        var mcRule0 = (msc.rules && msc.rules[c0]) ? ': ' + msc.rules[c0] : '';
         ctr.push({
-          name: 'C' + c0 + ' - ' + mcScen + ' (n=' + msc.sizes[c0] + ')',
+          name: wrapLegendName('C' + c0 + mcRule0 +
+                               ' (n=' + msc.sizes[c0] + ')'),
           x: [], y: [], text: [],
           mode: 'markers', type: 'scattergl', hoverinfo: 'text',
           marker: {size: 4, color: mcPay.palette[c0 % mcPay.palette.length],
@@ -2364,14 +2416,15 @@ function buildTraces() {
         if (currentYIsSparse && !isFinite(yValues[civ])) continue;
         if (!isOwnedFilter(civ)) continue;
         var clab = msc.labels[civ];
-        if (clab == null || !ctr[clab]) continue;
-        ctr[clab].x.push(DATA.spRanks[civ]);
-        ctr[clab].y.push(yValues[civ]);
-        ctr[clab].text.push(buildHoverText(civ) +
-                            '<br>Matchup cluster: C' + clab + ' (' + mcScen + ')');
+        // +1: ctr[0] is the legend note key, so cluster c lives at c + 1.
+        if (clab == null || !ctr[clab + 1]) continue;
+        ctr[clab + 1].x.push(DATA.spRanks[civ]);
+        ctr[clab + 1].y.push(yValues[civ]);
+        ctr[clab + 1].text.push(buildHoverText(civ) +
+                            '<br>Matchup cluster: C' + clab + ' (' + mcDisp + ')');
       }
       for (var c1 = 0; c1 < ctr.length; c1++) {
-        if (ctr[c1].x.length) traces.push(ctr[c1]);
+        if (c1 === 0 || ctr[c1].x.length) traces.push(ctr[c1]);
       }
     } else {
       var ncx = [], ncy = [], nct = [];
@@ -3395,6 +3448,23 @@ function updateMethodology() {
 
 // ---- Plot ----
 var origOpacities = [];
+
+// B5 state. The cluster bands are HORIZONTAL lines on a wins y-axis (each
+// band is a set of spreads with the same win count) and a smear on the
+// averaged-score axis, so the first time the reader picks cluster coloring
+// the y-axis moves with them -- ONCE. `_mcYAxisNudged` makes it a nudge
+// rather than a lock: switch back and it stays back. `_mcYAxisSwitched`
+// tells the legend to say it happened.
+var _mcYAxisNudged = false;
+var _mcYAxisSwitched = false;
+function _selHasValue(sel, v) {
+  if (!sel) return false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === v) return true;
+  }
+  return false;
+}
+
 function updateView() {
   // Read state from dropdowns
   var msel = document.getElementById('moveset-sel');
@@ -3420,6 +3490,14 @@ function updateView() {
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
   if (ysel) state.yAxisMode = ysel.value;
+  if (state.colorMode === 'cluster' && !_mcYAxisNudged) {
+    _mcYAxisNudged = true;
+    if (state.yAxisMode === 'avgScore' && _selHasValue(ysel, 'winsPvpoke')) {
+      ysel.value = 'winsPvpoke';
+      state.yAxisMode = 'winsPvpoke';
+      _mcYAxisSwitched = true;
+    }
+  }
   var asel = document.getElementById('anchor-display-sel');
   if (asel) state.anchorDisplayMode = asel.value;
   lockedIdx = -1;
@@ -4052,6 +4130,39 @@ function _mcPayload(root) {
   try { return JSON.parse(s.textContent); } catch (e) { return null; }
 }
 
+// The page's cluster payload, read from whichever Matchup clusters section is
+// live (the best-buddy swap replaces the section wholesale). Three surfaces
+// need it now -- the section's own panels, the main scatter's cluster color
+// mode, and the all-scenarios mini-grid -- so the lookup and the
+// "do the baked labels describe what is on screen" gate live here once.
+function _mcPayloadPage() {
+  var root = document.querySelector('.dd-mc-root');
+  return root ? _mcPayload(root) : null;
+}
+
+// Labels are baked for moveset 0 at the default opp-IV mode. On any other
+// moveset/mode they would not describe the displayed grid, so every consumer
+// falls back to uncolored points rather than mis-coloring.
+function _mcLabelsApply() {
+  return state.movesetIdx === 0 &&
+         (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
+}
+
+// Legend / title text for one scenario key: "K=2, sil 0.65, atk < 148.06",
+// or the degenerate note. Python emits every number and the rule string; this
+// only concatenates them.
+function _mcHeadline(pay, lbl) {
+  if (!pay) return '';
+  var sc = pay.scens ? pay.scens[lbl] : null;
+  if (sc) {
+    return 'K=' + sc.k + ', sil ' + Number(sc.sil).toFixed(2) +
+           (sc.root ? ', ' + sc.root : '');
+  }
+  var dg = pay.degenerate ? pay.degenerate[lbl] : null;
+  if (dg) return dg.degenerate ? 'degenerate' : 'no clusters';
+  return '';
+}
+
 // One scattergl trace spec for the cluster panels. The per-cluster traces and
 // the owned-mon overlay differ ONLY in name + marker (and whether their arrays
 // arrive prebuilt), so the shared plumbing -- type/mode/hoverinfo -- is named
@@ -4092,7 +4203,11 @@ function _mcRenderRoot(root) {
     if (!xs || !ys) return;
     var traces = [];
     for (var c = 0; c < sc.k; c++) {
-      traces.push(_mcTrace('C' + c + ' (n=' + sc.sizes[c] + ')',
+      // Same legend rule the main scatter carries (Python emits the
+      // string; null when the depth-1 root does not separate that cluster).
+      traces.push(_mcTrace('C' + c +
+                           ((sc.rules && sc.rules[c]) ? ': ' + sc.rules[c] : '') +
+                           ' (n=' + sc.sizes[c] + ')',
                            {size: 4,
                             color: payload.palette[c % payload.palette.length],
                             opacity: 0.75}));
