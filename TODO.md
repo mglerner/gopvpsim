@@ -385,6 +385,18 @@ Michael's answers, 2026-09-12 evening:
 4. **Sequencing: Cramorant first.** Page integration of the brief WAITS until
    the Cramorant strategy reinvestigation lands. v3 (standalone) may proceed.
 
+Naming + spread visibility (Michael, 2026-09-13): the section is called
+**"Which one to build?"** (not "build brief"; "verdict" and "recommended"
+stay reserved). Collapsed by default; the summary line is the question plus
+the headline's first sentence. Integration must make the line VISIBLE AS
+SPREADS: (1) example spreads in the first sentence ("... 148.10 attack, which
+6/9/7 at L50, 10/13/11 at L45.5 and 2218 other spreads reach"); (2) hover/tap
+on the number lists the top spreads by stat product with a "show all N"
+expander (reuse the flavor guide's Member IVs pattern); (3) a small in-section
+plot (SP rank vs wins; at-or-above-the-line filled, bulk alternative in its
+own color, rest muted; hover = IVs/level/stats/side of the line), drawn
+client-side like the cluster panels; plus the main scatter's color mode.
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
