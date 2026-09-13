@@ -2415,8 +2415,16 @@ function buildTraces() {
                               ? " (y-axis switched to 'Wins vs PvPoke " +
                                 "default' once: the clusters are horizontal " +
                                 'bands there; switch it back any time)' : '')),
-        x: [], y: [], text: [],
+        // [null], not []: Plotly builds the legend from calcdata, and a trace
+        // with NO points gets no legend entry at all -- this note key was
+        // invisible on every clustered dive, and its missing entry is what
+        // put every later legend item one row out of step with its trace
+        // (see the C0 isolation bug below). One null point renders nothing
+        // and legends normally. Verified in Plotly 2.35.2 against a page
+        // built from this engine.
+        x: [null], y: [null], text: [],
         mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
+        legendrank: 100,
         marker: {size: 6, color: themeColor('--text-muted'), opacity: 0.55}
       });
       for (var c0 = 0; c0 < msc.k; c0++) {
@@ -2429,6 +2437,10 @@ function buildTraces() {
                                ' (n=' + msc.sizes[c0] + ')'),
           x: [], y: [], text: [],
           mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+          // Legend position, independent of draw order: these traces are
+          // pushed LAST (z-order, below) but the color mode the reader chose
+          // reads first in the legend, in cluster order, as it always did.
+          legendrank: 101 + c0,
           marker: {size: 4, color: mcPay.palette[c0 % mcPay.palette.length],
                    opacity: 0.75},
           hoverlabel: {bordercolor: mcPay.palette[c0 % mcPay.palette.length]}
@@ -2446,13 +2458,20 @@ function buildTraces() {
                             '<br>Matchup cluster: C' + clab + ' (' + mcDisp + ')');
       }
       // Collected, not pushed: Plotly z-order is insertion order, and the
-      // anchor / Efficient / slayer overlays are pushed further down. C0 on
-      // this dive is mostly anchor spreads, so with the cluster traces
-      // underneath, legend-hover isolation of C0 dimmed the cluster trace and
-      // left the full-opacity anchor overlay sitting on top of it -- the
-      // cluster looked EMPTY when isolated. They are appended after the
-      // overlays instead (see the _clusterTraces push below), which is the
-      // same treatment the tier traces already get.
+      // anchor / Efficient / slayer overlays are pushed further down. The
+      // color mode a reader selected should own the top of the canvas, which
+      // is the same reason the tier traces are appended after the overlays;
+      // they are appended alongside them below.
+      //
+      // This is NOT what made C0 isolate to an empty plot (Michael's
+      // screenshots). That was the legend/trace off-by-one above: the note
+      // key carried no points, so it got no legend entry, every later legend
+      // row addressed the trace BEFORE its own, and hovering "C0" brightened
+      // the empty note trace and dimmed C0 to 0.03. Measured on a rendered
+      // preview page in headless Chrome (7 traces, 6 legend rows, legend row
+      // 4 -> trace 5). Two fixes, both kept: the null point above, and
+      // _legendTraceIndex below, which reads the index Plotly itself bound to
+      // the legend node instead of counting DOM position.
       _clusterTraces = [];
       for (var c1 = 0; c1 < ctr.length; c1++) {
         if (c1 === 0 || ctr[c1].x.length) _clusterTraces.push(ctr[c1]);
@@ -3814,6 +3833,22 @@ function applyHistogramHash() {
 }
 
 // ---- Legend hover/click ----
+// The trace index Plotly bound to a legend node, NOT the node's position in
+// the legend. The two differ whenever a trace is missing from the legend (a
+// pointless trace gets no entry) or legendrank reorders it, and the
+// difference is silent: the reader hovers one key and a different trace
+// lights up. Falls back to the DOM position when the binding is not there.
+function _legendTraceIndex(el, fallback) {
+  try {
+    var d = el.__data__;
+    var item = Array.isArray(d) ? d[0] : d;
+    if (Array.isArray(item)) item = item[0];
+    var tr = item && item.trace;
+    if (tr && typeof tr.index === 'number') return tr.index;
+  } catch (e) { /* fall through to the DOM position */ }
+  return fallback;
+}
+
 function highlightTrace(idx) {
   var gd = document.getElementById('plot');
   for (var j=0; j<origOpacities.length; j++) {
@@ -3859,11 +3894,16 @@ function reattachLegendHandlers() {
       if (el._ddLegendWired) { return; }
       el._ddLegendWired = true;
       el.style.cursor = 'pointer';
-      el.addEventListener('mouseenter', function() { if (lockedIdx<0) highlightTrace(idx); });
+      // Resolved at EVENT time, not wiring time: Plotly reuses these nodes
+      // across react calls, so the binding a handler closed over could be a
+      // previous render's.
+      el.addEventListener('mouseenter', function() {
+        if (lockedIdx<0) highlightTrace(_legendTraceIndex(el, idx)); });
       el.addEventListener('mouseleave', function() { if (lockedIdx<0) restoreAll(); });
       el.addEventListener('click', function() {
-        if (lockedIdx===idx) { lockedIdx=-1; restoreAll(); }
-        else { lockedIdx=idx; highlightTrace(idx); }
+        var ti = _legendTraceIndex(el, idx);
+        if (lockedIdx===ti) { lockedIdx=-1; restoreAll(); }
+        else { lockedIdx=ti; highlightTrace(ti); }
       });
     });
   }
@@ -4475,21 +4515,29 @@ function wbWins(mi, mode) {
 // tests/test_which_build_section.py so the two cannot drift.
 var WB_FALLBACK = {
   '--wb-line': '#7a4fc0', '--wb-below': '#7f858f', '--wb-alt': '#a63089',
-  '--wb-mark1': '#16706a', '--wb-mark2': '#2f5fd0',
-  '--wb-r0': '#9d61d1', '--wb-r1': '#8840c7', '--wb-r2': '#7232ab',
-  '--wb-r3': '#5c288a', '--wb-r4': '#461e68', '--wb-r5': '#301547'
+  '--wb-mark1': '#16706a', '--wb-mark2': '#2f5fd0'
 };
-function _wbColors(root) {
+// The rung ramp has exactly as many steps as the page prints rungs, emitted
+// as --wb-r0..--wb-r(n-1) by deep_dive_which_build.ramp_css (and repeated in
+// the payload's rungColors as the light-theme fallback). A fixed six-color
+// ramp painted the 6th and 7th rung of a seven-rung page the same color, on
+// the one view whose whole encoding is color.
+function _wbColors(root, pay) {
   var cs = getComputedStyle(root);
   function v(n) { var x = cs.getPropertyValue(n).trim(); return x || WB_FALLBACK[n]; }
+  var ramp = [], fb = (pay && pay.rungColors) || [];
+  var nR = (pay && pay.rungs) ? pay.rungs.length : 0;
+  for (var k = 0; k < nR; k++) {
+    var got = cs.getPropertyValue('--wb-r' + k).trim();
+    ramp.push(got || fb[k] || WB_FALLBACK['--wb-line']);
+  }
   return {
     line: v('--wb-line'),
     below: v('--wb-below'),
     alt: v('--wb-alt'),
     mark1: v('--wb-mark1'),
     mark2: v('--wb-mark2'),
-    rungs: ['--wb-r0', '--wb-r1', '--wb-r2', '--wb-r3', '--wb-r4', '--wb-r5']
-             .map(v)
+    rungs: ramp
   };
 }
 
@@ -4533,12 +4581,29 @@ function _wbHover(i, L, wins, side) {
          '<br>' + side;
 }
 
+// Which side of the line one spread is on, in the order the words are read:
+// "attack at or above the 148.10 line", not "at or above attack 148.10".
+function _wbSide(pay, on) {
+  return pay.axisWord + (on ? ' at or above the ' : ' below the ') +
+         pay.printed + ' line';
+}
+
 function _wbTrace(name, color, symbol, size, opacity) {
   return { type: 'scattergl', mode: 'markers', x: [], y: [], text: [],
            hoverinfo: 'text', name: name,
            marker: { size: size, color: color, symbol: symbol || 'circle',
                      opacity: opacity == null ? 0.75 : opacity },
            hoverlabel: { bordercolor: color } };
+}
+
+function _wbIvStr(i) {
+  return i < 0 ? '?' : (DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i]);
+}
+
+// One marked spread's side of the line, for its hover and its legend key.
+function _wbSideAt(pay, i) {
+  if (!pay.hasFloor || i < 0) return 'no line on this page';
+  return _wbSide(pay, _wbBit(_wbMask(pay.rungs[0].mask), i));
 }
 
 // A named spread (rank-1, an example, the most-winning spread) as its own
@@ -4576,8 +4641,7 @@ function _wbGroups(pay, view, L, wins, colors) {
       var on = _wbBit(lineMask, i);
       var t = on ? above : below;
       t.x.push(L.spRanks[i]); t.y.push(wins[i]);
-      t.text.push(_wbHover(i, L, wins, (on ? 'at or above ' : 'below ')
-                                        + pay.axisWord + ' ' + pay.printed));
+      t.text.push(_wbHover(i, L, wins, _wbSide(pay, on)));
     }
     above.name += ' (' + above.x.length + ')';
     below.name += ' (' + below.x.length + ')';
@@ -4586,8 +4650,12 @@ function _wbGroups(pay, view, L, wins, colors) {
     var rmasks = pay.rungs.map(function(r) { return _wbMask(r.mask); });
     var below2 = _wbTrace('Below the line', colors.below, 'circle', 3, 0.5);
     var rts = pay.rungs.map(function(r, k) {
-      return _wbTrace(r.label, colors.rungs[Math.min(k, colors.rungs.length - 1)],
-                      'circle', 4);
+      // No '(N)' on a rung key. Every count in the prose above is CUMULATIVE
+      // ("2220 reach it"), while a drawn rung group is the spreads whose
+      // HIGHEST cleared rung is that one -- 250 of the 2220 on the Shadow
+      // Sableye page. The same label carrying both numbers on one screen is
+      // the ambiguity; the hover says which relation it is.
+      return _wbTrace(r.label, colors.rungs[k] || colors.line, 'circle', 4);
     });
     for (i = 0; i < n; i++) {
       var hit = -1;
@@ -4597,12 +4665,12 @@ function _wbGroups(pay, view, L, wins, colors) {
       var tr = hit < 0 ? below2 : rts[hit];
       tr.x.push(L.spRanks[i]); tr.y.push(wins[i]);
       tr.text.push(_wbHover(i, L, wins, hit < 0
-        ? 'below the line'
-        : 'highest rung cleared: ' + pay.rungs[hit].label));
+        ? _wbSide(pay, false)
+        : 'highest rung cleared: ' + (pay.rungs[hit].full ||
+                                      pay.rungs[hit].label)));
     }
     traces.push(below2);
     for (var k2 = 0; k2 < rts.length; k2++) {
-      rts[k2].name += ' (' + rts[k2].x.length + ')';
       if (rts[k2].x.length) traces.push(rts[k2]);
     }
     below2.name += ' (' + below2.x.length + ')';
@@ -4610,14 +4678,20 @@ function _wbGroups(pay, view, L, wins, colors) {
     var tLine = _wbMask(pay.rungs[0].mask);
     var tAlt = pay.alt ? _wbMask(pay.alt.mask) : null;
     var cl = _wbTrace('At or above the line', colors.line, 'circle', 4);
-    var al = _wbTrace(pay.alt ? 'Bulk alternative: ' + pay.alt.label
-                              : 'Bulk alternative', colors.alt, 'square', 5);
+    // "below the line" in the key because the group DRAWN here is the bulk
+    // rectangle minus the line's own spreads -- the two can overlap, and a
+    // count that silently excluded the overlap would contradict the caption's
+    // printed rectangle count.
+    var al = _wbTrace(pay.alt ? 'Bulk alternative, below the line: ' + pay.alt.label
+                              : 'Bulk alternative, below the line',
+                      colors.alt, 'square', 5);
     var ne = _wbTrace('Neither', colors.below, 'circle', 3, 0.45);
     for (i = 0; i < n; i++) {
       var side, tt;
-      if (_wbBit(tLine, i)) { tt = cl; side = 'at or above the line'; }
+      if (_wbBit(tLine, i)) { tt = cl; side = _wbSide(pay, true); }
       else if (tAlt && _wbBit(tAlt, i)) {
-        tt = al; side = 'in the bulk alternative (' + pay.alt.label + ')';
+        tt = al; side = 'in the bulk alternative (' + pay.alt.label +
+                        '), ' + _wbSide(pay, false);
       } else { tt = ne; side = 'neither'; }
       tt.x.push(L.spRanks[i]); tt.y.push(wins[i]);
       tt.text.push(_wbHover(i, L, wins, side));
@@ -4652,10 +4726,20 @@ function _wbGroups(pay, view, L, wins, colors) {
       ? pay.clusterScen : mcPay['default'];
     var sc = mcPay.scens[want];
     if (!sc) return { traces: [], missing: true };
+    // Cluster names. sc.rules[c] is the clusters section's own depth-1 rule,
+    // printed by Python, and null whenever that split is not an iff for the
+    // cluster -- which is the usual case, and left "C0 (n=2072)" under a
+    // caption that talks about a split at atk 148.68 with no way to tell
+    // which color is which side. Where there is a split to lean on, the side
+    // each cluster MOSTLY sits on is named instead. The threshold string is
+    // the payload's (`sc.split`); nothing here formats a number.
+    var sides = _wbClusterSides(sc, L);
     var cts = [];
     for (var c = 0; c < sc.k; c++) {
-      cts.push(_wbTrace('C' + c + ((sc.rules && sc.rules[c]) ? ': ' + sc.rules[c] : '') +
-                        ' (n=' + sc.sizes[c] + ')',
+      var cname = 'C' + c;
+      if (sc.rules && sc.rules[c]) cname += ': ' + sc.rules[c];
+      else if (sides && sides[c]) cname += ': ' + sides[c].label;
+      cts.push(_wbTrace(cname + ' (n=' + sc.sizes[c] + ')',
                         mcPay.palette[c % mcPay.palette.length], 'circle', 4));
     }
     for (i = 0; i < n; i++) {
@@ -4663,7 +4747,9 @@ function _wbGroups(pay, view, L, wins, colors) {
       if (lab == null || !cts[lab]) continue;
       cts[lab].x.push(L.spRanks[i]); cts[lab].y.push(wins[i]);
       cts[lab].text.push(_wbHover(i, L, wins, 'matchup cluster C' + lab +
-                                  ' (' + (sc.display || want) + ')'));
+                                  ' (' + (sc.display || want) + ')' +
+                                  ((sides && sides[lab])
+                                     ? '; ' + sides[lab].hover : '')));
     }
     for (var c3 = 0; c3 < cts.length; c3++) {
       if (cts[c3].x.length) traces.push(cts[c3]);
@@ -4672,10 +4758,54 @@ function _wbGroups(pay, view, L, wins, colors) {
   return { traces: traces, missing: false };
 }
 
+// Which side of the clusters section's own depth-1 split each cluster mostly
+// sits on. `sc.split` is that section's string ('atk 148.68'); the stat word
+// selects the page's own array and the value is read back out of the same
+// string, so the two sections cannot print different thresholds.
+function _wbClusterSides(sc, L) {
+  if (!sc.split) return null;
+  var bits = String(sc.split).split(/\s+/);
+  var arr = {atk: L.ivAtk, def: L.ivDef, hp: L.ivHp}[bits[0]];
+  var thr = parseFloat(bits[1]);
+  if (!arr || !isFinite(thr)) return null;
+  var above = [], tot = [];
+  for (var c = 0; c < sc.k; c++) { above.push(0); tot.push(0); }
+  for (var i = 0; i < DATA.nIvs; i++) {
+    var lab = sc.labels[i];
+    if (lab == null || lab >= sc.k) continue;
+    tot[lab]++;
+    if (arr[i] >= thr) above[lab]++;
+  }
+  var out = [];
+  for (var c2 = 0; c2 < sc.k; c2++) {
+    if (!tot[c2]) { out.push(null); continue; }
+    var share = above[c2] / tot[c2];
+    var on = share >= 0.5;
+    var pctTxt = Math.round((on ? share : 1 - share) * 100) + '%';
+    out.push({
+      label: 'mostly ' + (on ? 'at or above ' : 'below ') + sc.split,
+      hover: pctTxt + ' of it is ' + (on ? 'at or above ' : 'below ') + sc.split
+    });
+  }
+  return out;
+}
+
 // Your pasted collection, on this panel, in every view -- same gold star the
 // cluster panels use, hover naming the mon and its side of the line.
 function _wbOwnedTrace(pay, L, wins) {
   if (!state.ownedByIv) return null;
+  // The same tiny y-nudge the cluster panels and the main scatter apply, for
+  // the same measured reason: a star sitting at the EXACT coordinates of a
+  // scattergl population point loses the hover contest (3 of 24 stars hovered
+  // as the wrong spread when the cluster panel shipped without it), and then
+  // the overlay's whole point -- "Yours: <mon>" on hover -- is gone. The
+  // y-axis is an integer win count, so 0.05% of the range is invisible.
+  var ymin = Infinity, ymax = -Infinity;
+  for (var w = 0; w < wins.length; w++) {
+    if (wins[w] < ymin) ymin = wins[w];
+    if (wins[w] > ymax) ymax = wins[w];
+  }
+  var ynudge = (isFinite(ymin) && ymax > ymin) ? (ymax - ymin) * 0.0005 : 0;
   var ox = [], oy = [], ot = [];
   for (var key in state.ownedByIv) {
     var i = parseInt(key, 10);
@@ -4688,10 +4818,9 @@ function _wbOwnedTrace(pay, L, wins) {
     if (!pay.hasFloor) {
       side = 'no line on this page';
     } else {
-      side = (_wbBit(_wbMask(pay.rungs[0].mask), i) ? 'at or above ' : 'below ')
-             + pay.axisWord + ' ' + pay.printed;
+      side = _wbSide(pay, _wbBit(_wbMask(pay.rungs[0].mask), i));
     }
-    ox.push(L.spRanks[i]); oy.push(wins[i]);
+    ox.push(L.spRanks[i]); oy.push(wins[i] + ynudge);
     ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side));
   }
   if (!ox.length) return null;
@@ -4722,8 +4851,9 @@ function _wbWireLegend(panel, ops) {
       el.style.cursor = 'pointer';
       el.addEventListener('mouseenter', function() {
         var cur = panel._wbOps || [];
+        var ti = _legendTraceIndex(el, idx);
         for (var j = 0; j < cur.length; j++) {
-          Plotly.restyle(panel, { 'marker.opacity': (j === idx) ? 1 : 0.03 }, [j]);
+          Plotly.restyle(panel, { 'marker.opacity': (j === ti) ? 1 : 0.03 }, [j]);
         }
       });
       el.addEventListener('mouseleave', function() {
@@ -4754,19 +4884,36 @@ function wbRenderRoot(root) {
   }
   var sel = root.querySelector('select.wb-view');
   var view = sel ? sel.value : (pay.views[0] && pay.views[0].id);
-  var colors = _wbColors(root);
+  var colors = _wbColors(root, pay);
   var g = _wbGroups(pay, view, L, wins, colors);
   var traces = g.traces.slice();
   if (pay.hasFloor && (view === 'line' || view === 'rungs' || view === 'trade')) {
     var r1i = _wbIvIdx(pay.rank1.iv);
+    // Every marked point says its side of the line as well as its role: the
+    // role alone ("the stat-product rank-1 spread") is the one hover on the
+    // panel that did not answer the question the panel is about.
     var r1t = _wbMarkTrace('Stat-product rank-1', r1i, colors.mark1, 'diamond',
-                           L, wins, 'the stat-product rank-1 spread');
+                           L, wins, 'the stat-product rank-1 spread; ' +
+                           _wbSideAt(pay, r1i));
     if (r1t) traces.push(r1t);
     for (var e = 0; e < pay.examples.length; e++) {
       var ei = _wbIvIdx(pay.examples[e].iv);
-      var et = _wbMarkTrace('Example: ' + pay.examples[e].rule, ei, colors.mark2,
-                            'triangle-up', L, wins, pay.examples[e].rule);
+      // The reader label, not the brief's selection rule: the rules are
+      // written in the audit's vocabulary ("most cells won among clearers
+      // with SP >= 95%"), which is exactly what the voice gate keeps out of
+      // the prose this legend sits under.
+      var elabel = pay.examples[e].label || pay.examples[e].rule;
+      var et = _wbMarkTrace(_wbIvStr(ei) + ': ' + elabel, ei, colors.mark2,
+                            'triangle-up', L, wins,
+                            elabel + '; ' + _wbSideAt(pay, ei));
       if (et) traces.push(et);
+    }
+    if (pay.bestAbove) {
+      var bi = _wbIvIdx(pay.bestAbove.iv);
+      var bt = _wbMarkTrace(_wbIvStr(bi) + ': ' + pay.bestAbove.label, bi,
+                            colors.mark2, 'triangle-down', L, wins,
+                            pay.bestAbove.label + '; ' + _wbSideAt(pay, bi));
+      if (bt) traces.push(bt);
     }
   }
   if (!pay.hasFloor && view === 'rank1') {
@@ -4788,14 +4935,28 @@ function wbRenderRoot(root) {
   var layout = {
     xaxis: { title: 'Stat product rank', autorange: 'reversed',
              showgrid: false, zeroline: false },
-    yaxis: { title: 'Matchups won', showgrid: true, gridcolor: chrome.grid,
-             zeroline: false },
+    // The denominator in the title: the main scatter's own "Wins vs PvPoke
+    // default" axis honours the Shields dropdown, so a reader flipping
+    // between the two meets two different scales. This one never moves, and
+    // says what it is out of.
+    yaxis: { title: 'Matchups won (of ' + (DATA.nScenarios * DATA.nOpponents) +
+                    ': ' + DATA.nScenarios + ' shield scenarios x ' +
+                    DATA.nOpponents + ' opponents)',
+             showgrid: true, gridcolor: chrome.grid, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 11 },
     margin: { t: 8, b: 44, l: 56, r: 8 },
     showlegend: true,
-    legend: { orientation: 'h', y: -0.22, bgcolor: chrome.legendBg,
-              bordercolor: chrome.legendBorder, borderwidth: 1 },
+    // A horizontal legend under a 400px panel wraps to three or four rows
+    // once the rung ladder is long (seven rungs plus "Below the line" plus
+    // the marked spreads), and the rows eat the plot. Past six keys it goes
+    // vertical, outside the plot on the right.
+    legend: (traces.length > 6
+             ? { orientation: 'v', x: 1.02, xanchor: 'left', y: 1,
+                 bgcolor: chrome.legendBg, bordercolor: chrome.legendBorder,
+                 borderwidth: 1 }
+             : { orientation: 'h', y: -0.22, bgcolor: chrome.legendBg,
+                 bordercolor: chrome.legendBorder, borderwidth: 1 }),
     hoverlabel: { bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder }
   };
   if (g.missing) {
@@ -4843,6 +5004,10 @@ function wbCompare(btn) {
   var list = [pay.rank1.iv];
   if (pay.hasFloor) {
     for (var i = 0; i < pay.examples.length; i++) list.push(pay.examples[i].iv);
+    // The spread the headline names as winning the most above the line, when
+    // the example rules' stat-product filter left it out: a reader who read
+    // that sentence and clicked this button did not find it in the widget.
+    if (pay.bestAbove) list.push(pay.bestAbove.iv);
   } else if (pay.gridBest) {
     list.push(pay.gridBest.iv);
   }
