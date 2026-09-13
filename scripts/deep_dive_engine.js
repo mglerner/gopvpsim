@@ -1285,6 +1285,7 @@ function loadCollection(csvText) {
   annotateAnchorBullets();
   updateView();
   mcRefreshAll();
+  wbRefresh();
 }
 
 // For each anchor-flip bullet in the analysis layer, look up which of
@@ -1877,6 +1878,7 @@ function clearCollection() {
   renderManualList();
   updateView();
   mcRefreshAll();
+  wbRefresh();
 }
 
 // ---- Manual one-at-a-time IV entry ----
@@ -1982,6 +1984,7 @@ function removeManualMon(idx) {
     annotateAnchorBullets();
     updateView();
     mcRefreshAll();
+    wbRefresh();
     return;
   }
   loadCollection(null);
@@ -2369,6 +2372,8 @@ function buildTraces() {
     }
   } else if (cm === 'cluster') {
     // --- Matchup-fingerprint cluster coloring ---
+    // var (not let): read back below, after the overlay traces are pushed.
+    var _clusterTraces = null;
     // Labels come from the live Matchup clusters section's inline JSON
     // payload (baked for moveset 0 + the default opp-IV mode at this
     // page's displayed level; the best-buddy swap keeps the live section
@@ -2440,8 +2445,17 @@ function buildTraces() {
         ctr[clab + 1].text.push(buildHoverText(civ) +
                             '<br>Matchup cluster: C' + clab + ' (' + mcDisp + ')');
       }
+      // Collected, not pushed: Plotly z-order is insertion order, and the
+      // anchor / Efficient / slayer overlays are pushed further down. C0 on
+      // this dive is mostly anchor spreads, so with the cluster traces
+      // underneath, legend-hover isolation of C0 dimmed the cluster trace and
+      // left the full-opacity anchor overlay sitting on top of it -- the
+      // cluster looked EMPTY when isolated. They are appended after the
+      // overlays instead (see the _clusterTraces push below), which is the
+      // same treatment the tier traces already get.
+      _clusterTraces = [];
       for (var c1 = 0; c1 < ctr.length; c1++) {
-        if (c1 === 0 || ctr[c1].x.length) traces.push(ctr[c1]);
+        if (c1 === 0 || ctr[c1].x.length) _clusterTraces.push(ctr[c1]);
       }
     } else {
       var ncx = [], ncy = [], nct = [];
@@ -2736,6 +2750,16 @@ function buildTraces() {
   // when a tier circle sits on the same point.
   var recTrace = buildOverlayTrace('Spec Card Spreads', DATA.recIvs, '#e94560', false, false, true);
   if (recTrace) traces.push(recTrace);
+
+  // Matchup-cluster traces go on top of the overlays, for the same reason
+  // the tier traces do: the color mode a reader selected has to be the thing
+  // they can isolate. Order inside the group is left as built (legend note
+  // key first, then C0..Ck) so the legend reads in cluster order.
+  if (typeof _clusterTraces !== 'undefined' && _clusterTraces) {
+    for (var _ci = 0; _ci < _clusterTraces.length; _ci++) {
+      traces.push(_clusterTraces[_ci]);
+    }
+  }
 
   // Tier traces go next so they render on top of slayer/anchor overlays.
   // Sort largest first so smallest tiers (most selective) draw on top.
@@ -3981,6 +4005,30 @@ function cmpAdd() {
   cmpRender();
 }
 window.cmpAdd = cmpAdd;
+// Prefill the widget from ANOTHER section (today: the "Which one to build?"
+// button). Replaces the candidate list rather than appending, so the button is
+// idempotent -- two clicks give the same cards, not a doubled list that trips
+// CMP_MAX. `list` is an array of [atk, def, hp] IV triples; out-of-range,
+// non-integer and duplicate entries are dropped, and the same 0-15 validation
+// cmpAdd applies to typed input applies here. Returns how many were kept.
+function cmpSetCandidates(list) {
+  var out = [], seen = {};
+  function okIv(x) { return x >= 0 && x <= 15; }
+  for (var i = 0; i < list.length && out.length < CMP_MAX; i++) {
+    var t = list[i] || [];
+    var a = parseInt(t[0], 10), d = parseInt(t[1], 10), sv = parseInt(t[2], 10);
+    if (!(okIv(a) && okIv(d) && okIv(sv))) continue;
+    var k = a + '/' + d + '/' + sv;
+    if (seen[k]) continue;
+    seen[k] = 1;
+    out.push({ a: a, d: d, s: sv, level: null });
+  }
+  state.compareCandidates = out;
+  cmpStatus('', 'var(--text-muted)');
+  cmpRender();
+  return out.length;
+}
+window.cmpSetCandidates = cmpSetCandidates;
 function cmpStatus(t, c) {
   var el = document.getElementById('cmp-status'); if (el) { el.textContent = t; el.style.color = c; }
 }
@@ -4357,6 +4405,533 @@ document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(functio
   if (root.offsetParent !== null) _mcRenderRoot(root);
 });
 
+// ---------------------------------------------------------------------------
+// "Which one to build?" section (scripts/deep_dive_which_build.py).
+//
+// One scattergl panel owned by the section, drawn the same way the Matchup
+// clusters panels are: server-side JSON carrying thresholds and marked
+// spreads only, every per-IV array read from the DATA / SCORES blobs the page
+// already embeds once. Axes are the main scatter's: stat-product rank
+// (reversed) against matchups won.
+//
+// The panel is deliberately INERT to the page's dropdowns. The line above it
+// was derived at the league cap, over every baked shield scenario and the
+// whole opponent pool, with PvPoke-default opponent IVs; following the
+// Shields / Opponent-IV / Bait selectors or the opponent filter would draw a
+// grid the printed numbers were never measured on. The note under the panel
+// says so on the page.
+// ---------------------------------------------------------------------------
+// Located by CLASS, like the clusters section's .dd-mc-root: the section is
+// optional (a dive with no replay blob renders no brief), and a literal
+// getElementById for a conditionally-emitted id is exactly what
+// tests/test_dive_dom_ids.py exists to flag.
+function _wbRoot() { return document.querySelector('.wb-root'); }
+
+function _wbPayload(root) {
+  var s = root.querySelector('script.wb-data');
+  if (!s) return null;
+  try { return JSON.parse(s.textContent); } catch (e) { return null; }
+}
+
+// The league-cap (L50) per-IV arrays. setBestBuddyLevel rebinds DATA.iv* to
+// the L51 grid; this section must keep reading the level its line was derived
+// at, or the threshold would be compared against stats it never saw.
+function wbLevelArrays() {
+  return (DATA.ivL51 && _bbL50) ? _bbL50 : DATA;
+}
+
+var _wbWinsCache = {};
+// Matchups won, per IV, over ALL baked scenarios and ALL opponents at the
+// league cap -- the brief's own denominator (its `total_cells`). Same win
+// predicate as everywhere else on the page (isWin: score > 500).
+function wbWins(mi, mode) {
+  var key = mi + SCORE_KEY_SEP + mode;
+  if (_wbWinsCache[key]) return _wbWinsCache[key];
+  var g = SCORES[key];
+  if (!g) return null;
+  var nO = DATA.nOpponents, nS = DATA.nScenarios, n = DATA.nIvs;
+  var out = new Float64Array(n);
+  for (var iv = 0; iv < n; iv++) {
+    var c = 0, base0 = iv * nS * nO;
+    for (var si = 0; si < nS; si++) {
+      var base = base0 + si * nO;
+      for (var oi = 0; oi < nO; oi++) { if (isWin(g[base + oi])) c++; }
+    }
+    out[iv] = c;
+  }
+  _wbWinsCache[key] = out;
+  return out;
+}
+
+// Section palette. Declared as CSS custom properties on #dd-which-build (with
+// a dark-theme override) so the colors live with the rest of the section's
+// styling and re-theme with the picker like everything else.
+//
+// WB_FALLBACK is the LIGHT-theme half of that declaration, copied. Same
+// deliberate-fallback pattern as LEVEL_CAP_FALLBACK / THEME_FALLBACK above:
+// getComputedStyle can come back empty (an environment that did not apply the
+// inline <style>), and a trace with no color is a legend entry pointing at
+// invisible points. The copy is pinned to the CSS by
+// tests/test_which_build_section.py so the two cannot drift.
+var WB_FALLBACK = {
+  '--wb-line': '#7a4fc0', '--wb-below': '#7f858f', '--wb-alt': '#a63089',
+  '--wb-mark1': '#16706a', '--wb-mark2': '#2f5fd0',
+  '--wb-r0': '#9d61d1', '--wb-r1': '#8840c7', '--wb-r2': '#7232ab',
+  '--wb-r3': '#5c288a', '--wb-r4': '#461e68', '--wb-r5': '#301547'
+};
+function _wbColors(root) {
+  var cs = getComputedStyle(root);
+  function v(n) { var x = cs.getPropertyValue(n).trim(); return x || WB_FALLBACK[n]; }
+  return {
+    line: v('--wb-line'),
+    below: v('--wb-below'),
+    alt: v('--wb-alt'),
+    mark1: v('--wb-mark1'),
+    mark2: v('--wb-mark2'),
+    rungs: ['--wb-r0', '--wb-r1', '--wb-r2', '--wb-r3', '--wb-r4', '--wb-r5']
+             .map(v)
+  };
+}
+
+// Membership masks, packed server-side (deep_dive_which_build.mask_b64).
+//
+// The page's DATA.ivAtk / ivDef are rounded to 2 dp, while a line is a
+// full-precision value, so `DATA.ivAtk[i] >= T` mis-sides every spread inside
+// the rounding window -- 19 of 4096 on the Shadow Sableye grid, drawn in the
+// wrong color under a sentence saying the split is exact. The masks are
+// computed from the same full-precision plane the brief selected the line on,
+// and their counts are checked against the page's printed counts before they
+// are packed, so the plot and the prose cannot disagree. 512 bytes each.
+var _wbMaskCache = {};
+function _wbMask(b64) {
+  if (_wbMaskCache[b64]) return _wbMaskCache[b64];
+  var bin = atob(b64), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  _wbMaskCache[b64] = out;
+  return out;
+}
+function _wbBit(m, i) { return (m[i >> 3] >> (i & 7)) & 1; }
+
+// Grid index of an IV triple. The IV arrays are level-invariant, so this
+// needs no level view.
+function _wbIvIdx(t) {
+  for (var i = 0; i < DATA.nIvs; i++) {
+    if (DATA.ivA[i] === t[0] && DATA.ivD[i] === t[1] && DATA.ivS[i] === t[2]) return i;
+  }
+  return -1;
+}
+
+// Hover body shared by every view: who the spread is, then its side of
+// whatever the current view is grouping by.
+function _wbHover(i, L, wins, side) {
+  return DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i] +
+         ' at L' + Number(L.ivLv[i]).toFixed(1) +
+         '<br>atk ' + Number(L.ivAtk[i]).toFixed(2) +
+         ' / def ' + Number(L.ivDef[i]).toFixed(2) +
+         ' / hp ' + L.ivHp[i] +
+         '<br>wins ' + wins[i] + ' of ' + (DATA.nScenarios * DATA.nOpponents) +
+         '<br>' + side;
+}
+
+function _wbTrace(name, color, symbol, size, opacity) {
+  return { type: 'scattergl', mode: 'markers', x: [], y: [], text: [],
+           hoverinfo: 'text', name: name,
+           marker: { size: size, color: color, symbol: symbol || 'circle',
+                     opacity: opacity == null ? 0.75 : opacity },
+           hoverlabel: { bordercolor: color } };
+}
+
+// A named spread (rank-1, an example, the most-winning spread) as its own
+// one-point trace: distinct symbol, a text label on the point, and a legend
+// entry that carries the IVs.
+function _wbMarkTrace(label, iv, color, symbol, L, wins, side) {
+  if (iv < 0) return null;
+  var t = _wbTrace(label, color, symbol, 13, 1);
+  t.mode = 'markers+text';
+  t.textposition = 'top center';
+  t.textfont = { size: 10, color: color };
+  t.marker.line = { width: 1.5, color: plotChrome().ink };
+  t.x = [L.spRanks[iv]];
+  t.y = [wins[iv]];
+  // `text` is the on-point label (mode carries 'text'); `hovertext` is the
+  // hover card. Putting the multi-line hover body in `text` would print the
+  // whole card next to the marker.
+  t.text = [DATA.ivA[iv] + '/' + DATA.ivD[iv] + '/' + DATA.ivS[iv]];
+  t.hovertext = [_wbHover(iv, L, wins, side)];
+  return t;
+}
+
+// Group every spread for one view. Returns {traces, missing}: the population
+// traces (the caller adds the marked spreads and the collection overlay), and
+// whether the view had nothing to draw -- today only the clusters view, when
+// the section baked no labels for this panel's moveset and mode.
+function _wbGroups(pay, view, L, wins, colors) {
+  var n = DATA.nIvs, i;
+  var traces = [];
+  if (view === 'line') {
+    var lineMask = _wbMask(pay.rungs[0].mask);
+    var above = _wbTrace('At or above the line', colors.line, 'circle', 4);
+    var below = _wbTrace('Below the line', colors.below, 'circle', 3, 0.5);
+    for (i = 0; i < n; i++) {
+      var on = _wbBit(lineMask, i);
+      var t = on ? above : below;
+      t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+      t.text.push(_wbHover(i, L, wins, (on ? 'at or above ' : 'below ')
+                                        + pay.axisWord + ' ' + pay.printed));
+    }
+    above.name += ' (' + above.x.length + ')';
+    below.name += ' (' + below.x.length + ')';
+    traces.push(below, above);
+  } else if (view === 'rungs') {
+    var rmasks = pay.rungs.map(function(r) { return _wbMask(r.mask); });
+    var below2 = _wbTrace('Below the line', colors.below, 'circle', 3, 0.5);
+    var rts = pay.rungs.map(function(r, k) {
+      return _wbTrace(r.label, colors.rungs[Math.min(k, colors.rungs.length - 1)],
+                      'circle', 4);
+    });
+    for (i = 0; i < n; i++) {
+      var hit = -1;
+      for (var k = 0; k < pay.rungs.length; k++) {
+        if (_wbBit(rmasks[k], i)) hit = k;
+      }
+      var tr = hit < 0 ? below2 : rts[hit];
+      tr.x.push(L.spRanks[i]); tr.y.push(wins[i]);
+      tr.text.push(_wbHover(i, L, wins, hit < 0
+        ? 'below the line'
+        : 'highest rung cleared: ' + pay.rungs[hit].label));
+    }
+    traces.push(below2);
+    for (var k2 = 0; k2 < rts.length; k2++) {
+      rts[k2].name += ' (' + rts[k2].x.length + ')';
+      if (rts[k2].x.length) traces.push(rts[k2]);
+    }
+    below2.name += ' (' + below2.x.length + ')';
+  } else if (view === 'trade') {
+    var tLine = _wbMask(pay.rungs[0].mask);
+    var tAlt = pay.alt ? _wbMask(pay.alt.mask) : null;
+    var cl = _wbTrace('At or above the line', colors.line, 'circle', 4);
+    var al = _wbTrace(pay.alt ? 'Bulk alternative: ' + pay.alt.label
+                              : 'Bulk alternative', colors.alt, 'square', 5);
+    var ne = _wbTrace('Neither', colors.below, 'circle', 3, 0.45);
+    for (i = 0; i < n; i++) {
+      var side, tt;
+      if (_wbBit(tLine, i)) { tt = cl; side = 'at or above the line'; }
+      else if (tAlt && _wbBit(tAlt, i)) {
+        tt = al; side = 'in the bulk alternative (' + pay.alt.label + ')';
+      } else { tt = ne; side = 'neither'; }
+      tt.x.push(L.spRanks[i]); tt.y.push(wins[i]);
+      tt.text.push(_wbHover(i, L, wins, side));
+    }
+    ne.name += ' (' + ne.x.length + ')';
+    cl.name += ' (' + cl.x.length + ')';
+    al.name += ' (' + al.x.length + ')';
+    traces.push(ne, cl);
+    if (al.x.length) traces.push(al);
+  } else if (view === 'rank1') {
+    var all = _wbTrace('All spreads', colors.below, 'circle', 3, 0.45);
+    for (i = 0; i < n; i++) {
+      all.x.push(L.spRanks[i]); all.y.push(wins[i]);
+      all.text.push(_wbHover(i, L, wins, 'no line on this page'));
+    }
+    all.name += ' (' + all.x.length + ')';
+    traces.push(all);
+  } else if (view === 'clusters') {
+    // The Matchup clusters section's own labels, read from ITS payload. No
+    // second clustering runs here: a section that printed a different
+    // partition under the same name would be worse than no view at all.
+    var mcPay = _mcPayloadPage();
+    // The clusters section bakes its labels for moveset 0 at the default
+    // opponent-IV mode. This panel is pinned to ITS OWN moveset and mode, so
+    // the labels describe what is on screen exactly when the two agree --
+    // which is NOT _mcLabelsApply()'s question (that one tracks the scatter's
+    // live dropdowns, and this panel deliberately ignores them).
+    var mcApplies = mcPay && pay.mi === 0 &&
+                    (!DATA.oppIvModes || pay.mode === DATA.oppIvModes[0]);
+    if (!mcApplies || !mcPay.scens) return { traces: [], missing: true };
+    var want = pay.clusterScen && mcPay.scens[pay.clusterScen]
+      ? pay.clusterScen : mcPay['default'];
+    var sc = mcPay.scens[want];
+    if (!sc) return { traces: [], missing: true };
+    var cts = [];
+    for (var c = 0; c < sc.k; c++) {
+      cts.push(_wbTrace('C' + c + ((sc.rules && sc.rules[c]) ? ': ' + sc.rules[c] : '') +
+                        ' (n=' + sc.sizes[c] + ')',
+                        mcPay.palette[c % mcPay.palette.length], 'circle', 4));
+    }
+    for (i = 0; i < n; i++) {
+      var lab = sc.labels[i];
+      if (lab == null || !cts[lab]) continue;
+      cts[lab].x.push(L.spRanks[i]); cts[lab].y.push(wins[i]);
+      cts[lab].text.push(_wbHover(i, L, wins, 'matchup cluster C' + lab +
+                                  ' (' + (sc.display || want) + ')'));
+    }
+    for (var c3 = 0; c3 < cts.length; c3++) {
+      if (cts[c3].x.length) traces.push(cts[c3]);
+    }
+  }
+  return { traces: traces, missing: false };
+}
+
+// Your pasted collection, on this panel, in every view -- same gold star the
+// cluster panels use, hover naming the mon and its side of the line.
+function _wbOwnedTrace(pay, L, wins) {
+  if (!state.ownedByIv) return null;
+  var ox = [], oy = [], ot = [];
+  for (var key in state.ownedByIv) {
+    var i = parseInt(key, 10);
+    if (!(i >= 0 && i < DATA.nIvs)) continue;
+    var names = state.ownedByIv[i].map(function(r) {
+      return ((r.mon && r.mon.name) || 'mon') + ' CP' +
+             ((r.stats && r.stats.cp) || '?');
+    }).join(', ');
+    var side;
+    if (!pay.hasFloor) {
+      side = 'no line on this page';
+    } else {
+      side = (_wbBit(_wbMask(pay.rungs[0].mask), i) ? 'at or above ' : 'below ')
+             + pay.axisWord + ' ' + pay.printed;
+    }
+    ox.push(L.spRanks[i]); oy.push(wins[i]);
+    ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side));
+  }
+  if (!ox.length) return null;
+  var t = _wbTrace('Yours (' + ox.length + ')', '#ffd700', 'star', 12, 1);
+  t.marker.line = { width: 1.5, color: plotChrome().ink };
+  t.x = ox; t.y = oy; t.text = ot;
+  return t;
+}
+
+// Legend hover isolates a group, the same affordance the main scatter has.
+// Scoped to this panel and guarded per legend node (Plotly's d3 join reuses
+// them across react calls).
+function _wbWireLegend(panel, ops) {
+  var attempts = 0;
+  var gen = (panel._wbLegendGen || 0) + 1;
+  panel._wbLegendGen = gen;
+  // Read at EVENT time, not captured: Plotly's d3 join reuses legend nodes
+  // across react calls, so a handler wired under "the line" would otherwise
+  // restore that view's opacities after the reader switched to "the rungs".
+  panel._wbOps = ops;
+  function tryAttach() {
+    if (panel._wbLegendGen !== gen) return;
+    var items = panel.querySelectorAll('.legend .traces');
+    if (items.length === 0 && attempts < 50) { attempts++; setTimeout(tryAttach, 100); return; }
+    items.forEach(function(el, idx) {
+      if (el._wbWired) return;
+      el._wbWired = true;
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function() {
+        var cur = panel._wbOps || [];
+        for (var j = 0; j < cur.length; j++) {
+          Plotly.restyle(panel, { 'marker.opacity': (j === idx) ? 1 : 0.03 }, [j]);
+        }
+      });
+      el.addEventListener('mouseleave', function() {
+        var cur = panel._wbOps || [];
+        for (var j = 0; j < cur.length; j++) {
+          Plotly.restyle(panel, { 'marker.opacity': cur[j] }, [j]);
+        }
+      });
+    });
+  }
+  tryAttach();
+}
+
+function wbRenderRoot(root) {
+  if (!root) return;
+  var pay = _wbPayload(root);
+  var panel = root.querySelector('.wb-panel');
+  if (!pay || !panel) return;
+  var L = wbLevelArrays();
+  var wins = wbWins(pay.mi, pay.mode);
+  var cap = root.querySelector('.wb-caption');
+  if (!wins) {
+    panel.innerHTML = '';
+    if (cap) cap.textContent = 'This dive did not bake the score grid this ' +
+      'panel reads, so it is not drawn.';
+    root.setAttribute('data-wb-rendered', '1');
+    return;
+  }
+  var sel = root.querySelector('select.wb-view');
+  var view = sel ? sel.value : (pay.views[0] && pay.views[0].id);
+  var colors = _wbColors(root);
+  var g = _wbGroups(pay, view, L, wins, colors);
+  var traces = g.traces.slice();
+  if (pay.hasFloor && (view === 'line' || view === 'rungs' || view === 'trade')) {
+    var r1i = _wbIvIdx(pay.rank1.iv);
+    var r1t = _wbMarkTrace('Stat-product rank-1', r1i, colors.mark1, 'diamond',
+                           L, wins, 'the stat-product rank-1 spread');
+    if (r1t) traces.push(r1t);
+    for (var e = 0; e < pay.examples.length; e++) {
+      var ei = _wbIvIdx(pay.examples[e].iv);
+      var et = _wbMarkTrace('Example: ' + pay.examples[e].rule, ei, colors.mark2,
+                            'triangle-up', L, wins, pay.examples[e].rule);
+      if (et) traces.push(et);
+    }
+  }
+  if (!pay.hasFloor && view === 'rank1') {
+    var nr1 = _wbIvIdx(pay.rank1.iv);
+    var nr1t = _wbMarkTrace('Stat-product rank-1', nr1, colors.mark1, 'diamond',
+                            L, wins, 'the stat-product rank-1 spread');
+    if (nr1t) traces.push(nr1t);
+    var gbi = _wbIvIdx(pay.gridBest.iv);
+    if (gbi !== nr1) {
+      var gbt = _wbMarkTrace('Wins the most matchups', gbi, colors.mark2,
+                             'triangle-up', L, wins, 'wins the most matchups');
+      if (gbt) traces.push(gbt);
+    }
+  }
+  var ownT = _wbOwnedTrace(pay, L, wins);
+  if (ownT) traces.push(ownT);
+
+  var chrome = plotChrome();
+  var layout = {
+    xaxis: { title: 'Stat product rank', autorange: 'reversed',
+             showgrid: false, zeroline: false },
+    yaxis: { title: 'Matchups won', showgrid: true, gridcolor: chrome.grid,
+             zeroline: false },
+    paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
+    font: { color: chrome.font, size: 11 },
+    margin: { t: 8, b: 44, l: 56, r: 8 },
+    showlegend: true,
+    legend: { orientation: 'h', y: -0.22, bgcolor: chrome.legendBg,
+              bordercolor: chrome.legendBorder, borderwidth: 1 },
+    hoverlabel: { bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder }
+  };
+  if (g.missing) {
+    layout.annotations = [{
+      text: 'No cluster labels apply to this view.',
+      showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5,
+      font: { color: chrome.font, size: 12 }
+    }];
+  }
+  Plotly.react(panel, traces, layout,
+               { responsive: true, displayModeBar: false });
+  _wbWireLegend(panel, traces.map(function(t) { return t.marker.opacity; }));
+  if (cap) {
+    for (var vi = 0; vi < pay.views.length; vi++) {
+      if (pay.views[vi].id === view) cap.textContent = pay.views[vi].caption;
+    }
+  }
+  root.setAttribute('data-wb-rendered', '1');
+}
+
+function wbSelectView(sel) {
+  var root = sel.closest('.wb-root');
+  if (root) wbRenderRoot(root);
+}
+window.wbSelectView = wbSelectView;
+
+// Collection load / clear and theme switches both change what the panel
+// should draw. A closed section drops its rendered flag instead, so it picks
+// the change up on its next open (Plotly sizes to zero inside a closed
+// <details>).
+function wbRefresh() {
+  var root = _wbRoot();
+  if (!root || !root.hasAttribute('data-wb-rendered')) return;
+  if (root.offsetParent !== null && root.open) wbRenderRoot(root);
+  else root.removeAttribute('data-wb-rendered');
+}
+window.wbRefresh = wbRefresh;
+
+// "Compare these spreads": prefill the page's Compare candidates widget with
+// rank-1 plus the spreads this section names, then open it and scroll there.
+function wbCompare(btn) {
+  var root = btn.closest('.wb-root') || _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay) return;
+  var list = [pay.rank1.iv];
+  if (pay.hasFloor) {
+    for (var i = 0; i < pay.examples.length; i++) list.push(pay.examples[i].iv);
+  } else if (pay.gridBest) {
+    list.push(pay.gridBest.iv);
+  }
+  if (window.cmpSetCandidates) window.cmpSetCandidates(list);
+  var sec = document.getElementById('cmp-section');
+  if (sec) {
+    sec.open = true;
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.wbCompare = wbCompare;
+
+// The printed line value expands to the spreads that reach it: top 25 by
+// stat product, then a control for the rest. Built here rather than baked:
+// a 2220-row table server-side would be ~150 KB of markup per moveset file
+// for a list most readers never open, and every column it needs is already
+// in DATA.
+function _wbClearerRows(L, from, to, rows) {
+  var h = '';
+  for (var i = from; i < to && i < rows.length; i++) {
+    var iv = rows[i];
+    h += '<tr><td>' + DATA.ivA[iv] + '/' + DATA.ivD[iv] + '/' + DATA.ivS[iv] +
+         '</td><td>' + Number(L.ivAtk[iv]).toFixed(2) +
+         '</td><td>' + Number(L.ivDef[iv]).toFixed(2) +
+         '</td><td>' + L.ivHp[iv] +
+         '</td><td>L' + Number(L.ivLv[iv]).toFixed(1) +
+         '</td><td>#' + L.spRanks[iv] + '</td></tr>';
+  }
+  return h;
+}
+
+function wbRenderClearers(box, all) {
+  var root = _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay || !pay.hasFloor) return;
+  var L = wbLevelArrays();
+  var mask = _wbMask(pay.rungs[0].mask);
+  var rows = [];
+  for (var i = 0; i < DATA.nIvs; i++) { if (_wbBit(mask, i)) rows.push(i); }
+  rows.sort(function(a, b) { return L.spRanks[a] - L.spRanks[b]; });
+  var shown = all ? rows.length : Math.min(pay.topN || 25, rows.length);
+  var h = '<p style="margin:0 0 6px">The ' + rows.length + ' spreads at or above ' +
+    pay.axisWord + ' ' + pay.printed + ', by stat product' +
+    (all ? '' : ' (top ' + shown + ')') + ':</p>' +
+    '<table><thead><tr><th>IV</th><th>Atk</th><th>Def</th><th>HP</th>' +
+    '<th>Level</th><th>SP rank</th></tr></thead><tbody>' +
+    _wbClearerRows(L, 0, shown, rows) + '</tbody></table>';
+  if (!all && rows.length > shown) {
+    h += '<button type="button" class="wb-btn" style="margin-top:6px" ' +
+         'onclick="wbShowAllClearers(this)">Show all ' + rows.length + '</button>';
+  }
+  box.innerHTML = h;
+}
+
+function wbToggleClearers(btn) {
+  var root = _wbRoot();
+  if (!root) return;
+  var box = root.querySelector('.wb-clearers');
+  if (!box) return;
+  if (!box.hidden) { box.hidden = true; return; }
+  box.hidden = false;
+  wbRenderClearers(box, false);
+}
+window.wbToggleClearers = wbToggleClearers;
+
+function wbShowAllClearers(btn) {
+  var root = _wbRoot();
+  var box = root && root.querySelector('.wb-clearers');
+  if (box) wbRenderClearers(box, true);
+}
+window.wbShowAllClearers = wbShowAllClearers;
+
+// Lazy render on first open, and a resize when an already-rendered panel
+// comes back into view -- same two reasons as the cluster panels.
+document.addEventListener('toggle', function(ev) {
+  var det = ev.target;
+  if (!det || !det.open || !det.classList) return;
+  var root = det.classList.contains('wb-root') ? det : det.closest('.wb-root');
+  if (!root) return;
+  if (!root.hasAttribute('data-wb-rendered')) {
+    if (root.offsetParent !== null) wbRenderRoot(root);
+    return;
+  }
+  var p = root.querySelector('.wb-panel');
+  if (p && p.children.length && window.Plotly && Plotly.Plots) {
+    try { Plotly.Plots.resize(p); } catch (e) {}
+  }
+}, true);
+
 // ---- Re-theme the canvases when the theme picker flips data-theme ----
 //
 // theme.py's picker sets data-theme on <html>. CSS re-themes instantly, but
@@ -4374,6 +4949,7 @@ if (typeof MutationObserver !== 'undefined' && document.documentElement) {
     _themeVarCache = {};
     try { updateView(); } catch (e) {}
     try { mcRefreshAll(); } catch (e) {}
+    try { wbRefresh(); } catch (e) {}
   }).observe(document.documentElement,
              {attributes: true, attributeFilter: ['data-theme']});
 }

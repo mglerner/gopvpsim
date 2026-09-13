@@ -7179,9 +7179,18 @@ def shared_line_with(facts, earlier):
     return None
 
 
-def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
+def render_parts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
                  same_as=None):
-    """Render an already-computed fact set, running every stage-15 gate."""
+    """Gate an already-computed fact set and return its four rendered parts.
+
+    Returns ``(headline, strip, fields, evidence)`` -- the same four objects
+    ``render_facts`` hands to ``arm_html``. Split out so a SECOND renderer
+    (the dive page's "Which one to build?" section,
+    ``scripts/deep_dive_which_build.py``) can lay the parts out differently
+    without re-running, re-ordering or re-implementing the stage-15 gates.
+    Every gate below still runs exactly once per rendered section, in the
+    order the plan fixes; the standalone brief page is unchanged.
+    """
     ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
     gate_recompute(state, arm, blob_path, mode, level, facts, ctx)
     gate_names(facts, ctx)
@@ -7200,6 +7209,14 @@ def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
     gate_words(blocks + strip_strings, ctx)
     gate_caveat(blocks + strip_strings, ctx)
     gate_voice(list(headline) + strip_strings, ctx)
+    return headline, strip, fields, evidence
+
+
+def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
+                 same_as=None):
+    """Render an already-computed fact set, running every stage-15 gate."""
+    headline, strip, fields, evidence = render_parts(
+        state, arm, blob_path, facts, mode, level, same_as=same_as)
     return arm_html(facts, headline, strip, fields, evidence)
 
 
