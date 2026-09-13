@@ -89,6 +89,37 @@ lines of mostly-completed chronological batches. -->
   changed rows at stride 1 once the rebake frees the cores, (4) THEN new
   showcases and the article prose pass. Full-res compute waits for the
   rebake; tensor reads and stride screens do not.
+
+  **STATUS 2026-09-12 late: sheet v6 IMPLEMENTED on the branch** (13-agent
+  campaign; record: `docs/validations/2026-09-12_cramorant_deep_vet.md`).
+  Two row changes -- (1,0) `lead_ready_ko` (terminal-KO guard), (2,2)
+  `lead_ready_chip` (last-shield "can they chip us" guard, division-free);
+  everything else kept, 2v1 stays exempt, Dondozo documented as a boundary
+  cost (19/4096 razor ties, 0 net flips), not an exception. Stride-13 screen
+  of the changed rows over all 160 slices: 0 bar failures, the 4 failing GL
+  cells go -3.36/-4.27 -> +3.05/+3.35 mean, every top-SP lens >= 0 (worst
+  2v2 +1.65, 1v0 +0.03); 2v2 total net +77,153 -> +77,243, 1v0 unchanged.
+  Stride-61 adjacency: all 560 slices of the 7 unchanged rows identical to
+  shipped. Costs to disclose: UL Peck/Surf 2v2 net +1057 -> +911 (mean
+  -0.7), UL HP/Surf 2v2 bait -154 net, GL Dive+Fly 2v2 mean -0.003; the KO
+  guard is NOT a perfect GL no-op when threaded (GL 1v0 Dive+Surf / HP+Surf
+  mean -0.008 / -0.006, net unchanged) -- wrapper-to-threaded drift, as the
+  playbook warns. REMAINING: (a) stride-1 re-certification of the two
+  changed rows, 90 slices (`cramorant_recertify.py --scenarios 2v2,1v0
+  --stride 1`, ~4-6 h serial under load; parallelise once the rebake frees
+  cores); (b) merge order after the rebake is published: Aegislash fix
+  (2e8d36b, predicate species-startswith-Aegislash), then the v6 rule
+  commit (Cramorant-only, predicate = the pogodives case registry), each
+  alone on its hash bump; (c) rebake the Cramorant pages and run
+  `cramorant_certify.py --league both` as the ship gate; (d) THEN new
+  showcases (the renderer re-picks from the survivors automatically) and
+  Michael's prose pass; (e) hygiene commit deleting the three dead
+  constants (needs test_pogodives synthetic rows + cramorant_sensitivity
+  updated). MICHAEL'S CALLS: Guzzlord 2v2 (-1559 flips / +72.6 mean:
+  documented cost or target?); whether to re-express the gate column as
+  `opp_start_shields >= my_start_shields` (reproduces all 9 rows, zero
+  score change); P-C (KO guard at 1v1, measured positive in GL) and P-D
+  (constant-free 1v2 `lead_drained`, costs most of the row) next cycle.
 - **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
   2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
   links showed the same 642 win. Audit

@@ -326,7 +326,16 @@ _POGODIVES_SHEET = {
     # UL-cheap-hit wins from the GL-nuke drains; 1.4 was BROKEN on the
     # top-100-SP lens in both leagues (skeptic), while 1.9 passes both
     # lenses on all ten pages AND beats 1.4 on global rating.
-    (1, 0): {'gate': 'off', 'tank_aggr': 1.9, 'tank_rule': 'lead_ready'},
+    # v6 (deep re-verification 2026-09-12): 'lead_ready_ko' = lead_ready
+    # PLUS the terminal-KO guard -- if our own charged move already KOs the
+    # hitter (affordable now or within two fast moves), declining only buys
+    # an overkill missile and leaves the shield unspent; take the shield.
+    # Fixed the UL 1v0 top-100-SP negative (rank1 -1.05 @50 / -1.69 @51,
+    # all Corviknight: -4.73 -> 0.00, 320 cells better / 0 worse), a
+    # byte-identical no-op on every GL page and every other UL opponent.
+    # Row-scoped on purpose: applied to every lead row it goes net-negative
+    # at UL 1v2 and worsens the failing GL 2v2 slice.
+    (1, 0): {'gate': 'off', 'tank_aggr': 1.9, 'tank_rule': 'lead_ready_ko'},
     (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (2, 0): None,
@@ -357,7 +366,20 @@ _POGODIVES_SHEET = {
     # Gate 'always': with this tank every gate variant passes, so the
     # fitted cmp/dpt/energy gate conditions are dropped (plateaus:
     # aggr [1.55, 2.0], lead [0.30, 0.45]).
-    (2, 2): {'gate': 'always', 'tank_aggr': 1.6, 'tank_rule': 'lead_ready'},
+    # v6 (2026-09-12): 'lead_ready_chip' = lead_ready PLUS the last-shield
+    # chip guard -- on our LAST shield, decline only if the opponent's fast
+    # move can actually chip us (more than 1 damage per turn). Against a
+    # non-chipping opponent nearly all their damage is charged, so the kept
+    # shield is worth a whole charged move and HP does not decay on its own:
+    # exactly where hoarding HP beats hoarding a shield. The Gulp Missile's
+    # payload is fixed (int(0.15 * their max HP) + 1, percentMaxHP, typing
+    # irrelevant), so a 34%-of-our-bar hit can never be bought back by it.
+    # This was the only strict-bar failure of the 720-cell grid: GL Peck /
+    # Hydro Pump + Surf 2v2 no-bait, Corviknight -3835 flips / -324 mean
+    # (PvPoke shields the T34 Air Cutter and wins 662; the 1.6 tank declined
+    # it and lost 300 in 3835/4096 spreads). Division-free on purpose: the
+    # ratio form at 0.012 split 70 GL cells on Cramorant's own bulk.
+    (2, 2): {'gate': 'always', 'tank_aggr': 1.6, 'tank_rule': 'lead_ready_chip'},
 }
 
 # The pogodives case REGISTRY, cache-facing form: a battle can differ from
@@ -463,6 +485,17 @@ def _cram_tank_mult(attacker, defender, damage, attacker_energy_after=None):
         if aggr is None:
             aggr = _POGODIVES_TANK_AGGRESSIVE
         rule = entry['tank_rule']
+        if rule == 'lead_ready_ko':
+            # Terminal-KO guard (v6, row (1,0)): if one of OUR charged moves
+            # KOs the hitter and is affordable now or within two fast moves,
+            # the missile a decline would buy is overkill and the declined
+            # shield is never spent -- shield. Evaluated before the lead
+            # test so it also overrides the aggressive path.
+            gain = defender.fast_move.get('energyGain', 0)
+            if any(defender.energy + 2 * gain >= cm.get('energy', 100)
+                   and defender.charged_move_damage(cm, attacker) >= attacker.hp
+                   for cm in defender.charged_moves):
+                return _POGODIVES_TANK_CONSERVATIVE
         if rule == 'cheap':
             frac = entry.get('cheap_frac', _POGODIVES_TANK_CHEAP_FRAC)
             return (aggr if damage <= frac * defender.max_hp
@@ -471,7 +504,7 @@ def _cram_tank_mult(attacker, defender, damage, attacker_energy_after=None):
                 - attacker.hp / attacker.max_hp)
         if lead > _POGODIVES_TANK_LEAD:
             return _POGODIVES_TANK_CONSERVATIVE
-        if rule == 'lead_ready':
+        if rule in ('lead_ready', 'lead_ready_chip', 'lead_ready_ko'):
             # Decline the shield only while the opponent stays LOADED:
             # if this throw empties their bar below their cheapest
             # charged move, take the shield -- the HP buys a missile
@@ -481,6 +514,19 @@ def _cram_tank_mult(attacker, defender, damage, attacker_energy_after=None):
                             for c in attacker.charged_moves), default=100)
             if (attacker_energy_after is None
                     or attacker_energy_after < cheapest):
+                return _POGODIVES_TANK_CONSERVATIVE
+        if rule == 'lead_ready_chip' and defender.shields < 2:
+            # Last-shield chip guard (v6, row (2,2)): on our last shield,
+            # decline only if the opponent's fast move can chip us -- more
+            # than 1 damage per turn (the damage formula's +1 floor). A
+            # non-chipping opponent's damage is all charged, so the kept
+            # shield is worth a whole charged move and our HP does not
+            # decay on its own; the fixed-payload missile cannot buy back a
+            # third of our bar. _turns is set by simulate() at battle start;
+            # the cooldown fallback covers unit probes outside a battle.
+            fm = attacker.fast_move
+            turns = fm.get('_turns') or max(1, fm.get('cooldown', 500) // 500)
+            if attacker.fast_move_damage(defender) <= turns:
                 return _POGODIVES_TANK_CONSERVATIVE
         return aggr
     return _CRAM_TANK_MULT
