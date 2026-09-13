@@ -61,6 +61,11 @@ from deep_dive_lib.opponents import (
     resolve_opp_ivs, parse_opponent_spec, build_opp_meta_ranks,
     rankings_snapshot_date, register_opponent_variant,
 )
+# The dive page's own Matchup clusters section. Imported, not reimplemented:
+# the corroboration line below quotes THAT section's partition of THIS grid,
+# so both must cluster the same bits with the same machinery or the page and
+# the brief would print two partitions under one name.
+import deep_dive_matchup_clusters as clusters
 
 # ---------------------------------------------------------------------------
 # Selection constants. Every one is a parameter of the stage that uses it and
@@ -85,6 +90,13 @@ MATERIAL_HI = 0.90                # G-material-hi
 # a test that never ran. 5 is roughly the quarter-of-the-axis share that 20 is
 # of a typical attack grid. atk and def are unchanged from v2.
 MIN_ATTAINED_BELOW = {'atk': 20, 'def': 20, 'hp': 5}
+# Stage 14: the cluster corroboration line is printed only when the
+# partition is actually separated. 0.40 is the section's own reading of a
+# usable silhouette (its WEAK_SIL is 0.30, below which the section itself
+# prints "weak separation"), set one notch higher here because this line is
+# a corroboration -- a weakly-separated partition corroborates nothing, and
+# an unprinted line is the honest outcome.
+CLUSTER_SIL_MIN = 0.40
 RANK_GATE = 50                    # G-rank / D3
 DIRECTION_MIN_ABOVE = 0.90        # G-direction
 MODES_TO_LIST = 2                 # a rung needs this many passing modes to list
@@ -1901,10 +1913,12 @@ def stage12_degradation(triage, cuts, rungs, floor, n_modes, n_arms, n_iv,
 #   "not a clean cut in this bake: N of M clearers win" rather than
 #   substituting it.
 #
-# Stage 14 -- cluster corroboration line ("the cluster partition splits at
-#   X"). Deferred: it needs `scripts/deep_dive_lib/clusters.py` `choose_k`,
-#   and the plan itself marks that number as CITED rather than recomputed, so
-#   shipping it here would print a number this module never derived.
+# Stage 14 -- cluster corroboration line. NO LONGER DEFERRED (2026-09-13):
+#   the number is now DERIVED here, from this arm's own win cube, by calling
+#   deep_dive_matchup_clusters' choose_k / cluster_tree on the concatenated
+#   all-scenario fingerprint -- see cluster_corroboration() below. It was
+#   deferred while it would have been a CITED number the module never
+#   computed. It is re-derived by G-recompute like every other printed value.
 #
 # G-recompute, the numbers it does NOT re-derive, and why. Round 3 closed
 #   the 25 reader-facing leaves a corruption probe found unguarded (rank-1's
@@ -1945,6 +1959,49 @@ def stage12_degradation(triage, cuts, rungs, floor, n_modes, n_arms, n_iv,
 #   evidence block, which is as close as a blob with no gamemaster stamp
 #   (plan Phase 0 item 1) can get.
 # ---------------------------------------------------------------------------
+
+
+def cluster_corroboration(win, planes, state):
+    """Stage 14: the dive page's all-scenario cluster partition, in one line.
+
+    Independent evidence for the printed floor: the brief selects a line by
+    clean cuts on single cells, while the Matchup clusters section partitions
+    the SAME grid by whole win/loss fingerprints and reads a stat rule off
+    the result. When the two land on the same stat and a nearby value, that
+    is corroboration from a method that shares no machinery with stages 2-6.
+
+    Returns None when there is nothing honest to say -- fewer than two
+    non-degenerate scenarios, no K clearing the cluster floor, or a tree that
+    does not split -- and the caller drops the sentence entirely rather than
+    printing a hedge. The silhouette is returned unfiltered; CLUSTER_SIL_MIN
+    is applied at the PRINT site, so G-recompute checks the number whether or
+    not this page printed it.
+    """
+    n_sc = win.shape[1]
+    cf = clusters.concat_fingerprint(
+        [(scenario_label(state, si), win[:, si, :]) for si in range(n_sc)])
+    if cf['W'] is None:
+        return None
+    k, labels, sil, _ = clusters.choose_k(cf['W'].astype(np.uint8))
+    if k is None:
+        return None
+    # Fitted on the stats ROUNDED the way the page rounds them: the section
+    # this line quotes fits its tree on DATA.ivAtk/ivDef (2dp), so on the
+    # Shadow Sableye 1v1 grid the full-precision split prints 148.67 where
+    # the page prints 148.68. Same partition either way -- the clustering is
+    # on win bits, not stats -- but a corroboration that cites a number the
+    # reader cannot find on the page is worse than no corroboration.
+    dp = clusters.SECTION_STAT_DP
+    tree, _X, _y = clusters.cluster_tree(
+        {'k': k, 'labels': labels},
+        np.round(planes['atk'], dp), np.round(planes['def'], dp),
+        np.round(planes['hp'], dp))
+    if 'feat' not in tree:
+        return None
+    return {'stat': clusters.TREE_FEATURES[tree['feat']],
+            'value': float(tree['thr']), 'k': int(k), 'sil': float(sil),
+            'n_bits': int(cf['n_bits']), 'n_scens': len(cf['scens']),
+            'excluded': list(cf['excluded'])}
 
 
 def stage12_caps(n_modes, n_arms):
@@ -2505,6 +2562,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                                    triage['n_patterns'][si])
                                   for si in range(n_sc)},
         },
+        'cluster_corroboration': cluster_corroboration(win, planes, state),
         'clean_counts': dict(Counter(c['axis'] for c in cuts)),
         'clean_excluded': len(cuts_caveat),
         'clean_claimed': len(cuts_claimed),
@@ -5679,6 +5737,15 @@ def _f14_how_sure(facts):
                 f"grid would select {_n(l51['n_selected_by_l50_literal'])}.")
         else:
             lines.append("The same cell has no clean cut in the level-51 view.")
+    cc = facts.get('cluster_corroboration')
+    if cc and cc['sil'] >= CLUSTER_SIL_MIN:
+        # ONE sentence, in the evidence block only. It is corroboration, not
+        # a result: it never reaches the headline, and a weakly-separated
+        # partition (silhouette under CLUSTER_SIL_MIN) prints nothing at all.
+        lines.append(
+            f"The all-scenario cluster partition splits this grid at "
+            f"{cc['stat']} {fmt(cc['value'])} (K={_n(cc['k'])}, silhouette "
+            f"{fmt(cc['sil'])}).")
     lines.append(
         "Not measured here: opponent IVs outside the baked cohorts, "
         "post-match HP and shields, XL or dust cost, and any live-game check "
@@ -5909,6 +5976,16 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     check('How sure', '-', facts['triage']['all_lose'], int((nwin == 0).sum()))
     check('How sure', '-', facts['triage']['contested'],
           int(((nwin > 0) & (nwin < n_iv)).sum()))
+
+    # Stage 14's corroboration line: re-clustered from the cube, not carried.
+    cc = facts.get('cluster_corroboration')
+    cc_r = cluster_corroboration(win, planes_r, state)
+    check('How sure', 'clusters', cc is None, cc_r is None)
+    if cc is not None and cc_r is not None:
+        for key in ('stat', 'k', 'n_bits', 'n_scens', 'excluded'):
+            check('How sure', 'clusters', cc[key], cc_r[key])
+        check('How sure', 'clusters', cc['value'], cc_r['value'], tol=1e-9)
+        check('How sure', 'clusters', cc['sil'], cc_r['sil'], tol=1e-12)
 
     fl = facts['floor']
     if fl is not None:
