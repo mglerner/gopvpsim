@@ -189,3 +189,18 @@ against anything the rebalance did. It is a genuine strategic cost of
 dive-early into a bulky opponent that can trade into the missile.
 
 Left as the single accepted exception, now correctly labelled.
+
+---
+
+# CORRECTION 2026-09-12: the "-2 win cells" was one IV spread
+
+The full-resolution read (`scripts/cramorant_certify.py`, all 4096 spreads x
+the pool, from the dive tensors) shows UL 0v1 has NO net-negative opponent.
+Dondozo: 19 negative cells of 4096 in pvpoke opp-IV mode (all attack IV 15;
+razor wins 503/506/515 turned into exact 500 ties -- 0 net flips under the
+>= 500 rule, -123 rating against +614,916 of gains on the same opponent in
+the same slice), zero in rank1 mode. The lab run above sampled exactly one
+spread (15/15/15 = iv 4095), which is one of the 19. Mechanism and decision:
+docs/validations/2026-09-12_cramorant_deep_vet.md (M7). The (0,1) row is
+kept; Dondozo and Jellicent are documented boundary costs of a correctly
+priced rush, not an exception to the bar.
