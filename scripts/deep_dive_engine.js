@@ -529,8 +529,14 @@ function toggleAllScenarios() {
   var box = document.getElementById('allscen-toggle');
   var grid = document.getElementById('allscen-grid');
   if (!box || !grid) return;
-  if (!box.checked) { grid.style.display = 'none'; return; }
+  var note = document.getElementById('allscen-note');
+  if (!box.checked) {
+    grid.style.display = 'none';
+    if (note) note.style.display = 'none';
+    return;
+  }
   grid.style.display = 'grid';
+  if (note) note.style.display = 'block';
   var key = state.movesetIdx + '|' + state.oppIvMode;
   if (!_allscenRendered || key !== _allscenKey) {
     var g2 = document.getElementById('allscen-grid');
@@ -555,17 +561,26 @@ function renderAllScenarios() {
       var y = computeScenarioAvgPure(state.movesetIdx, si);
       if (!y) return;
       // Each mini wears its OWN scenario's clusters, with that scenario's
-      // K / silhouette / root rule in the title -- the one-glance "which
-      // shield state actually has structure" view. Uncolored (and untitled
-      // beyond the label) when the baked labels do not describe this
-      // moveset/mode, or when that scenario carried no clusters.
+      // K / silhouette / split in the title -- the one-glance "which shield
+      // state actually has structure" view. Uncolored AND untitled beyond
+      // the label when the baked labels do not describe this moveset/mode
+      // (state.oppIvMode is composed from the Opponent IVs AND Bait
+      // dropdowns, so one click off either default falsifies it), or when
+      // that scenario carried no clusters. The gate covers the TITLE and
+      // not just the colors: a headline is a claim about the data on
+      // screen, and "K=2, silhouette 0.65, split atk 148.06" over a grid
+      // those labels do not describe is a false one.
       var mLbl = scenLabel(si);
       var mPay = _mcPayloadPage();
-      var mSc = (mPay && mPay.scens && _mcLabelsApply())
-        ? mPay.scens[mLbl] : null;
-      var mHead = _mcHeadline(mPay, mLbl);
-      var mTitle = (labels[si] || ('scenario ' + si)) +
-                   (mHead ? ' - ' + mHead : '');
+      var mApply = _mcLabelsApply();
+      var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;
+      var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';
+      var mDispS = mPay && ((mPay.scens && mPay.scens[mLbl] &&
+                             mPay.scens[mLbl].display) ||
+                            (mPay.degenerate && mPay.degenerate[mLbl] &&
+                             mPay.degenerate[mLbl].display));
+      var mTitle = (mDispS || labels[si] || ('scenario ' + si)) +
+                   (mHead ? ': ' + mHead : '');
       var mTraces;
       if (mSc && mSc.labels) {
         mTraces = [];
@@ -2391,8 +2406,10 @@ function buildTraces() {
       // cluster names below carry the rule, not the scenario.
       ctr.push({
         name: wrapLegendName('Matchup clusters: ' + mcDisp +
-                             (_mcYAxisSwitched ? ' (y-axis switched to wins: ' +
-                              'the clusters are horizontal bands there)' : '')),
+                             (_mcYAxisSwitched
+                              ? " (y-axis switched to 'Wins vs PvPoke " +
+                                "default' once: the clusters are horizontal " +
+                                'bands there; switch it back any time)' : '')),
         x: [], y: [], text: [],
         mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
         marker: {size: 6, color: themeColor('--text-muted'), opacity: 0.55}
@@ -3490,7 +3507,16 @@ function updateView() {
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
   if (ysel) state.yAxisMode = ysel.value;
-  if (state.colorMode === 'cluster' && !_mcYAxisNudged) {
+  // The legend's "y-axis switched to ..." note is a claim about the axis as
+  // it stands; a reader who switches back must stop reading it. (The NUDGE
+  // itself stays spent -- _mcYAxisNudged is never cleared -- so switching
+  // back keeps it back.)
+  if (state.yAxisMode !== 'winsPvpoke') _mcYAxisSwitched = false;
+  // Spend the one-shot nudge only where the clusters can actually be drawn:
+  // on a non-default moveset / opponent-IV mode the cluster branch renders
+  // neutral points, and consuming the nudge there would mean the reader
+  // never gets it on the view it was written for.
+  if (state.colorMode === 'cluster' && !_mcYAxisNudged && _mcLabelsApply()) {
     _mcYAxisNudged = true;
     if (state.yAxisMode === 'avgScore' && _selHasValue(ysel, 'winsPvpoke')) {
       ysel.value = 'winsPvpoke';
@@ -4148,18 +4174,20 @@ function _mcLabelsApply() {
          (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
 }
 
-// Legend / title text for one scenario key: "K=2, sil 0.65, atk < 148.06",
-// or the degenerate note. Python emits every number and the rule string; this
-// only concatenates them.
+// Legend / title text for one scenario key: "K=2, silhouette 0.65, split
+// atk 148.06", or the short no-clusters note. Python emits every number and
+// every string; this only concatenates them. Words are spelled out ("sil"
+// and a bare "atk < 148.06" read as an abbreviation and a filter condition
+// to a reader who has met neither before).
 function _mcHeadline(pay, lbl) {
   if (!pay) return '';
   var sc = pay.scens ? pay.scens[lbl] : null;
   if (sc) {
-    return 'K=' + sc.k + ', sil ' + Number(sc.sil).toFixed(2) +
-           (sc.root ? ', ' + sc.root : '');
+    return 'K=' + sc.k + ', silhouette ' + Number(sc.sil).toFixed(2) +
+           (sc.split ? ', split ' + sc.split : '');
   }
   var dg = pay.degenerate ? pay.degenerate[lbl] : null;
-  if (dg) return dg.degenerate ? 'degenerate' : 'no clusters';
+  if (dg) return dg.short || (dg.degenerate ? 'degenerate' : 'no clusters');
   return '';
 }
 

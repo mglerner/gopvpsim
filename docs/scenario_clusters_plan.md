@@ -239,15 +239,30 @@ touched. Plus the deferred build-brief corroboration line (stage 14).
 Three things came out differently from the plan above, and each is recorded
 where the code lives:
 
-1. **"all" on Shadow Sableye GL is K=3, silhouette 0.395, root `atk < 148.68`
-   over 113 bits -- not the K=2 / 0.45 / `atk < 148.06` / 118 bits in the
-   section-1 table.** The two are the same computation over different inputs:
-   the table's offline run predates the degeneracy floor and included 0v2's 5
-   bits. Section 3's floor (item 3) excludes them, and the decision "'all' =
-   every NON-DEGENERATE scenario's bits" is what shipped. Both measurements
-   are in the comment beside the exclusion in
-   `deep_dive_matchup_clusters.compute_matchup_clusters`, so flipping it is
-   one predicate if the 118-bit reading is preferred on a corpus look.
+1. **"all" on Shadow Sableye GL is K=2, silhouette 0.451, root `atk < 148.68`
+   over 113 bits -- the section-1 table's K, but not its `atk < 148.06` over
+   ~118 bits.** The table's offline run predates the degeneracy floor and
+   included 0v2's 5 bits; section 3's floor excludes them, and "'all' = every
+   NON-DEGENERATE scenario's bits" is what shipped. Both readings are in the
+   comment beside the exclusion in
+   `deep_dive_matchup_clusters.compute_matchup_clusters` (with every
+   scenario's bits: 119 bits, K=2, silhouette 0.459, `atk < 147.96`), so
+   flipping it is one predicate if the fuller reading is preferred on a
+   corpus look.
+
+   **Column order turned out to be load-bearing, and is now a stated
+   choice.** Hamming distance is permutation-invariant in the columns, so
+   ordering cannot move a point -- but it sets `np.unique`'s lexicographic
+   order of the unique patterns, which is the linkage tie-break, and a
+   combined fingerprint ties constantly (2117 unique patterns over 113 bits
+   share 85 distinct distances). On this grid raw collection order gives
+   K=3 / 0.395 / accuracy 0.961 and most other orderings give K=2. The
+   shipped order is |win-rate - 0.5| ascending -- the same sharpest-first
+   order `sharp_marginals` already hands every per-scenario entry -- which
+   on this grid also carries the better silhouette (0.451) and tree accuracy
+   (0.983). `concat_fingerprint`'s docstring states it and
+   `test_combined_bits_are_ordered_most_discriminating_first` pins both the
+   order and the fact that it changes the answer here.
 2. **Two no-cluster outcomes, not one.** "Degenerate" (under the 6 sharp / 8
    pattern floor; bits excluded from "all") is now distinct from
    "fragmented" (clears the floor, but no K keeps every cluster above the
@@ -272,6 +287,39 @@ the PAGE's 2dp-rounded `DATA.ivAtk`/`ivDef`, so a consumer starting from the
 full-precision blob meta lands 0.01 off on some splits (this grid: 148.67 vs
 148.68). `SECTION_STAT_DP` names the rounding and the brief rounds the same
 way; a test pins it against `deep_dive.py`.
+
+Round 2 (the two reviews) changed four more things, all reader-facing:
+
+4. **A legend rule is emitted only when the root split is an IFF for that
+   cluster** (every member on one side AND nothing else on that side), not
+   when it is merely necessary. "C1: atk < 151.20" is read as a definition;
+   on 1v0 the necessary-only form gave three different clusters that same
+   name. Those clusters are now "C1 (n=1105)" and the depth-3 rules block is
+   where their description lives.
+5. **The combined block carries a signpost line** naming the two sharpest
+   single scenarios -- K, silhouette, the split, and the number of sharp
+   marginals the silhouette was measured over, because "sharpest" is a
+   comparative claim and a silhouette rises as the fingerprints get shorter
+   (plain Sableye GL tops its page at 0v1's 0.76 over 7 marginals, against
+   0v0's 0.48 over 28). Every clustered dropdown option carries its own K
+   and silhouette too. The default view is routinely the least separated
+   partition on the page, and the page's best material was one unlabelled
+   click away.
+6. **"silhouette" is defined on the page**, in "How this works", with the
+   calibration (above ~0.5 distinct groups, below WEAK_SIL tendencies), and
+   the mini-grid titles spell "silhouette" and "split" instead of "sil" and a
+   bare rule. The degenerate/fragmented sentences lead with the finding
+   ("every spread wins 0-5 of 76 opponents here...") instead of the apology.
+7. **The brief stopped reusing the page's word for a different count.** Its
+   own screen is over CONTESTED cells and DISTINCT OPPONENT COLUMNS; the
+   page's is over SHARP MARGINALS and distinct IV FINGERPRINTS. Same 6 / 8
+   bar, neither count dominating the other (this blob's 0v2: page 5 / 16,
+   brief 7 / 8). The sentence now names its own tests. The corroboration
+   line names its source and its RELATION to the printed floor ("also splits
+   it on attack -- at 148.68, 0.58 above the line printed here" / "splits it
+   on HP ... the two methods do not agree"), and its silhouette gate reads
+   the value as PRINTED (2dp), so it cannot go silent beside a page headline
+   reading "silhouette 0.40".
 
 Not done here and still open: Phase C layout (a)+(b), Phase D, and the
 shipped-page re-render (`userdata/.cards_rerender_pending` stays set).

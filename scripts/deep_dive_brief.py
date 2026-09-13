@@ -5689,9 +5689,26 @@ def _f14_how_sure(facts):
     if facts['triage']['degenerate']:
         dd = facts['triage']['degenerate_detail']
         bits = [f"{s} ({_n(dd[s][0])} contested, {_n(dd[s][1])} distinct "
-                f"win patterns)" for s in facts['triage']['degenerate']]
-        lines.append("Scenarios flagged degenerate and barred from carrying a "
-                     "floor: " + ', '.join(bits) + ".")
+                f"opponent columns)" for s in facts['triage']['degenerate']]
+        # The dive page's Matchup clusters section applies the SAME two
+        # numbers (6 / 8) to DIFFERENT quantities under the same word: its
+        # "sharp marginals" are the cells 2%-98% of spreads win (a subset of
+        # these contested cells) and its "distinct win patterns" are the
+        # distinct IV FINGERPRINTS over those cells, where this screen
+        # counts distinct opponent COLUMNS. Neither count dominates the
+        # other, so the two documents legitimately print different numbers
+        # for one scenario. Naming the tests here, instead of reusing the
+        # page's word, keeps a reader holding both from seeing a
+        # contradiction. (Unifying on clusters.screen_scenario would change
+        # WHICH scenarios can carry a floor, which is a behaviour change,
+        # not a wording one.)
+        lines.append(
+            f"Scenarios barred from carrying a floor -- fewer than "
+            f"{_n(DEGENERATE_SHARP)} contested cells, or fewer than "
+            f"{_n(DEGENERATE_PATTERNS)} distinct opponent columns among "
+            f"them; the dive page's \"degenerate\" flag applies the same "
+            f"two numbers to its own stricter counts, so it can flag a "
+            f"different set: " + ', '.join(bits) + ".")
     if fl is not None:
         if fl['kind'] != 'exact':
             lines.append(
@@ -5738,14 +5755,39 @@ def _f14_how_sure(facts):
         else:
             lines.append("The same cell has no clean cut in the level-51 view.")
     cc = facts.get('cluster_corroboration')
-    if cc and cc['sil'] >= CLUSTER_SIL_MIN:
+    # Gated on the silhouette AS PRINTED (2dp, the precision the dive page's
+    # headline uses too). Gating on the raw value would suppress this line
+    # at 0.3954 beside a page headline reading "silhouette 0.40", which is a
+    # threshold the reader can see the page meet and the brief ignore.
+    if cc and round(cc['sil'], 2) >= CLUSTER_SIL_MIN:
         # ONE sentence, in the evidence block only. It is corroboration, not
-        # a result: it never reaches the headline, and a weakly-separated
-        # partition (silhouette under CLUSTER_SIL_MIN) prints nothing at all.
-        lines.append(
-            f"The all-scenario cluster partition splits this grid at "
-            f"{cc['stat']} {fmt(cc['value'])} (K={_n(cc['k'])}, silhouette "
-            f"{fmt(cc['sil'])}).")
+        # a result: it never reaches the headline, and a partition that does
+        # not PRINT at CLUSTER_SIL_MIN or better says nothing at all.
+        # It names its SOURCE and its RELATION to the printed line: the same
+        # sentence under agreement and disagreement would leave the reader
+        # no cue which one they are looking at.
+        src = (f"the dive page's Matchup clusters section, which partitions "
+               f"this same grid by whole win/loss fingerprint across all "
+               f"{_n(cc['n_scens'])} non-degenerate shield scenarios")
+        if fl is None:
+            lines.append(
+                f"Independent check: {src}, splits it at "
+                f"{AXIS_WORD[cc['stat']]} {fmt(cc['value'])} "
+                f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
+        elif cc['stat'] == fl['axis']:
+            gap = abs(cc['value'] - fl['printed'])
+            where = ('above' if cc['value'] > fl['printed'] else 'below')
+            lines.append(
+                f"Independent check: {src}, also splits it on "
+                f"{AXIS_WORD[cc['stat']]} -- at {fmt(cc['value'])}, "
+                f"{fmt(gap)} {where} the line printed here "
+                f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
+        else:
+            lines.append(
+                f"Independent check: {src}, splits it on "
+                f"{AXIS_WORD[cc['stat']]} (at {fmt(cc['value'])}), not "
+                f"{AXIS_WORD[fl['axis']]} -- the two methods do not agree on "
+                f"this dive (K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
     lines.append(
         "Not measured here: opponent IVs outside the baked cohorts, "
         "post-match HP and shields, XL or dust cost, and any live-game check "
@@ -5769,8 +5811,11 @@ def _f15_provenance(facts):
         "That is stricter than the two numbers the dive page prints for the "
         "same opponent: the Threats \"flips at\" boundary (a 75/25 gate, so "
         "spreads on the passing side can still lose) and the Matchup clusters "
-        "single-stat split (the most accurate one, misclassifications "
-        "allowed).",
+        "flip table's single-stat split for that one opponent (the most "
+        "accurate such split, misclassifications allowed). The cluster line "
+        "in \"How sure\" above is a third thing again: not one opponent but "
+        "the stat rule that reproduces that section's "
+        f"\"{clusters.ALL_SCEN_DISPLAY}\" partition of the whole grid.",
         "Priority ties: the coverage ladder counts an exact attack tie as NOT "
         "beaten. The engine is seat-dependent on an exact tie, so a tied line "
         "is not a guarantee in either direction.",
