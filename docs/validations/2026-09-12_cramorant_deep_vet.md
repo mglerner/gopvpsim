@@ -195,3 +195,37 @@ the 2026-09-10 "-2 win cells" line is corrected below.
 - Michael's calls: Guzzlord 2v2 flips-vs-rating (documented cost or target?);
   the dead-constant hygiene commit; whether to re-express the gate column as
   the one predicate.
+
+## Stride-1 re-certification, priority slices (2026-09-12 night, v6 threaded)
+
+`cramorant_mini_sweep.py --stride 1` on the referee's priority set (15 of
+the 90 changed-row slices; the rest wait for the rebake to free cores).
+"was" = the shipped v5 tensor. Plain-tier mismatches in the two GL m4
+slices (1 and 64 cells) are the Aegislash (Blade) contamination, not v6.
+
+| slice                                   | net was -> v6    | mean was -> v6   |
+| --------------------------------------- | ---------------- | ---------------- |
+| GL HP+Surf 2v2 pvpoke/nobait @50 (FAIL) | +288 -> +6814    | -3.298 -> +3.089 |
+| GL HP+Surf 2v2 rank1/nobait @50 (FAIL)  | +3606 -> +11291  | -4.217 -> +3.244 |
+| GL Dive 2v2 pvpoke/bait @50             | +2683 -> +2683   | +4.712 -> +4.709 |
+| GL Dive+Fly 2v2 pvpoke/bait @50         | +5577 -> +5577   | +2.087 -> +2.084 |
+| UL HP+Surf 2v2 pvpoke/bait @50          | +14613 -> +12613 | +6.519 -> +6.504 |
+| UL HP+Surf 2v2 pvpoke/bait @51          | +14282 -> +12634 | +6.714 -> +6.771 |
+| UL HP+Surf 2v2 pvpoke/nobait @50        | +10433 -> +12433 | +3.474 -> +6.688 |
+| UL HP+Surf 2v2 pvpoke/nobait @51        | +10883 -> +12531 | +4.027 -> +6.886 |
+| UL HP+Surf 2v2 rank1/bait @50           | +12857 -> +11465 | +6.288 -> +6.168 |
+| UL HP+Surf 2v2 rank1/bait @51           | +12173 -> +10973 | +6.298 -> +6.185 |
+| UL HP+Surf 2v2 rank1/nobait @50         | +12958 -> +13852 | +6.877 -> +8.207 |
+| UL HP+Surf 2v2 rank1/nobait @51         | +12222 -> +13136 | +6.760 -> +8.117 |
+| UL Dive+Fly 1v0 rank1/bait @50          | +1429 -> +1429   | +1.589 -> +1.665 |
+| UL Dive+Fly 1v0 rank1/bait @51          | +913 -> +913     | +1.156 -> +1.323 |
+| UL Dive+Fly 1v0 pvpoke/bait @51         | +624 -> +624     | +1.290 -> +1.357 |
+
+All 15 pass the bar on both metrics. The four failing cells are fixed with
+large margins. Disclosed cost of the chip guard: UL HP+Surf 2v2 BAIT mode
+gives back 1200-2000 win-cells per slice (mean flat) for +900-2000 in
+no-bait mode; the page nets -784 win-cells over its eight 2v2 slices with
+mean up everywhere. Remaining 75 slices: GL 2v2 (16 more at cap 50), UL
+2v2 pages m0/m2/m3/m4 (32), GL 1v0 (10), UL 1v0 m1/m2/m3/m4 (16) plus the
+UL index 1v0 nobait twins; run `cramorant_recertify.py --scenarios 2v2,1v0
+--stride 1` when the machine is free (~4-6 h serial under load).

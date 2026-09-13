@@ -104,8 +104,12 @@ lines of mostly-completed chronological batches. -->
   -0.7), UL HP/Surf 2v2 bait -154 net, GL Dive+Fly 2v2 mean -0.003; the KO
   guard is NOT a perfect GL no-op when threaded (GL 1v0 Dive+Surf / HP+Surf
   mean -0.008 / -0.006, net unchanged) -- wrapper-to-threaded drift, as the
-  playbook warns. REMAINING: (a) stride-1 re-certification of the two
-  changed rows, 90 slices (`cramorant_recertify.py --scenarios 2v2,1v0
+  playbook warns. Stride-1 on the 15 priority slices (both failing GL
+  cells, GL top-SP margins, all 8 UL HP+Surf 2v2 slices, UL 1v0 lenses):
+  15/15 pass, failing cells -3.3/-4.2 -> +3.09/+3.24 mean, cost = UL
+  HP+Surf 2v2 bait mode -1200..-2000 win-cells/slice (mean flat).
+  REMAINING: (a) stride-1 re-certification of the other 75 changed-row
+  slices (`cramorant_recertify.py --scenarios 2v2,1v0
   --stride 1`, ~4-6 h serial under load; parallelise once the rebake frees
   cores); (b) merge order after the rebake is published: Aegislash fix
   (2e8d36b, predicate species-startswith-Aegislash), then the v6 rule
