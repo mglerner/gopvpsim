@@ -855,3 +855,145 @@ taken in a modified form; the reason is one line each.
 - NEW: floors extend to Def and HP (bulkpoints) as v3, standalone, before any
   page integration. Page integration waits for the Cramorant strategy
   reinvestigation to land.
+
+## V3, 2026-09-12: floors extend to Def and HP
+
+Michael's decision, implemented on branch `build-brief-v3`. The v2 floor pool
+was the attack axis alone, so a bulk-first species ended its page with "build
+for stat product" while the real verdict sat in its evidence table (Altaria:
+Def >= 148.29 vs the 2v2 Clodsire; Furret: Def >= 102.063 vs the 1v1 Lapras,
+wrong on 1 spread of 4096). What changed:
+
+1. **Floor axes.** The three primitives (exact clean cut / one-sided gate at
+   >= 97% / near-exact at <= 0.5%) run on atk, def and hp. Floor selection --
+   the D1 band [25%, 60%], the 1%-of-grid merge, and the gates G-material /
+   G-rank / G-attributed / G-direction / G-scenario / G-caveat -- runs once
+   PER AXIS on that axis's own rung ladder. One headline line is then chosen
+   across the three by `stage6_cross_axis`: (a) the larger NET matchup gain of
+   its best clearer over the stat-product rank-1 build (the number field 10
+   already computed, and the only measure the three axes share); (b) a tie
+   inside `CROSS_AXIS_TIE` = 1% of the focal's matchups goes to the stronger
+   primitive, then to the smaller clearer pool. Which clause decided is
+   carried in `facts['axis_choice']['decided_by']` and printed, because the
+   printed line is NOT always the larger-net one and a sentence claiming
+   otherwise would be false on exactly the pages the rule exists for.
+2. **Bulkpoint mechanism labels.** A Def cut is a BULKPOINT iff the
+   opponent's damage INTO us steps down by an integer across it, searched over
+   every move it carries (fast and charged), every attack stage its own kit
+   can buff itself to and every Def stage its debuffs can impose on us -- the
+   attack axis's breakpoint test with the seats swapped. An HP cut is an
+   HP-BULKPOINT iff the number of hits one of those moves needs to KO us
+   changes across it. Damage into us depends on our Def as well as our HP, so
+   the HP test holds the defense at ONE stated value -- the grid's median
+   attained Def -- and prints it; searching every attained Def would fire the
+   label on almost any HP value. Otherwise UNATTRIBUTED, and G-attributed
+   still bars an unattributed cut from carrying a line on any axis.
+3. **Everything that assumed attack is now axis-aware**: the headline lead
+   ("should have at least 102.06 (102.063) defense"), rank-1's shortfall, the
+   rung ladder and its tail, the strip's Line row, field 2's threshold row,
+   the co-gate search, the print-precision rule (the bulk axes may escalate
+   past 3 dp; attack keeps the plan's strict two-rung abort), G-recompute, and
+   the sweep row. The coverage ladder is CMP-only and therefore attack-only:
+   a bulk line prints "No ladder: not a priority line."
+4. **The alternative target forks on the two axes the line does NOT use**: an
+   attack line keeps the v2 (Def, HP) rectangle; a Def line gets (HP, attack)
+   and an HP line (Def, attack). Where the search leaves one of the two at its
+   grid minimum the page says the target is a single stat.
+5. **The negative page's "attack lines only" disqualifier is gone.** A rule
+   that is not the line now fails a GATE or one of the three primitive bars,
+   and the sentence says which -- Altaria's Def 148.29 is 90.9% pure above the
+   line against a 97% bar and 190 of 4096 on the wrong side against a
+   near-exact limit of 20.
+6. **One new field**, the sixteenth: "Lines on the other stats", printed
+   directly under the line it lost to, with value, matchup, primitive badge,
+   pool share, net and mechanism for each.
+
+Open question for Michael, flagged rather than decided: the tie-break's
+"smaller pool" clause moves three of the four Shadow Sableye arms off the
+148.10 Annihilape priority line (net +9) and onto a Def bulkpoint at 99.11
+(net +4), because 5 matchups is inside the 1% window and 2193 < 2220. That is
+the rule as written; whether "smaller pool" should instead read "larger pool"
+(D1 elsewhere minimises the ask) is a calibration question the corpus sweep
+now has numbers for.
+
+## V3 round 2, 2026-09-12: the two reviews
+
+Two independent reviews of the round-1 render set (an expert read of all ten
+pages; an independent recomputation of the primitives, gates and cross-axis
+selection from the blobs) converged on the same defect in the cross-axis rule
+and split on one calibration question. What round 2 changed, and what it
+deliberately did not:
+
+1. **The cross-axis measure is symmetric.** `line_net` now compares the
+   spread that clears the line and wins the most matchups against the spread
+   that MISSES it and wins the most, not against the stat-product rank-1
+   build. Under a CP cap rank-1 is the bulk-heavy corner of the grid: it
+   clears essentially every Def line (so `net >= 0` held BY CONSTRUCTION,
+   rank-1 being itself a clearer) and misses essentially every attack line.
+   The old comparator measured "is rank-1 already on this axis". Measured
+   symmetrically the Shadow Sableye Def lines score -5 / -5 / -3 where they
+   scored +4 / +1 / +1 against rank-1, and all four arms print the 148.10
+   Annihilape line again. The rank-1 comparison keeps its own job: it is the
+   COST measure in field 10, where "what does clearing this cost the
+   stat-product build" is the right question, and the demotion rule is
+   unchanged.
+2. **The tie-break prefers the LARGER pool**, after a new clause for
+   cross-setting survival: primitive, then settings-and-arms held, then pool,
+   then stat order. Round 1 read Michael's "the smaller pool" literally and
+   published the harder-to-reach line with its reason printed out loud ("the
+   printed line is the one fewer spreads reach"), which contradicts D1's
+   minimise-the-ask everywhere else in the module. `decided_by` gains
+   `'robustness'`.
+3. **G-material-gap is per axis**: 20 distinct attained values below the cut
+   on atk and def (unchanged), 5 on HP. Measured over this corpus an HP grid
+   carries 13-26 distinct values IN TOTAL against 49-166 attack and 61-288
+   Def, so the single constant disqualified the HP axis by CONSTRUCTION while
+   the negative page claimed "no attack, defense or HP threshold decides a
+   matchup". `facts['axis_testable']` records, per axis and per arm, whether
+   the bar was reachable at all, and the negative headline names only the axes
+   it actually tested. The HP axis carries its first corpus line as a result
+   (Deoxys (Defense), COUNTER / PSYCHO_BOOST, THUNDERBOLT).
+4. **Bulk floors get a coverage ladder.** The CMP ladder asks which of the
+   opponent's own builds our printed attack out-prioritises; the bulk question
+   is the same one with the seats swapped, and has the same closed form, so
+   the same seven reference builds (rank-1 / PvPoke default / 10-10-10 / grid
+   median / hundo / 12-12-12 / max-attack) each get the lowest ATTAINED value
+   on the line's axis that holds them to the stepped damage. Round 1's "No
+   ladder: not a priority line" contradicted its own headline one field above
+   ("a higher-attack Lapras moves the step"). The CMP-only silence survives
+   for attack-axis BREAKPOINT floors, where the ladder genuinely does not
+   apply.
+5. **A bulkpoint names every move that steps** at the cut, ordered by the
+   RELATIVE size of the step (one point off a 3-damage fast move is a third of
+   its output; one off a 73-damage charged move is 1.4%), instead of the first
+   in kit order -- which was always the fast move.
+6. **Smaller reader-facing fixes**: `pct_below` escalates a percentage until
+   it renders on the failing side of the bar it is quoted against (Lapras
+   printed "97.0% ... under the 97%"); the printed line carries the
+   one-decimal sensitivity sentence that previously fired only in a negative
+   page's evidence table, and only when the one-decimal reading selects a
+   different set; field 6's silence branch names the two free stats; field 5
+   says nothing about a target field 6 says does not exist; the field-16
+   mechanism cell drops its "Mechanism:" label; the headline and field 16 both
+   say "net"; the sweep's species column carries the blob date.
+7. **G-recompute covers the round-2 facts**: `rate_below_loss`, the
+   one-decimal `genre` numbers, every bulk-ladder row, and the cross-axis
+   decision itself -- each axis's net is recomputed from its own plane and the
+   comparator re-run, so `decided_by` is a re-derived claim rather than a
+   trusted label.
+
+**Not applied: the necessary-gate bar.** One review asked for the 97% bar to
+be split by direction -- a NECESSARY gate (nothing below the line wins) gated
+on the size of the locked-out set rather than on the purity of its dirty side,
+which would make Lapras's "nothing below 110.51 defense wins the 2v1 against
+Tinkaton" and Altaria's Clodsire rule into printed lines. It is not in round 2,
+for three reasons: the spec pins the primitive bars ("one-sided gate at
+>= 97%") and this is a change to a selection primitive, not a defect in
+implementing one; the second review probed the same exclusions independently
+and called them right for the right reason, so the reviews disagree; and the
+replacement bar ("a win rate above the cut materially better than the grid
+base rate") is uncalibrated -- adopting it would newly print directives
+corpus-wide on a bar nobody has swept. The corpus sweep now counts the
+blast radius (`sweep_all_summary.md`, "Counterfactual: the necessary-gate
+bar"), so the decision is Michael's with numbers in front of it. Both pages
+name the bar their rule missed today, so nothing is hidden.

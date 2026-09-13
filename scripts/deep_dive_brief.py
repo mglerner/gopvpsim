@@ -14,7 +14,13 @@ Vocabulary (defined once here, per the docs style rule):
   shadow-STRIPPED attack (``src/gopvpsim/battle.py`` ``cmp_atk``), so for a
   shadow focal the CMP line sits at ``SHADOW_ATK_BONUS x opponent cmp_atk``.
 - Clean cut: see above. Win is ``gopvpsim.battle.is_win`` (score > 500).
-- Rung: a clean cut on the attack axis, named by the cell(s) it owns.
+- Rung: a clean cut on ONE stat axis, named by the cell(s) it owns. V3 runs
+  the three primitives on attack, defense and HP; each axis selects its own
+  line and one of them is chosen as the headline (see ``stage6_cross_axis``).
+- Bulkpoint: a Def line where the opponent's damage INTO us steps down by an
+  integer across it; an HP line where the number of hits it needs to KO us
+  changes is an HP-bulkpoint. They are to a Def/HP line what a breakpoint and
+  a priority line are to an attack one.
 - Co-gate: a second-stat condition (Def >= d or HP >= h) that, INSIDE the
   spreads clearing a rung, wins one named cell 100% of the time.
 - Alternative target: a (Def, HP) rectangle containing no spread that clears
@@ -68,7 +74,17 @@ SENSITIVITY_BANDS = ((0.25, 0.60), (0.25, 0.55), (0.25, 0.50),
                      (0.20, 0.60), (0.30, 0.60), (0.25, 0.70))
 MATERIAL_LO = 0.10                # G-material-lo: a rung is a build decision
 MATERIAL_HI = 0.90                # G-material-hi
-MIN_ATTAINED_BELOW = 20           # G-material-gap
+# G-material-gap, per axis. The cut needs this many DISTINCT attained values
+# strictly below it, so the line divides a populated range rather than sitting
+# on the grid's own floor. The HP axis gets its own constant because it is
+# integer-valued and coarse: measured over this corpus a Great League grid
+# carries 13-26 distinct HP values in total against 49-166 attack and 61-288
+# Def values, so the attack constant is unreachable on the HP axis by
+# CONSTRUCTION -- the gate would disqualify the axis rather than test it, and
+# the negative page would then claim "no HP threshold decides a matchup" about
+# a test that never ran. 5 is roughly the quarter-of-the-axis share that 20 is
+# of a typical attack grid. atk and def are unchanged from v2.
+MIN_ATTAINED_BELOW = {'atk': 20, 'def': 20, 'hp': 5}
 RANK_GATE = 50                    # G-rank / D3
 DIRECTION_MIN_ABOVE = 0.90        # G-direction
 MODES_TO_LIST = 2                 # a rung needs this many passing modes to list
@@ -84,7 +100,7 @@ DEGENERATE_SHARP = 6              # G-scenario
 DEGENERATE_PATTERNS = 8           # G-scenario
 NEAR_EXACT_SHARE = 0.005          # E2: "near-exact" = this share of the grid
 GATE_MIN_ABOVE = 0.97             # E2b: a one-sided gate wins this share above
-PRIMITIVE_TIE_WINDOW = 0.50       # attack points: kind preference inside this
+PRIMITIVE_TIE_WINDOW = 0.50       # stat points on the line's OWN axis
 MERGE_SPREAD_TOL = 0.01           # E3: rungs this close share one printed line
 # V2 round 2. What clearing the line COSTS, measured as the exact matchup diff
 # between the clearer field 10 costs out and the stat-product rank-1 spread.
@@ -93,11 +109,23 @@ MERGE_SPREAD_TOL = 0.01           # E3: rungs this close share one printed line
 # directive is demoted, because "there is a line and clearing it loses you
 # matchups" is the honest reading and is itself a result.
 FLOOR_COST_MATERIAL = 0.01
+# V3 cross-axis selection. Each axis picks its own line under the same band
+# and the same gates; ONE of them becomes the headline. The comparison is the
+# net matchup count of the best spread clearing the line against the best
+# spread that MISSES it, because that is the only measure on the page that is
+# commensurable across axes AND asks the same question of each (a defense
+# point and an attack point are not comparable; a comparison against rank-1 is
+# comparable but not axis-neutral -- see ``line_net``). Inside this share of
+# the focal's matchups the two nets are a tie and the tie-break is the
+# stronger primitive, then the line that survives in more settings and arms,
+# then the LARGER clearer pool (D1's minimise-the-ask: between two equally
+# clean, equally attributed lines the printed one asks less of the build).
+CROSS_AXIS_TIE = 0.01
 # A rule on a BETTER-ranked opponent this close below the printed line is
 # named in the headline: every spread clearing the line clears it too, so the
 # reader gets both for free (Medicham: rank-13 Snorlax at 108.39 under a
 # rank-42 Shadow Snorlax line at 109.27).
-NEAR_FLOOR_WINDOW = 1.00          # attack points
+NEAR_FLOOR_WINDOW = 1.00          # stat points on the line's OWN axis
 NAME_CAP = 3                      # G-names
 LIST_CAP = 12                     # names printed in a field-8 list
 SCORE_ROW_CAP = 12                # stage 10 table length
@@ -171,6 +199,27 @@ HEADLINE_BANNED = (
     (r'\bcells?\b', 'say "matchup", or "the 0v1 against X"'),
     (r'\bclearers?\b', 'say "spreads at or above the line"'),
 )
+
+
+AXES = ('atk', 'def', 'hp')
+AXIS_WORD = {'atk': 'attack', 'def': 'defense', 'hp': 'HP'}
+AXIS_SHORT = {'atk': 'Atk', 'def': 'Def', 'hp': 'HP'}
+AXIS_META_COL = {'atk': 5, 'def': 6, 'hp': 7}
+# An attack floor keeps the plan's strict two-rung print rule (2 dp, then
+# 3 dp, then abort): an unprintable attack line is a bug worth stopping for.
+# The bulk axes are DENSER -- attained Def values pack closer than a
+# thousandth -- so refusing to print a Def line that needs four places would
+# be refusing the axis, not catching a defect.
+FLOOR_DP_OPTIONS = {'atk': (2, 3), 'def': (2, 3, 4, 5, 6), 'hp': (2, 3)}
+
+# The four mechanism kinds that can carry a line, and which axis each belongs
+# to. G-attributed is the gate; an UNATTRIBUTED cut is printed as evidence and
+# can never be the floor, on any axis.
+ATTRIBUTED_KINDS = ('cmp', 'breakpoint', 'bulkpoint', 'hp_bulkpoint')
+
+
+def axis_plane(planes, axis):
+    return planes[axis]
 
 
 class GuardError(RuntimeError):
@@ -460,14 +509,16 @@ def stage2_clean_cuts(win, planes, triage):
 
 
 def stage2_primitives(win, planes, triage, axis='atk'):
-    """Gate and near-exact candidates on the ATTACK axis (E2).
+    """Gate and near-exact candidates on ONE axis (E2, widened to all three).
 
-    The floor is an attack line everywhere else in this module -- the page
-    prints "Atk >= X", the clearer mask is ``atk >= T``, rank-1's shortfall is
-    in attack and the coverage ladder walks an attack grid -- so widening the
-    primitive set widens WHICH ATTACK VALUES may carry the line, not which
-    axis carries it. A Def gate still prints as the closest rule on a
-    no-floor page; it does not become a floor.
+    V2 ran this on the attack axis alone, because everything downstream
+    assumed an attack line: the page printed "Atk >= X", the clearer mask was
+    ``atk >= T``, rank-1's shortfall was in attack and the coverage ladder
+    walked an attack grid. That made a bulk-first species end its page with
+    "build for stat product" while the real verdict -- Altaria's Def >= 148.29
+    against a 2v2 Clodsire -- sat in its evidence table. V3 runs the three
+    primitives on atk, def and hp; each axis selects its own line and one is
+    chosen across them (``stage6_cross_axis``).
 
     At most two candidates per cell reach the pool: the gate (a value with no
     winner below it) and the best-classifying split, each kept only when it
@@ -670,13 +721,152 @@ def breakpoint_label(cut, prev_atk, focal_types, opp_build, opp_types,
     return None
 
 
+def _opp_stages(opp_charged):
+    """(attack stages the opponent's own kit can reach, Def stages it can
+    impose on US), both including 0.
+
+    The mirror of ``breakpoint_label``'s stage search with the seats swapped:
+    a self-Atk buff on one of the opponent's own charged moves raises the
+    damage it does to us, and an opponent-targeting Def DEBUFF lowers the
+    defense the damage lands on. Only guaranteed buffs (apply chance 1) are
+    searched, exactly as on the attack axis.
+    """
+    atk_stages, def_stages = [0], [0]
+    for cm in opp_charged:
+        buffs = cm.get('buffs')
+        if not buffs or float(cm.get('buffApplyChance', 0) or 0) != 1:
+            continue
+        if cm.get('buffTarget') == 'self' and buffs[0] > 0:
+            atk_stages.append(int(buffs[0]))
+        if cm.get('buffTarget') == 'opponent' and buffs[1] < 0:
+            def_stages.append(int(buffs[1]))
+    return sorted(set(atk_stages)), sorted(set(def_stages))
+
+
+def _opp_moves(opp_fast, opp_charged):
+    return [m for m in ([opp_fast] + list(opp_charged or [])) if m]
+
+
+def bulkpoint_label(cut, prev_def, focal_types, opp_build, opp_types,
+                    opp_fast, opp_charged):
+    """Does the OPPONENT's damage into us step down by an integer across a
+    Def cut, at a stage its own kit can reach?
+
+    This is ``breakpoint_label`` with the seats swapped: the opponent is the
+    attacker, our Def is the stat that moves, and the two values straddling
+    the cut are the previous attained Def and the cut itself. Every move the
+    opponent carries is searched, fast and charged, at every attack stage its
+    own charged moves can buff itself to and every Def stage its debuffs can
+    impose on us.
+    """
+    moves = _opp_moves(opp_fast, opp_charged)
+    if not moves or opp_build is None:
+        return None
+    if not math.isfinite(prev_def):
+        return None
+    atk_stages, def_stages = _opp_stages(opp_charged)
+    for a_s in atk_stages:
+        opp_atk = opp_build['atk'] * _stat_stage_mult(a_s)
+        for d_s in def_stages:
+            dmult = _stat_stage_mult(d_s)
+            steps = []
+            for m in moves:
+                lo = damage(m['power'], opp_atk, prev_def * dmult, m['type'],
+                            opp_types, focal_types)
+                hi = damage(m['power'], opp_atk, cut['T'] * dmult, m['type'],
+                            opp_types, focal_types)
+                if hi != lo:
+                    steps.append({'move': m['moveId'], 'from': int(lo),
+                                  'to': int(hi)})
+            if not steps:
+                continue
+            # EVERY move that steps at this cut, most material first.
+            # Returning the first in kit order always named the FAST move: at
+            # Furret's line all three of Lapras's moves step (PSYWAVE 3 -> 2,
+            # SPARKLING_ARIA 65 -> 64, ICE_BEAM 73 -> 72) and the page named
+            # one of them as though it were the only one. Materiality is the
+            # RELATIVE step, not the absolute one -- one damage off a 73-damage
+            # charged move is 1.4% and one off a 3-damage fast move is a third
+            # of its output -- and the rest ride along in ``also`` so the
+            # sentence can name them all.
+            steps.sort(key=lambda x: (-abs(x['from'] - x['to'])
+                                      / max(x['from'], 1),
+                                      -abs(x['from'] - x['to'])))
+            out = dict(steps[0])
+            out.update({'opp_atk_stage': a_s, 'def_stage': d_s,
+                        'also': steps[1:]})
+            return out
+    return None
+
+
+def hp_bulkpoint_label(cut, prev_hp, def_ref, focal_types, opp_build,
+                       opp_types, opp_fast, opp_charged):
+    """Does the number of hits one of the opponent's moves needs to KO us
+    change across an HP cut?
+
+    Damage into us depends on our Def as well as our HP, and the two attained
+    HP values straddling the cut are shared by spreads of every Def on the
+    grid. Searching all of them would make the label fire on almost any HP
+    value (for some Def there is always a move whose damage divides the lower
+    HP exactly), so the defense is held at ONE stated, reproducible value --
+    the grid's median attained Def -- and printed with the sentence. A real
+    KO-count step that the median misses prints as UNATTRIBUTED, which costs
+    the line rather than inventing a cause for it.
+    """
+    moves = _opp_moves(opp_fast, opp_charged)
+    if not moves or opp_build is None or def_ref is None:
+        return None
+    if not math.isfinite(prev_hp):
+        return None
+    atk_stages, def_stages = _opp_stages(opp_charged)
+    for a_s in atk_stages:
+        opp_atk = opp_build['atk'] * _stat_stage_mult(a_s)
+        for d_s in def_stages:
+            our_def = def_ref * _stat_stage_mult(d_s)
+            for m in moves:
+                dmg = int(damage(m['power'], opp_atk, our_def, m['type'],
+                                 opp_types, focal_types))
+                if dmg <= 0:
+                    continue
+                n_lo = int(math.ceil(prev_hp / dmg))
+                n_hi = int(math.ceil(cut['T'] / dmg))
+                if n_hi != n_lo:
+                    return {'move': m['moveId'], 'damage': dmg,
+                            'from': n_lo, 'to': n_hi,
+                            'opp_atk_stage': a_s, 'def_stage': d_s,
+                            'def_ref': float(def_ref)}
+    return None
+
+
 def stage4_mechanism(cut, state, mode, builds, focal_types, arm_label,
-                     opp_types, opp_charged_moves):
-    """CMP / BREAKPOINT / UNATTRIBUTED for one attack cut."""
-    if cut['axis'] != 'atk':
-        return {'kind': 'unattributed'}
+                     opp_types, opp_charged_moves, opp_fast_moves=None,
+                     def_ref=None):
+    """The closed-form cause of one cut, on whichever axis it sits.
+
+    atk -> CMP or BREAKPOINT; def -> BULKPOINT; hp -> HP-BULKPOINT; otherwise
+    UNATTRIBUTED. G-attributed bars an unattributed cut from carrying a line
+    on every axis, so a bulk cut with no mechanism is still evidence only.
+    """
     oi = cut['oi']
     build = builds.get(oi)
+    opp_fast_moves = opp_fast_moves or {}
+    if cut['axis'] == 'def':
+        bp = bulkpoint_label(cut, cut['prev_attained'], focal_types, build,
+                             opp_types.get(oi, ()), opp_fast_moves.get(oi),
+                             opp_charged_moves.get(oi, []))
+        if bp is not None:
+            return {'kind': 'bulkpoint', 'detail': bp, 'build': build}
+        return {'kind': 'unattributed', 'build': build, 'line': None,
+                'cmp_near_miss': False}
+    if cut['axis'] == 'hp':
+        bp = hp_bulkpoint_label(cut, cut['prev_attained'], def_ref,
+                                focal_types, build, opp_types.get(oi, ()),
+                                opp_fast_moves.get(oi),
+                                opp_charged_moves.get(oi, []))
+        if bp is not None:
+            return {'kind': 'hp_bulkpoint', 'detail': bp, 'build': build}
+        return {'kind': 'unattributed', 'build': build, 'line': None,
+                'cmp_near_miss': False}
     if build is not None:
         line = cmp_line(build, state['shadow'])
         if cut['prev_attained'] < line <= cut['T']:
@@ -787,10 +977,139 @@ def stage5_coverage(cut, state, mode, atk, league):
     monotone = all(b >= a for a, b in zip(lines, lines[1:]))
     top_iv = int(np.argmax(grid))
     top_ivs = (top_iv // 256, (top_iv // 16) % 16, top_iv % 16)
-    return {'opponent': name, 'rows': rows, 'monotone': monotone,
-            'max_ivs': top_ivs,
+    return {'kind': 'cmp', 'opponent': name, 'rows': rows,
+            'monotone': monotone, 'max_ivs': top_ivs,
             'grid_min': float(grid.min()) * focal_shadow_mult,
             'grid_max': top * focal_shadow_mult}
+
+
+def opponent_atk_grid(species, league, shadow):
+    """Attack for all 4096 IV spreads of one opponent, at its league level.
+
+    The DAMAGE attack, shadow bonus included -- ``opponent_iv_grid`` strips it
+    because a priority comparison does, and the two must not be confused.
+    """
+    out = np.empty(4096, dtype=float)
+    k = 0
+    for a in range(16):
+        for d in range(16):
+            for s in range(16):
+                out[k] = Pokemon.at_best_level(species, a, d, s, league=league,
+                                               shadow=shadow).atk
+                k += 1
+    return out
+
+
+def _bulk_need(axis, plane_vals, opp_atk, move, to, focal_types, opp_types,
+               dmult, def_ref=None):
+    """The lowest ATTAINED value on ``axis`` that holds this build to ``to``.
+
+    Def: the lowest defense at which that move's damage into us is at most
+    ``to``. HP: the lowest HP at which the move needs at least ``to`` hits to
+    knock us out, measured at the same stated reference defense the mechanism
+    used. Both are monotone in the stat, so the first value that qualifies is
+    the line.
+    """
+    if axis == 'def':
+        for v in plane_vals:
+            if int(damage(move['power'], opp_atk, v * dmult, move['type'],
+                          opp_types, focal_types)) <= to:
+                return float(v)
+        return None
+    dmg = int(damage(move['power'], opp_atk, def_ref * dmult, move['type'],
+                     opp_types, focal_types))
+    if dmg <= 0:
+        return None
+    for v in plane_vals:
+        if int(math.ceil(v / dmg)) >= to:
+            return float(v)
+    return None
+
+
+def stage5_bulk_coverage(cut, mech, state, mode, plane, league, focal_types,
+                         opp_types, opp_fast, opp_charged):
+    """The coverage ladder for a BULKPOINT or HP-BULKPOINT line.
+
+    The CMP ladder asks which of the opponent's own builds our printed attack
+    out-prioritises. The bulk question is the same one with the seats swapped
+    -- which of its builds our printed defense (or HP) holds to the stepped
+    damage -- and it has the same closed form: the damage that build does to
+    us is its attack over our defense, so its own 4096 spreads trace out
+    exactly the same ladder. V3 round 1 printed "No ladder: not a priority
+    line" on every bulk floor, which was both a silence on the most
+    expert-legible block of the page and a contradiction of the headline one
+    field above it ("a higher-attack Lapras moves the step").
+    """
+    name = state['opponent_names'][cut['oi']]
+    species, _variant, opp_shadow = parse_opponent_spec(name)
+    move = (_move_dicts_for(mech['move'], opp_fast, opp_charged))
+    if move is None:
+        return None
+    try:
+        grid = opponent_atk_grid(species, league, opp_shadow)
+    except Exception:
+        return None
+    axis = cut['axis']
+    vals = np.unique(plane)            # ascending: lowest qualifying value wins
+    a_mult = _stat_stage_mult(int(mech['opp_atk_stage']))
+    dmult = _stat_stage_mult(int(mech['def_stage']))
+    to = int(mech['to'])
+    def_ref = mech.get('def_ref')
+
+    def row(label, opp_atk_raw, note=None):
+        opp_atk = opp_atk_raw * a_mult
+        need = _bulk_need(axis, vals, opp_atk, move, to, focal_types,
+                          opp_types, dmult, def_ref)
+        held = float((grid <= opp_atk_raw).mean())
+        if need is None:
+            return {'label': label, 'line': None, 'printed': None, 'dp': 2,
+                    'opp_atk': float(opp_atk_raw), 'held': held, 'focal': 0,
+                    'note': note}
+        pr, dp = printed_cut(need, plane, field='Coverage line',
+                             ctx={'cell': label})
+        return {'label': label, 'line': need, 'printed': pr, 'dp': dp,
+                'opp_atk': float(opp_atk_raw), 'held': held,
+                'focal': int((plane >= need).sum()), 'note': note}
+
+    def build_atk(ivs):
+        return float(Pokemon.at_best_level(species, *ivs, league=league,
+                                           shadow=opp_shadow).atk)
+
+    rows = []
+    try:
+        r1 = resolve_opp_ivs(species, league, opp_shadow, 'rank1')
+        rows.append(row(f"rank-1 ({r1[0]}/{r1[1]}/{r1[2]})", build_atk(r1)))
+        dflt = resolve_opp_ivs(species, league, opp_shadow, 'pvpoke')
+        rows.append(row(f"PvPoke default ({dflt[0]}/{dflt[1]}/{dflt[2]})",
+                        build_atk(dflt), note='floor line'))
+        rows.append(row('10/10/10 (raid/research floor)', build_atk((10, 10, 10))))
+        rows.append(row('grid median', float(np.median(grid))))
+        rows.append(row('hundo (15/15/15)', build_atk((15, 15, 15))))
+        rows.append(row('12/12/12 (lucky trade)', build_atk((12, 12, 12))))
+    except Exception:
+        return None
+    top = float(grid.max())
+    n_top = int((grid == top).sum())
+    rows.append(row(f"the max-attack {species} "
+                    f"({_n(n_top)} {_noun(n_top, 'spread')})", top))
+    lines = [r['line'] for r in rows if r['line'] is not None]
+    monotone = all(b >= a for a, b in zip(lines, lines[1:]))
+    top_iv = int(np.argmax(grid))
+    return {'kind': 'bulk', 'opponent': name, 'axis': axis, 'rows': rows,
+            'monotone': monotone,
+            'max_ivs': (top_iv // 256, (top_iv // 16) % 16, top_iv % 16),
+            'move': mech['move'], 'to': to, 'from': int(mech['from']),
+            'def_ref': (float(def_ref) if def_ref is not None else None),
+            'opp_atk_stage': int(mech['opp_atk_stage']),
+            'def_stage': int(mech['def_stage'])}
+
+
+def _move_dicts_for(move_id, opp_fast, opp_charged):
+    """The opponent move dict behind a stored mechanism, or None."""
+    for m in _opp_moves(opp_fast, opp_charged):
+        if m['moveId'] == move_id:
+            return m
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -806,9 +1125,10 @@ def rung_gates(cut, holds, mech, ranks, triage, state, n_iv):
     gates = {
         'G-material-hi': pool <= MATERIAL_HI,
         'G-material-lo': pool >= MATERIAL_LO,
-        'G-material-gap': cut['n_attained_below'] >= MIN_ATTAINED_BELOW,
+        'G-material-gap': (cut['n_attained_below']
+                           >= MIN_ATTAINED_BELOW[cut['axis']]),
         'G-rank': rank is not None and rank <= RANK_GATE,
-        'G-attributed': mech['kind'] in ('cmp', 'breakpoint'),
+        'G-attributed': mech['kind'] in ATTRIBUTED_KINDS,
         'G-direction': holds['modes_ok'] == holds['modes_total'],
         'G-scenario': not triage['degenerate'][cut['si']],
         'G-caveat': not any(c in species for c in CAVEAT_SPECIES),
@@ -817,7 +1137,7 @@ def rung_gates(cut, holds, mech, ranks, triage, state, n_iv):
 
 
 def group_rungs(cut_list, n_iv):
-    """Cuts sharing one attack VALUE become one rung.
+    """Cuts sharing one VALUE on one axis become one rung.
 
     ``n_pass``, ``pool_share`` and ``prev_attained`` are functions of T alone,
     so cells of different primitives can share a rung; the rung's own kind is
@@ -825,12 +1145,18 @@ def group_rungs(cut_list, n_iv):
     line), falling back to the strongest present when none is eligible.
     """
     rungs = []
+    axes = {c['axis'] for c in cut_list}
+    if len(axes) > 1:
+        raise GuardError(
+            f"G-names: field=Rungs cell=- printed='{sorted(axes)}' "
+            f"recomputed=one axis per ladder (blob=- arm=- mode=-)")
     for T in sorted({c['T'] for c in cut_list}):
         group = [c for c in cut_list if c['T'] == T]
         rep = group[0]
         eligible = [c for c in group if c['eligible']]
         kind = min((PRIMITIVE_RANK[c['kind']] for c in (eligible or group)))
         rungs.append({
+            'axis': rep['axis'],
             'T': T, 'n_pass': rep['n_pass'], 'pool_share': rep['pool_share'],
             'n_attained_below': rep['n_attained_below'],
             'prev_attained': rep['prev_attained'],
@@ -874,6 +1200,11 @@ def rung_kind(r):
 def stage6_select(rungs, band=DECISION_BAND, n_iv=None,
                   tol=MERGE_SPREAD_TOL, kinds=None):
     """Lowest eligible rung in ``band`` (D1), MERGED UPWARD where it is free.
+
+    V3 runs this once PER AXIS, on that axis's own rung ladder; the winner
+    across the three is picked by ``stage6_cross_axis``. Every threshold and
+    tolerance below is therefore in the units of whichever stat the ladder is
+    on.
 
     D1 minimises the ask. Taken literally that makes the headline opponent
     flap between arms and between two pages for a difference of 0.08 attack:
@@ -929,6 +1260,100 @@ def stage6_select(rungs, band=DECISION_BAND, n_iv=None,
     out = dict(pick)
     out['merged_from'] = merged
     return out
+
+
+def line_net(mask, total_won):
+    """Net matchups crossing a line buys: best clearer MINUS best non-clearer.
+
+    The one measure on the page that is commensurable ACROSS axes, and the
+    only one that asks the same question of each. V3 round 1 compared each
+    axis's best clearer against the stat-product RANK-1 build, which is not
+    axis-neutral: under a CP cap rank-1 is the bulk-heavy corner of the grid,
+    so it sits above a Def line essentially always (forcing net >= 0 by
+    construction, rank-1 being itself a clearer) and below an attack line
+    essentially always. That comparator measured "is rank-1 already on this
+    axis", not "what does crossing this line buy", and it inverted the sign on
+    real pages: Shadow Sableye movesets 2-4 printed a Def line whose best
+    clearer wins FEWER matchups than the best build that misses it, over an
+    attack line worth +9.
+
+    Measured against the best spread that does NOT clear the line, the
+    question is the same on every axis: what does the reader get for paying
+    the line's price? The rank-1 comparison keeps its own job -- it is the
+    COST measure in field 10, where "what does clearing this line cost the
+    stat-product build" is exactly the right question.
+    """
+    if not mask.any() or mask.all():
+        return None
+    idx = np.nonzero(mask)[0]
+    other = np.nonzero(~mask)[0]
+    return int(total_won[idx].max()) - int(total_won[other].max())
+
+
+def stage6_cross_axis(candidates, total_cells, tie=CROSS_AXIS_TIE):
+    """Pick ONE headline line from the per-axis picks (V3, Michael's spec).
+
+    ``candidates`` is a list of dicts with ``axis``, ``rung``, ``net`` and
+    ``kind``. The rule, in order:
+
+    (a) the larger NET matchup gain of its best clearer over the best spread
+        that MISSES the same line (``line_net``);
+    (b) a tie -- the two nets within ``tie`` of the focal's matchups -- goes
+        to the axis whose line is EXACT over a gate (over near-exact);
+    (c) still tied: the line that survives in more settings and arms;
+    (d) still tied: the LARGER clearer pool -- D1's minimise-the-ask, applied
+        across axes as it already is within one. V3 round 1 read Michael's
+        "the smaller pool" literally and published the harder-to-reach line
+        with its reason printed out loud ("the printed line is the one fewer
+        spreads reach"), which is not a justification an expert would sign:
+        a build target being harder to hit is not what makes it right.
+
+    Ties are resolved against the MAXIMUM net rather than pairwise, so the
+    outcome does not depend on the order the axes are offered in (the
+    "within 1%" relation is not transitive, and a pairwise fold over three
+    axes is not well defined).
+    """
+    live = [c for c in candidates if c['rung'] is not None
+            and c['net'] is not None]
+    if not live:
+        return None
+    best_net = max(c['net'] for c in live)
+    window = [c for c in live
+              if best_net - c['net'] <= tie * total_cells]
+    window.sort(key=lambda c: (PRIMITIVE_RANK[c['kind']],
+                               -(c['rung']['modes_ok'] + c['rung']['arms_ok']),
+                               -c['rung']['n_pass'],
+                               AXES.index(c['axis'])))
+    pick = dict(window[0])
+    # WHICH clause of the rule decided, so the page can say it. The printed
+    # line is NOT always the one with the larger net -- inside the tie window
+    # a smaller-net exact rule beats a larger-net gate, and two exact rules
+    # are separated by pool size -- and a sentence claiming otherwise would be
+    # false on exactly the pages the rule exists for. The converse matters
+    # too: a line that took the larger net outright must not be reported as
+    # having won a tie-break, even when a weaker rival sits inside the window.
+    rivals = [c for c in window if c['axis'] != pick['axis']]
+    if not rivals or all(r['net'] < pick['net'] for r in rivals):
+        pick['decided_by'] = 'net'
+        rival = None
+    else:
+        rival = max(rivals, key=lambda c: (c['net'], -AXES.index(c['axis'])))
+        p_rob = pick['rung']['modes_ok'] + pick['rung']['arms_ok']
+        r_rob = rival['rung']['modes_ok'] + rival['rung']['arms_ok']
+        if PRIMITIVE_RANK[pick['kind']] != PRIMITIVE_RANK[rival['kind']]:
+            pick['decided_by'] = 'primitive'
+        elif p_rob != r_rob:
+            pick['decided_by'] = 'robustness'
+        elif pick['rung']['n_pass'] != rival['rung']['n_pass']:
+            pick['decided_by'] = 'pool'
+        else:
+            pick['decided_by'] = 'axis order'
+    pick['tie_window'] = tie * total_cells
+    pick['runner_up'] = (None if rival is None else
+                         {'axis': rival['axis'], 'net': rival['net'],
+                          'kind': rival['kind'],
+                          'n_pass': rival['rung']['n_pass']})
+    return pick
 
 
 def stage6_sensitivity(rungs, bands=SENSITIVITY_BANDS, atk=None, n_iv=None):
@@ -1021,6 +1446,24 @@ def pct(x, dp=1):
     return s
 
 
+def pct_below(x, bar, dp=1):
+    """A percentage printed in the same sentence as the bar it FAILED.
+
+    ``pct`` escalates places only to avoid rendering an exact 0 or 100, so a
+    rate that rounds onto its own bar renders as equal to it and the sentence
+    contradicts itself on the page: Lapras 1v2 Tinkaton wins 2606 of 2687
+    spreads above the cut -- 96.98548% -- and v3 round 1 printed "It is not a
+    build line because 97.0% of the spreads at or above it win, under the 97%
+    a rule with one clean side needs". Escalate until the RENDERING is on the
+    failing side of the bar.
+    """
+    for d in range(dp, 9):
+        s = f"{100.0 * x:.{d}f}%"
+        if float(s[:-1]) < bar * 100.0:
+            return s
+    return f"{100.0 * x:.9f}%"
+
+
 # ---------------------------------------------------------------------------
 # Stage 8 -- example spreads
 # ---------------------------------------------------------------------------
@@ -1105,12 +1548,18 @@ def stage9_frontier(meta, floor_mask):
 
 
 def stage9_cogates(win, meta, floor_mask, contested_cells, ranks, triage, state,
-                   n_iv):
-    """Least attained Def / HP threshold inside the floor that wins a cell 100%."""
+                   n_iv, axes=('def', 'hp')):
+    """Least attained threshold on a SECOND axis, inside the line's clearers,
+    that wins one named cell every time.
+
+    ``axes`` are the two axes the printed line does not use, so a Def line
+    gets HP and attack co-gates rather than a Def co-gate inside a Def
+    condition (which is the line itself, one notch up).
+    """
     clearers = np.nonzero(floor_mask)[0]
     out = []
-    for axis, col in (('def', 6), ('hp', 7)):
-        stat = meta[:, col]
+    for axis in axes:
+        stat = meta[:, AXIS_META_COL[axis]]
         for (si, oi) in contested_cells:
             species, _v, _s = parse_opponent_spec(state['opponent_names'][oi])
             if any(c in species for c in CAVEAT_SPECIES):
@@ -1153,9 +1602,22 @@ def stage9_cogates(win, meta, floor_mask, contested_cells, ranks, triage, state,
 # Stage 9b -- alternative (bulk) target
 # ---------------------------------------------------------------------------
 
+def alt_axes(floor_axis):
+    """The two axes the alternative target is built on, in PRINT order.
+
+    The rectangle is the fork AWAY from the printed line, so it is built on
+    the two axes the line does not use. With an attack line that is the
+    (Def, HP) pair v2 printed; with a Def line it is (HP, attack); with an HP
+    line it is (Def, attack). Bulk stat first, attack last, so a reader sees
+    the same shape of sentence whichever axis carried the line.
+    """
+    rest = [a for a in AXES if a != floor_axis]
+    return tuple(sorted(rest, key=lambda a: (a == 'atk', AXES.index(a))))
+
+
 def stage9b_alternative(win, meta, floor_mask, contested_cells, state,
-                        score_ok=None):
-    """The (Def >= d) & (HP >= h) rectangle that buys the most, or None.
+                        score_ok=None, axes=('def', 'hp')):
+    """The two-stat rectangle that buys the most, or None.
 
     With a floor, the plan's rule: rectangles of at least ALT_MIN_MEMBERS
     members that contain no floor clearer, scored by the contested cells every
@@ -1179,7 +1641,14 @@ def stage9b_alternative(win, meta, floor_mask, contested_cells, state,
     Deoxys' rectangle was selected by two rank-110 Wartortle cells.
     Give-ups are never gated: a cost is a cost whoever owns it.
     """
-    dfn, hp = meta[:, 6], meta[:, 7]
+    # V3: ``axes`` is the PRINT order; the search runs the axis with fewer
+    # distinct attained values on the OUTSIDE, which is what makes the inner
+    # ``break`` a monotone cut-off and keeps the (Def, HP) case bit-identical
+    # to v2 (HP outside, Def inside).
+    va = {a: meta[:, AXIS_META_COL[a]] for a in axes}
+    outer, inner = sorted(
+        axes, key=lambda a: (np.unique(va[a]).size, AXES.index(a)))
+    v_outer, v_inner = va[outer], va[inner]
     cells = np.array(contested_cells)
     if cells.size == 0:
         return None
@@ -1206,15 +1675,15 @@ def stage9b_alternative(win, meta, floor_mask, contested_cells, state,
         return (total_win - n) <= ALT_MAX_CLEARER_RATE * outside
 
     best = None
-    for h in np.unique(hp):
-        hmask = hp >= h
+    for h in np.unique(v_outer):
+        hmask = v_outer >= h
         if hmask.sum() < ALT_MIN_MEMBERS:
             continue
-        for d in np.unique(dfn[hmask]):
-            mask = hmask & (dfn >= d)
+        for d in np.unique(v_inner[hmask]):
+            mask = hmask & (v_inner >= d)
             n = int(mask.sum())
             if n < ALT_MIN_MEMBERS:
-                break                                # monotone in d
+                break                                # monotone in the inner axis
             if has_floor and (mask & floor_mask).any():
                 continue
             guaranteed_all = wc[mask].all(axis=0) & score_ok
@@ -1225,10 +1694,11 @@ def stage9b_alternative(win, meta, floor_mask, contested_cells, state,
             key = (score, n)
             if best is None or key > best['key']:
                 given_up = floor_guaranteed & ~wc[mask].any(axis=0)
+                cuts = {a: float(va[a][mask].min()) for a in axes}
                 best = {
                     'key': key, 'score': score, 'n': n,
-                    'def_cut': float(dfn[mask].min()),
-                    'hp_cut': int(hp[mask].min()),
+                    'axes': tuple(axes), 'cuts': cuts,
+                    'search_axes': (outer, inner),
                     'guaranteed': [contested_cells[i]
                                    for i in np.nonzero(guaranteed)[0]],
                     'exclusive': [contested_cells[i]
@@ -1317,7 +1787,7 @@ def stage10_score_only(scores, atk, triage, state, ranks):
 # ---------------------------------------------------------------------------
 
 def stage11_rank1(meta, sp, win, rungs, floor, atk, n_iv, atk_cuts=(),
-                  contested_cells=()):
+                  contested_cells=(), axis='atk'):
     """Which side of the floor rank-1 is on, and what it clears.
 
     The cut count is over clean attack cuts (CELLS), not over distinct cut
@@ -1339,6 +1809,10 @@ def stage11_rank1(meta, sp, win, rungs, floor, atk, n_iv, atk_cuts=(),
         'level': float(meta[i, 3]), 'atk': float(meta[i, 5]),
         'def': float(meta[i, 6]), 'hp': int(meta[i, 7]),
         'clears_floor': bool(floor is not None and atk[i] >= floor['T']),
+        # The shortfall is on the LINE'S OWN axis: "misses it by 6.35 attack"
+        # on an attack line, "by 4 HP" on an HP one. ``axis`` is carried so
+        # the sentence can say which.
+        'axis': axis,
         'shortfall': (float(floor['T'] - atk[i]) if floor is not None else None),
         'n_cuts_cleared': len(clears), 'n_cuts': len(atk_cuts or rungs),
         'lowest_missed': _missed_row(min(missed, key=lambda r: r['T']), atk)
@@ -1684,20 +2158,24 @@ def disqualifier(d, prims):
 
     A no-line page that names a rule wrong on 1 spread in 4096 and then says
     nothing about why it is not the line reads as the tool contradicting
-    itself. The reason is almost never the rule's own numbers: it is a gate
-    (usually G-direction -- the rule reverses when the opponent is built for
-    stat product instead of PvPoke's defaults), or it is that the floor pool
-    is the attack axis and this rule is on Def or HP.
+    itself. The reason is almost never the rule's own numbers: it is a gate,
+    usually G-direction -- the rule reverses when the opponent is built for
+    stat product instead of PvPoke's defaults.
 
-    Matched by CELL and by VALUE, so a row whose number was never a floor
+    V3 removed the other reason v2 printed. The floor pool used to be the
+    attack axis alone, so a Def or HP rule was disqualified for being on the
+    wrong axis; all three axes now select a line, and a bulk rule that is not
+    the line fails a GATE like any other.
+
+    Matched by CELL, AXIS and VALUE, so a row whose number was never a floor
     candidate reports that rather than borrowing a neighbour's reason.
     """
-    if d['axis'] != 'atk':
-        return {'reason': 'axis'}
     for c in prims:
+        if c['axis'] != d['axis']:
+            continue
         if (c['si'], c['oi']) == (d['si'], d['oi']) and abs(c['T'] - d['t']) <= 1e-9:
             failed = [g for g, ok in c['gates'].items() if not ok]
-            return {'reason': 'gates', 'failed': failed,
+            return {'reason': 'gates', 'failed': failed, 'axis': c['axis'],
                     'modes_ok': c['holds']['modes_ok'],
                     'modes_total': c['holds']['modes_total'],
                     'modes_fail': list(c['holds']['modes_fail']),
@@ -1821,11 +2299,14 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
 
     triage = stage1_triage(win)
     cuts = stage2_clean_cuts(win, planes, triage)
-    # V2 (E2): the two inexact primitives, attack axis only. They are kept in
-    # their OWN list so that every census on this page -- the clean-cut counts,
-    # the rung ladder, the not-claimed denominator, the dirty-threshold table
-    # -- keeps meaning "exact clean cut" and only the FLOOR pool widens.
-    prims = stage2_primitives(win, planes, triage)
+    # V2 (E2): the two inexact primitives. V3 runs them on all three axes.
+    # They are kept in their OWN list so that every census on this page -- the
+    # clean-cut counts, the rung ladder, the not-claimed denominator, the
+    # dirty-threshold table -- keeps meaning "exact clean cut" and only the
+    # FLOOR pool widens.
+    prims = []
+    for _axis in AXES:
+        prims.extend(stage2_primitives(win, planes, triage, axis=_axis))
     reverse_cuts = stage2_reverse_cuts(win, planes, triage)
 
     mode_cubes = {}
@@ -1846,21 +2327,30 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         builds[oi] = opponent_build(nm, league, mode)
     opp_types = {}
     opp_charged = {}
-    _fast, charged_all = get_moves()
+    opp_fast = {}
+    fast_all, charged_all = get_moves()
     for oi, nm in enumerate(names):
         species, _v, _s = parse_opponent_spec(nm)
         opp_types[oi] = _species_types(species)
         ms = state['opp_movesets'][oi] if oi < len(state['opp_movesets']) else None
         opp_charged[oi] = [charged_all[c] for c in (ms[1] if ms else [])
                            if c in charged_all]
+        # The opponent's FAST move matters on the bulk axes and only there: a
+        # Def bulkpoint is most often a fast-move damage step, and an HP line
+        # is a fast-move KO count. The attack axis never needed it.
+        opp_fast[oi] = fast_all.get(ms[0]) if ms else None
     focal_types = _species_types(state['species'])
+    # The stated, reproducible defense an HP-bulkpoint is measured at; see
+    # hp_bulkpoint_label for why it is one value and not a search.
+    def_ref = float(np.median(dfn))
 
     # per-cut mechanism, holds, gates
     for c in cuts + prims:
         c['label'] = cell_label(state, c['si'], c['oi'])
         c['rank'] = ranks[c['oi']]
         c['mech'] = stage4_mechanism(c, state, mode, builds, focal_types,
-                                     arm_label, opp_types, opp_charged)
+                                     arm_label, opp_types, opp_charged,
+                                     opp_fast, def_ref)
         c['holds'] = stage3_holds(c, mode_cubes, arm_cubes, planes)
         c['gates'] = rung_gates(c, c['holds'], c['mech'], ranks, triage, state,
                                 n_iv)
@@ -1879,19 +2369,45 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     # nowhere on the page.
     cuts_claimed = [c for c in cuts if not c['caveat']]
     cuts_caveat = [c for c in cuts if c['caveat']]
-    atk_cuts = [c for c in cuts_claimed if c['axis'] == 'atk']
     prims_claimed = [c for c in prims if not c['caveat']]
-    # Two rung lists, and the difference matters on every page. ``rungs`` is
-    # the EXACT ladder: it is what fields 5 and 6 print, what rank-1 is scored
-    # against, and what the tail sentence counts, and every claim it makes
-    # ("every spread at or above it wins") is exact. ``floor_rungs`` is the
-    # wider pool the floor is SELECTED from, exact cuts plus gates plus
-    # near-exact splits.
-    rungs = group_rungs(atk_cuts, n_iv)
-    floor_rungs = group_rungs(atk_cuts + prims_claimed, n_iv)
+    # Two rung lists PER AXIS, and the difference matters on every page.
+    # ``rungs_by_axis`` is the EXACT ladder: it is what fields 5 and 6 print,
+    # what rank-1 is scored against, and what the tail sentence counts, and
+    # every claim it makes ("every spread at or above it wins") is exact.
+    # ``floor_rungs_by_axis`` is the wider pool the line is SELECTED from,
+    # exact cuts plus gates plus near-exact splits.
+    rungs_by_axis, floor_rungs_by_axis, axis_pick = {}, {}, {}
+    for _axis in AXES:
+        _cuts_a = [c for c in cuts_claimed if c['axis'] == _axis]
+        _prims_a = [c for c in prims_claimed if c['axis'] == _axis]
+        rungs_by_axis[_axis] = group_rungs(_cuts_a, n_iv)
+        floor_rungs_by_axis[_axis] = group_rungs(_cuts_a + _prims_a, n_iv)
+        axis_pick[_axis] = stage6_select(floor_rungs_by_axis[_axis], n_iv=n_iv)
 
-    floor_rung = stage6_select(floor_rungs, n_iv=n_iv)
-    sensitivity = stage6_sensitivity(floor_rungs, atk=atk, n_iv=n_iv)
+    # V3 cross-axis choice. Each axis has run the same band, the same merge
+    # and the same gates; the headline is the line whose best clearer gains
+    # the most matchups over the best spread that MISSES that same line, with
+    # the stronger primitive, then cross-setting survival, then the larger
+    # pool breaking a tie inside 1% of the focal's matchups.
+    _total_won = win.reshape(n_iv, -1).sum(axis=1)
+    _r1_i = int(np.argmax(sp))
+    _total_cells = int(win[_r1_i].size)
+    axis_candidates = []
+    for _axis in AXES:
+        r = axis_pick[_axis]
+        axis_candidates.append({
+            'axis': _axis, 'rung': r,
+            'kind': (rung_kind(r) if r is not None else 'near_exact'),
+            'net': (line_net(planes[_axis] >= r['T'], _total_won)
+                    if r is not None else None)})
+    chosen = stage6_cross_axis(axis_candidates, _total_cells)
+    floor_axis = chosen['axis'] if chosen is not None else 'atk'
+    floor_rung = chosen['rung'] if chosen is not None else None
+    fplane = planes[floor_axis]
+    atk_cuts = [c for c in cuts_claimed if c['axis'] == floor_axis]
+    rungs = rungs_by_axis[floor_axis]
+    floor_rungs = floor_rungs_by_axis[floor_axis]
+    sensitivity = stage6_sensitivity(floor_rungs, atk=fplane, n_iv=n_iv)
     # E2 audit: what each primitive ALONE would have selected, so a reader can
     # see whether the widened pool moved the line and by how much.
     primitive_picks = {}
@@ -1899,10 +2415,10 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         pick = stage6_select(floor_rungs, n_iv=n_iv, kinds=(kind,))
         if pick is not None:
             primitive_picks[kind] = {
-                'T': pick['T'],
-                'printed': printed_cut(pick['T'], atk, field='Primitive audit',
+                'T': pick['T'], 'axis': floor_axis,
+                'printed': printed_cut(pick['T'], fplane, field='Primitive audit',
                                        ctx={'cell': pick['cells'][0]['label']})[0],
-                'dp': printed_cut(pick['T'], atk, field='Primitive audit',
+                'dp': printed_cut(pick['T'], fplane, field='Primitive audit',
                                   ctx={'cell': pick['cells'][0]['label']})[1],
                 'cell': floor_cell_of(pick)['label'],
                 'n_pass': pick['n_pass'], 'pool_share': pick['pool_share'],
@@ -1922,17 +2438,18 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
             c = sorted(r['cells'],
                        key=lambda x: (PRIMITIVE_RANK[x['kind']], x['T']))[0]
             failed = [g for g, ok in r['gates'].items() if not ok]
-            rej = {'T': r['T'],
-                   'printed': printed_cut(r['T'], atk, field='Primitive audit',
+            rej = {'T': r['T'], 'axis': floor_axis,
+                   'printed': printed_cut(r['T'], fplane, field='Primitive audit',
                                           ctx={'cell': c['label']})[0],
-                   'dp': printed_cut(r['T'], atk, field='Primitive audit',
+                   'dp': printed_cut(r['T'], fplane, field='Primitive audit',
                                      ctx={'cell': c['label']})[1],
                    'cell': c['label'], 'pool_share': r['pool_share'],
                    'failed': failed,
                    'modes_ok': c['holds']['modes_ok'],
                    'modes_total': c['holds']['modes_total']}
             break
-        primitive_picks[kind] = None if rej is None else {'rejected': rej}
+        primitive_picks[kind] = (None if rej is None
+                                 else {'rejected': rej, 'axis': floor_axis})
 
     contested_cells = [(int(si), int(oi))
                        for si, oi in zip(*np.nonzero(triage['contested_mask']))]
@@ -1997,6 +2514,42 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         'caps': caps,
         'dirty_thresholds': dirty,
         'primitive_picks': primitive_picks,
+        'floor_axis': floor_axis,
+        # Which axes the page actually TESTED. G-material-gap wants a number
+        # of distinct attainable values below the cut, and an axis whose
+        # whole grid is shorter than that bar is disqualified by
+        # CONSTRUCTION -- a negative page claiming "no HP threshold decides a
+        # matchup" about a test that could never run is untestable-not-tested
+        # dressed as a result. Measured, not assumed, per axis and per arm.
+        'axis_testable': {
+            a: {'n_distinct': int(np.unique(planes[a]).size),
+                'need': MIN_ATTAINED_BELOW[a],
+                'ok': bool(int(np.unique(planes[a]).size) - 1
+                           >= MIN_ATTAINED_BELOW[a])}
+            for a in AXES},
+        'axis_nets': {c['axis']: c['net'] for c in axis_candidates},
+        # Everything the cross-axis comparator saw, so G-recompute can re-run
+        # the decision from the cube instead of trusting the reported clause.
+        # ``decided_by`` is a printed CLAIM about which rule fired ("on the
+        # larger net" beside "attack +9, defense +4" would be false), so it
+        # is re-derived like every other printed number.
+        'axis_inputs': [
+            {'axis': c['axis'], 'net': c['net'],
+             'kind': (c['kind'] if c['rung'] is not None else None),
+             'T': (c['rung']['T'] if c['rung'] is not None else None),
+             'n_pass': (c['rung']['n_pass'] if c['rung'] is not None else None),
+             'modes_ok': (c['rung']['modes_ok'] if c['rung'] is not None
+                          else None),
+             'arms_ok': (c['rung']['arms_ok'] if c['rung'] is not None
+                         else None)}
+            for c in axis_candidates],
+        'axis_choice': (None if chosen is None else
+                        {'axis': chosen['axis'],
+                         'decided_by': chosen['decided_by'],
+                         'tie_window': chosen['tie_window'],
+                         'runner_up': chosen['runner_up'],
+                         'net': chosen['net']}),
+        'cross_axis_tie': CROSS_AXIS_TIE,
         'cmp_near_misses': cmp_near_misses,
         'acquisition': acquisition_class(state['species'],
                                          bool(state['shadow'])),
@@ -2048,7 +2601,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                   and floor_cell_of(floor_rung)['kind'] != 'exact' else [])
     facts['not_claimed'] = _not_claimed(
         win, triage, cuts_claimed + _floor_own,
-        cuts_caveat, contested_cells, state, ranks, floor_rung, atk)
+        cuts_caveat, contested_cells, state, ranks, floor_rung, fplane)
     # E5: the size of the decision, stated as a measured fact -- how many
     # cells the grid's most-winning spread takes, against rank-1's count. On
     # a no-floor arm this is the whole verdict, and rounds 1 and 2 never
@@ -2068,24 +2621,28 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     if floor_rung is None:
         facts['floor'] = None
         facts['rungs_above'] = []
-        facts['rungs_below'] = [_rung_row(r, state, n_iv, atk) for r in rungs
+        facts['rungs_below'] = [_rung_row(r, state, n_iv, fplane)
+                                for r in rungs
                                 if r['gates']['G-material-lo']
                                 and r['gates']['G-material-hi']]
         facts['bulk'] = {'clean_def': facts['clean_counts'].get('def', 0),
                          'clean_hp': facts['clean_counts'].get('hp', 0),
                          'frontier': [], 'cogates': []}
         alt = stage9b_alternative(win, meta, np.zeros(n_iv, bool),
-                                  contested_cells, state, score_ok)
+                                  contested_cells, state, score_ok,
+                                  axes=alt_axes(floor_axis))
         facts['alternative'] = _alt_facts(alt, state, meta, win, n_iv, ranks,
                                           triage, state['opponent_names'])
         facts['examples'] = stage8_examples(meta, win, np.zeros(n_iv, bool),
                                             contested_cells, sp, sp_rank)
         for ex in facts['examples']:
             ex['by_scenario'] = per_scenario_wins(win, ex['i'], n_sc)
-        facts['rank1'] = stage11_rank1(meta, sp, win, rungs, None, atk, n_iv,
-                                       atk_cuts, contested_cells)
+        facts['rank1'] = stage11_rank1(meta, sp, win, rungs, None, fplane,
+                                       n_iv, atk_cuts, contested_cells,
+                                       axis=floor_axis)
         facts['coverage'] = None
-        facts['mirror'] = _mirror(state, win, meta, atk, None, mode_cubes, modes)
+        facts['mirror'] = _mirror(state, win, meta, fplane, None, mode_cubes,
+                                  modes)
         facts['score_only'] = [_score_row(r, atk) for r in
                                stage10_score_only(scores, atk, triage, state, ranks)]
         facts['cost'] = {'reverse_cuts': len(reverse_cuts), 'diff': None}
@@ -2104,14 +2661,19 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
             alt is not None and alt['mask'][facts['rank1']['i']])
         facts['alt_catch'], facts['alt_catch_model'] = _alt_catch(
             alt, meta, facts['acquisition'])
+        facts['other_axis_lines'] = _other_axis_lines(
+            axis_candidates, floor_axis, planes, state, n_iv, win)
         return facts
 
     # --- floor present -------------------------------------------------
     _, meta51 = arm_view(state, arm, mode, 'l51')
     atk51 = meta51[:, 5]
-    pp = stage7_print_precision(floor_rung['T'], atk, atk51, field='Floor',
+    fplane51 = meta51[:, AXIS_META_COL[floor_axis]]
+    pp = stage7_print_precision(floor_rung['T'], fplane, fplane51,
+                                field='Floor',
+                                dp_options=FLOOR_DP_OPTIONS[floor_axis],
                                 ctx=dict(ctx, cell=floor_rung['cells'][0]['label']))
-    floor_mask = atk >= floor_rung['T']
+    floor_mask = fplane >= floor_rung['T']
     floor_cell = floor_cell_of(floor_rung)
     below = ~floor_mask
     below_scores = scores[below, floor_cell['si'], floor_cell['oi']]
@@ -2136,11 +2698,27 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     owners = sorted({
         parse_opponent_spec(names[triage['dedup_of'][(c['si'], c['oi'])][1]])[0]
         for c in floor_rung['cells']})
+    # E8 on the PRINTED line, not only on the evidence table: the one
+    # sentence the module owns about reader-tool precision rendered on
+    # negative pages only, so Furret's Def >= 102.06 (102.063) -- a line that
+    # NEEDS three places to select its 1614 spreads -- never told the reader
+    # what a one-decimal reading would cost.
+    _g = None
+    if pp['dp'] > 1 and floor_axis != 'hp':
+        _g_cut = math.floor(floor_rung['T'] * 10.0) / 10.0
+        _g_above = fplane >= _g_cut
+        _g = {'printed': _g_cut, 'n_above': int(_g_above.sum()),
+              'n_extra': int((_g_above & (fplane < floor_rung['T'])).sum())}
     facts['floor'] = {
         'T': floor_rung['T'], 'printed': pp['printed'], 'dp': pp['dp'],
+        'genre': _g,
         'prev_attained': floor_rung['prev_attained'],
         'n_pass': floor_rung['n_pass'], 'pool_share': floor_rung['pool_share'],
-        'axis': 'atk',
+        'axis': floor_axis,
+        # What the cross-axis rule saw. ``net`` is this line's own measure;
+        # ``axis_nets`` beside it is what the other two axes offered, so the
+        # page can say which line was displaced and by how much.
+        'net': chosen['net'],
         # E2: which primitive carries the line, and both sides of it. An
         # exact cut has n_wrong 0 and n_win_above == n_above; a gate has
         # n_win_below 0 and a rate above at least GATE_MIN_ABOVE; a
@@ -2201,9 +2779,9 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         # spreads below the line win them too. Both halves are carried.
         'merged_from': [
             {'T': r['T'],
-             'printed': printed_cut(r['T'], atk, field='Floor merge',
+             'printed': printed_cut(r['T'], fplane, field='Floor merge',
                                     ctx={'cell': r['cells'][0]['label']})[0],
-             'dp': printed_cut(r['T'], atk, field='Floor merge',
+             'dp': printed_cut(r['T'], fplane, field='Floor merge',
                                ctx={'cell': r['cells'][0]['label']})[1],
              'n_pass': r['n_pass'],
              'n_below_floor_win': int(r['n_pass'] - floor_rung['n_pass']),
@@ -2217,13 +2795,22 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     facts['catch'] = _catch.pop('rows')
     facts['catch_model'] = _catch
     facts['floor']['per_mode_cuts'] = cell_cuts_by_view(
-        floor_cell['si'], floor_cell['oi'], mode_cubes)
+        floor_cell['si'], floor_cell['oi'], mode_cubes, axis=floor_axis)
     facts['floor']['per_arm_cuts'] = cell_cuts_by_view(
-        floor_cell['si'], floor_cell['oi'], arm_cubes)
+        floor_cell['si'], floor_cell['oi'], arm_cubes, axis=floor_axis)
 
     cov = None
     if floor_cell['mech']['kind'] == 'cmp':
         cov = stage5_coverage(floor_cell, state, mode, atk, league)
+    elif floor_cell['mech']['kind'] in ('bulkpoint', 'hp_bulkpoint'):
+        # The bulk ladder, on the SAME seven reference builds: which of the
+        # opponent's own spreads the printed Def (or HP) holds to the stepped
+        # damage. See stage5_bulk_coverage.
+        _oi = floor_cell['oi']
+        cov = stage5_bulk_coverage(
+            floor_cell, floor_cell['mech']['detail'], state, mode, fplane,
+            league, focal_types, opp_types.get(_oi, ()), opp_fast.get(_oi),
+            opp_charged.get(_oi, []))
     facts['coverage'] = cov
 
     # The same line without the shadow bonus. Stats in this blob are
@@ -2260,16 +2847,17 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     tail = [r for r in rungs if r['T'] > top_printed and r not in above_rungs]
     dropped = [r for r in rungs if floor_rung['T'] < r['T'] <= top_printed
                and r not in above_rungs]
-    facts['rungs_above'] = [_rung_row(r, state, n_iv, atk) for r in above_rungs]
-    facts['rungs_above_tail'] = _tail_sentence(tail, atk)
+    facts['rungs_above'] = [_rung_row(r, state, n_iv, fplane)
+                            for r in above_rungs]
+    facts['rungs_above_tail'] = _tail_sentence(tail, fplane)
     facts['rungs_dropped'] = [
-        {'printed': _rung_row(r, state, n_iv, atk)['printed'],
-         'dp': _rung_row(r, state, n_iv, atk)['dp'],
+        {'printed': _rung_row(r, state, n_iv, fplane)['printed'],
+         'dp': _rung_row(r, state, n_iv, fplane)['dp'],
          'cell': r['cells'][0]['label'], 'rank': r['cells'][0]['rank'],
          'pool_share': r['pool_share'],
          'modes_ok': r['modes_ok'], 'modes_total': r['modes_total']}
         for r in dropped]
-    facts['rungs_below'] = [_rung_row(r, state, n_iv, atk) for r in rungs
+    facts['rungs_below'] = [_rung_row(r, state, n_iv, fplane) for r in rungs
                             if r['T'] < floor_rung['T']
                             and MATERIAL_LO <= r['pool_share'] <= MATERIAL_HI]
 
@@ -2281,7 +2869,8 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         'frontier': stage9_frontier(meta, floor_mask),
         'cogates': [_cogate_row(r) for r in
                     stage9_cogates(win, meta, floor_mask, contested_cells,
-                                   ranks, triage, state, n_iv)],
+                                   ranks, triage, state, n_iv,
+                                   axes=alt_axes(floor_axis))],
         'cells_won_range': [
             int(win[floor_mask].reshape(int(floor_mask.sum()), -1).sum(axis=1).min()),
             int(win[floor_mask].reshape(int(floor_mask.sum()), -1).sum(axis=1).max())],
@@ -2292,11 +2881,12 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         r['per_arm_cuts'] = cell_cuts_by_view(rep['si'], rep['oi'], arm_cubes)
         r['per_mode_cuts'] = cell_cuts_by_view(rep['si'], rep['oi'], mode_cubes)
         r['cogates'] = [_cogate_row(x) for x in
-                        stage9_cogates(win, meta, atk >= rung['T'],
+                        stage9_cogates(win, meta, fplane >= rung['T'],
                                        contested_cells, ranks, triage, state,
-                                       n_iv)]
+                                       n_iv, axes=alt_axes(floor_axis))]
 
-    alt = stage9b_alternative(win, meta, floor_mask, contested_cells, state)
+    alt = stage9b_alternative(win, meta, floor_mask, contested_cells, state,
+                              axes=alt_axes(floor_axis))
     facts['alternative'] = _alt_facts(alt, state, meta, win, n_iv, ranks,
                                       triage, state['opponent_names'])
     facts['alt_catch'], facts['alt_catch_model'] = _alt_catch(
@@ -2304,8 +2894,9 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
 
     facts['examples'] = stage8_examples(meta, win, floor_mask, contested_cells,
                                         sp, sp_rank)
-    facts['rank1'] = stage11_rank1(meta, sp, win, rungs, floor_rung, atk, n_iv,
-                                   atk_cuts, contested_cells)
+    facts['rank1'] = stage11_rank1(meta, sp, win, rungs, floor_rung, fplane,
+                                   n_iv, atk_cuts, contested_cells,
+                                   axis=floor_axis)
     facts['rank1']['in_alternative'] = bool(
         alt is not None and alt['mask'][facts['rank1']['i']])
     for ex in facts['examples']:
@@ -2313,15 +2904,24 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     facts['rank1']['by_scenario'] = per_scenario_wins(win, facts['rank1']['i'], n_sc)
     facts['level_reach'] = _level_reach(meta, floor_mask)
 
-    facts['mirror'] = _mirror(state, win, meta, atk, floor_rung, mode_cubes, modes)
+    facts['mirror'] = _mirror(state, win, meta, fplane, floor_rung,
+                              mode_cubes, modes)
     facts['score_only'] = [_score_row(r, atk) for r in
                            stage10_score_only(scores, atk, triage, state, ranks)]
     facts['cost'] = _cost(win, meta, facts, state, ranks, contested_cells,
                           reverse_cuts)
     facts['floor_cost'] = _floor_cost(facts, win, meta, floor_mask)
     facts['floor']['near_rule'] = near_floor_rule(floor_rung, floor_cell,
-                                                  floor_rungs, atk)
-    facts['l51'] = _l51_view(state, arm, mode, floor_rung, floor_cell)
+                                                  floor_rungs, fplane)
+    facts['l51'] = _l51_view(state, arm, mode, floor_rung, floor_cell,
+                             axis=floor_axis)
+    # V3 field: the lines the OTHER two axes selected under the same band and
+    # the same gates. One of them may be the line an expert would have named
+    # (a bulk-first species keeps an attack rung and a Def line at once), and
+    # printing only the winner would hide the fork the cross-axis rule just
+    # resolved.
+    facts['other_axis_lines'] = _other_axis_lines(
+        axis_candidates, floor_axis, planes, state, n_iv, win)
     return facts
 
 
@@ -2361,8 +2961,54 @@ def _mech_facts(mech, cut=None):
                 # the same way the priority clause names the one it compared.
                 'opp_ivs': (b['ivs'] if b else None),
                 'opp_level': (b['level'] if b else None)}
+    if mech['kind'] in ('bulkpoint', 'hp_bulkpoint'):
+        d = mech['detail']
+        b = mech.get('build')
+        out = {'kind': mech['kind'], 'move': d['move'], 'from': d['from'],
+               'to': d['to'], 'def_stage': d['def_stage'],
+               'also': list(d.get('also') or []),
+               'opp_atk_stage': d['opp_atk_stage'],
+               'opp_ivs': (b['ivs'] if b else None),
+               'opp_level': (b['level'] if b else None),
+               'opp_atk': (b['atk'] if b else None)}
+        if mech['kind'] == 'hp_bulkpoint':
+            out['damage'] = d['damage']
+            out['def_ref'] = d['def_ref']
+        return out
     return {'kind': 'unattributed',
             'line': mech.get('line')}
+
+
+def _other_axis_lines(axis_candidates, floor_axis, planes, state, n_iv, win):
+    """The lines the OTHER two axes selected, as printable rows (V3).
+
+    Each is a real line by the same band and the same gates -- it lost the
+    cross-axis comparison, not the eligibility test -- so it is printed with
+    everything the headline line gets except the directive: value, matchup,
+    primitive badge, pool share and mechanism.
+    """
+    out = []
+    for cand in axis_candidates:
+        if cand['axis'] == floor_axis or cand['rung'] is None:
+            continue
+        r = cand['rung']
+        cell = floor_cell_of(r)
+        plane = planes[cand['axis']]
+        pr, dp = printed_cut(r['T'], plane, field='Other axis',
+                             ctx={'cell': cell['label']})
+        out.append({
+            'axis': cand['axis'], 'T': r['T'], 'printed': pr, 'dp': dp,
+            'cell': cell['label'], 'rank': cell['rank'],
+            'kind': cell['kind'], 'badge': PRIMITIVE_BADGE[cell['kind']],
+            'gate_side': cell['gate_side'],
+            'n_pass': r['n_pass'], 'pool_share': r['pool_share'],
+            'net': cand['net'],
+            'mech': _mech_facts(cell['mech'], cell),
+            'modes_ok': cell['holds']['modes_ok'],
+            'modes_total': cell['holds']['modes_total'],
+        })
+    out.sort(key=lambda x: AXES.index(x['axis']))
+    return out
 
 
 def _rung_row(r, state, n_iv, atk):
@@ -2432,15 +3078,21 @@ def _tail_sentence(tail, atk):
 
 
 def stat_threshold_str(axis, printed, dp=2):
-    """'DEF >= 101.40' / 'HP >= 121'.
+    """'Def >= 101.40' / 'HP >= 121'.
 
     HP is an integer in the blob's meta, so it prints as one EVERYWHERE. The
     dirty-threshold table was the one place that did not take this branch,
     which put "HP >= 142" and "HP >= 142.00" on the same Melmetal page and
     claimed a precision the stat does not have.
+
+    V3 spells the axis the way the strip and the floor row always did
+    (Atk / Def / HP, not ATK / DEF / HP). With three axes carrying lines the
+    two spellings would otherwise land in the same five-line strip -- "Def >=
+    102.06" on the Line row beside "ATK >= 122.29" on the Alternative one --
+    which reads as two different kinds of number.
     """
     value = _n(printed) if axis == 'hp' else fmt(printed, dp)
-    return f"{axis.upper()} >= {value}"
+    return f"{AXIS_SHORT[axis]} >= {value}"
 
 
 def cogate_str(c):
@@ -2482,10 +3134,20 @@ def _alt_facts(alt, state, meta, win, n_iv, ranks=None, triage=None,
             out.append(f"{label} ({'; '.join(tags)})")
         return out
 
-    same_hp = meta[:, 7] >= alt['hp_cut']
-    def_pr, def_dp = printed_cut(alt['def_cut'], meta[same_hp, 6],
-                                 field='Alternative target',
-                                 ctx={'cell': 'Def x HP rectangle'})
+    axes = tuple(alt['axes'])
+    outer, inner = alt['search_axes']
+    # The inner cut is printed as a >= selector INSIDE the outer half-plane,
+    # which is the set it actually selects from; the outer one is printed
+    # against the whole grid. Round 2's (Def, HP) version did exactly this
+    # with Def inside HP, and the generalisation keeps it.
+    same_outer = meta[:, AXIS_META_COL[outer]] >= alt['cuts'][outer]
+    pr = {}
+    label = ' x '.join(AXIS_SHORT[a] for a in axes) + ' rectangle'
+    pr[inner] = printed_cut(alt['cuts'][inner],
+                            meta[same_outer, AXIS_META_COL[inner]],
+                            field='Alternative target', ctx={'cell': label})
+    pr[outer] = printed_cut(alt['cuts'][outer], meta[:, AXIS_META_COL[outer]],
+                            field='Alternative target', ctx={'cell': label})
     sp = meta[:, 5] * meta[:, 6] * meta[:, 7]
     cells_won = win[mask].reshape(int(mask.sum()), -1).sum(axis=1)
     # E12: the step the genre ends on -- "these are the spreads to look out
@@ -2506,10 +3168,21 @@ def _alt_facts(alt, state, meta, win, n_iv, ranks=None, triage=None,
                     'sp_share': float(sp[mask][i] / sp.max())}
                    for i in order],
     }
-    return {
+    out = {
         'envelope': envelope,
-        'def_cut': alt['def_cut'], 'def_printed': def_pr, 'def_dp': def_dp,
-        'hp_cut': alt['hp_cut'], 'n': alt['n'],
+        'axes': list(axes), 'label': label,
+        'cut_a': alt['cuts'][axes[0]], 'cut_b': alt['cuts'][axes[1]],
+        'printed_a': pr[axes[0]][0], 'dp_a': pr[axes[0]][1],
+        'printed_b': pr[axes[1]][0], 'dp_b': pr[axes[1]][1],
+        # A rectangle whose cut on one axis is that axis's grid MINIMUM does
+        # not constrain it: the target is a single-stat one, and saying
+        # "Atk >= 97.43 and Def >= 84.12" when every spread on the grid has
+        # at least 84.12 Def would print a condition that is not one.
+        'free_a': bool(meta[:, AXIS_META_COL[axes[0]]].min()
+                       >= alt['cuts'][axes[0]]),
+        'free_b': bool(meta[:, AXIS_META_COL[axes[1]]].min()
+                       >= alt['cuts'][axes[1]]),
+        'n': alt['n'],
         'share': alt['n'] / n_iv,
         'sp_share_lo': float((sp[mask] / sp.max()).min()),
         'sp_share_hi': float((sp[mask] / sp.max()).max()),
@@ -2527,6 +3200,45 @@ def _alt_facts(alt, state, meta, win, n_iv, ranks=None, triage=None,
         # cells, not "build for this".
         'too_wide': bool(alt['n'] / n_iv > ALT_SHARE_REFRAME),
     }
+    # Back-compat aliases, present only when the pair really is (Def, HP) --
+    # which is every arm whose line is on attack, and every arm with no line
+    # at all. A (HP, attack) or (Def, attack) rectangle has no Def-and-HP
+    # reading, so it does not get keys that would invite one.
+    if set(axes) == {'def', 'hp'}:
+        out.update({'def_cut': alt['cuts']['def'],
+                    'def_printed': pr['def'][0], 'def_dp': pr['def'][1],
+                    'hp_cut': int(alt['cuts']['hp'])})
+    return out
+
+
+def alt_pair_str(alt):
+    """'101.40 defense with 125 HP' / '97.43 attack' -- the target, spoken.
+
+    Prints only the axes the rectangle actually constrains, so a single-stat
+    target reads as one.
+    """
+    bits = []
+    for key_v, key_p, key_dp, key_free, axis in (
+            ('cut_a', 'printed_a', 'dp_a', 'free_a', alt['axes'][0]),
+            ('cut_b', 'printed_b', 'dp_b', 'free_b', alt['axes'][1])):
+        if alt[key_free]:
+            continue
+        bits.append(_stat_phrase(axis, alt[key_p], alt[key_dp]))
+    if not bits:
+        return 'no condition at all'
+    return ' with '.join(bits)
+
+
+def alt_pair_short(alt):
+    """'Def >= 101.40, HP >= 125' -- the strip and table spelling."""
+    bits = []
+    for key_p, key_dp, key_free, axis in (
+            ('printed_a', 'dp_a', 'free_a', alt['axes'][0]),
+            ('printed_b', 'dp_b', 'free_b', alt['axes'][1])):
+        if alt[key_free]:
+            continue
+        bits.append(stat_threshold_str(axis, alt[key_p], alt[key_dp]))
+    return ', '.join(bits) if bits else 'no condition'
 
 
 def _alt_catch(alt_raw, meta, acquisition):
@@ -2709,13 +3421,13 @@ def _level_reach(meta, floor_mask):
     }
 
 
-def _l51_view(state, arm, mode, floor_rung, floor_cell):
+def _l51_view(state, arm, mode, floor_rung, floor_cell, axis='atk'):
     """D8: the level-51 grid prints its OWN cut for the same cell."""
     try:
         scores51, meta51 = arm_view(state, arm, mode, 'l51')
     except Exception:
         return None
-    atk51 = meta51[:, 5]
+    atk51 = meta51[:, AXIS_META_COL[axis]]
     w = win_cube(scores51[:, floor_cell['si'], floor_cell['oi']])
     got = clean_cut(atk51, w)
     if got is None:
@@ -2723,6 +3435,7 @@ def _l51_view(state, arm, mode, floor_rung, floor_cell):
                 'n_selected_by_l50_literal': int((atk51 >= floor_rung['T']).sum())}
     T51, n51, _prev, _nb = got
     pp = stage7_print_precision(T51, atk51, field='Floor (L51)',
+                                dp_options=FLOOR_DP_OPTIONS[axis],
                                 ctx={'cell': floor_cell['label']})
     return {'clean': True, 'T': T51, 'printed': pp['printed'], 'dp': pp['dp'],
             'n_pass': n51,
@@ -2819,7 +3532,47 @@ def _mech_sentence(mech, shadow, opponent):
             stage += f" at focal Atk stage {mech['atk_stage']:+d}"
         return (f"Mechanism: {mech['move']} damage steps {mech['from']} -> "
                 f"{mech['to']} across the cut{stage}.")
-    return "Mechanism unattributed: no priority line and no damage step sits in the gap."
+    if mech['kind'] == 'bulkpoint':
+        stage = ''
+        if mech['opp_atk_stage']:
+            stage = f" at opponent Atk stage {mech['opp_atk_stage']:+d}"
+        if mech['def_stage']:
+            stage += f" at focal Def stage {mech['def_stage']:+d}"
+        ivs = (f" ({_ivs(mech['opp_ivs'])})" if mech.get('opp_ivs') else '')
+        also = mech.get('also') or []
+        tail = ''
+        if also:
+            tail = (" (" + _and_list([f"{a['move']} {a['from']} -> {a['to']}"
+                                      for a in also])
+                    + (" steps" if len(also) == 1 else " step")
+                    + " across it too)")
+        return (f"Mechanism: bulkpoint -- {opponent}'s{ivs} {mech['move']} "
+                f"drops from {mech['from']} to {mech['to']} damage into us "
+                f"across the cut{stage}{tail}.")
+    if mech['kind'] == 'hp_bulkpoint':
+        stage = ''
+        if mech['opp_atk_stage']:
+            stage = f" at opponent Atk stage {mech['opp_atk_stage']:+d}"
+        if mech['def_stage']:
+            stage += f" at focal Def stage {mech['def_stage']:+d}"
+        ivs = (f" ({_ivs(mech['opp_ivs'])})" if mech.get('opp_ivs') else '')
+        return (f"Mechanism: HP bulkpoint -- {opponent}'s{ivs} {mech['move']} "
+                f"needs {_n(mech['to'])} hits to knock us out across the cut "
+                f"instead of {_n(mech['from'])} "
+                f"({_n(mech['damage'])} damage a hit, measured at the grid's "
+                f"median defense {fmt(mech['def_ref'])}){stage}.")
+    return "Mechanism unattributed: no priority line, damage step or bulkpoint sits in the gap."
+
+
+def _strip_mech_label(sentence):
+    """``_mech_sentence`` without its "Mechanism:" label, for a table cell."""
+    for lead in ('Mechanism: ', 'Mechanism unattributed: '):
+        if sentence.startswith(lead):
+            body = sentence[len(lead):]
+            if lead.endswith('unattributed: '):
+                return 'unattributed -- ' + body
+            return body
+    return sentence
 
 
 def _cell_names(row, with_rank=False):
@@ -2873,8 +3626,9 @@ def _settings_col(row):
     return f"{_n(lo)}-{_n(hi)} of {_n(tot)}"
 
 
-def _rung_line(row, dp_default=2):
-    parts = [f"Atk >= {fmt(row['printed'], row['dp'])}",
+def _rung_line(row, dp_default=2, axis=None):
+    parts = [stat_threshold_str(axis or row.get('axis', 'atk'),
+                                row['printed'], row['dp']),
              f"{_n(row['n_pass'])} spreads ({pct(row['pool_share'])})",
              _cell_names(row)]
     return '  '.join(parts)
@@ -2970,6 +3724,29 @@ def _headline_mech_clause(facts, fl, opp):
         return (f"That is where {m['move']} starts doing {_n(m['to'])} damage "
                 f"to a PvPoke-default {opp}{build} instead of "
                 f"{_n(m['from'])}.")
+    if m['kind'] == 'bulkpoint':
+        build = (f" ({_ivs(m['opp_ivs'])})" if m.get('opp_ivs') else '')
+        # When several of its moves step at the same value the headline says
+        # so: naming one of three reads as the only one, and the move named
+        # is the one whose step is the largest SHARE of its own damage, not
+        # the largest in points.
+        also = m.get('also') or []
+        tail = ''
+        if also:
+            tail = (" Its "
+                    + _and_list([f"{a['move']} ({_n(a['from'])} -> "
+                                 f"{_n(a['to'])})" for a in also])
+                    + (" steps" if len(also) == 1 else " step")
+                    + " across the same line.")
+        return (f"That is where a PvPoke-default {opp}{build} stops doing "
+                f"{_n(m['from'])} with {m['move']} and starts doing "
+                f"{_n(m['to'])}.{tail}")
+    if m['kind'] == 'hp_bulkpoint':
+        build = (f" ({_ivs(m['opp_ivs'])})" if m.get('opp_ivs') else '')
+        return (f"That is where a PvPoke-default {opp}{build} needs "
+                f"{_n(m['to'])} {m['move']} hits to knock you out instead of "
+                f"{_n(m['from'])}, at {_n(m['damage'])} damage a hit against "
+                f"the grid's median defense of {fmt(m['def_ref'])}.")
     return ''
 
 
@@ -2979,10 +3756,21 @@ def _headline_coverage_clause(facts, fl, opp):
     if cov:
         rows = {r['label']: r for r in cov['rows']}
         row = rows.get('hundo (15/15/15)') or cov['rows'][-1]
-        return (f"It is built for the default {opp}; a "
-                f"{'hundo' if row['label'].startswith('hundo') else row['label']} "
-                f"{opp} moves it to "
-                f"{headline_value(row['printed'], row['dp'])}, and the ladder "
+        who = 'hundo' if row['label'].startswith('hundo') else row['label']
+        if row['printed'] is None:
+            return (f"It is built for the default {opp}; no spread of ours "
+                    f"reaches what a {who} {opp} asks for, and the ladder "
+                    f"further down has the rest.")
+        value = (_n(row['printed']) if cov.get('axis') == 'hp'
+                 else headline_value(row['printed'], row['dp']))
+        flat = len({r['line'] for r in cov['rows']
+                    if r['line'] is not None}) == 1
+        if flat:
+            return (f"It is built for the default {opp}, and every build of "
+                    f"that species asks for the same value, so the line does "
+                    f"not move with theirs.")
+        return (f"It is built for the default {opp}; a {who} "
+                f"{opp} moves it to {value}, and the ladder "
                 f"further down has the rest.")
     if fl['mech']['kind'] == 'breakpoint':
         return (f"It is built for the default {opp}; a bulkier {opp} moves "
@@ -3052,18 +3840,75 @@ def _matchup_list(names, omitted=0):
     return _and_list(bits)
 
 
-def _headline_rungs(rungs):
-    """The next one or two steps up, each with what it adds, one per sentence."""
+def _shortfall_phrase(axis, shortfall):
+    """'6.35 attack' / '4 HP' -- a distance on the line's own axis."""
+    if axis == 'hp':
+        return f"{_n(int(round(shortfall)))} {AXIS_WORD[axis]}"
+    return f"{fmt(shortfall)} {AXIS_WORD[axis]}"
+
+
+def _headline_rungs(rungs, axis='atk'):
+    """The next one or two steps up, each with what it adds, one per sentence.
+
+    The ladder walks the FLOOR'S OWN axis, so a Def line's next step up is a
+    Def value; v2 said "attack" here whatever the number was.
+    """
     if not rungs:
         return (f"No higher line keeps {pct(RUNG_POOL_MIN, 0)} of the grid, "
                 f"so this is the last step this page names.")
     out = []
     for i, r in enumerate(rungs):
-        value = headline_value(r['printed'], r['dp'])
         adds = _matchup_list(r['names'], r['omitted'])
-        out.append(f"The next step up is {value} attack, which adds {adds}."
+        phrase = _stat_phrase(axis, r['printed'], r['dp'])
+        value = headline_value(r['printed'], r['dp'])
+        out.append(f"The next step up is {phrase}, which adds {adds}."
                    if i == 0 else f"{value} adds {adds}.")
     return ' '.join(out)
+
+
+def _headline_other_axis(facts):
+    """The line the OTHER axis carries, when there is one (V3).
+
+    Each of the three axes runs the same band and the same gates and selects
+    its own line; the headline names one. Saying so is the difference between
+    a verdict and a silent choice -- the Def line an expert would have named
+    is on the page either way, and the reader is told it lost the comparison
+    rather than that it does not exist.
+    """
+    rows = facts.get('other_axis_lines') or []
+    if not rows:
+        return ''
+    bits = []
+    for r in rows:
+        phrase = _stat_phrase(r['axis'], r['printed'], r['dp'])
+        gain = ('' if r['net'] is None else
+                f", where the spread clearing it that wins the most matchups "
+                f"takes {_n(r['net'])} more than the spread that misses it "
+                f"and wins the most" if r['net'] > 0 else
+                f", where the spread clearing it that wins the most matchups "
+                f"takes {_n(-r['net'])} fewer than the spread that misses it "
+                f"and wins the most" if r['net'] < 0 else
+                ", where the spread clearing it that wins the most matchups "
+                "ties the spread that misses it and wins the most")
+        bits.append(f"{phrase} for {_matchup(r['cell'], r['rank'])}{gain}")
+    plural = 'A separate line' if len(bits) == 1 else 'Separate lines'
+    ch = facts.get('axis_choice') or {}
+    why = {
+        'net': "The printed line is the one with the larger net.",
+        'primitive': "The nets are close enough to call level, so the "
+                     "printed line is the one that is an exact rule where the "
+                     "other is not.",
+        'robustness': "The nets are close enough to call level and both rules "
+                      "are equally clean, so the printed line is the one that "
+                      "holds in more of the baked settings and movesets.",
+        'pool': "Both lines are equally clean, equally attributed and hold in "
+                "the same settings, and their nets are level, so the printed "
+                "one is the one that asks less of the build.",
+        'axis order': "The nets, the rules and the spread counts are all "
+                      "level, so the printed line is the first of them by "
+                      "stat order.",
+    }.get(ch.get('decided_by'), '')
+    return (f"{plural} on another stat: " + _and_list(bits) + ". " + why)
 
 
 def _headline_bulk(alt, facts):
@@ -3076,12 +3921,13 @@ def _headline_bulk(alt, facts):
     what gets read, so it carries it now.
     """
     reach = _reach_clause(facts.get('alt_catch_model'), noun='pair')
+    fl = facts.get('floor') or {}
+    pair_word = _alt_pair_word(fl.get('axis', 'atk'))
     if alt is None:
-        return (f"No defense-and-HP pair of {_n(ALT_MIN_MEMBERS)} spreads or "
-                f"more wins a matchup the attack line cannot, so there is no "
+        return (f"No {pair_word} of {_n(ALT_MIN_MEMBERS)} spreads or "
+                f"more wins a matchup the printed line cannot, so there is no "
                 f"second target to name.")
-    pair = (f"{fmt(alt['def_printed'], alt['def_dp'])} defense with "
-            f"{_n(alt['hp_cut'])} HP")
+    pair = alt_pair_str(alt)
     given = ("nothing the line holds" if alt['n_given_up'] == 0 else
              f"{_n(alt['n_given_up'])} "
              f"{_noun(alt['n_given_up'], 'matchup')} the line holds")
@@ -3102,8 +3948,16 @@ def _headline_bulk(alt, facts):
             tail = (f" At most {pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads "
                     f"outside the pair win {_n(n_x)} of those; the rest are "
                     f"not exclusive to it.")
-    return (f"Trading attack for bulk -- {pair}, {_n(alt['n'])} spreads -- "
+    trade = ('Trading attack for bulk' if fl.get('axis', 'atk') == 'atk'
+             else f"Trading {AXIS_WORD[fl['axis']]} for the other stats")
+    return (f"{trade} -- {pair}, {_n(alt['n'])} spreads -- "
             f"gives up {given} and {picks}." + tail + reach)
+
+
+def _alt_pair_word(floor_axis):
+    """'defense-and-HP pair' / 'HP-and-attack pair' -- the fork's two stats."""
+    a, b = alt_axes(floor_axis)
+    return f"{AXIS_WORD[a]}-and-{AXIS_WORD[b]} pair"
 
 
 def _headline_cost(facts, floor, r1):
@@ -3135,6 +3989,24 @@ def _headline_cost(facts, floor, r1):
         out += (f" Build {_ivs(r1['ivs'])} and concede "
                 f"{_matchup(floor['cell'])}.")
     return out
+
+
+def _headline_lead(who, arm_label, league, floor, costly):
+    """The opening sentence: the directive, or the line and its price.
+
+    Pulled out of ``build_headline`` so the demoted wording can be pinned on
+    a bulk floor without a blob -- on the bulk axes the stat-product rank-1
+    build usually clears the line already, so the demotion branch is rare in
+    the corpus and would otherwise ship untested.
+    """
+    word = AXIS_WORD[floor['axis']]
+    if costly:
+        return (f"{who} running {arm_label} in {league} has "
+                f"{'a' if word != 'attack' else 'an'} {word} line at "
+                f"{headline_value(floor['printed'], floor['dp'])}, and "
+                f"clearing it costs more than it buys.")
+    return (f"Most {who} running {arm_label} in {league} should have at "
+            f"least {_stat_phrase(floor['axis'], floor['printed'], floor['dp'])}.")
 
 
 def _headline_near_rule(floor):
@@ -3177,25 +4049,19 @@ def build_headline(facts, same_as=None):
         return _headline_no_floor(facts, who, league, same_as)
 
     opp = floor['cell'].split(' ', 1)[1]
-    value = headline_value(floor['printed'], floor['dp'])
     costly = bool((facts.get('floor_cost') or {}).get('material'))
     if same_as:
         # Four near-identical mechanism paragraphs on the Shadow Sableye page
         # read as padding and hid the one thing that differs between the
         # movesets. The strip above stays complete per moveset; the paragraph
         # says what it shares and moves on.
-        first = [f"Same line as {same_as}: at least {value} attack for "
-                 f"{_matchup(floor['cell'], floor['rank'])}, reached by "
+        first = [f"Same line as {same_as}: at least "
+                 f"{_stat_phrase(floor['axis'], floor['printed'], floor['dp'])}"
+                 f" for {_matchup(floor['cell'], floor['rank'])}, reached by "
                  f"{_n(floor['n_pass'])} of the {_n(h['n_iv'])} IV spreads "
                  f"({pct(floor['pool_share'])})."]
     else:
-        if costly:
-            lead = (f"{who} running {h['arm_label']} in {league} has an attack "
-                    f"line at {value}, and clearing it costs more than it "
-                    f"buys.")
-        else:
-            lead = (f"Most {who} running {h['arm_label']} in {league} should "
-                    f"have at least {value} attack.")
+        lead = _headline_lead(who, h['arm_label'], league, floor, costly)
         first = [
             lead,
             f"{_n(floor['n_pass'])} of the {_n(h['n_iv'])} IV spreads "
@@ -3221,12 +4087,15 @@ def build_headline(facts, same_as=None):
                   f"clears it, so there is nothing to trade away here."]
     else:
         second = [f"The stat-product rank-1 spread, {_ivs(r1['ivs'])}, misses "
-                  f"it by {fmt(r1['shortfall'])} attack, and wins "
+                  f"it by "
+                  f"{_shortfall_phrase(floor['axis'], r1['shortfall'])}"
+                  f", and wins "
                   f"{_n(r1['total_won'])} of its {_n(r1['total_cells'])} "
                   f"matchups."]
     second.append(_headline_cost(facts, floor, r1))
     second.append(_headline_near_rule(floor))
-    second.append(_headline_rungs(facts['rungs_above'][:2]))
+    second.append(_headline_rungs(facts['rungs_above'][:2], floor['axis']))
+    second.append(_headline_other_axis(facts))
     second.append(_headline_bulk(alt, facts))
     second.append(
         f"{_n(nc['n_no_rule'])} of the {_n(nc['of'])} contested matchups turn "
@@ -3327,7 +4196,7 @@ def _reverses_clause(info):
             f"baked opponent-IV settings")
 
 
-def _closest_why_not(d):
+def _closest_why_not(d, n_iv=4096):
     """Why the closest rule is not the line -- the page's best missing sentence.
 
     Without it a negative page names a rule wrong on 1 spread in 4096 against
@@ -3336,9 +4205,31 @@ def _closest_why_not(d):
     computed beside the rule (``disqualifier``); this only says it.
     """
     dq = d.get('disqualified') or {}
-    if dq.get('reason') == 'axis':
-        return (" This page prints attack lines only, so that one is "
-                "evidence, not a target.")
+    if dq.get('reason') == 'not_a_candidate':
+        # V3: with all three axes in the pool, "it is on the wrong axis" is
+        # gone as a reason and a rule that never reached the pool did so on
+        # its own numbers. Say which bar it missed -- Altaria's Def 148.29 is
+        # 90.9% pure above the line against a 97% bar, and 190 of 4096 on the
+        # wrong side against a near-exact limit of 20.
+        limit = near_exact_limit(n_iv)
+        if d.get('one_sided'):
+            rate = (d['n_win_above'] / d['n_above'] if d['gate_side'] ==
+                    'necessary' else 1.0 - d['n_win_below'] / d['n_below'])
+            side = ('of the spreads at or above it win'
+                    if d['gate_side'] == 'necessary'
+                    else 'of the spreads below it lose')
+            # "one-sided gate" is the machinery's noun and G-voice bars it
+            # from the headline, so the bar is named by what it measures.
+            return (f" It is not a build line because "
+                    f"{pct_below(rate, GATE_MIN_ABOVE)} {side}, "
+                    f"under the {pct(GATE_MIN_ABOVE, 0)} a rule with one "
+                    f"clean side needs, and {_n(d['n_wrong'])} of "
+                    f"{_n(n_iv)} spreads sit on the wrong side of it, over "
+                    f"the {_n(limit)} a near-exact rule allows.")
+        return (f" It is not a build line because {_n(d['n_wrong'])} of "
+                f"{_n(n_iv)} spreads sit on the wrong side of it -- over the "
+                f"{_n(limit)} a near-exact rule allows -- and neither side of "
+                f"it is clean.")
     if dq.get('reason') != 'gates':
         return ''
     failed = dq.get('failed') or []
@@ -3348,6 +4239,14 @@ def _closest_why_not(d):
         return (" It is not a build line because its opponent is outside the "
                 f"top {_n(RANK_GATE)}.")
     if 'G-attributed' in failed:
+        if dq.get('axis') == 'def':
+            return (" It is not a build line because no bulkpoint -- no step "
+                    "in the damage that opponent does to us -- lands in the "
+                    "interval it turns over in.")
+        if dq.get('axis') == 'hp':
+            return (" It is not a build line because no change in the number "
+                    "of hits that opponent needs to knock us out lands in the "
+                    "interval it turns over in.")
         return (" It is not a build line because no priority line or damage "
                 "step lands in the interval it turns over in.")
     if not dq.get('in_band'):
@@ -3362,7 +4261,7 @@ def _closest_sentence(d, n_iv):
     """The closest rule to a line, in words, with its own numbers (item 3)."""
     where = _matchup(d['cell'], d['rank'])
     rule = _stat_phrase(d['axis'], d['printed'], d['dp'])
-    why = _closest_why_not(d)
+    why = _closest_why_not(d, n_iv)
     # Two sentences: the rule, then its two sides. As one it ran to 37 words,
     # which is the longest thing on a negative page and its main content.
     head = f"The closest thing to a line is {rule} in {where}."
@@ -3396,15 +4295,28 @@ def _headline_no_floor(facts, who, league, same_as=None):
     r1 = facts['rank1']
     alt = facts['alternative']
     dirty = facts['dirty_thresholds']
-    # "No single stat threshold decides a matchup" was false as written on
-    # every page whose closest rule is on Def or HP -- a defense threshold IS
-    # a single stat threshold, and 4095 of 4096 correct is "decides" by any
-    # player's standard. The claim is now scoped to what the floor pool
-    # actually searches, and the closest-rule sentence says when the rule it
-    # names is on another axis.
-    lead = (f"{'Same result as ' + same_as + ': no' if same_as else 'No'} "
-            f"single attack threshold decides a matchup for {who} running "
-            f"{h['arm_label']} in {league}; build for stat product.")
+    # V2 scoped this to the attack axis, because that was the only axis the
+    # floor pool searched. V3 searches all three, so the claim is the wider
+    # one again -- and it is now true as written: no attack, defense or HP
+    # threshold cleared every gate inside the band.
+    # Name the axes that were TESTED. V3 round 1 always claimed all three,
+    # including on grids where the HP axis could not produce a candidate at
+    # all (a 20-value gap bar against a 17-value HP grid).
+    tested = facts.get('axis_testable') or {}
+    live = [a for a in AXES if tested.get(a, {}).get('ok', True)]
+    dead = [a for a in AXES if a not in live]
+    axis_list = _and_list([AXIS_WORD[a] for a in live]).replace(' and ', ' or ')
+    if live:
+        lead = (f"{'Same result as ' + same_as + ': no' if same_as else 'No'} "
+                f"{axis_list} threshold decides a matchup for {who} "
+                f"running {h['arm_label']} in {league}; build for stat "
+                f"product.")
+    else:
+        # Every axis short of the distinct-values bar: the honest lead is that
+        # no axis could be tested, not that none of them decided anything.
+        lead = (f"No stat on this grid carries enough distinct attainable "
+                f"values to test a threshold for {who} running "
+                f"{h['arm_label']} in {league}; build for stat product.")
     first = [lead]
     if dirty:
         first.append(_closest_sentence(dirty[0], h['n_iv']))
@@ -3413,23 +4325,40 @@ def _headline_no_floor(facts, who, league, same_as=None):
             f"No matchup against a top-{_n(RANK_GATE)} opponent even has a "
             f"rough threshold that beats predicting one outcome for every "
             f"spread.")
+    if dead:
+        # After the closest rule, not before it: this is a note about what
+        # the page could test, and it reads as a contradiction if it lands
+        # ahead of a named rule on one of those same stats. (The dirty
+        # threshold table is a separate search and does not apply the gap
+        # bar, which is why a rule can be named on an untested axis.)
+        t = tested[dead[0]]
+        counts = sorted({tested[a]['n_distinct'] for a in dead})
+        held = (f"{_n(counts[0])} distinct attainable "
+                f"{_noun(counts[0], 'value')}" if len(counts) == 1 else
+                f"{_and_list([_n(c) for c in counts])} distinct attainable "
+                f"values")
+        first.append(
+            f"The {_and_list([AXIS_WORD[a] for a in dead])} "
+            f"{'axis is' if len(dead) == 1 else 'axes are'} not tested on "
+            f"this grid: {'it carries' if len(dead) == 1 else 'they carry'} "
+            f"{held} in all, and a line needs {_n(t['need'])} of them below "
+            f"it.")
 
     second = []
+    pair_word = _alt_pair_word('atk')
     if alt is None:
         second.append(
-            f"No defense-and-HP pair of {_n(ALT_MIN_MEMBERS)} spreads or more "
+            f"No {pair_word} of {_n(ALT_MIN_MEMBERS)} spreads or more "
             f"wins a matchup the rest of the grid does not, so the answer "
             f"here is stat product.")
     elif alt['too_wide']:
-        pair = (f"{fmt(alt['def_printed'], alt['def_dp'])} defense with "
-                f"{_n(alt['hp_cut'])} HP")
+        pair = alt_pair_str(alt)
         second.append(
-            f"Bulk does not separate either: the only defense-and-HP pair "
+            f"Bulk does not separate either: the only {pair_word} "
             f"that buys anything, {pair}, is already {pct(alt['share'])} of "
             f"the grid.")
     else:
-        pair = (f"{fmt(alt['def_printed'], alt['def_dp'])} defense with "
-                f"{_n(alt['hp_cut'])} HP")
+        pair = alt_pair_str(alt)
         # Two sentences, not one 38-word one: the pair and its size, then
         # what it buys.
         second.append(
@@ -3511,8 +4440,7 @@ def build_strip(facts):
     r1 = facts['rank1']
     alt = facts['alternative']
     rect = ('none' if alt is None else
-            f"Def >= {fmt(alt['def_printed'], alt['def_dp'])}, HP >= "
-            f"{_n(alt['hp_cut'])} ({_n(alt['n'])} spreads, "
+            f"{alt_pair_short(alt)} ({_n(alt['n'])} spreads, "
             f"{pct(alt['share'])})")
     # A five-line values-only strip cannot afford to name a target the prose
     # two lines below retracts. The headline calls a pair over
@@ -3522,14 +4450,19 @@ def build_strip(facts):
         rect = (f"none (the widest pair that buys anything is already "
                 f"{pct(alt['share'])} of the grid)")
     if fl is not None:
-        line = (f"Atk >= {headline_value(fl['printed'], fl['dp'])} "
+        # V3: the strip's first row names the AXIS. Five labelled values above
+        # a verdict cannot leave the reader to infer which stat "148.29" is.
+        axis_v = (_n(fl['printed']) if fl['axis'] == 'hp'
+                  else headline_value(fl['printed'], fl['dp']))
+        line = (f"{AXIS_SHORT[fl['axis']]} >= {axis_v} "
                 f"[{strip_badge(fl)}] -- "
                 f"{_n(fl['n_pass'])} of {_n(h['n_iv'])} spreads "
                 f"({pct(fl['pool_share'])})")
         decides = f"{fl['cell']}, rank {fl['rank']}"
         rank1 = (f"{_ivs(r1['ivs'])} -- clears it"
                  if r1['clears_floor'] else
-                 f"{_ivs(r1['ivs'])} -- {fmt(r1['shortfall'])} attack short")
+                 f"{_ivs(r1['ivs'])} -- "
+                 f"{_shortfall_phrase(fl['axis'], r1['shortfall'])} short")
         nc = facts['not_claimed']
         last = (f"{_n(nc['n_no_rule'])} of {_n(nc['of'])} contested matchups",)
         values = (line, decides, rank1, rect) + last
@@ -3575,8 +4508,8 @@ def _field(n, title, lines=None, head=None, rows=None, note=None):
 # one and what does it cost"; everything after is the ladder and the audit.
 # The contract is the fifteen fields BY NAME, and no field's content changes
 # here -- only its position, and the number it is printed with.
-FIELD_ORDER = ('_f1_header', '_f2_floor', '_f9_examples', '_f4_rank1',
-               '_f8_alternative', '_f10_cost', '_f5_rungs_above',
+FIELD_ORDER = ('_f1_header', '_f2_floor', '_f16_other_axis', '_f9_examples',
+               '_f4_rank1', '_f8_alternative', '_f10_cost', '_f5_rungs_above',
                '_f6_rungs_below', '_f7_bulk', '_f3_coverage', '_f11_mirror',
                '_f12_score_only', '_f13_not_claimed', '_f14_how_sure',
                '_f15_provenance')
@@ -3586,7 +4519,10 @@ FIELD_DERIVATION_ORDER = (
     '_f1_header', '_f2_floor', '_f3_coverage', '_f4_rank1', '_f5_rungs_above',
     '_f6_rungs_below', '_f7_bulk', '_f8_alternative', '_f9_examples',
     '_f10_cost', '_f11_mirror', '_f12_score_only', '_f13_not_claimed',
-    '_f14_how_sure', '_f15_provenance')
+    '_f14_how_sure', '_f15_provenance',
+    # V3, derived at stage 6 with the cross-axis pick and printed right under
+    # the line it lost to.
+    '_f16_other_axis')
 
 
 def build_fields(facts):
@@ -3704,13 +4640,28 @@ def _f2_floor(facts):
                             'wins below'],
                       rows=rows)
     lines = [
-        f"Atk >= {fmt(fl['printed'], fl['dp'])} -- {_n(fl['n_pass'])} of "
+        f"{stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])} -- "
+        f"{_n(fl['n_pass'])} of "
         f"{_n(h['n_iv'])} spreads ({pct(fl['pool_share'])}).",
         _primitive_sentence(fl, h['n_iv']),
         _mech_sentence(fl['mech'], h['shadow'], fl['cell'].split(' ', 1)[1]),
         f"{'Owns' if fl['kind'] == 'exact' else 'Decides'}: {fl['cell']} "
         f"(rank {fl['rank']}).",
     ]
+    if fl.get('genre') and fl['genre']['n_extra']:
+        # E8, on the printed line. Silent when the one-decimal reading selects
+        # exactly the same spreads -- then there is nothing to warn about. The exact value is the one that selects
+        # the set every count on the page describes; a reader typing it into
+        # a one-decimal tool selects a different set, and that difference is
+        # a number rather than an argument.
+        g = fl['genre']
+        lines.insert(1, (
+            f"At the one decimal place PvPoke and Poke Genie display this "
+            f"reads {stat_threshold_str(fl['axis'], g['printed'], 1)}, which "
+            f"selects {_n(g['n_above'])} spreads where the exact value "
+            f"selects {_n(fl['n_pass'])}: "
+            f"{_n(g['n_extra'])} more {_noun(g['n_extra'], 'spread')} land "
+            f"inside a line printed that way."))
     for m in fl.get('merged_from') or []:
         lines.append(
             f"Also buys: {_merged_cell_names(m)}. Its own clean cut is "
@@ -3905,6 +4856,152 @@ def _catch_sentence(acquisition, catch, what, model=None):
     return (f"{source} needed to {what}: {counts}. Model: {caveat}.")
 
 
+def _f16_other_axis(facts):
+    """V3: the lines the other two axes selected, and why they are not it.
+
+    Michael's v3 spec: floors extend to Def and HP, and each axis selects
+    independently. Exactly one line can be the verdict, so the other two are
+    printed here with everything but the directive -- the reader sees the
+    fork rather than a silent choice.
+    """
+    rows_src = facts.get('other_axis_lines') or []
+    fl = facts['floor']
+    nets = facts.get('axis_nets') or {}
+    if not rows_src:
+        if fl is None:
+            return _field(16, 'Lines on the other stats',
+                          ["No axis carries a line on this arm, so there is "
+                           "nothing to compare across them."])
+        others = ' nor '.join(AXIS_WORD[a] for a in AXES
+                              if a != fl['axis'])
+        return _field(16, 'Lines on the other stats',
+                      [f"Neither {others} carries a line of its own on this "
+                       f"arm: no threshold on either clears every gate with a "
+                       f"pool inside [{pct(DECISION_BAND[0], 0)}, "
+                       f"{pct(DECISION_BAND[1], 0)}] of the grid."])
+    rows = [[stat_threshold_str(r['axis'], r['printed'], r['dp']),
+             f"{r['cell']} (rank {r['rank']})" if r['rank'] is not None
+             else f"{r['cell']} (unranked)",
+             PRIMITIVE_BADGE[r['kind']]
+             + (f" ({r['gate_side']})"
+                if r['kind'] == 'gate' and r['gate_side'] else ''),
+             f"{_n(r['n_pass'])} ({pct(r['pool_share'])})",
+             '-' if r['net'] is None else f"{r['net']:+d}",
+             # The column is already headed "mechanism", so the sentence's
+             # own label is repetition inside the cell.
+             _strip_mech_label(
+                 _mech_sentence(r['mech'], facts['header']['shadow'],
+                                r['cell'].split(' ', 1)[1]))]
+            for r in rows_src]
+    lines = [
+        "Each of the three stats runs the same band, the same merge and the "
+        "same gates, and selects its own line. One of them is printed above "
+        "as the verdict; these are the others.",
+        f"The choice is made on NET MATCHUPS, the only measure the three "
+        f"axes share and the only one that asks the same question of each: "
+        f"the spread that clears a line and wins the most matchups, against "
+        f"the spread that MISSES that same line and wins the most -- what "
+        f"crossing it buys. (What clearing it COSTS the stat-product build is a separate "
+        f"question, and field 10 answers it.) A difference under "
+        f"{pct(CROSS_AXIS_TIE, 0)} of the "
+        f"{_n(facts['header']['total_cells'])} matchups on this dive is a "
+        f"tie, and goes to the stronger primitive, then to the line that "
+        f"holds in more settings and movesets, then to the larger clearer "
+        f"pool.",
+    ]
+    if fl is not None:
+        bits = ', '.join(
+            f"{AXIS_WORD[a]} {nets[a]:+d}" for a in AXES
+            if nets.get(a) is not None)
+        ch = facts.get('axis_choice') or {}
+        decided = {
+            'net': 'the larger net',
+            'primitive': 'the stronger primitive, the two nets being inside '
+                         'the tie window',
+            'robustness': 'holding in more settings and movesets, the two '
+                          'nets being inside the tie window and both rules '
+                          'equally clean',
+            'pool': 'asking less of the build, the two nets being inside the '
+                    'tie window and the rules level on everything above it',
+            'axis order': 'stat order, everything above it being level',
+        }.get(ch.get('decided_by'), 'the larger net')
+        lines.append(
+            f"Net on this dive -- {bits}. Printed: {AXIS_WORD[fl['axis']]}, "
+            f"on {decided}. The tie window on this dive is "
+            f"{fmt(ch.get('tie_window', 0.0))} matchups.")
+    return _field(16, 'Lines on the other stats', lines,
+                  head=['line', 'matchup', 'primitive', 'spreads',
+                        'net (clear - miss)', 'mechanism'], rows=rows)
+
+
+def _f3_bulk_coverage(facts, cov, fl):
+    """The bulk ladder: what each of the opponent's own builds asks of us."""
+    axis_word = AXIS_WORD[cov['axis']]
+    stage = ''
+    if cov['opp_atk_stage']:
+        stage += f" at opponent Atk stage {cov['opp_atk_stage']:+d}"
+    if cov['def_stage']:
+        stage += f" at focal Def stage {cov['def_stage']:+d}"
+    if cov['axis'] == 'def':
+        lead = (f"What each of {cov['opponent']}'s own {_n(4096)} spreads "
+                f"asks of our {axis_word}: the lowest attainable value that "
+                f"holds its {cov['move']} to {_n(cov['to'])} damage "
+                f"(from {_n(cov['from'])}){stage}.")
+    else:
+        lead = (f"What each of {cov['opponent']}'s own {_n(4096)} spreads "
+                f"asks of our {axis_word}: the lowest attainable value that "
+                f"makes its {cov['move']} need {_n(cov['to'])} hits to knock "
+                f"us out instead of {_n(cov['from'])}, at the grid's median "
+                f"defense {fmt(cov['def_ref'])}{stage}.")
+    lines = [lead,
+             f"\"held\" is the share of that species' own grid whose attack "
+             f"is at or below the row's, and so is held by the same value: "
+             f"the damage it does to us is its attack over our "
+             f"{AXIS_WORD['def']}, so its IV grid traces out the ladder the "
+             f"same way an attacker's does."]
+    col_dp = max((r['dp'] for r in cov['rows'] if r['line'] is not None),
+                 default=2)
+    rows = [[r['label'],
+             ('-' if r['line'] is None
+              else _n(r['printed']) if cov['axis'] == 'hp'
+              else fmt(r['printed'], col_dp)),
+             pct(r['held']), _n(r['focal'])]
+            for r in cov['rows']]
+    if col_dp > 2 and cov['axis'] != 'hp':
+        lines.append(
+            f"The line column prints {_n(col_dp)} decimal places throughout: "
+            f"at least one row needs them to stay a valid \">=\" selector "
+            f"(two places would select a different set of our spreads), and "
+            f"mixing precisions inside one column hides which row that is.")
+    if not cov.get('monotone', True):
+        lines.append(
+            f"The column is not monotone, and that is a CP-cap effect rather "
+            f"than a transcription error: under the cap a hundo sits at a "
+            f"lower level than a low-attack spread, so it carries less "
+            f"attack. The highest-attack {cov['opponent']} is "
+            f"{_ivs(cov['max_ivs'])}.")
+    vals = {r['line'] for r in cov['rows'] if r['line'] is not None}
+    if len(vals) == 1 and len(cov['rows']) > 1:
+        lines.append(
+            f"Every row asks for the same value, and that is the reading: at "
+            f"the stated reference the damage {cov['opponent']} does to us is "
+            f"the same integer across its whole attack grid, so this line "
+            f"does not move with its build.")
+    missed = [r for r in cov['rows'] if r['line'] is None]
+    if missed:
+        lines.append(
+            f"No spread of ours reaches the value "
+            + _and_list([r['label'] for r in missed])
+            + (" asks" if len(missed) == 1 else " ask") + " for at all.")
+    note = (f"\"focal\" is the count of our spreads at or above that value. "
+            f"The printed floor is the PvPoke-default row; it is the line "
+            f"every reference tool quotes, not a guarantee against every "
+            f"build of that species.")
+    return _field(3, 'Coverage', lines,
+                  head=['opponent build', f"{axis_word} you need", 'held',
+                        'focal clearers'], rows=rows, note=note)
+
+
 def _f3_coverage(facts):
     cov = facts['coverage']
     fl = facts['floor']
@@ -3922,10 +5019,19 @@ def _f3_coverage(facts):
                    "opponent's own IV grid, and this floor is a damage "
                    "breakpoint, which does not move with the opponent's "
                    "attack")
+        elif fl['mech']['kind'] in ('bulkpoint', 'hp_bulkpoint'):
+            # A bulk floor HAS a ladder (see stage5_bulk_coverage); reaching
+            # here means the opponent's own grid could not be rebuilt, which
+            # is a different sentence from "there is nothing to walk".
+            why = ("the opponent's own IV grid could not be rebuilt here, so "
+                   "the ladder its builds would trace is omitted rather than "
+                   "guessed")
         else:
             why = ("the floor carries no closed-form mechanism, so there is "
                    "no line to walk across the opponent's grid")
         return _field(3, 'Coverage', [f"Omitted: {why}."])
+    if cov.get('kind') == 'bulk':
+        return _f3_bulk_coverage(facts, cov, fl)
     lines = [
         f"What the printed line beats over {cov['opponent']}'s own "
         f"{_n(4096)} spreads. Strict: an exact attack tie counts as NOT "
@@ -3979,17 +5085,22 @@ def _f4_rank1(facts):
         lines.append("It already clears the floor; there is no trade to make.")
     else:
         lines.append(
-            f"It misses the floor by {fmt(r1['shortfall'])} attack and clears "
-            f"{_n(r1['n_cuts_cleared'])} of {_n(r1['n_cuts'])} clean attack "
-            f"cuts on this dive.")
+            f"It misses the floor by "
+            f"{_shortfall_phrase(fl['axis'], r1['shortfall'])} and clears "
+            f"{_n(r1['n_cuts_cleared'])} of {_n(r1['n_cuts'])} clean "
+            f"{AXIS_WORD[fl['axis']]} cuts on this dive.")
     lm = r1.get('lowest_missed')
     if lm:
         lines.append(
             f"The lowest material rung it misses is "
             f"{fmt(lm['printed'], lm['dp'])} ({lm['cell']}).")
-    lines.append("It is a member of the Alternative target below."
-                 if r1.get('in_alternative') else
-                 "It is not a member of the Alternative target below.")
+    # Only when there IS one: v2 printed "It is not a member of the
+    # Alternative target below" beside a field 6 that says no alternative
+    # target exists, and v3's bulk lines doubled how often that pair appears.
+    if facts.get('alternative') is not None:
+        lines.append("It is a member of the Alternative target below."
+                     if r1.get('in_alternative') else
+                     "It is not a member of the Alternative target below.")
     return _field(4, 'Rank-1 check', lines)
 
 
@@ -4002,10 +5113,11 @@ def _f5_rungs_above(facts):
         return _field(5, 'Rungs above',
                       [f"No further clean rung above the floor keeps "
                        f"{pct(RUNG_POOL_MIN, 0)} of the grid."])
+    axis = facts['floor']['axis']
     rows = []
     for r in rows_src:
         arm_bits = _other_arm_bits(r.get('per_arm_cuts'), facts['header'])
-        rows.append([f"Atk >= {fmt(r['printed'], r['dp'])}",
+        rows.append([stat_threshold_str(axis, r['printed'], r['dp']),
                      _cell_names(r, with_rank=True),
                      f"{_n(r['n_pass'])} ({pct(r['pool_share'])})",
                      _settings_col(r),
@@ -4021,7 +5133,9 @@ def _f5_rungs_above(facts):
     t = facts.get('rungs_above_tail')
     if t and t['n_rungs']:
         lines.append(
-            f"Beyond {fmt(rows_src[-1]['printed'], rows_src[-1]['dp'])} there "
+            f"Beyond "
+            f"{stat_threshold_str(axis, rows_src[-1]['printed'], rows_src[-1]['dp'])}"
+            f" there "
             f"are {_n(t['n_rungs'])} more clean rungs covering "
             f"{_n(t['n_cells'])} cells, the highest at "
             f"{fmt(t['max_printed'], t['max_dp'])} "
@@ -4031,7 +5145,8 @@ def _f5_rungs_above(facts):
     cogate_rows, omitted_cg = [], 0
     for r in rows_src:
         for c in r['cogates'][:COGATE_ROW_CAP]:
-            cogate_rows.append([f"Atk >= {fmt(r['printed'], r['dp'])}",
+            cogate_rows.append([stat_threshold_str(axis, r['printed'],
+                                                   r['dp']),
                                 cogate_str(c), c['cell'],
                                 f"rank {c['rank']}" if c['rank'] else 'unranked',
                                 _n(c['n']), pct(c['rate_outside'])])
@@ -4091,7 +5206,9 @@ def _f6_rungs_below(facts):
              f"{pct(MATERIAL_HI, 0)} of the grid, ascending. The widest of "
              f"them are what {SHOULD_ALLOWED_PHRASE} already; the narrow ones "
              f"at the bottom of the table are not."]
-    rows = [[f"Atk >= {fmt(r['printed'], r['dp'])}",
+    axis = (facts['floor']['axis'] if has_floor
+            else facts.get('floor_axis', 'atk'))
+    rows = [[stat_threshold_str(axis, r['printed'], r['dp']),
              _cell_names(r, with_rank=True),
              f"{_n(r['n_pass'])} ({pct(r['pool_share'])})",
              _settings_col(r),
@@ -4119,8 +5236,16 @@ def _f7_bulk(facts):
             f"attack, {_n(b['clean_def'])} on Def, {_n(b['clean_hp'])} on HP.")
     if not b['frontier']:
         return _field(7, 'Bulk', lines)
+    # The frontier is the bulk SHAPE available inside the line, and it is
+    # always HP against Def. On an attack line that is a trade the reader
+    # makes; on a Def or HP line one of the two is the line itself, so the
+    # sentence stops calling it a trade.
+    axis = (facts['floor'] or {}).get('axis', 'atk')
     lines.append("Inside the floor the trade is HP against Def -- the highest "
-                 "Def attained at each HP among the clearers:")
+                 "Def attained at each HP among the clearers:"
+                 if axis == 'atk' else
+                 "The bulk shape available inside the line -- the highest Def "
+                 "attained at each HP among the spreads clearing it:")
     rows = [[_n(x['hp']), fmt(x['max_def']), _n(x['n'])] for x in b['frontier']]
     if b.get('cells_won_range'):
         lines.append(f"Within the clearers, cells won in total run "
@@ -4144,16 +5269,38 @@ def _f8_alternative(facts):
     alt = facts['alternative']
     has_floor = facts['floor'] is not None
     if alt is None:
+        # The populated branch names the two FREE stats (a Def line forks on
+        # HP and attack); v3 round 1 left this one saying "bulk rectangle"
+        # under a Def line whose alternative is an HP-and-attack pair, so the
+        # two adjacent fields disagreed about which stats were on offer.
+        faxis = (facts['floor'] or {}).get('axis', 'atk')
+        a, b = alt_axes(faxis)
         return _field(8, 'Alternative target',
-                      [f"No bulk rectangle of {_n(ALT_MIN_MEMBERS)} or more "
+                      [f"No {AXIS_WORD[a]}-and-{AXIS_WORD[b]} rectangle of "
+                       f"{_n(ALT_MIN_MEMBERS)} or more "
                        f"spreads guarantees a contested cell that "
                        f"{'the floor' if has_floor else 'the rest of the grid'} "
                        f"cannot."])
     lines = [
-        f"Def >= {fmt(alt['def_printed'], alt['def_dp'])} and HP >= "
-        f"{_n(alt['hp_cut'])}: {_n(alt['n'])} spreads ({pct(alt['share'])}), "
+        f"{alt_pair_short(alt)}: {_n(alt['n'])} spreads ({pct(alt['share'])}), "
         f"stat product {pct(alt['sp_share_lo'])} to {pct(alt['sp_share_hi'])} "
         f"of rank-1, attack {fmt(alt['atk_lo'])}-{fmt(alt['atk_hi'])}."]
+    # V3: the rectangle is built on the two axes the printed line does NOT
+    # use, so on a Def line it is an (HP, attack) pair and on an HP line a
+    # (Def, attack) one. Where the search leaves one of the two at its grid
+    # minimum the target is a single stat, and the sentence says so.
+    free = [alt['axes'][i] for i, k in enumerate(('free_a', 'free_b'))
+            if alt[k]]
+    held = [a for a in alt['axes'] if a not in free]
+    if has_floor:
+        lines.append(
+            f"It is built on {_and_list([AXIS_WORD[a] for a in alt['axes']])}"
+            f" -- the two stats the printed "
+            f"{AXIS_WORD[facts['floor']['axis']]} line does not use."
+            + (f" The search left {_and_list([AXIS_WORD[a] for a in free])} "
+               f"at the grid minimum, so this is "
+               f"{'an' if AXIS_WORD[held[0]] == 'attack' else 'a'} "
+               f"{AXIS_WORD[held[0]]}-only target." if free and held else ''))
     if has_floor:
         # Lead with the number the brief will stand behind. The first build
         # opened with the vs-the-floor guarantee and retracted it three lines
@@ -4174,7 +5321,8 @@ def _f8_alternative(facts):
                 f"{pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads outside the "
                 f"rectangle: " + _cap_list(alt['exclusive']) + ".")
         lines.append(
-            f"Rule: among (Def, HP) rectangles with at least "
+            f"Rule: among ({AXIS_SHORT[alt['axes'][0]]}, "
+            f"{AXIS_SHORT[alt['axes'][1]]}) rectangles with at least "
             f"{_n(ALT_MIN_MEMBERS)} members and no floor clearer, the one "
             f"winning the most contested cells the floor cannot (won by "
             f"every member, by at most {pct(ALT_MAX_CLEARER_RATE, 0)} of "
@@ -4193,8 +5341,8 @@ def _f8_alternative(facts):
                 + _cap_list(alt['given_up']) + ".")
         else:
             lines.append("It gives up no cell the floor guarantees.")
-        lines.append("No spread satisfies both this rectangle and the attack "
-                     "floor.")
+        lines.append(f"No spread satisfies both this rectangle and the "
+                     f"{AXIS_WORD[facts['floor']['axis']]} line.")
     elif alt['too_wide']:
         lines.append(
             f"{pct(alt['share'])} of the grid already satisfies this, so it is "
@@ -4204,7 +5352,8 @@ def _f8_alternative(facts):
             f"{_noun(alt['n_exclusive'], 'matchup')} that every member wins: "
             + _cap_list(alt['exclusive']) + ".")
         lines.append(
-            f"Rule: among (Def, HP) rectangles with at least "
+            f"Rule: among ({AXIS_SHORT[alt['axes'][0]]}, "
+            f"{AXIS_SHORT[alt['axes'][1]]}) rectangles with at least "
             f"{_n(ALT_MIN_MEMBERS)} members, the one winning the most "
             f"contested cells with EVERY member that at most "
             f"{pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads outside it win, "
@@ -4212,8 +5361,9 @@ def _f8_alternative(facts):
             f"non-degenerate scenario; ties broken by member count.")
     else:
         lines.append(
-            f"There is no attack floor on this arm, so there is nothing for "
-            f"the rectangle to be disjoint from. Rule: among (Def, HP) "
+            f"There is no line on this arm, so there is nothing for "
+            f"the rectangle to be disjoint from. Rule: among "
+            f"({AXIS_SHORT[alt['axes'][0]]}, {AXIS_SHORT[alt['axes'][1]]}) "
             f"rectangles with at least {_n(ALT_MIN_MEMBERS)} members, the one "
             f"winning the most contested cells with EVERY member that at most "
             f"{pct(ALT_MAX_CLEARER_RATE, 0)} of the spreads outside it win, "
@@ -4275,7 +5425,7 @@ def _f9_examples(facts):
     lines = ["Existence proofs; each selection rule is printed with its spread."]
     if facts['floor'] is None:
         lines.append(
-            "There is no attack floor on this arm, so the rules run over the "
+            "There is no line on this arm, so the rules run over the "
             "whole grid rather than over a set of clearers.")
         lines.append(_grid_best_sentence(facts))
     # The scenario labels come from the blob, not from a hardcoded list: a
@@ -4509,11 +5659,14 @@ def _f14_how_sure(facts):
         if cov:
             r1row = cov['rows'][0]
             dflt = cov['rows'][1]
+            share = ('strict' if cov.get('kind') != 'bulk' else 'held')
+            what = ('strictly beaten' if cov.get('kind') != 'bulk'
+                    else 'at or below them, and so held by the same value')
             lines.append(
                 f"Both baked opponent cohorts sit low in "
                 f"{cov['opponent']}'s own attack grid "
-                f"({pct(r1row['strict'])} and {pct(dflt['strict'])} of it "
-                f"strictly beaten), so \"{_n(fl['modes_partition'])} of "
+                f"({pct(r1row[share])} and {pct(dflt[share])} of it "
+                f"{what}), so \"{_n(fl['modes_partition'])} of "
                 f"{_n(fl['modes_total'])} settings\" is not robustness against "
                 f"attack-weighted opponent builds; the coverage ladder is.")
     l51 = facts.get('l51')
@@ -4718,8 +5871,14 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     scores, meta = arm_view(state, arm, mode, level)
     win = win_cube(scores)
     atk, dfn, hp = stat_planes(meta)
+    planes_r = {'atk': atk, 'def': dfn, 'hp': hp}
     n_iv = scores.shape[0]
     league = state['league']
+    # V3: every "the printed line selects N spreads" check below runs on the
+    # LINE'S OWN axis. Re-deriving a Def line against the attack plane would
+    # compare two unrelated numbers and pass or fail for the wrong reason.
+    faxis = (facts['floor'] or {}).get('axis', facts.get('floor_axis', 'atk'))
+    fplane = planes_r[faxis]
 
     def check(field, cell, printed, recomputed, tol=0.0):
         if isinstance(printed, float) or isinstance(recomputed, float):
@@ -4745,7 +5904,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     check('How sure', '-', facts['gate_tally']['n_cuts'], len(cuts_r))
     check('How sure', '-', facts.get('clean_excluded', 0),
           sum(1 for c in cuts_r if c['caveat']))
-    atk_cuts_r = [c for c in cuts_r if c['axis'] == 'atk' and not c['caveat']]
+    atk_cuts_r = [c for c in cuts_r if c['axis'] == faxis and not c['caveat']]
     check('How sure', '-', facts['triage']['all_win'], int((nwin == n_iv).sum()))
     check('How sure', '-', facts['triage']['all_lose'], int((nwin == 0).sum()))
     check('How sure', '-', facts['triage']['contested'],
@@ -4754,12 +5913,13 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     fl = facts['floor']
     if fl is not None:
         si, oi = _cell_index(state, fl['cell'])
-        check('Floor', fl['cell'], fl['n_pass'], int((atk >= fl['T']).sum()))
+        check('Floor', fl['cell'], fl['axis'], faxis)
+        check('Floor', fl['cell'], fl['n_pass'], int((fplane >= fl['T']).sum()))
         check('Floor', fl['cell'], fl['pool_share'],
-              float((atk >= fl['T']).sum()) / n_iv, tol=1e-12)
+              float((fplane >= fl['T']).sum()) / n_iv, tol=1e-12)
         check('Floor', fl['cell'], fl['n_pass'],
-              int((atk >= fl['printed']).sum()))
-        below = atk < fl['T']
+              int((fplane >= fl['printed']).sum()))
+        below = fplane < fl['T']
         check('Floor', fl['cell'], fl['n_below'], int(below.sum()))
         check('Floor', fl['cell'], fl['n_below_win'],
               int(win[below, si, oi].sum()))
@@ -4779,6 +5939,13 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
         check('Floor primitive', fl['cell'], fl['n_wrong'], int(n_wrong_r))
         check('Floor primitive', fl['cell'], fl['rate_above'],
               n_win_above_r / n_above_r if n_above_r else 0.0, tol=1e-12)
+        # Both PERCENTAGES, not only the counts they come from: the badge
+        # sentence prints "99.96% of the spreads below lose, against a bar of
+        # 97%", and a corrupted rate rendered that self-contradiction with no
+        # guard while the counts beside it were checked.
+        check('Floor primitive', fl['cell'], fl['rate_below_loss'],
+              (1.0 - n_win_below_r / int(below.sum())) if below.any() else 0.0,
+              tol=1e-12)
         # Re-derive the badge through the same three independent bars the
         # pool used, not from the shape of the dirty side alone: a one-sided
         # candidate under the gate bar is admitted (and printed) as
@@ -4814,6 +5981,15 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
             guard_fail('G-primitive', 'Floor', fl['cell'],
                        f"near-exact with {n_wrong_r} wrong",
                        f"limit {near_exact_limit(n_iv)}", ctx)
+        if fl.get('genre'):
+            g_cut = math.floor(fl['T'] * 10.0) / 10.0
+            g_above = fplane >= g_cut
+            check('Floor', fl['cell'], fl['genre']['printed'], g_cut,
+                  tol=1e-12)
+            check('Floor', fl['cell'], fl['genre']['n_above'],
+                  int(g_above.sum()))
+            check('Floor', fl['cell'], fl['genre']['n_extra'],
+                  int((g_above & (fplane < fl['T'])).sum()))
         check('Floor', fl['cell'], fl['score_below'][0],
               int(scores[below, si, oi].min()))
         check('Floor', fl['cell'], fl['score_above'][0],
@@ -4835,6 +6011,57 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                            ctx)
             check('Floor mechanism', fl['cell'], bool(m.get('on_the_line')),
                   bool(m['line'] == fl['T']))
+        if m['kind'] in ('bulkpoint', 'hp_bulkpoint'):
+            # The bulk mechanisms are headline sentences on a bulk-first
+            # page, so both ends are recomputed from the stored move, stages
+            # and opponent build exactly as the attack breakpoint is.
+            build_r = opponent_build(state['opponent_names'][oi], league, mode)
+            if build_r is None:
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'no opponent build to step against', ctx)
+            check('Floor mechanism', fl['cell'], tuple(m['opp_ivs']),
+                  tuple(build_r['ivs']))
+            _f, _c = get_moves()
+            mv = _f.get(m['move']) or _c.get(m['move'])
+            if mv is None:
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'not a move in the gamemaster', ctx)
+            opp_atk_r = build_r['atk'] * _stat_stage_mult(int(m['opp_atk_stage']))
+            dmult_r = _stat_stage_mult(int(m['def_stage']))
+            f_types = _species_types(state['species'])
+            o_types = _species_types(
+                parse_opponent_spec(state['opponent_names'][oi])[0])
+            if m['kind'] == 'bulkpoint':
+                for value, printed_dmg, where in (
+                        (fl['prev_attained'], m['from'], 'below the line'),
+                        (fl['T'], m['to'], 'at the line')):
+                    got = damage(mv['power'], opp_atk_r, value * dmult_r,
+                                 mv['type'], o_types, f_types)
+                    if int(got) != int(printed_dmg):
+                        guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                                   f"{m['move']} {printed_dmg} {where}",
+                                   f"{int(got)} damage", ctx)
+            else:
+                check('Floor mechanism', fl['cell'], m['def_ref'],
+                      float(np.median(dfn)), tol=1e-9)
+                got = int(damage(mv['power'], opp_atk_r,
+                                 m['def_ref'] * dmult_r, mv['type'],
+                                 o_types, f_types))
+                check('Floor mechanism', fl['cell'], m['damage'], got)
+                if got <= 0:
+                    guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                               m['move'], 'zero damage a hit', ctx)
+                for value, printed_hits, where in (
+                        (fl['prev_attained'], m['from'], 'below the line'),
+                        (fl['T'], m['to'], 'at the line')):
+                    n_hits = int(math.ceil(value / got))
+                    if n_hits != int(printed_hits):
+                        guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                                   f"{m['move']} {printed_hits} hits {where}",
+                                   f"{n_hits} hits", ctx)
+            if int(m['from']) == int(m['to']):
+                guard_fail('G-recompute', 'Floor mechanism', fl['cell'],
+                           m['move'], 'no step across the line', ctx)
         if m['kind'] == 'breakpoint':
             # The damage step is a headline sentence on two pages in this
             # corpus ("PSYCHO_CUT starts doing 5 damage instead of 4"), and
@@ -4899,9 +6126,9 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                        'only an exact rung may carry a merge', ctx)
         for m in fl.get('merged_from') or []:
             check('Floor merge', m['cells'][0]['label'], m['n_pass'],
-                  int((atk >= m['T']).sum()))
+                  int((fplane >= m['T']).sum()))
             check('Floor merge', m['cells'][0]['label'], m['n_pass'],
-                  int((atk >= m['printed']).sum()))
+                  int((fplane >= m['printed']).sum()))
             check('Floor merge', m['cells'][0]['label'],
                   m['n_below_floor_win'], int(m['n_pass'] - fl['n_pass']))
             if m['T'] >= fl['T']:
@@ -4916,14 +6143,14 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                            f"{MERGE_SPREAD_TOL * n_iv}", ctx)
             for c in m['cells']:
                 si_m, oi_m = _cell_index(state, c['label'])
-                if not np.array_equal(atk >= m['T'], win[:, si_m, oi_m]):
+                if not np.array_equal(fplane >= m['T'], win[:, si_m, oi_m]):
                     guard_fail('G-recompute', 'Floor merge', c['label'],
                                'clean at its own cut',
                                'not a clean partition there', ctx)
-                if not win[atk >= fl['T'], si_m, oi_m].all():
+                if not win[fplane >= fl['T'], si_m, oi_m].all():
                     guard_fail('G-recompute', 'Floor merge', c['label'],
                                'won by every clearer',
-                               int(win[atk >= fl['T'], si_m, oi_m].sum()), ctx)
+                               int(win[fplane >= fl['T'], si_m, oi_m].sum()), ctx)
         check('Floor', fl['cell'], fl['single_owner'], len(owners) == 1)
         check('Floor', fl['cell'], sorted(fl['owners']), sorted(owners))
         # Direction and PARTITION on the printed line, in every baked view.
@@ -4935,7 +6162,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
         for m in state['opp_iv_modes']:
             sc_m, meta_m = arm_view(state, arm, m, level)
             cube_m = win_cube(sc_m)
-            a_m = meta_m[:, 5]
+            a_m = meta_m[:, AXIS_META_COL[faxis]]
             if np.array_equal(a_m >= fl['T'], cube_m[:, si, oi]):
                 n_part_m += 1
             r_a, r_b = direction_rates(cube_m, a_m, fl['T'], si, oi)
@@ -4947,7 +6174,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
         for k in range(len(state['moveset_data'])):
             sc_k, meta_k = arm_view(state, k, mode, level)
             cube_k = win_cube(sc_k)
-            a_k = meta_k[:, 5]
+            a_k = meta_k[:, AXIS_META_COL[faxis]]
             if np.array_equal(a_k >= fl['T'], cube_k[:, si, oi]):
                 n_part_a += 1
             r_a, r_b = direction_rates(cube_k, a_k, fl['T'], si, oi)
@@ -4979,14 +6206,110 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     for key in ('rungs_above', 'rungs_below'):
         for row in facts.get(key) or []:
             check(key, row['names'][0], row['n_pass'],
-                  int((atk >= row['T']).sum()))
+                  int((fplane >= row['T']).sum()))
             check(key, row['names'][0], row['n_pass'],
-                  int((atk >= row['printed']).sum()))
+                  int((fplane >= row['printed']).sum()))
             check(key, row['names'][0], row['pool_share'],
-                  float((atk >= row['T']).sum()) / n_iv, tol=1e-12)
+                  float((fplane >= row['T']).sum()) / n_iv, tol=1e-12)
+
+    # V3: the lines the other axes selected are printed with the same counts
+    # the headline line carries, so they are re-derived the same way.
+    for row in facts.get('other_axis_lines') or []:
+        plane_o = planes_r[row['axis']]
+        check('Lines on the other stats', row['cell'], row['n_pass'],
+              int((plane_o >= row['T']).sum()))
+        check('Lines on the other stats', row['cell'], row['n_pass'],
+              int((plane_o >= row['printed']).sum()))
+        check('Lines on the other stats', row['cell'], row['pool_share'],
+              float((plane_o >= row['T']).sum()) / n_iv, tol=1e-12)
+        if row['axis'] == faxis:
+            guard_fail('G-recompute', 'Lines on the other stats', row['cell'],
+                       row['axis'], f"the printed line is on {faxis}", ctx)
+
+    # The CROSS-AXIS DECISION, re-run from the cube. Each axis's net is
+    # recomputed from its own plane and the stored line value, the comparator
+    # is re-run on those nets, and the axis it picks and the CLAUSE it reports
+    # are both checked -- "Printed: defense, on the larger net" beside
+    # "attack +9, defense +4" is a false sentence, not a wrong label. What is
+    # NOT re-derived here is each axis's own pick (that is stages 2-6 again,
+    # and the floor axis's pick is guarded above value by value).
+    ai = facts.get('axis_inputs') or []
+    if ai:
+        total_won_r = win.reshape(n_iv, -1).sum(axis=1)
+        cands_r = []
+        for row in ai:
+            if row['T'] is None:
+                cands_r.append({'axis': row['axis'], 'rung': None,
+                                'kind': 'near_exact', 'net': None})
+                continue
+            mask_r = planes_r[row['axis']] >= row['T']
+            net_r = line_net(mask_r, total_won_r)
+            check('Cross-axis', row['axis'], row['net'], net_r)
+            check('Cross-axis', row['axis'],
+                  facts['axis_nets'][row['axis']], net_r)
+            check('Cross-axis', row['axis'], row['n_pass'], int(mask_r.sum()))
+            cands_r.append({
+                'axis': row['axis'], 'kind': row['kind'], 'net': net_r,
+                'rung': {'n_pass': int(mask_r.sum()),
+                         'modes_ok': row['modes_ok'],
+                         'arms_ok': row['arms_ok']}})
+        chosen_r = stage6_cross_axis(cands_r, int(win[0].size))
+        ch = facts.get('axis_choice')
+        if (chosen_r is None) != (ch is None):
+            guard_fail('G-recompute', 'Cross-axis', '-',
+                       'a line' if ch else 'no line',
+                       'a line' if chosen_r else 'no line', ctx)
+        if ch is not None:
+            check('Cross-axis', '-', ch['axis'], chosen_r['axis'])
+            check('Cross-axis', '-', ch['decided_by'],
+                  chosen_r['decided_by'])
+            check('Cross-axis', '-', ch['net'], chosen_r['net'])
+            check('Cross-axis', '-', float(ch['tie_window']),
+                  float(chosen_r['tie_window']), tol=1e-12)
+            check('Cross-axis', '-', ch['runner_up'] is None,
+                  chosen_r['runner_up'] is None)
+            if ch['runner_up'] is not None:
+                check('Cross-axis', 'runner-up', ch['runner_up']['axis'],
+                      chosen_r['runner_up']['axis'])
+                check('Cross-axis', 'runner-up', ch['runner_up']['net'],
+                      chosen_r['runner_up']['net'])
 
     cov = facts.get('coverage')
-    if cov:
+    if cov and cov.get('kind') == 'bulk':
+        # The bulk ladder, re-derived the same way: every printed value is
+        # the lowest ATTAINED value on the line's own axis that holds that
+        # build to the stepped damage, and every clearer count is a count
+        # against the same plane the floor is selected on.
+        species, _v, opp_shadow = parse_opponent_spec(cov['opponent'])
+        grid_a = opponent_atk_grid(species, league, opp_shadow)
+        _fm, _cm = get_moves()
+        mv_r = _fm.get(cov['move']) or _cm.get(cov['move'])
+        if mv_r is None:
+            guard_fail('G-recompute', 'Coverage', cov['opponent'],
+                       cov['move'], 'not a move in the gamemaster', ctx)
+        f_types = _species_types(state['species'])
+        o_types = _species_types(species)
+        a_mult = _stat_stage_mult(int(cov['opp_atk_stage']))
+        d_mult = _stat_stage_mult(int(cov['def_stage']))
+        vals_r = np.unique(fplane)
+        for row in cov['rows']:
+            need = _bulk_need(cov['axis'], vals_r, row['opp_atk'] * a_mult,
+                              mv_r, int(cov['to']), f_types, o_types, d_mult,
+                              cov.get('def_ref'))
+            if (need is None) != (row['line'] is None):
+                guard_fail('G-recompute', 'Coverage', row['label'],
+                           row['line'], need, ctx)
+            check('Coverage', row['label'], row['held'],
+                  float((grid_a <= row['opp_atk']).mean()), tol=1e-12)
+            if need is None:
+                check('Coverage', row['label'], row['focal'], 0)
+                continue
+            check('Coverage', row['label'], row['line'], need, tol=1e-12)
+            check('Coverage', row['label'], row['focal'],
+                  int((fplane >= need).sum()))
+            check('Coverage', row['label'], row['focal'],
+                  int((fplane >= row['printed']).sum()))
+    elif cov:
         # The strict share and the tie count are re-derived from the
         # opponent's own IV grid, not carried over from stage 5: field 14
         # names this column as the real robustness measure, and the first
@@ -5014,7 +6337,13 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
 
     alt = facts.get('alternative')
     if alt is not None:
-        mask = (dfn >= alt['def_cut']) & (hp >= alt['hp_cut'])
+        a_ax, b_ax = alt['axes']
+        mask = ((planes_r[a_ax] >= alt['cut_a'])
+                & (planes_r[b_ax] >= alt['cut_b']))
+        if faxis in alt['axes']:
+            guard_fail('G-recompute', 'Alternative target', alt['label'],
+                       ', '.join(alt['axes']),
+                       f"the fork must avoid the printed axis {faxis}", ctx)
         sp_a = atk * dfn * hp
         check('Alternative target', 'Def x HP rectangle', alt['sp_share_lo'],
               float((sp_a[mask] / sp_a.max()).min()), tol=1e-12)
@@ -5041,7 +6370,8 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                   _encounters(acm.get('share', alt['share']), row['target']))
         check('Alternative target', 'Def x HP rectangle', alt['n'],
               int(mask.sum()))
-        pmask = (dfn >= alt['def_printed']) & (hp >= alt['hp_cut'])
+        pmask = ((planes_r[a_ax] >= alt['printed_a'])
+                 & (planes_r[b_ax] >= alt['printed_b']))
         check('Alternative target', 'Def x HP rectangle (printed)', alt['n'],
               int(pmask.sum()))
         check('Alternative target', 'Def x HP rectangle', alt['share'],
@@ -5137,8 +6467,8 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
 
     for row in (facts.get('bulk') or {}).get('cogates') or []:
         si, oi = _cell_index(state, row['cell'])
-        clearers = atk >= fl['T']
-        stat = dfn if row['axis'] == 'def' else hp
+        clearers = fplane >= fl['T']
+        stat = planes_r[row['axis']]
         sub = clearers & (stat >= row['t'])
         check('Bulk co-gate', row['cell'], row['n'], int(sub.sum()))
         if not win[sub, si, oi].all():
@@ -5148,7 +6478,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
 
     bulk = facts.get('bulk') or {}
     if bulk.get('cells_won_range') and fl is not None:
-        m = atk >= fl['T']
+        m = fplane >= fl['T']
         won = win[m].reshape(int(m.sum()), -1).sum(axis=1)
         check('Bulk', 'cells won', bulk['cells_won_range'][0], int(won.min()))
         check('Bulk', 'cells won', bulk['cells_won_range'][1], int(won.max()))
@@ -5156,7 +6486,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     l51 = facts.get('l51')
     if l51:
         _s51, meta51 = arm_view(state, arm, mode, 'l51')
-        atk51 = meta51[:, 5]
+        atk51 = meta51[:, AXIS_META_COL[faxis]]
         check('How sure', 'L51', l51['n_selected_by_l50_literal'],
               int((atk51 >= fl['T']).sum()))
         if l51['clean']:
@@ -5171,13 +6501,13 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
                   'share', fl['pool_share']), row['target']))
 
     for fr in (facts.get('bulk') or {}).get('frontier') or []:
-        sel = (atk >= fl['T']) & (hp == fr['hp'])
+        sel = (fplane >= fl['T']) & (hp == fr['hp'])
         check('Bulk', f"HP {fr['hp']}", fr['max_def'], float(dfn[sel].max()),
               tol=1e-9)
         check('Bulk', f"HP {fr['hp']}", fr['n'], int(sel.sum()))
 
     nc = facts['not_claimed']
-    mask = (atk >= fl['T']) if fl is not None else np.ones(n_iv, bool)
+    mask = (fplane >= fl['T']) if fl is not None else np.ones(n_iv, bool)
     for row in nc['rows'][:8]:
         si, oi = _cell_index(state, row['cell'])
         check('Not claimed', row['cell'], row['rate_inside_floor'],
@@ -5192,19 +6522,19 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     tail = facts.get('rungs_above_tail')
     if tail and tail['n_rungs']:
         check('Rungs above', 'tail', tail['max_n_pass'],
-              int((atk >= tail['max_T']).sum()))
+              int((fplane >= tail['max_T']).sum()))
         check('Rungs above', 'tail', tail['max_pool'],
-              float((atk >= tail['max_pool_T']).sum()) / n_iv, tol=1e-12)
+              float((fplane >= tail['max_pool_T']).sum()) / n_iv, tol=1e-12)
         check('Rungs above', 'tail', tail['max_pool_n_pass'],
-              int((atk >= tail['max_pool_printed']).sum()))
+              int((fplane >= tail['max_pool_printed']).sum()))
         check('Rungs above', 'tail', tail['max_n_pass'],
-              int((atk >= tail['max_printed']).sum()))
+              int((fplane >= tail['max_printed']).sum()))
 
     mir = facts.get('mirror')
     if mir is not None:
         oi_m = state['opponent_names'].index(mir['opponent'])
         check('Mirror', mir['opponent'], mir['oi'], int(oi_m))
-        m_mask = (atk >= fl['T']) if fl is not None else None
+        m_mask = (fplane >= fl['T']) if fl is not None else None
         for si_m, row in enumerate(mir['rows']):
             w = win[:, si_m, oi_m]
             check('Mirror', row['scenario'], row['rate'], float(w.mean()),
@@ -5223,17 +6553,17 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
 
     for row in (facts.get('bulk') or {}).get('cogates') or []:
         si_c, oi_c = _cell_index(state, row['cell'])
-        stat = dfn if row['axis'] == 'def' else hp
-        outside = (atk >= fl['T']) & (stat < row['t'])
+        stat = planes_r[row['axis']]
+        outside = (fplane >= fl['T']) & (stat < row['t'])
         check('Bulk co-gate', row['cell'], row['rate_outside'],
               float(win[outside, si_c, oi_c].mean()) if outside.any() else 0.0,
               tol=1e-12)
         check('Bulk co-gate', row['cell'], row['base_rate'],
-              float(win[atk >= fl['T'], si_c, oi_c].mean()), tol=1e-12)
+              float(win[fplane >= fl['T'], si_c, oi_c].mean()), tol=1e-12)
 
     lr = facts.get('level_reach')
     if lr and fl is not None:
-        m_in = atk >= fl['T']
+        m_in = fplane >= fl['T']
         check('Example spreads', 'level reach', lr['median_in'],
               float(np.median(meta[m_in, 3])), tol=1e-9)
         check('Example spreads', 'level reach', lr['median_out'],
@@ -5261,7 +6591,7 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
         check('Floor', 'encounters', cm['restricted'], bool(restricted_r))
         check('Floor', 'encounters', cm['n_grid'], int(grid_r.sum()))
         check('Floor', 'encounters', cm['n_reachable'],
-              int(((atk >= fl['T']) & grid_r).sum()))
+              int(((fplane >= fl['T']) & grid_r).sum()))
         check('Floor', 'encounters', cm['share'],
               float(cm['n_reachable']) / cm['n_grid'], tol=1e-12)
 
@@ -5298,12 +6628,12 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     check('Rank-1 check', 'rank-1', r1['i'], int(np.argmax(sp)))
     check('Rank-1 check', 'rank-1', r1['n_cuts'], len(atk_cuts_r))
     check('Rank-1 check', 'rank-1', r1['n_cuts_cleared'],
-          int(sum(1 for c in atk_cuts_r if atk[r1['i']] >= c['T'])))
+          int(sum(1 for c in atk_cuts_r if fplane[r1['i']] >= c['T'])))
     if fl is not None:
         check('Rank-1 check', 'rank-1', r1['shortfall'],
-              float(fl['T'] - atk[r1['i']]), tol=1e-9)
+              float(fl['T'] - fplane[r1['i']]), tol=1e-9)
         check('Rank-1 check', 'rank-1', r1['clears_floor'],
-              bool(atk[r1['i']] >= fl['T']))
+              bool(fplane[r1['i']] >= fl['T']))
     check('Rank-1 check', 'rank-1', tuple(int(v) for v in r1['ivs']),
           tuple(int(v) for v in meta[r1['i'], :3]))
     check('Rank-1 check', 'rank-1', r1['total_won'], int(win[r1['i']].sum()))
@@ -5319,7 +6649,8 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
           tol=1e-9)
     check('Rank-1 check', 'rank-1', r1['hp'], int(meta[r1['i'], 7]))
     if alt is not None:
-        amask = (dfn >= alt['def_cut']) & (hp >= alt['hp_cut'])
+        amask = ((planes_r[alt['axes'][0]] >= alt['cut_a'])
+                 & (planes_r[alt['axes'][1]] >= alt['cut_b']))
         check('Rank-1 check', 'rank-1', bool(r1['in_alternative']),
               bool(amask[r1['i']]))
     check('Rank-1 check', 'rank-1', r1['by_scenario'],
@@ -5366,21 +6697,26 @@ def _primitive_audit_sentence(facts):
             # the page and the audit said it was not there.
             r = p['rejected']
             why = (', '.join(r['failed']) if r['failed'] else 'no gate')
-            bits.append(f"{label} -> Atk >= {fmt(r['printed'], r['dp'])} "
+            bits.append(f"{label} -> "
+                        f"{stat_threshold_str(r.get('axis', 'atk'), r['printed'], r['dp'])} "
                         f"({r['cell']}, {pct(r['pool_share'])}) rejected on "
                         f"{why} ({_n(r['modes_ok'])} of "
                         f"{_n(r['modes_total'])} settings)")
         else:
-            bits.append(f"{label} -> Atk >= {fmt(p['printed'], p['dp'])} "
+            bits.append(f"{label} -> "
+                        f"{stat_threshold_str(p.get('axis', 'atk'), p['printed'], p['dp'])} "
                         f"({p['cell']}, {pct(p['pool_share'])})")
     fl = facts['floor']
+    axis = facts.get('floor_axis', 'atk')
     chosen = ('no floor' if fl is None else
-              f"the {fl['badge']} at Atk >= {fmt(fl['printed'], fl['dp'])}")
-    return (f"Floor pool by primitive, each selected on its own under the "
-            f"same band and the same gates: " + '; '.join(bits) + ". "
-            f"Selected: {chosen}. Selection takes the lowest eligible rung in "
-            f"the band; a stronger primitive within "
-            f"{fmt(PRIMITIVE_TIE_WINDOW)} attack of it wins the tie, in the "
+              f"the {fl['badge']} at "
+              f"{stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])}")
+    return (f"Floor pool by primitive on the {AXIS_WORD[axis]} axis -- the "
+            f"axis the cross-stat rule selected -- each selected on its own "
+            f"under the same band and the same gates: " + '; '.join(bits)
+            + f". Selected: {chosen}. Selection takes the lowest eligible "
+            f"rung in the band; a stronger primitive within "
+            f"{fmt(PRIMITIVE_TIE_WINDOW)} stat points of it wins the tie, in the "
             f"order exact, one-sided gate, near-exact. A gate needs "
             f"{pct(GATE_MIN_ABOVE, 0)} of its dirty side pointing the right "
             f"way; a near-exact split needs at most "
@@ -5398,7 +6734,10 @@ def build_evidence(facts):
         f"{pct(c['decision_band'][1], 0)}] of the grid. Materiality band for a "
         f"rung: [{pct(c['material'][0], 0)}, {pct(c['material'][1], 0)}].",
         f"To be ELIGIBLE AS THE FLOOR -- not to be listed as a rung -- a cut "
-        f"needs at least {_n(c['min_attained_below'])} distinct attainable "
+        f"needs at least "
+        + '/'.join(f"{_n(c['min_attained_below'][a])} {AXIS_WORD[a]}"
+                   for a in AXES)
+        + f" distinct attainable "
         f"values below it, an opponent of rank {_n(c['rank_gate'])} or better "
         f"outside the caveat list, a non-degenerate shield scenario, a win "
         f"rate at or above the cut of at least "
@@ -5482,8 +6821,13 @@ def build_evidence(facts):
                         f"({_plural(d['n_wrong'], 'spread')} on the wrong "
                         f"side)"
                         for d in facts['dirty_thresholds']) + ".")
+    # The sensitivity table walks the FLOOR'S OWN axis, so its column says
+    # which stat the values in it are; a bare "148.29" beside an attack page's
+    # "148.10" two sections up is two different stats spelled the same way.
+    axis_v = AXIS_WORD[facts.get('floor_axis', 'atk')]
     return {'lines': lines,
-            'head': ['band', 'floor it selects', 'cell'], 'rows': rows}
+            'head': ['band', f"{axis_v} line it selects", 'cell'],
+            'rows': rows}
 
 
 # ---------------------------------------------------------------------------
@@ -5621,16 +6965,17 @@ def lead_block(all_facts):
         h = f['header']
         fl = f['floor']
         if fl is not None:
-            outcome = (f"Atk >= {fmt(fl['printed'], fl['dp'])} "
+            outcome = (f"{stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])} "
                        f"({pct(fl['pool_share'])} of the grid, {fl['cell']}, "
                        f"{strip_badge(fl)})")
-            with_floor.append((h['arm'] + 1, fmt(fl['printed'], fl['dp'])))
+            with_floor.append(
+                (h['arm'] + 1,
+                 stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])))
         else:
             outcome = "no line"
         alt = f['alternative']
         rect = ('-' if alt is None else
-                f"Def >= {fmt(alt['def_printed'], alt['def_dp'])}, "
-                f"HP >= {_n(alt['hp_cut'])} ({pct(alt['share'])})"
+                f"{alt_pair_short(alt)} ({pct(alt['share'])})"
                 + (' -- not a target' if alt['too_wide'] and fl is None
                    else ''))
         rows.append([f"moveset {h['arm'] + 1} of {h['n_arms']}",
@@ -5649,7 +6994,7 @@ def lead_block(all_facts):
                      if n == 1 else
                      f"All {_n(n)} movesets rendered here carry a build line.")
     else:
-        bits = ', '.join(f"moveset {a} at Atk >= {v}" for a, v in with_floor)
+        bits = ', '.join(f"moveset {a} at {v}" for a, v in with_floor)
         carry = 'carries' if len(with_floor) == 1 else 'carry'
         lines.append(
             f"{_n(len(with_floor))} of {_n(n)} movesets rendered here "
@@ -5701,7 +7046,7 @@ def shared_line_with(facts, earlier):
         p = prev['floor']
         if fl is not None and p is not None:
             if (p['T'] == fl['T'] and p['cell'] == fl['cell']
-                    and p['kind'] == fl['kind']):
+                    and p['axis'] == fl['axis'] and p['kind'] == fl['kind']):
                 return prev['header']['arm_label']
         elif fl is None and p is None:
             a = facts['dirty_thresholds']
@@ -5811,7 +7156,8 @@ def sweep_row(facts):
     fl = facts['floor']
     cc = facts['clean_counts']
     if fl is not None:
-        outcome = (f"floor {fmt(fl['printed'], fl['dp'])} "
+        outcome = (f"floor "
+                   f"{stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])} "
                    f"({pct(fl['pool_share'])}, {fl['badge']}, "
                    f"{fl['mech']['kind']})")
     else:
@@ -5819,9 +7165,19 @@ def sweep_row(facts):
     # The page numbers arms 1-based ("arm 3 of 4"); the sweep numbered them
     # 0-based, so a reader picking a row from sweep.md opened the wrong
     # section of the page.
-    return [f"{focal_name(h)} {h['league']}",
+    others = facts.get('other_axis_lines') or []
+    other_txt = ('-' if not others else
+                 '; '.join(stat_threshold_str(o['axis'], o['printed'], o['dp'])
+                           + f" ({o['badge']})" for o in others))
+    # The blob date rides in the species column: three separate Tinkaton
+    # bakes produced fifteen rows a reader could not tell apart, and a
+    # near-duplicate pair then reads as a rendering bug rather than as two
+    # different bakes.
+    return [f"{focal_name(h)} {h['league']} ({h['blob_date']})",
             f"arm {h['arm'] + 1} of {h['n_arms']}",
             h['arm_label'], outcome,
+            (fl['axis'] if fl is not None else '-'),
+            other_txt,
             f"{cc.get('atk', 0)}/{cc.get('def', 0)}/{cc.get('hp', 0)}",
             str(facts['triage']['contested']),
             _sweep_rectangle(facts)]
@@ -5849,8 +7205,9 @@ def _plural(n, noun):
     return f"{int(n)} {noun}" + ('' if int(n) == 1 else 's')
 
 
-SWEEP_HEAD = ['species', 'arm', 'moveset', 'outcome',
-              'clean atk/def/hp', 'contested', 'bulk rectangle']
+SWEEP_HEAD = ['species', 'arm', 'moveset', 'outcome', 'axis',
+              'other-axis lines', 'clean atk/def/hp', 'contested',
+              'bulk rectangle']
 
 
 def write_sweep(rows, out_dir):
@@ -5868,8 +7225,11 @@ def write_sweep(rows, out_dir):
             "or the degradation-ladder rung reached when no cut clears every "
             "gate. Floors print at the precision stage 7 proves is a valid "
             "`>=` selector. `bulk rectangle` counts the contested cells the "
-            "(Def, HP) rectangle wins with every member where at most 1% of "
-            "the spreads outside it do.\n\n" + '\n'.join(body) + '\n')
+            "two-stat rectangle wins with every member where at most 1% of "
+            "the spreads outside it do. `axis` is the stat the printed line "
+            "sits on; `other-axis lines` are the lines the other two stats "
+            "selected under the same band and gates.\n\n"
+            + '\n'.join(body) + '\n')
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, 'sweep.md')
     with open(path, 'w') as fh:

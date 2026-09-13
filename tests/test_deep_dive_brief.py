@@ -18,6 +18,7 @@ Three kinds of test live here:
 Blob-reading tests are marked ``local_artifacts`` and skip when the replay
 store is not on the machine.
 """
+import copy
 import importlib.util
 import math
 import re
@@ -705,12 +706,14 @@ def test_deoxys_defense_has_no_floor_and_says_why():
     # build instead, and the closest rule in its own numbers. Round 3's
     # wording is the pre-fix value for each of these.
     assert 'nothing on this arm is a build line to hunt for' not in joined
-    # V2 round 2: the claim is scoped to the axis the floor pool searches.
-    # "No single stat threshold decides a matchup" (the round-4 wording, and
-    # the pre-fix value here) is FALSE on any page whose closest rule is a Def
-    # or HP threshold wrong on one spread in 4096.
-    assert joined.startswith('No single attack threshold decides a matchup')
-    assert 'No single stat threshold decides' not in joined      # pre-fix
+    # V3: the floor pool searches all three axes, so the wide claim is the
+    # true one again. Pre-fix (v2) this read "No single attack threshold
+    # decides a matchup", scoped that way because a Def or HP rule could not
+    # carry a line however clean it was.
+    assert joined.startswith('No attack, defense or HP threshold decides a '
+                             'matchup')
+    assert 'No single attack threshold decides' not in joined     # pre-fix v2
+    assert 'No single stat threshold decides' not in joined       # pre-fix v1
     assert 'build for stat product' in joined
     # V2 round 2: the rule and its two sides are two sentences (as one it ran
     # to 32-37 words). Pre-fix: "... rank 44: nothing below it wins, and ...".
@@ -749,9 +752,15 @@ def test_sweep_row_and_table(tmp_path, sableye_shadow_facts):
     _state, facts, _path = sableye_shadow_facts
     row = B.sweep_row(facts)
     assert len(row) == len(B.SWEEP_HEAD)
-    assert row[0] == 'Sableye (Shadow) great'
-    assert row[3].startswith('floor 148.10')
-    assert row[4] == '40/0/0'
+    # Round 2: the blob date rides in the species column, so three separate
+    # Tinkaton bakes are three distinguishable sets of rows.
+    assert row[0] == 'Sableye (Shadow) great (2026-09-11)'   # pre-fix: no date
+    # V3: the outcome names the axis and two columns are added after it.
+    # Pre-fix: row[3] == 'floor 148.10 (...)' and row[4] == '40/0/0'.
+    assert row[3].startswith('floor Atk >= 148.10')
+    assert row[4] == 'atk'
+    assert row[5] == '-'                       # no line on another stat here
+    assert row[6] == '40/0/0'
     out = B.write_sweep([row], str(tmp_path))
     text = Path(out).read_text()
     assert text.count('\n|') == 3          # header, rule, one row
@@ -980,13 +989,19 @@ def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed():
     """
     path = require_blob(FURRET)
     state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    # V3 moved movesets 1-4 onto a Def line, whose ladder has no material
+    # rungs, so the ATTACK ladder this test inspects now lives on moveset 5
+    # (the only Furret arm with no line on any axis). The exclusion itself is
+    # unchanged; only where the printed ladder is.
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is None)
+    facts = B.compute_brief(state, arm, str(path))
     named = [n for row in facts['rungs_above'] + facts['rungs_below']
              for n in row['names']]
     assert named, "this arm does have material rungs"
     assert not any('Aegislash' in n for n in named)     # pre-fix: present
     assert facts['not_claimed']['n_excluded_by_caveat'] >= 1
-    html = B.render_facts(state, 0, str(path), facts)
+    html = B.render_facts(state, arm, str(path), facts)
     assert 'engine divergence' in html
     assert 'Atk &gt;= 120.83' not in html               # pre-fix string
 
@@ -1534,8 +1549,12 @@ def test_stat_threshold_str_uses_the_integer_branch_for_hp():
     # It formats an ALREADY-FLOORED printed value (printed_cut does the
     # flooring), so the Def case is fed 101.40, not the 101.4055 cut.
     assert B.stat_threshold_str('hp', 142.0, 2) == 'HP >= 142'
-    assert B.stat_threshold_str('def', 101.40, 2) == 'DEF >= 101.40'
-    assert B.stat_threshold_str('atk', 148.103, 3) == 'ATK >= 148.103'
+    # V3 spells the axis as the strip and the floor row always did. Pre-fix
+    # these were 'DEF >= 101.40' and 'ATK >= 148.103', which put two
+    # spellings of the same kind of number in one strip once Def and HP
+    # could carry the printed line.
+    assert B.stat_threshold_str('def', 101.40, 2) == 'Def >= 101.40'
+    assert B.stat_threshold_str('atk', 148.103, 3) == 'Atk >= 148.103'
 
 
 @pytest.mark.local_artifacts
@@ -1587,46 +1606,51 @@ def test_near_line_row_only_promotes_a_gate_or_a_near_miss():
 
 
 @pytest.mark.local_artifacts
-def test_furret_near_exact_rule_leads_its_headline():
-    """A rule broken by ONE spread in 4096 is a verdict, not "nothing"."""
+def test_furret_defense_rule_is_the_line_not_the_closest_thing_to_one():
+    """The rule broken by ONE spread in 4096 is now the printed verdict.
+
+    Pre-fix (v2) this arm had NO line: the same Def >= 102.063 rule was
+    printed as "The closest thing to a line is 102.06 (102.063) defense in
+    the 1v1 against Lapras (rank 37)" and then disqualified with "This page
+    prints attack lines only, so that one is evidence, not a target." Both
+    strings are the pre-fix values recorded here.
+    """
     path = require_blob(FURRET)
     state = B.load_blob(str(path))
     facts = B.compute_brief(state, 0, str(path))
-    d = facts['dirty_thresholds'][0]
-    assert d['cell'] == '1v1 Lapras'
-    assert d['n_wrong'] == 1 and d['near_exact'] is True
-    # V2: one_sided covers BOTH clean-sided shapes, and this row is the
-    # second one -- every spread at or above the line wins, and a single
-    # spread below it wins too. Pre-fix this read False, because only the
-    # "nothing below wins" shape counted, which is why Medicham's 108.39
-    # (1978 of 1978 above, 56 of 2118 below) was printed as a plain dirty
-    # split rather than as the gate it is.
-    assert d['one_sided'] is True
-    assert d['gate_side'] == 'sufficient'
+    fl = facts['floor']
+    assert fl is not None                                 # pre-fix: None
+    assert (fl['axis'], fl['cell']) == ('def', '1v1 Lapras')
+    assert fl['printed'] == pytest.approx(102.063, abs=1e-4)
+    # The same two sides the closest-rule sentence used to print.
+    assert (fl['n_above'], fl['n_win_above']) == (1614, 1614)
+    assert (fl['n_below'], fl['n_win_below']) == (2482, 1)
+    assert fl['kind'] == 'gate' and fl['gate_side'] == 'sufficient'
     text = ' '.join(B.build_headline(facts))
-    # V2 round 2: item 5's precision rule applies wherever a threshold is
-    # spoken (pre-fix: the bare "102.063 defense"), and the rule is followed
-    # by the reason it is not the line -- here, that the floor pool is the
-    # attack axis.
-    assert 'The closest thing to a line is 102.06 (102.063) defense in the '\
-           '1v1 against Lapras (rank 37). Every one of the 1614 spreads at '\
-           'or above it wins, and 1 of the 2482 below it wins too.' in text
-    assert 'is 102.063 defense' not in text                          # pre-fix
+    assert 'should have at least 102.06 (102.063) defense' in text
+    assert 'The closest thing to a line is' not in text              # pre-fix
     assert 'This page prints attack lines only, so that one is evidence, '\
-           'not a target.' in text
+           'not a target.' not in text                               # pre-fix
     assert 'nothing on this arm is a build line to hunt for' not in text
 
 
 @pytest.mark.local_artifacts
 def test_furret_clean_cut_denominators_reconcile():
-    """Round 2 printed 28, 26 and 28 for one quantity, ten lines apart."""
+    """Round 2 printed 28, 26 and 28 for one quantity, ten lines apart.
+
+    V3: the reconciliation sentence lives in the degradation ladder, which
+    only fires on an arm with NO line, so this runs on the Furret arm that
+    has none (pre-fix it was arm 1, which now carries a Def line).
+    """
     path = require_blob(FURRET)
     state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is None)
+    facts = B.compute_brief(state, arm, str(path))
     cc = facts['clean_counts']
     assert sum(cc.values()) == facts['gate_tally']['n_cuts']
     assert facts['clean_claimed'] + facts['clean_excluded'] == sum(cc.values())
-    assert facts['clean_excluded'] == 2
+    assert facts['clean_excluded'] >= 1
     joined = ' '.join(B.build_headline(facts)) + ' ' + \
         facts['degradation']['sentence']
     assert 'excluded for an open engine divergence' in joined
@@ -1675,9 +1699,11 @@ def test_alternative_target_prints_its_iv_envelope(sableye_shadow_facts):
 
 def test_field_order_is_the_reader_order_and_renumbers_from_one():
     assert sorted(B.FIELD_ORDER) == sorted(B.FIELD_DERIVATION_ORDER)
-    assert len(B.FIELD_ORDER) == 15
-    # Examples sits directly under Floor; Coverage moves back with the audit.
-    assert B.FIELD_ORDER[:3] == ('_f1_header', '_f2_floor', '_f9_examples')
+    # V3 adds the sixteenth field, "Lines on the other stats", directly under
+    # the line it lost to. Pre-fix: 15 fields, and Example spreads third.
+    assert len(B.FIELD_ORDER) == 16
+    assert B.FIELD_ORDER[:4] == ('_f1_header', '_f2_floor', '_f16_other_axis',
+                                 '_f9_examples')
     assert B.FIELD_ORDER.index('_f3_coverage') > B.FIELD_ORDER.index('_f10_cost')
 
 
@@ -1685,9 +1711,10 @@ def test_field_order_is_the_reader_order_and_renumbers_from_one():
 def test_fields_render_in_the_reader_order(sableye_shadow_facts):
     _state, facts, _path = sableye_shadow_facts
     fields = B.build_fields(facts)
-    assert [f['n'] for f in fields] == list(range(1, 16))
+    assert [f['n'] for f in fields] == list(range(1, 17))   # pre-fix: 1..15
     titles = [f['title'] for f in fields]
-    assert titles[:3] == ['Header', 'Floor', 'Example spreads']
+    assert titles[:4] == ['Header', 'Floor', 'Lines on the other stats',
+                          'Example spreads']
     assert titles.index('Coverage') > titles.index('Cost')
 
 
@@ -1703,14 +1730,23 @@ def test_coverage_column_prints_one_precision(sableye_shadow_facts):
 
 @pytest.mark.local_artifacts
 def test_dirty_table_prints_the_genre_precision_cost():
-    """E8: the exact selector stays, with what one decimal place costs."""
+    """E8: the exact selector stays, with what one decimal place costs.
+
+    V3 runs it on the Furret arm with no line: the sentence lives in field
+    2's negative branch, and the arm it used to run on (moveset 1, whose top
+    dirty row was the Def 102.063 rule at a genre precision of 102.0) now
+    prints that rule as its line.
+    """
     path = require_blob(FURRET)
     state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
-    g = facts['dirty_thresholds'][0]['genre']
-    assert g['printed'] == pytest.approx(102.0, abs=0.1)
-    assert g['n_above'] >= facts['dirty_thresholds'][0]['n_above']
-    html = B.render_facts(state, 0, str(path), facts)
+    arm = next(i for i in range(len(state['moveset_data']))
+               if B.compute_brief(state, i, str(path))['floor'] is None)
+    facts = B.compute_brief(state, arm, str(path))
+    top = facts['dirty_thresholds'][0]
+    g = top['genre']
+    assert g['printed'] == pytest.approx(math.floor(top['t'] * 10) / 10.0)
+    assert g['n_above'] >= top['n_above']
+    html = B.render_facts(state, arm, str(path), facts)
     assert 'PvPoke and Poke Genie display' in html
 
 
@@ -1732,14 +1768,32 @@ def test_both_sableye_pages_headline_the_same_priority_line():
     plain = B.compute_brief(pl_state, 0, str(plain_path))['floor']
     assert plain['cell'] == '0v1 Annihilape'
     assert plain['n_pass'] == 2220
-    shadow_cells = set()
+    # V3 round 2: all four Shadow Sableye arms print the 148.10 attack line
+    # again. Round 1 printed a Def line on movesets 2-4 -- the two nets sat
+    # inside the tie window and the tie-break took the SMALLER clearer pool
+    # (2193 < 2220) -- and both halves of that are now fixed: the net is
+    # measured against the best spread that misses the line rather than
+    # against rank-1 (which made every Def line look free, because rank-1 is
+    # itself a clearer), and the pool clause prefers the larger pool.
+    # Pre-fix (round 1): ['atk', 'def', 'def', 'def'], decided_by 'pool',
+    # Def nets +4/+1/+1 against attack +9/+6/+4.
+    shadow_cells, printed_axes, nets = set(), [], []
     for arm in range(len(sh_state['moveset_data'])):
-        fl = B.compute_brief(sh_state, arm, str(shadow_path))['floor']
+        facts = B.compute_brief(sh_state, arm, str(shadow_path))
+        fl = facts['floor']
         assert fl is not None
-        assert fl['n_pass'] == 2220                  # round-2: 2220 / 2239
-        assert fl['printed'] == pytest.approx(148.10)
-        shadow_cells.add(fl['cell'])
+        printed_axes.append(fl['axis'])
+        nets.append((facts['axis_nets']['atk'], facts['axis_nets']['def']))
+        atk_line = fl
+        assert atk_line['n_pass'] == 2220            # round-2: 2220 / 2239
+        assert atk_line['printed'] == pytest.approx(148.10)
+        shadow_cells.add(atk_line['cell'])
     assert shadow_cells == {'0v1 Annihilape'}        # round-2: two opponents
+    assert printed_axes == ['atk', 'atk', 'atk', 'atk']
+    # The Def line on movesets 2-4 is a NET LOSS under the symmetric measure
+    # (round 1 scored the same lines +4/+1/+1 against rank-1).
+    assert [n[1] for n in nets[1:]] == [-5, -5, -3]
+    assert [n[0] for n in nets[1:]] == [9, 6, 4]
     assert (plain['mech']['opp_cmp_atk']
             == pytest.approx(B.compute_brief(sh_state, 0, str(shadow_path))
                              ['floor']['mech']['opp_cmp_atk']))
@@ -2324,12 +2378,20 @@ def test_a_shared_line_is_not_re_explained_on_every_moveset(tmp_path):
              for a in range(len(state['moveset_data']))]
     assert len(facts) >= 2
     assert B.shared_line_with(facts[0], []) is None
+    # V3 round 2: all four movesets share the 148.10 Annihilape attack line
+    # again, so the shared pair is (2, 1). Round 1 printed a Def line on
+    # movesets 2-4 (the cross-axis tie-break took the smaller clearer pool),
+    # which made ``shared_line_with(facts[1], facts[:1])`` None and moved the
+    # repeated sentence onto "99.11 defense ... 0v1 Snorlax (Shadow)".
     same = B.shared_line_with(facts[1], facts[:1])
-    assert same == facts[0]['header']['arm_label']
+    assert same == facts[0]['header']['arm_label']    # round 1: None
     head = B.build_headline(facts[1], same_as=same)
     assert head[0].startswith(f'Same line as {same}: at least 148.10 attack '
                               f'for the 0v1 against Annihilape (rank 30)')
     assert 'charge-move-priority line' not in head[0]
+    assert 'bulkpoint' not in head[0]
+    same2 = B.shared_line_with(facts[2], facts[:2])
+    assert same2 == facts[0]['header']['arm_label']
     # The strip stays complete per moveset: dropping the paragraph must not
     # drop the numbers.
     assert len(B.build_strip(facts[1])) == 5
@@ -2398,3 +2460,692 @@ def test_not_claimed_only_counts_the_floors_own_cell_as_claimed():
     if (si, oi) not in exact:
         want -= 1
     assert facts['not_claimed']['n_no_rule'] == want
+
+
+# ---------------------------------------------------------------------------
+# V3: floors on the bulk axes (Michael's 2026-09-12 decision)
+#
+# Pre-fix, the floor pool was the attack axis alone: a Def or HP rule printed
+# as "evidence, not a target" and a bulk-first species ended its page with
+# "build for stat product" while the real verdict sat in its evidence table.
+# ---------------------------------------------------------------------------
+
+ALL_GATES_PASS = ('G-material-hi', 'G-material-lo', 'G-material-gap', 'G-rank',
+                  'G-attributed', 'G-direction', 'G-scenario', 'G-caveat')
+
+
+def _axis_rungs(wins, axis, n_iv=4096):
+    """Floor-pool rungs for one synthetic cell whose signal is on ``axis``.
+
+    The other two planes are CONSTANT, so they produce no cut of their own
+    (``stat >= min(stat[wins])`` is the whole grid) and the pool contains
+    exactly the axis under test. Every gate is satisfied by hand: this test
+    is about whether the SELECTION machinery runs on a bulk axis at all, and
+    the gates have their own tests above.
+    """
+    wins = np.asarray(wins, dtype=bool)
+    win = wins.reshape(n_iv, 1, 1)
+    planes = {a: np.full(n_iv, 100.0) for a in B.AXES}
+    planes[axis] = np.arange(n_iv, dtype=float) / 10.0
+    triage = B.stage1_triage(win)
+    cuts = [c for c in B.stage2_clean_cuts(win, planes, triage)
+            if c['axis'] == axis]
+    prims = B.stage2_primitives(win, planes, triage, axis=axis)
+    for c in cuts + prims:
+        c['label'] = '0v0 Synth'
+        c['rank'] = 1
+        c['holds'] = {'modes_ok': 4, 'modes_total': 4, 'modes_fail': [],
+                      'arms_ok': 1, 'arms_total': 1}
+        c['gates'] = {g: True for g in ALL_GATES_PASS}
+        c['eligible'] = True
+        c['pool_share'] = c['n_pass'] / n_iv
+    return B.group_rungs(cuts + prims, n_iv), planes
+
+
+def test_a_defense_gate_can_carry_the_line():
+    """A necessary gate on Def is now floor-eligible (pre-fix: atk only)."""
+    n = 4096
+    cut = 2048                     # 50% of the grid, inside the [25%, 60%] band
+    wins = np.zeros(n, dtype=bool)
+    wins[cut:] = True
+    wins[-40:] = False             # 40 of 2048 above lose: 98.0%, over the bar
+    rungs, _planes = _axis_rungs(wins, 'def')
+    pick = B.stage6_select(rungs, n_iv=n)
+    assert pick is not None
+    assert pick['axis'] == 'def'                       # pre-fix: never 'def'
+    assert pick['n_pass'] == n - cut
+    cell = B.floor_cell_of(pick)
+    assert cell['kind'] == 'gate' and cell['gate_side'] == 'necessary'
+
+
+def test_an_hp_exact_cut_can_carry_the_line():
+    """An exact cut on HP is now floor-eligible (pre-fix: atk only)."""
+    n = 4096
+    cut = 1800                     # 56% of the grid clears
+    wins = np.zeros(n, dtype=bool)
+    wins[cut:] = True
+    rungs, _planes = _axis_rungs(wins, 'hp')
+    pick = B.stage6_select(rungs, n_iv=n)
+    assert pick is not None
+    assert pick['axis'] == 'hp'                        # pre-fix: never 'hp'
+    assert B.floor_cell_of(pick)['kind'] == 'exact'
+    assert pick['n_pass'] == n - cut
+
+
+def test_group_rungs_refuses_a_mixed_axis_ladder():
+    """One ladder, one axis: a Def 148.29 and an Atk 148.29 are not one rung."""
+    def cut(axis):
+        return {'axis': axis, 'T': 148.29, 'n_pass': 100, 'pool_share': 0.02,
+                'n_attained_below': 30, 'prev_attained': 148.0,
+                'kind': 'exact', 'eligible': True, 'gates': {},
+                'holds': {'modes_ok': 4, 'modes_total': 4, 'arms_ok': 1,
+                          'arms_total': 1}}
+    with pytest.raises(B.GuardError):
+        B.group_rungs([cut('atk'), cut('def')], 4096)
+
+
+# ---------------------------------------------------------------------------
+# V3: the cross-axis rule
+# ---------------------------------------------------------------------------
+
+def _cand(axis, net, kind, n_pass, modes_ok=4, arms_ok=4):
+    return {'axis': axis, 'net': net, 'kind': kind,
+            'rung': {'n_pass': n_pass, 'T': 1.0, 'axis': axis,
+                     'modes_ok': modes_ok, 'arms_ok': arms_ok}}
+
+
+def test_cross_axis_takes_the_larger_net():
+    """An attack line worth +15 beats a Def line worth +2 (13 > 1% of 684)."""
+    pick = B.stage6_cross_axis([_cand('atk', 15, 'exact', 2000),
+                                _cand('def', 2, 'exact', 1000)], 684)
+    assert pick['axis'] == 'atk'
+    assert pick['decided_by'] == 'net'
+    assert pick['runner_up'] is None
+
+
+def test_cross_axis_tie_prefers_the_exact_rule_over_a_gate():
+    """Equal nets (and a near-tie) go to the stronger primitive."""
+    for def_net in (5, 3):
+        pick = B.stage6_cross_axis([_cand('atk', 5, 'gate', 1000),
+                                    _cand('def', def_net, 'exact', 2000)], 684)
+        assert pick['axis'] == 'def', def_net
+        assert pick['decided_by'] == 'primitive'
+        assert pick['runner_up']['axis'] == 'atk'
+    # But a line that ALSO took the larger net outright is reported as
+    # winning on net, not as winning a tie-break, even though the weaker
+    # rival sits inside the window.
+    pick = B.stage6_cross_axis([_cand('atk', 3, 'gate', 1000),
+                                _cand('def', 5, 'exact', 2000)], 684)
+    assert pick['axis'] == 'def'
+    assert pick['decided_by'] == 'net'
+    assert pick['runner_up'] is None
+
+
+def test_cross_axis_tie_between_two_exact_rules_takes_the_larger_pool():
+    """Everything above it level: the line that asks LESS of the build wins.
+
+    Round 1 read Michael's "the smaller pool" literally and picked the
+    harder-to-reach line (pre-fix: axis 'def', the 2193-spread rule), which
+    is the opposite of D1's minimise-the-ask everywhere else in the module
+    and published its reason on the page ("the printed line is the one fewer
+    spreads reach").
+    """
+    pick = B.stage6_cross_axis([_cand('atk', 4, 'exact', 2220),
+                                _cand('def', 5, 'exact', 2193)], 684)
+    assert pick['axis'] == 'atk'                 # pre-fix: 'def'
+    assert pick['decided_by'] == 'pool'
+    assert pick['runner_up'] == {'axis': 'def', 'net': 5, 'kind': 'exact',
+                                 'n_pass': 2193}
+
+
+def test_cross_axis_tie_prefers_the_line_that_holds_in_more_settings():
+    """Ahead of the pool clause: survival across settings and movesets.
+
+    Two equally clean rules inside the tie window, the larger-pool one
+    holding in 2 of 4 settings and the smaller in 4 of 4. Pre-fix (round 1)
+    there was no robustness clause at all and the pool decided (it would
+    have taken the 2000-spread rule, for the wrong reason).
+    """
+    pick = B.stage6_cross_axis(
+        [_cand('atk', 4, 'exact', 2000, modes_ok=4, arms_ok=4),
+         _cand('def', 5, 'exact', 2400, modes_ok=2, arms_ok=2)], 684)
+    assert pick['axis'] == 'atk'
+    assert pick['decided_by'] == 'robustness'
+    assert pick['runner_up']['axis'] == 'def'
+
+
+def test_cross_axis_returns_none_when_no_axis_has_a_line():
+    assert B.stage6_cross_axis([{'axis': a, 'rung': None, 'kind': 'exact',
+                                 'net': None} for a in B.AXES], 684) is None
+
+
+def test_the_headline_never_claims_the_larger_count_when_it_lost_a_tie():
+    """The sentence has to name the clause that actually decided.
+
+    Pre-fix (first v3 draft) it said "the printed line is the one that
+    carries the larger matchup count" unconditionally, which is false on
+    exactly the pages the tie-break exists for -- Shadow Sableye moveset 2
+    prints a Def line worth +4 beside an attack line worth +9.
+    """
+    facts = {
+        'floor': {'axis': 'def'},
+        'axis_choice': {'decided_by': 'pool', 'tie_window': 6.84},
+        'other_axis_lines': [{'axis': 'atk', 'printed': 148.10, 'dp': 2,
+                              'cell': '0v1 Annihilape', 'rank': 30, 'net': 9}],
+    }
+    text = B._headline_other_axis(facts)
+    # Round 2 retired the pool sentence's reason as well as the clause:
+    # "the printed line is the one fewer spreads reach" is not a
+    # justification an expert signs. Pre-fix that was the wording here.
+    assert 'the one that asks less of the build' in text
+    assert 'fewer spreads reach' not in text                     # round 1
+    assert 'carries the larger matchup count' not in text        # pre-fix
+    facts['axis_choice']['decided_by'] = 'net'
+    assert 'the one with the larger net' in B._headline_other_axis(facts)
+    facts['axis_choice']['decided_by'] = 'robustness'
+    assert ('holds in more of the baked settings'
+            in B._headline_other_axis(facts))
+
+
+# ---------------------------------------------------------------------------
+# V3: the two bulk mechanism labellers
+# ---------------------------------------------------------------------------
+
+def _synth_opponent(atk=100.0):
+    move = {'moveId': 'SYNTH_JAB', 'power': 50, 'type': 'normal'}
+    build = {'species': 'Synth', 'shadow': False, 'ivs': (0, 0, 0),
+             'level': 20.0, 'atk': atk, 'def': 100.0, 'hp': 120,
+             'cmp_atk': atk}
+    return move, build
+
+
+def test_bulkpoint_labeller_names_the_damage_step_into_us():
+    """A Def line is a BULKPOINT when the opponent's damage steps down."""
+    move, build = _synth_opponent()
+    lo_def, hi_def = 98.0, 99.0
+    dmg_lo = int(B.damage(move['power'], build['atk'], lo_def, move['type'],
+                          (), ()))
+    dmg_hi = int(B.damage(move['power'], build['atk'], hi_def, move['type'],
+                          (), ()))
+    assert dmg_hi == dmg_lo - 1, (dmg_lo, dmg_hi)      # the step exists
+    got = B.bulkpoint_label({'T': hi_def}, lo_def, (), build, (), move, [])
+    assert got['move'] == 'SYNTH_JAB'
+    assert (got['from'], got['to']) == (dmg_lo, dmg_hi)
+    assert got['opp_atk_stage'] == 0 and got['def_stage'] == 0
+
+
+def test_bulkpoint_labeller_returns_none_without_a_step():
+    """Two Def values inside one damage plateau are not a bulkpoint."""
+    move, build = _synth_opponent()
+    assert B.damage(move['power'], build['atk'], 99.0, move['type'], (), ()) \
+        == B.damage(move['power'], build['atk'], 99.5, move['type'], (), ())
+    assert B.bulkpoint_label({'T': 99.5}, 99.0, (), build, (), move, []) is None
+    # and no move at all is never a mechanism
+    assert B.bulkpoint_label({'T': 99.0}, 98.0, (), build, (), None, []) is None
+
+
+def test_hp_bulkpoint_labeller_names_the_ko_count_step():
+    """An HP line is an HP-BULKPOINT when a move's KO count changes."""
+    move, build = _synth_opponent()
+    def_ref = 100.0
+    dmg = int(B.damage(move['power'], build['atk'], def_ref, move['type'],
+                       (), ()))
+    hp_lo = 4 * dmg                       # exactly four hits
+    got = B.hp_bulkpoint_label({'T': float(hp_lo + 1)}, float(hp_lo), def_ref,
+                               (), build, (), move, [])
+    assert got['move'] == 'SYNTH_JAB'
+    assert (got['from'], got['to']) == (4, 5)
+    assert got['damage'] == dmg
+    assert got['def_ref'] == def_ref
+    # One HP up from a value that is NOT a multiple of the damage changes
+    # nothing, so there is no mechanism to name.
+    assert B.hp_bulkpoint_label({'T': float(hp_lo - 1)}, float(hp_lo - 2),
+                                def_ref, (), build, (), move, []) is None
+
+
+def test_opp_stages_only_takes_guaranteed_buffs():
+    """A buff that does not always apply cannot be counted on."""
+    always = {'moveId': 'A', 'power': 10, 'type': 'normal',
+              'buffs': [1, 0], 'buffTarget': 'self', 'buffApplyChance': 1}
+    sometimes = dict(always, moveId='B', buffApplyChance=0.5)
+    debuff = {'moveId': 'C', 'power': 10, 'type': 'normal',
+              'buffs': [0, -1], 'buffTarget': 'opponent', 'buffApplyChance': 1}
+    atk_stages, def_stages = B._opp_stages([always, sometimes, debuff])
+    assert atk_stages == [0, 1]
+    assert def_stages == [-1, 0]
+
+
+# ---------------------------------------------------------------------------
+# V3: the two blob cases Michael's decision named
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def furret_facts():
+    path = require_blob(FURRET)
+    state = B.load_blob(str(path))
+    return state, B.compute_brief(state, 0, str(path)), str(path)
+
+
+@pytest.mark.local_artifacts
+def test_furret_moveset_1_carries_a_defense_line(furret_facts):
+    """Pre-fix (v2): ``facts['floor'] is None`` -- "no line, build for stat
+    product" -- with the Def rule sitting in the evidence table as
+    "evidence, not a target" because the floor pool was attack-only.
+    """
+    _state, facts, _path = furret_facts
+    assert facts['floor'] is not None                  # pre-fix: None
+    fl = facts['floor']
+    assert fl['axis'] == 'def'
+    assert fl['printed'] == pytest.approx(102.063, abs=1e-4)
+    assert fl['cell'] == '1v1 Lapras'
+    assert fl['kind'] == 'gate' and fl['gate_side'] == 'sufficient'
+    assert fl['mech']['kind'] == 'bulkpoint'
+    assert fl['mech']['from'] > fl['mech']['to']       # damage into us drops
+    assert facts['floor_axis'] == 'def'
+
+
+@pytest.mark.local_artifacts
+def test_furret_moveset_3_bulk_line_displaces_the_attack_line(furret_facts):
+    """Pre-fix: ``Atk >= 120.12`` was the verdict on movesets 3 and 4.
+
+    Its best clearer wins 25 FEWER matchups than the stat-product rank-1
+    build; the Def line's best clearer ties rank-1. The cross-axis rule takes
+    the larger net, and the displaced attack line is printed in field 16
+    rather than dropped.
+    """
+    state, _facts, path = furret_facts
+    facts = B.compute_brief(state, 2, path)
+    assert facts['floor']['axis'] == 'def'             # pre-fix: 'atk'
+    # Round 2 measures a line against the spread that MISSES it and wins the
+    # most, not against rank-1 (round 1: atk -25, def 0).
+    assert facts['axis_nets']['atk'] == -25
+    assert facts['axis_nets']['def'] == 14             # round 1: 0
+    assert facts['axis_choice']['decided_by'] == 'net'
+    others = facts['other_axis_lines']
+    assert [o['axis'] for o in others] == ['atk']
+    assert others[0]['printed'] == pytest.approx(120.12, abs=1e-2)
+    text = ' '.join(B.build_headline(facts))
+    assert 'A separate line on another stat' in text
+    assert '120.12 attack' in text
+
+
+@pytest.mark.local_artifacts
+def test_altaria_still_has_no_line_and_now_says_why(furret_facts):
+    """Altaria's Def 148.29 is STILL not a line, and the reason changed.
+
+    Pre-fix the page said "This page prints attack lines only, so that one is
+    evidence, not a target" -- true of v2's pool and no longer true of v3's.
+    The rule fails on its own numbers: 90.9% of the spreads above it win,
+    under the 97% a gate needs, and 190 of 4096 are on the wrong side, over
+    the 20 near-exact allows.
+    """
+    path = require_blob(ALTARIA)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    assert facts['floor'] is None
+    assert facts['axis_nets'] == {'atk': None, 'def': None, 'hp': None}
+    d = facts['dirty_thresholds'][0]
+    assert d['axis'] == 'def' and d['cell'] == '2v2 Clodsire'
+    text = B._closest_sentence(d, facts['header']['n_iv'])
+    assert 'This page prints attack lines only' not in text      # pre-fix
+    assert '148.29 defense' in text
+    assert 'under the 97% a rule with one clean side needs' in text
+    head = ' '.join(B.build_headline(facts))
+    assert 'No attack, defense or HP threshold decides a matchup' in head
+    assert 'No single attack threshold decides a matchup' not in head  # pre-fix
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.parametrize('path_to_corrupt,new_value', [
+    (('floor', 'T'), 102.5),
+    (('floor', 'printed'), 102.0),
+    (('floor', 'axis'), 'atk'),
+    (('floor', 'n_pass'), 1615),
+    (('floor', 'mech', 'to'), 1),
+    (('floor', 'mech', 'from'), 9),
+    (('rank1', 'shortfall'), 1.0),
+])
+def test_gate_recompute_covers_the_defense_line(furret_facts, path_to_corrupt,
+                                                new_value):
+    """Every axis fact the Def page prints is re-derived on the Def plane.
+
+    Pre-fix there was no Def page to guard; the guard's floor block compared
+    everything against the ATTACK plane, so a Def line would have been
+    checked against unrelated numbers.
+    """
+    import copy
+    state, facts, path = furret_facts
+    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    bad = copy.deepcopy(facts)
+    node = bad
+    for key in path_to_corrupt[:-1]:
+        node = node[key]
+    node[path_to_corrupt[-1]] = new_value
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+    assert str(exc.value).startswith(('G-recompute:', 'G-primitive:'))
+
+
+@pytest.mark.local_artifacts
+def test_the_defense_page_renders_with_every_gate_running(furret_facts):
+    state, facts, path = furret_facts
+    html = B.render_facts(state, 0, path, facts)
+    assert html.isascii()
+    assert 'Def &gt;= 102.06' in html
+    assert 'Lines on the other stats' in html
+    # Round 1 printed "No ladder: not a priority line" on every bulk floor,
+    # which contradicted its own headline ("a higher-attack Lapras moves the
+    # step"). The bulk ladder walks the same seven reference builds the CMP
+    # ladder does and asks what each of them needs from our defense.
+    assert 'No ladder: not a priority line' not in html      # pre-fix: in
+    assert 'defense you need' in html
+    assert 'PvPoke default (4/11/12)' in html
+    # The alternative target on a Def line forks on (HP, attack), so an
+    # "Atk >=" does belong on the page -- as the fork, never as the line.
+    assert 'Line</dt><dd>Def &gt;= 102.06' in html
+
+
+
+# ---------------------------------------------------------------------------
+# V3 round 2: the two reviews
+#
+# Round 1 shipped the spec literally and two independent reviews found the
+# same two defects in the cross-axis rule: the measure it compares axes on
+# was not axis-neutral (rank-1 is a clearer of essentially every Def line and
+# of essentially no attack line, so "net vs rank-1" asked "is rank-1 already
+# on this axis"), and the tie-break preferred the SMALLER clearer pool, which
+# publishes the harder-to-reach line and says so out loud.
+# ---------------------------------------------------------------------------
+
+def test_line_net_is_measured_against_the_spread_that_misses_the_line():
+    """The comparator is symmetric: clearers' max minus non-clearers' max.
+
+    Pre-fix it was ``max(total_won[clearers]) - total_won[rank_1]``, which
+    is >= 0 by construction whenever rank-1 clears the line -- the case for
+    essentially every Def line under a CP cap.
+    """
+    total_won = np.array([10, 40, 25, 30], dtype=int)
+    mask = np.array([False, False, True, True])
+    assert B.line_net(mask, total_won) == -10        # 30 - 40
+    # Pre-fix, with rank-1 at index 1 (the bulk-heavy non-clearer), the same
+    # line scored 30 - 40 = -10 as well; with rank-1 INSIDE the pool (index
+    # 3) it scored 30 - 30 = 0 and the line looked free.
+    mask2 = np.array([False, True, True, True])
+    assert B.line_net(mask2, total_won) == 30        # 40 - 10
+    # A line every spread clears, or none does, buys nothing measurable.
+    assert B.line_net(np.ones(4, bool), total_won) is None
+    assert B.line_net(np.zeros(4, bool), total_won) is None
+
+
+def test_pct_below_never_renders_onto_the_bar_it_failed():
+    """Lapras 1v2 Tinkaton: 2606 of 2687 = 96.98548%, against a 97% bar.
+
+    Pre-fix ``pct`` rendered it "97.0%" and the page read "It is not a build
+    line because 97.0% of the spreads at or above it win, under the 97% a
+    rule with one clean side needs" -- a sentence that contradicts itself.
+    """
+    rate = 2606 / 2687
+    assert B.pct(rate) == '97.0%'                    # the pre-fix rendering
+    assert B.pct_below(rate, B.GATE_MIN_ABOVE) == '96.99%'
+    # Scanner self-test: a rate that is nowhere near the bar still renders at
+    # the default precision, so the escalation is not always-on.
+    assert B.pct_below(0.5, B.GATE_MIN_ABOVE) == '50.0%'
+    assert float(B.pct_below(rate, B.GATE_MIN_ABOVE)[:-1]) < 97.0
+
+
+def test_bulkpoint_labeller_names_every_move_that_steps():
+    """All of them, most material first -- not the first one in kit order.
+
+    Pre-fix the loop returned on the first step it found, which is always the
+    FAST move, so a cut where three moves step was printed as one (Furret's
+    line: Lapras PSYWAVE 3 -> 2, SPARKLING_ARIA 65 -> 64, ICE_BEAM 73 -> 72,
+    and the page named only PSYWAVE). The order is by RELATIVE step: one
+    point off a 3-damage fast move is a third of its output, one off a
+    101-damage charged move is 1%.
+    """
+    fast = {'moveId': 'SYNTH_POKE', 'power': 3, 'type': 'normal'}
+    charged = {'moveId': 'SYNTH_BLAST', 'power': 150, 'type': 'normal'}
+    build = {'species': 'Synth', 'shadow': False, 'ivs': (0, 0, 0),
+             'level': 20.0, 'atk': 100.0, 'def': 100.0, 'hp': 120,
+             'cmp_atk': 100.0}
+    lo, hi = 97.49, 97.50        # both moves step across this pair
+    # Positive control: the pair really does move both damage numbers, so a
+    # labeller that named one of them would be under-reporting.
+    f_lo = int(B.damage(3, 100.0, lo, 'normal', (), ()))
+    f_hi = int(B.damage(3, 100.0, hi, 'normal', (), ()))
+    c_lo = int(B.damage(150, 100.0, lo, 'normal', (), ()))
+    c_hi = int(B.damage(150, 100.0, hi, 'normal', (), ()))
+    assert (f_lo, f_hi) == (3, 2) and (c_lo, c_hi) == (101, 100)
+    got = B.bulkpoint_label({'T': hi}, lo, (), build, (), fast, [charged])
+    assert got['move'] == 'SYNTH_POKE'            # larger RELATIVE step
+    assert (got['from'], got['to']) == (3, 2)
+    assert [a['move'] for a in got['also']] == ['SYNTH_BLAST']
+    assert (got['also'][0]['from'], got['also'][0]['to']) == (101, 100)
+    # A cut where only one move steps carries an empty ``also``.
+    solo = B.bulkpoint_label({'T': 98.0}, 97.0, (), build, (), fast, [])
+    assert solo is not None and solo['also'] == []
+    assert (solo['from'], solo['to']) == (3, 2)
+
+
+def test_the_hp_gap_gate_is_reachable_on_a_real_grid():
+    """G-material-gap is per axis, because the HP grid is short.
+
+    Pre-fix one constant (20 distinct attained values below the cut) ran on
+    all three axes, and a Great League HP grid carries 13-26 distinct values
+    IN TOTAL, so no HP cut could pass -- the axis was disqualified by
+    construction while the negative page claimed "no attack, defense or HP
+    threshold decides a matchup".
+    """
+    assert B.MIN_ATTAINED_BELOW['atk'] == 20         # unchanged from v2
+    assert B.MIN_ATTAINED_BELOW['def'] == 20         # unchanged from v2
+    assert B.MIN_ATTAINED_BELOW['hp'] < 20           # pre-fix: 20 everywhere
+    cut = {'axis': 'hp', 'n_attained_below': 6, 'n_pass': 2000}
+    holds = {'modes_ok': 4, 'modes_total': 4}
+    mech = {'kind': 'hp_bulkpoint'}
+    triage = {'degenerate': {0: False}}
+    state = {'opponent_names': ['Synth'], 'species': 'Synth'}
+    cut['si'], cut['oi'] = 0, 0
+    gates = B.rung_gates(cut, holds, mech, [1], triage, state, 4096)
+    assert gates['G-material-gap'] is True           # pre-fix: False
+
+
+@pytest.mark.local_artifacts
+def test_deoxys_carries_the_corpus_first_hp_line():
+    """The HP axis finally selects a line, on the axis-relative gap gate.
+
+    Pre-fix (round 1) the HP axis carried ZERO lines across the whole 458-row
+    corpus and this arm printed "no attack, defense or HP threshold decides a
+    matchup" -- on a grid where no HP cut could have been tested.
+    """
+    path = require_blob(DEOXYS)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 4, str(path))
+    fl = facts['floor']
+    assert fl is not None                            # pre-fix: None
+    assert fl['axis'] == 'hp'
+    assert fl['mech']['kind'] == 'hp_bulkpoint'
+    assert fl['mech']['from'] < fl['mech']['to']     # more hits to KO us
+    assert facts['coverage']['kind'] == 'bulk'
+    assert facts['coverage']['axis'] == 'hp'
+
+
+@pytest.mark.local_artifacts
+def test_the_bulk_ladder_rows_are_the_values_each_build_asks_for(furret_facts):
+    """Seven reference builds, each with the defense it needs from us.
+
+    The PvPoke-default row IS the printed floor (the line every reference
+    tool quotes), the clearer counts fall as the opponent's attack rises, and
+    every value is an attained one, so the ">=" selector is real.
+    """
+    _state, facts, _path = furret_facts
+    cov = facts['coverage']
+    assert cov is not None                           # pre-fix: None on a bulk
+    assert cov['kind'] == 'bulk' and cov['axis'] == 'def'
+    labels = [r['label'] for r in cov['rows']]
+    assert len(labels) == 7
+    assert labels[1].startswith('PvPoke default')
+    dflt = cov['rows'][1]
+    assert dflt['line'] == pytest.approx(facts['floor']['T'])
+    assert dflt['focal'] == facts['floor']['n_pass']
+    # A build with more attack asks for more defense and fewer of our
+    # spreads reach it.
+    hundo = next(r for r in cov['rows'] if r['label'].startswith('hundo'))
+    assert hundo['opp_atk'] > dflt['opp_atk']
+    assert hundo['line'] > dflt['line']
+    assert hundo['focal'] < dflt['focal']
+    assert 0.0 < dflt['held'] < 1.0
+    assert cov['rows'][-1]['held'] == 1.0            # the max-attack build
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.parametrize('path_to_corrupt,new_value', [
+    (('floor', 'rate_below_loss'), 0.5),
+    (('floor', 'genre', 'n_above'), 99),
+    (('axis_choice', 'decided_by'), 'pool'),
+    (('axis_nets', 'def'), 99),
+    (('coverage', 'rows', 1, 'focal'), 99),
+    (('coverage', 'rows', 1, 'line'), 103.0),
+])
+def test_gate_recompute_covers_the_round_2_facts(furret_facts,
+                                                 path_to_corrupt, new_value):
+    """Three printed numbers rendered corrupted with no guard in round 1.
+
+    ``rate_below_loss`` is the percentage inside the badge sentence ("99.96%
+    of the spreads below lose, against a bar of 97%"); ``decided_by`` is the
+    clause the page names as having decided the cross-axis choice, which is
+    the sentence the previous commit added to stop a false claim; the nets
+    are what it names beside it. The bulk ladder is new in round 2 and is
+    re-derived row by row.
+    """
+    import copy
+    state, facts, path = furret_facts
+    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    bad = copy.deepcopy(facts)
+    node = bad
+    for key in path_to_corrupt[:-1]:
+        node = node[key]
+    node[path_to_corrupt[-1]] = new_value
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+    assert str(exc.value).startswith(('G-recompute:', 'G-primitive:'))
+
+
+def test_a_demoted_bulk_floor_keeps_the_cost_wording():
+    """A Def line whose clearers lose matchups is demoted like an attack one.
+
+    The cost measure stays "against the stat-product rank-1 build" -- the
+    right question for a PRICE -- and on the bulk axes rank-1 usually clears
+    the line already, so no Def or HP floor in the 458-row corpus is demoted
+    and this branch would otherwise ship unexercised. Pinned here on a
+    hand-built fact set instead.
+    """
+    floor = {'axis': 'def', 'printed': 148.29, 'dp': 2, 'T': 148.29,
+             'kind': 'exact', 'cell': '2v2 Clodsire', 'rank': 25}
+    lead = B._headline_lead('Altaria', 'DRAGON_BREATH / MOONBLAST, SKY_ATTACK',
+                            'Great League', floor, costly=True)
+    assert lead == ('Altaria running DRAGON_BREATH / MOONBLAST, SKY_ATTACK '
+                    'in Great League has a defense line at 148.29, and '
+                    'clearing it costs more than it buys.')
+    assert B._headline_lead('Altaria', 'X', 'Great League',
+                            dict(floor, axis='atk'), costly=True).startswith(
+        'Altaria running X in Great League has an attack line at')
+    assert B._headline_lead('Altaria', 'X', 'Great League', floor,
+                            costly=False) == (
+        'Most Altaria running X in Great League should have at least '
+        '148.29 defense.')
+    facts = {
+        'floor_cost': {'best_ivs': (0, 15, 15), 'best_total': 300,
+                       'rank1_total': 340, 'net': -40, 'n_tied': 1,
+                       'material': True, 'share_of_matchups': 0.01,
+                       'total_cells': 684, 'top_sp_share': 0.93,
+                       'sp_floor': B.SP_FLOOR},
+    }
+    cost = B._headline_cost(facts, floor, {'ivs': (0, 15, 15)})
+    assert 'No spread that clears it matches that count' in cost
+    assert '40 fewer' in cost
+    assert 'Build 0/15/15 and concede the 2v2 against Clodsire.' in cost
+
+
+def test_the_alternative_silence_names_the_two_free_stats():
+    """Field 6 with no rectangle: the noun follows the line's axis.
+
+    Pre-fix the populated branch was axis-aware and this one was not, so a
+    Def line printed "No bulk rectangle ..." under a headline that correctly
+    called the fork an HP-and-attack pair.
+    """
+    out = B._f8_alternative({'alternative': None,
+                             'floor': {'axis': 'def'}})
+    text = ' '.join(out['lines'])
+    assert 'No HP-and-attack rectangle' in text        # pre-fix: 'No bulk'
+    assert 'bulk rectangle' not in text
+    out = B._f8_alternative({'alternative': None, 'floor': {'axis': 'hp'}})
+    assert 'No defense-and-attack rectangle' in ' '.join(out['lines'])
+    # An attack line still forks on bulk, and still says so.
+    out = B._f8_alternative({'alternative': None, 'floor': {'axis': 'atk'}})
+    assert 'No defense-and-HP rectangle' in ' '.join(out['lines'])
+
+
+def test_rank1_says_nothing_about_a_target_that_does_not_exist():
+    """Field 5 claimed membership of a field-6 target that is absent.
+
+    Pre-fix: "It is not a member of the Alternative target below." printed
+    beside "No ... rectangle ... guarantees a contested cell".
+    """
+    rank1 = {'ivs': (0, 15, 15), 'level': 20.0, 'atk': 100.0, 'def': 150.0,
+             'hp': 130, 'total_won': 300, 'total_cells': 684,
+             'contested_won': 90, 'n_contested': 151, 'clears_floor': True,
+             'in_alternative': False}
+    floor = {'axis': 'def', 'cell': '2v2 Clodsire', 'rank': 25}
+    text = ' '.join(B._f4_rank1({'rank1': rank1, 'floor': floor,
+                                 'alternative': None})['lines'])
+    assert 'Alternative target' not in text             # pre-fix: present
+    with_alt = ' '.join(B._f4_rank1({'rank1': rank1, 'floor': floor,
+                                     'alternative': {'n': 200}})['lines'])
+    assert 'It is not a member of the Alternative target below.' in with_alt
+
+
+@pytest.mark.local_artifacts
+def test_the_negative_headline_names_only_the_axes_it_tested():
+    """An axis whose gap bar is unreachable is not claimed as tested.
+
+    Pre-fix the lead always said "No attack, defense or HP threshold decides
+    a matchup", including on grids where the HP axis could not produce a
+    candidate at all.
+    """
+    path = require_blob(ALTARIA)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 0, str(path))
+    assert facts['floor'] is None
+    assert all(v['ok'] for v in facts['axis_testable'].values())
+    head = ' '.join(B.build_headline(facts))
+    assert 'No attack, defense or HP threshold decides a matchup' in head
+    # Same page, with the HP axis out of reach of its own gap bar.
+    facts['axis_testable']['hp']['ok'] = False
+    facts['axis_testable']['hp']['n_distinct'] = 4
+    head = ' '.join(B.build_headline(facts))
+    assert 'No attack or defense threshold decides a matchup' in head
+    assert 'The HP axis is not tested on this grid' in head
+    assert '4 distinct attainable values' in head
+
+
+@pytest.mark.local_artifacts
+def test_the_printed_line_says_what_one_decimal_would_cost(furret_facts):
+    """E8 on the PRINTED line, not only in the negative page's evidence.
+
+    Furret's Def >= 102.06 (102.063) needs three places to select its 1614
+    spreads; pre-fix the page never said what a reader typing 102.1 (or
+    102.0) into a one-decimal tool would select.
+    """
+    _state, facts, _path = furret_facts
+    g = facts['floor']['genre']
+    assert g is not None and g['n_extra'] > 0
+    text = ' '.join(B._f2_floor(facts)['lines'])
+    assert 'At the one decimal place PvPoke and Poke Genie display' in text
+    assert 'Def >= 102.0' in text
+    assert f"{g['n_above']} spreads" in text
+    # A line whose 2-dp rendering selects exactly the same set says nothing:
+    # the sentence is a warning, not a ritual.
+    quiet = copy.deepcopy(facts)
+    quiet['floor']['genre']['n_extra'] = 0
+    assert ('At the one decimal place'
+            not in ' '.join(B._f2_floor(quiet)['lines']))
