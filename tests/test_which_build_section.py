@@ -166,6 +166,7 @@ def _facts(floor=True):
     """A minimal fact dict shaped like compute_brief's, for the prose paths."""
     f = {
         'header': {'arm': 0, 'n_arms': 2, 'arm_label': 'FAST / CM1, CM2',
+                   'species': 'Sableye', 'shadow': True,
                    'league': 'great', 'n_iv': 4096},
         'rank1': {'ivs': [0, 15, 15], 'level': 49.5, 'total_won': 367,
                   'total_cells': 684},
@@ -176,7 +177,7 @@ def _facts(floor=True):
             {'ivs': [10, 13, 11], 'level': 45.5, 'rule': 'bulkiest'},
         ],
         'floor': None, 'alternative': None, 'rungs_above': [],
-        'cluster_corroboration': None,
+        'floor_cost': None, 'cluster_corroboration': None,
         '_headline': ['Most X should have at least 148.10 attack. '
                       '2220 of the 4096 IV spreads reach it.',
                       'The stat-product rank-1 spread misses it.'],
@@ -185,7 +186,22 @@ def _facts(floor=True):
         f['floor'] = {'axis': 'atk', 'printed': 148.1, 'dp': 2,
                       'T': 148.1039982, 'cell': '0v1 Annihilape',
                       'n_above': 2220, 'pool_share': 0.542, 'kind': 'exact'}
+        f['floor_cost'] = {'best_ivs': (7, 2, 14), 'best_total': 382,
+                           'rank1_total': 367, 'net': 15, 'n_tied': 1,
+                           'material': False, 'total_cells': 684}
     return f
+
+
+def _two_movesets(same_line=True):
+    """A page with two movesets, for the lead and the summary's clause."""
+    a, b = _facts(), _facts()
+    b['header'] = dict(b['header'], arm=1,
+                       arm_label='SHADOW_CLAW / FOUL_PLAY, POWER_GEM')
+    a['header'] = dict(a['header'],
+                       arm_label='SHADOW_CLAW / DRAIN_PUNCH, FOUL_PLAY')
+    if not same_line:
+        b['floor'] = dict(b['floor'], printed=149.2, T=149.2)
+    return [a, b]
 
 
 def test_sentences_do_not_split_inside_a_decimal():
@@ -211,8 +227,56 @@ def test_extended_first_sentence_is_untouched_with_no_line():
     assert W.extended_first_sentence(f) == W.sentences(f['_headline'][0])[0]
 
 
-def test_summary_uses_the_headline_sentence_when_there_is_a_line():
-    assert W.summary_sentence(_facts()).startswith('Most X should have')
+def test_summary_is_a_directive_at_two_places():
+    """Not the headline sentence quoted: the value prints at two places and
+    the sentence is built from the facts, so a moveset that shares an earlier
+    moveset's line still answers the question instead of pointing at another
+    file."""
+    got = W.summary_sentence(_facts())
+    assert got == 'Most Sableye (Shadow) should have at least 148.10 attack.'
+
+
+def test_summary_drops_the_precision_parenthetical():
+    """"123.42 (123.419)" reads as a typo in a one-line summary; the proven
+    selector stays in the headline and field 2."""
+    f = _facts()
+    f['floor'] = dict(f['floor'], printed=123.419, dp=3)
+    assert W.printed_value(f['floor']) == '123.42 (123.419)'
+    assert '(123.419)' not in W.summary_sentence(f)
+    assert '123.42 attack' in W.summary_sentence(f)
+
+
+def test_summary_prices_a_line_that_costs_a_matchup():
+    """The brief keeps its directive while the net loss is immaterial, so a
+    reader who reads ONLY the summary would be sent after a line the page's
+    own second paragraph prices. The clause is in the same sentence."""
+    f = _facts()
+    f['floor_cost'] = dict(f['floor_cost'], net=-1, best_total=359,
+                           rank1_total=360)
+    got = W.summary_sentence(f)
+    assert 'should have at least 148.10 attack' in got
+    assert 'though rank-1 0/15/15 still wins 1 more matchup overall' in got
+    f['floor_cost'] = dict(f['floor_cost'], net=0)
+    assert 'already wins as many matchups' in W.summary_sentence(f)
+
+
+def test_summary_follows_the_brief_when_the_line_is_demoted():
+    f = _facts()
+    f['floor_cost'] = dict(f['floor_cost'], net=-40, material=True)
+    got = W.summary_sentence(f)
+    assert got.startswith('Sableye (Shadow) has a line at 148.10 attack')
+    assert 'should' not in got
+
+
+def test_summary_names_the_moveset_on_a_multi_moveset_page():
+    """Split files each carry one moveset, so the summary has to say which."""
+    pair = _two_movesets(same_line=True)
+    got = W.summary_sentence(pair[0], pair)
+    assert got.endswith('(the same line as its other 1 movesets).') or \
+        '(the same line as its other 1 moveset' in got
+    pair = _two_movesets(same_line=False)
+    got = W.summary_sentence(pair[0], pair)
+    assert '(Drain Punch)' in got, got
 
 
 def test_summary_on_a_negative_page_says_any_of_them():
@@ -228,10 +292,35 @@ def test_summary_on_a_negative_page_defers_to_rank1_when_rank1_wins_most():
         'Your rank-1: it already wins more matchups than any other spread.')
 
 
+def test_summary_does_not_claim_a_strict_win_when_the_top_is_tied():
+    """"more matchups than any other spread" is a strict claim, and the same
+    fact dict says how many spreads share the top count."""
+    f = _facts(floor=False)
+    f['grid_best']['total'] = f['rank1']['total_won']
+    f['grid_best']['n_tied'] = 3
+    assert W.summary_sentence(f) == (
+        'Any of them: no single stat threshold decides a matchup here.')
+
+
 def test_compare_prefill_is_rank1_then_the_example_spreads():
     got = W.compare_spreads(_facts())
-    assert [iv for _rule, iv in got] == [[0, 15, 15], [6, 9, 7], [10, 13, 11]]
+    assert [iv for _rule, iv in got] == [[0, 15, 15], [6, 9, 7], [10, 13, 11],
+                                         [7, 2, 14]]
     assert got[0][0] == 'rank-1'
+
+
+def test_compare_prefill_carries_the_spread_the_headline_names():
+    """The headline names the spread that clears the line and wins the most;
+    the example rules' stat-product filter can exclude it, and a reader who
+    clicked Compare after reading that sentence did not find it."""
+    got = W.compare_spreads(_facts())
+    assert got[-1] == ('wins the most matchups above the line', [7, 2, 14])
+    # ...and not twice, when an example already names it.
+    f = _facts()
+    f['examples'] = f['examples'] + [{'ivs': [7, 2, 14], 'level': 49.5,
+                                      'rule': 'bulkiest'}]
+    ivs = [iv for _rule, iv in W.compare_spreads(f)]
+    assert ivs.count([7, 2, 14]) == 1
 
 
 def test_compare_prefill_on_a_negative_page_offers_the_most_winning_spread():
@@ -283,15 +372,44 @@ def test_term_marker_prefers_the_longer_term():
     assert _h.escape(glossary.TERMS['stat-product rank-1'], quote=True) in got
 
 
-def test_lead_names_the_other_movesets_with_semicolons():
-    """Every moveset label contains a comma, so the list cannot use one."""
+def test_lead_is_two_sentences_in_the_pages_own_words():
+    """Round 1 opened with "All 4 movesets rendered here carry a build line.
+    This file is SHADOW_CLAW / DRAIN_PUNCH, FOUL_PLAY at Atk >= 148.10" --
+    three pieces of internal vocabulary before the reader reaches a number."""
+    pair = _two_movesets(same_line=True)
+    out = W.lead_sentences(pair, 0)
+    assert len(out) == 2
+    assert out[0] == ('All 2 movesets on this page share one line: at least '
+                      '148.10 attack.')
+    assert out[1] == ('This page is Drain Punch, at least 148.10 attack; '
+                      'Power Gem prints the same line.')
+    for sentence in out:
+        for banned in ('rendered here', 'this file', 'build line', 'Atk >='):
+            assert banned not in sentence, (banned, sentence)
+
+
+def test_lead_names_only_what_differs_when_the_lines_differ():
+    pair = _two_movesets(same_line=False)
+    out = W.lead_sentences(pair, 1)
+    assert out[0] == 'All 2 movesets on this page carry a line, at different values.'
+    assert out[1] == ('This page is Power Gem, at least 149.20 attack; '
+                      'Drain Punch is at least 148.10 attack.')
+
+
+def test_lead_falls_back_to_full_labels_when_short_names_collide():
+    """Two movesets that differ only in the FAST move share every charged
+    move, so there is no distinguishing charged slot to name."""
     a, b = _facts(), _facts()
-    b['header'] = dict(b['header'], arm=1, arm_label='FAST / CM3, CM4')
-    out = W.lead_sentences([a, b], 0)
-    assert len(out) == 3
-    assert out[1].startswith('This file is FAST / CM1, CM2 at ')
-    assert out[2].startswith('Other movesets on this page: ')
-    assert 'FAST / CM3, CM4, the same line' in out[2]
+    a['header'] = dict(a['header'], arm_label='SHADOW_CLAW / FOUL_PLAY')
+    b['header'] = dict(b['header'], arm=1, arm_label='ASTONISH / FOUL_PLAY')
+    assert W.short_movesets([a, b]) == ['Shadow Claw / Foul Play',
+                                        'Astonish / Foul Play']
+
+
+def test_lead_on_a_single_moveset_page_is_one_sentence():
+    out = W.lead_sentences([_facts()], 0)
+    assert len(out) == 1
+    assert out[0].startswith('The only moveset on this page is ')
 
 
 def test_mask_packing_is_lsb_first_within_each_byte():
@@ -338,6 +456,23 @@ def _palette_blocks():
     return tokens(light), tokens(dark)
 
 
+# The rung ramp is generated per page now, so the palette guards below cover
+# EVERY length a page can ask for rather than a fixed six. RAMP_LENGTHS spans
+# one rung (a page whose floor owns the only clean cut) to twelve (past
+# anything in the corpus: the longest ladder in the two Sableye blobs is 7).
+RAMP_LENGTHS = range(1, 13)
+
+
+def _theme_colors(kind):
+    """Every color the section can paint in one theme kind, ramp included."""
+    light, dark = _palette_blocks()
+    out = dict(dark if kind == 'dark' else light)
+    for n in RAMP_LENGTHS:
+        for k, value in enumerate(W.rung_ramp(n, kind)):
+            out[f'ramp{n}-r{k}'] = value
+    return out
+
+
 def test_section_palette_is_legible_in_every_theme():
     """Every marker color clears 3:1 on its own theme's plot fill.
 
@@ -349,17 +484,44 @@ def test_section_palette_is_legible_in_every_theme():
     """
     from gopvpsim import theme
     light, dark = _palette_blocks()
-    assert len(light) == len(dark) >= 9, (len(light), len(dark))
+    assert len(light) == len(dark) >= 5, (len(light), len(dark))
     assert set(light) == set(dark)
     fills = dict(zip(theme._THEME_ORDER, theme._TOKENS['--surface-2']))
     bad = []
     for name, fill in fills.items():
-        palette = dark if name.endswith('dark') else light
-        for token, value in palette.items():
+        kind = 'dark' if name.endswith('dark') else 'light'
+        for token, value in _theme_colors(kind).items():
             r = _contrast(value, fill)
             if r < 3.0:
                 bad.append((name, token, value, round(r, 2)))
     assert bad == [], bad
+
+
+def test_every_rung_gets_its_own_color():
+    """A fixed six-color ramp painted the 6th and 7th rung of a seven-rung
+    page identically -- on the one view whose whole encoding IS color, and on
+    three of the five preview pages. The ramp is generated for the number of
+    rungs the page prints."""
+    for kind in ('light', 'dark'):
+        for n in RAMP_LENGTHS:
+            ramp = W.rung_ramp(n, kind)
+            assert len(ramp) == n, (kind, n)
+            assert len(set(ramp)) == n, (kind, n, ramp)
+    assert W.rung_ramp(0) == []
+
+
+def test_ramp_css_declares_one_property_per_rung_in_both_themes():
+    css = W.ramp_css(7)
+    for k in range(7):
+        assert css.count(f'--wb-r{k}:') == 2, k       # light + dark
+    assert '--wb-r7' not in css
+    assert 'gruvbox-dark' in css and 'pokemon-dark' in css
+    assert W.ramp_css(0) == ''
+    # The payload's fallback ramp is the light block, same pinned-copy rule
+    # the engine's WB_FALLBACK follows.
+    light = re.findall(r'--wb-r\d+: (#[0-9a-fA-F]{6})',
+                       css[:css.index('[data-theme=')])
+    assert light == W.rung_ramp(7, 'light')
 
 
 def test_js_palette_fallback_matches_the_css():
@@ -380,7 +542,7 @@ def test_js_palette_fallback_matches_the_css():
     assert got == light, {k: (got.get(k), light.get(k))
                           for k in set(got) | set(light)
                           if got.get(k) != light.get(k)}
-    assert len(got) >= 9
+    assert len(got) >= 5
 
 
 def test_palette_contrast_check_can_fail():
@@ -416,7 +578,7 @@ def test_section_palette_avoids_the_pages_outcome_hues():
                for tok in ('--win', '--loss', '--tie', '--notable')}
     checked = 0
     bad = []
-    for palette in (light, dark):
+    for palette in (_theme_colors('light'), _theme_colors('dark')):
         for token, value in palette.items():
             h, sat = _hue_sat(value)
             if sat < 0.15:
@@ -429,6 +591,7 @@ def test_section_palette_avoids_the_pages_outcome_hues():
     assert bad == [], bad
     # Anti-vacuity: the saturation exemption must not swallow the palette.
     assert checked >= 16, checked
+    assert light and dark
 
 
 # ---------------------------------------------------------------------------
@@ -446,14 +609,10 @@ def test_engine_js_parses():
 
 
 def test_cluster_traces_are_appended_after_the_overlays():
-    """The draw-order fix: isolating a cluster must not reveal an empty plot.
+    """The color mode a reader selected owns the top of the canvas.
 
-    C0 on a CP-capped grid is mostly anchor spreads. With the cluster traces
-    pushed where the color-mode branch builds them, the anchor / Efficient /
-    slayer overlays sat ON TOP of them, so legend-hover isolation dimmed the
-    cluster and left the overlay at full opacity -- the cluster read as
-    empty. Cluster traces now append after the overlays, the same treatment
-    the tier traces already had.
+    Same treatment the tier traces already had. This is a z-order fix only:
+    what made C0 isolate to an EMPTY plot is pinned by the two tests below.
     """
     src = _engine()
     collect = src.index('_clusterTraces.push(ctr[c1])')
@@ -470,6 +629,47 @@ def test_cluster_traces_are_appended_after_the_overlays():
     # stopped finding the overlay pushes would fail here first.
     assert src.index('traces.push(_tierTraces[_ti])') > anchor
     assert src.count('traces.push(anchorTrace)') == 1
+
+
+def test_legend_hover_resolves_the_trace_plotly_bound_not_the_dom_position():
+    """The bug behind the empty C0.
+
+    Measured on a rendered preview page in headless Chrome: the main scatter
+    in cluster color mode had 7 traces and 6 legend rows, and legend row 4
+    ("C0") addressed trace 4 -- the note key -- so hovering C0 brightened an
+    invisible trace and dimmed C0 itself to 0.03. Both legend wirings now
+    read the trace index Plotly bound to the node.
+    """
+    src = _engine()
+    assert 'function _legendTraceIndex(' in src
+    # The main scatter: hover, leave and click all go through the resolver.
+    main = src[src.index('function reattachLegendHandlers('):
+               src.index('window.updateView = updateView;')]
+    assert 'highlightTrace(idx)' not in main, \
+        'the main legend still highlights by DOM position'
+    assert main.count('_legendTraceIndex(el, idx)') >= 2
+    # The section panel wires the same way.
+    panel = src[src.index('function _wbWireLegend('):
+                src.index('function wbRenderRoot(')]
+    assert '_legendTraceIndex(el, idx)' in panel
+    assert '(j === idx)' not in panel
+
+
+def test_the_cluster_note_key_carries_a_point_so_it_gets_a_legend_entry():
+    """Plotly builds the legend from calcdata: a trace with no points gets no
+    entry at all. That silently dropped the "Matchup clusters: <scenario>"
+    note AND put every later legend row out of step with its trace. One null
+    point renders nothing and legends normally (verified in 2.35.2)."""
+    # strip_js blanks string literals, so the note key is located by its
+    # structure (the first ctr.push in the cluster branch), not by its text.
+    src = _engine()
+    note = src[src.index('ctr.push({'):src.index('for (var c0 = 0;')]
+    assert 'x: [null], y: [null]' in note, note[:400]
+    assert 'hoverinfo:' in note
+    # The cluster traces keep their legend position even though they now draw
+    # last, so the reader's chosen color mode still reads first.
+    assert 'legendrank: 100' in note
+    assert 'legendrank: 101 + c0' in src
 
 
 def test_section_panel_reads_the_page_arrays_and_embeds_no_second_grid():
@@ -543,6 +743,43 @@ def test_compare_prefill_replaces_rather_than_appends():
     assert 'CMP_MAX' in body and 'cmpRender()' in body
 
 
+def test_collection_overlay_is_nudged_off_the_population_point():
+    """An svg/gl marker at the EXACT coordinates of a scattergl point loses
+    the hover contest (3 of 24 stars hovered as the wrong spread when the
+    cluster panel shipped without the nudge), and then "Yours: <mon>" never
+    appears. Same 0.05%-of-range nudge as the cluster panels and the main
+    scatter."""
+    src = _engine()
+    owned = src[src.index('function _wbOwnedTrace('):
+                src.index('function _wbWireLegend(')]
+    assert 'ynudge' in owned
+    assert 'oy.push(wins[i] + ynudge)' in owned
+    assert '* 0.0005' in owned
+    # Positive control: the precedent it copies is still there -- the
+    # cluster panels' own star overlay, which measured the hover loss.
+    assert src.count('* 0.0005') >= 2
+
+
+def test_panel_legends_speak_the_sections_vocabulary_not_the_audits():
+    """"cells", "clearers" and "SP" are what the brief's voice gate keeps out
+    of the prose this legend sits under."""
+    py = (SCRIPTS_DIR / 'deep_dive_which_build.py').read_text()
+    assert W.example_label('most cells won among clearers with SP >= 95%') == \
+        'most contested matchups won above the line, stat product >= 95%'
+    assert W.example_label('bulkiest (max Def x HP) among clearers with '
+                           'SP >= 95%') == \
+        'bulkiest above the line, stat product >= 95%'
+    assert W.example_label('highest stat product clearing the floor') == \
+        'highest stat product above the line'
+    # An unmapped rule falls through rather than being dropped.
+    assert W.example_label('some new rule') == 'some new rule'
+    assert 'label' in py[py.index("pay['examples'] = ["):
+                         py.index("pay['examples'] = [") + 400]
+    src = _engine()
+    assert 'pay.examples[e].label' in src
+    assert "'Example: ' + pay.examples[e].rule" not in src
+
+
 def test_collection_overlay_refreshes_the_section_panel():
     """Load / clear collection and a theme flip must redraw the panel."""
     src = _engine()
@@ -586,7 +823,7 @@ const Plotly = { react: () => {}, restyle: () => {}, Plots: { resize: () => {} }
 const getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 let out;
-eval(block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit};');
+eval(block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit, _wbOwnedTrace, _wbClusterSides};');
 
 // Masks are LSB-first per byte, exactly as deep_dive_which_build.mask_b64
 // packs them: 'PA==' = 0b00111100 = spreads 2..5, 'MA==' = spreads 4..5,
@@ -597,8 +834,10 @@ const pay = {
   mi: 0, mode: 'pvpoke', hasFloor: true, axis: 'atk', axisWord: 'attack',
   T: 148.1039982, printed: '148.10', cell: '0v1 X', nAbove: 4, topN: 25,
   rank1: {iv: [0,15,15], level: 50}, gridBest: {iv:[5,10,10], level:50},
-  examples: [{iv:[2,13,13], level:50, rule:'r'}],
-  rungs: [{axis:'atk', T:148.1039982, n:4, mask:'PA==', label:'148.10 (a)'},
+  examples: [{iv:[2,13,13], level:50, rule:'r', label:'reader label'}],
+  rungColors: ['#6','#7'],
+  rungs: [{axis:'atk', T:148.1039982, n:4, mask:'PA==', label:'148.10 (a)',
+           full:'148.10 (a (Sucker Punch / Night Slash))'},
           {axis:'atk', T:150.0, n:2, mask:'MA==', label:'150.00 (b)'}],
   alt: {label: 'Def >= 105, HP >= 128', mask: 'Aw==', n: 2},
   clusterScen: null, views: [],
@@ -620,11 +859,25 @@ const rungs = out._wbGroups(pay, 'rungs', L, wins, {line:'#1',below:'#2',alt:'#3
 const rn = {}; rungs.traces.forEach(t => rn[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
 // atk 140,145 below; 148.2,149 -> rung0; 150.5,151 -> rung1
 eq('rung groups', rn, {'Below the line': 2, '148.10 (a)': 2, '150.00 (b)': 2});
+// A rung key carries NO '(N)': every count in the prose above is cumulative
+// and a drawn rung group is exclusive, so the same label would carry two
+// different numbers on one screen.
+rungs.traces.forEach(t => { if (/^1\d\d\./.test(t.name) && / \(\d+\)$/.test(t.name))
+  fail.push('rung key carries a band count: ' + t.name); });
+// The hover names the opponent in full even though the key drops the
+// moveset-variant parenthetical.
+const rh = rungs.traces.find(t => t.name.indexOf('148.10 (a)') === 0).text[0];
+if (rh.indexOf('Sucker Punch') < 0) fail.push('rung hover lost the full name');
 
 const trade = out._wbGroups(pay, 'trade', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
 const tn = {}; trade.traces.forEach(t => tn[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
 // idx0 (def110,hp130) and idx1 (def105,hp128) qualify for the rectangle and are below the line
-eq('trade groups', tn, {'Neither': 0, 'At or above the line': 4, 'Bulk alternative: Def >= 105, HP >= 128': 2});
+eq('trade groups', tn, {'Neither': 0, 'At or above the line': 4, 'Bulk alternative, below the line: Def >= 105, HP >= 128': 2});
+// Hover word order: "attack at or above the 148.10 line", not "at or above
+// attack 148.10".
+const lineTrace = line.traces.find(t => t.name.indexOf('At or above') === 0);
+if (lineTrace.text[0].indexOf('attack at or above the 148.10 line') < 0)
+  fail.push('line hover reads backwards: ' + lineTrace.text[0]);
 // The mask, not the rounded stats: spread 2 sits inside the 2-dp rounding
 // window and is a clearer only because the mask says so.
 eq('mask bit 2 is a clearer', out._wbBit(out._wbMask('PA=='), 2), 1);
@@ -632,6 +885,29 @@ eq('mask bit 1 is not', out._wbBit(out._wbMask('PA=='), 1), 0);
 
 const clusters = out._wbGroups(pay, 'clusters', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
 eq('clusters missing when no mc payload', clusters.missing, true);
+
+// Cluster keys say which side of the clusters section's own split they sit
+// on when that section printed no iff rule -- 'C0 (n=...)' alone is two
+// colors with no stat meaning under a caption about a split.
+const sc = {k: 2, sizes: [3, 3], split: 'atk 148.68', rules: [null, null],
+            labels: [0,0,0,1,1,1]};
+const sides = out._wbClusterSides(sc, L);
+eq('cluster side 0', sides[0].label, 'mostly below atk 148.68');
+eq('cluster side 1', sides[1].label, 'mostly at or above atk 148.68');
+if (sides[1].hover.indexOf('%') < 0) fail.push('cluster side hover has no share');
+eq('no split, no side labels', out._wbClusterSides({k:2, split:null}, L), null);
+
+// The collection overlay nudges off the population point, or its hover
+// loses the contest with the scattergl trace under it.
+state.ownedByIv = {2: [{mon: {name: 'Sab'}, stats: {cp: 1495}}]};
+const owned = out._wbOwnedTrace(pay, L, wins);
+state.ownedByIv = null;
+if (!owned) fail.push('no owned trace');
+else {
+  if (!(owned.y[0] > wins[2])) fail.push('owned star is not nudged: ' + owned.y[0]);
+  if (owned.y[0] - wins[2] > 0.01) fail.push('owned nudge is visible: ' + owned.y[0]);
+  if (owned.text[0].indexOf('Yours: Sab') !== 0) fail.push('owned hover does not name the mon');
+}
 
 eq('ivIdx', out._wbIvIdx([2,13,13]), 2);
 eq('ivIdx missing', out._wbIvIdx([9,9,9]), -1);
@@ -721,7 +997,14 @@ def test_real_section_is_collapsed_and_carries_the_headline(shadow_sableye):
     summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
                         html, re.S).group(1)
     assert 'Which one to build?' in summary
-    assert 'should have at least 148.10 attack.' in summary
+    assert 'should have at least 148.10 attack' in summary
+    # A literal space between the title and the sentence: copy/paste, a
+    # screen reader and this test all read the runs with nothing between
+    # them otherwise ("build?Most Sableye").
+    assert '</b> <span class="wb-head">' in summary
+    # Display spelling, not gamemaster ids, on the most visible line of the
+    # page -- the header two inches above says "Shadow Claw / Drain Punch".
+    assert 'SHADOW_CLAW' not in summary
     assert 'wb-evidence' in html and 'wb-guards' in html
     # The printed value is the expander's control, in the headline sentence.
     assert ('class="wb-val" onclick="wbToggleClearers(this)" '
@@ -760,8 +1043,9 @@ _SECTION_CHROME = (
     'league cap -- the exact view the line above was derived from, so this '
     "panel does not follow the scatter's dropdowns or the opponent filter.",
     'Compare these spreads',
-    'Other movesets on this page: ',
+    'All 4 movesets on this page share one line: at least 148.10 attack.',
     'Show: ',
+    'Terms used here',
 )
 
 
@@ -777,12 +1061,22 @@ def test_section_authored_chrome_is_present_and_passes_the_word_gates(
     cannot pass by scanning prose the page stopped emitting.
     """
     _state, all_facts, _path = shadow_sableye
-    html = W.section_html(all_facts, 0)
+    # The note is element TEXT, so its apostrophe ships escaped; compare
+    # what a reader reads.
+    html = W.section_html(all_facts, 0).replace('&#x27;', "'")
     for chunk in _SECTION_CHROME:
         assert chunk in html, chunk
     ctx = {'blob': 'test', 'arm': 0, 'mode': 'pvpoke'}
-    B.gate_words(list(_SECTION_CHROME), ctx)
-    B.gate_caveat(list(_SECTION_CHROME), ctx)
+    B.gate_words(list(_SECTION_CHROME) + [W.CLUSTERS_FALLBACK_CAPTION], ctx)
+    B.gate_caveat(list(_SECTION_CHROME) + [W.CLUSTERS_FALLBACK_CAPTION], ctx)
+    # prepare() runs the same two gates over every string this module
+    # authors, the clusters fallback caption included: it is a constant on a
+    # live branch (no corroboration sentence to quote), and a gate that only
+    # fires on the pages that reach the branch is a gate that ships the bad
+    # string. 'partition', the first draft's word, is barred by G-voice.
+    B.gate_voice([W.CLUSTERS_FALLBACK_CAPTION], ctx)
+    with pytest.raises(B.GuardError):
+        B.gate_voice(['the partition of this grid'], ctx)
     # Positive control: the gate can still fail.
     with pytest.raises(B.GuardError):
         B.gate_words(['this is the best spread'], ctx)
@@ -903,11 +1197,15 @@ def test_a_real_no_line_moveset_renders_the_negative_section():
     assert payload['rungs'] == [] and payload['alt'] is None
     # No line means no printed value, so no clearer expander either.
     assert 'wbToggleClearers' not in html
-    # The lead still names the movesets that DO carry one.
+    # The lead still names the movesets that DO carry one, in the page's
+    # own spelling (the distinguishing charged move, or the full label).
     lead = re.search(r'<p class="wb-lead">(.*?)</p>', html, re.S).group(1)
-    with_line = [f for f in all_facts if f['floor'] is not None]
-    for f in with_line:
-        assert f['header']['arm_label'] in lead
+    names = W.short_movesets(all_facts)
+    for i, f in enumerate(all_facts):
+        if f['floor'] is not None:
+            assert names[i] in lead, (names[i], lead)
+    assert 'carries no line' in lead or 'carry no line' in lead
+    assert '_' not in lead, 'a raw gamemaster id reached the lead'
 
 
 @pytest.mark.local_artifacts
@@ -926,8 +1224,10 @@ def test_a_single_file_page_says_which_moveset_the_section_is_about(
     many = W.section_html(all_facts, 0, page_movesets=4)
     assert one != many
     assert 'the Moveset dropdown above does not change' not in one
-    assert ('This whole section is about SHADOW_CLAW / DRAIN_PUNCH, FOUL_PLAY'
+    assert ('This whole section is about Shadow Claw / Drain Punch, Foul Play'
             in many)
+    assert 'SHADOW_CLAW' not in many[many.index('wb-fixed'):
+                                     many.index('wb-fixed') + 600]
     # Nothing else moves: the difference is exactly that one sentence.
     assert len(many) > len(one)
     assert one == W.section_html(all_facts, 0)
@@ -942,13 +1242,102 @@ def test_every_arm_renders_its_own_section(shadow_sableye):
     for arm in range(len(all_facts)):
         html = W.section_html(all_facts, arm)
         lead = re.search(r'<p class="wb-lead">(.*?)</p>', html, re.S).group(1)
-        label = all_facts[arm]['header']['arm_label']
-        assert f'This file is {label}' in lead
+        names = W.short_movesets(all_facts)
+        assert f'This page is {names[arm]}' in lead
         # The other movesets' lines are named, so a reader on one file can
         # see that the rest print the same one.
-        assert 'Other movesets on this page: ' in lead
+        assert 'print the same line' in lead
         for other in range(len(all_facts)):
             if other != arm:
-                assert all_facts[other]['header']['arm_label'] in lead
+                assert names[other] in lead
+        # Reader vocabulary: no "file", no "build line", no raw ids.
+        for banned in ('this file', 'build line', 'rendered here', '_'):
+            assert banned not in lead, (banned, lead)
         seen.add(lead)
     assert len(seen) == 4
+    # Each split file's SUMMARY answers the question itself rather than
+    # pointing at a moveset on another file.
+    for arm in range(len(all_facts)):
+        html = W.section_html(all_facts, arm)
+        summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
+                            html, re.S).group(1)
+        assert 'Same line as' not in summary
+        assert 'should have at least 148.10 attack' in summary
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_seven_rung_arm_paints_every_rung_its_own_color(shadow_sableye):
+    """The ramp is generated for the page's OWN rung count.
+
+    Shadow Sableye moveset 2 prints seven rungs; with the old fixed six-color
+    ramp the 6th and 7th were painted identically -- on the view whose entire
+    encoding is color, and the larger of the two groups was the biggest on
+    the panel.
+    """
+    _state, all_facts, _path = shadow_sableye
+    counts = []
+    for arm in range(len(all_facts)):
+        html = W.section_html(all_facts, arm)
+        payload = json.loads(
+            re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
+        n = len(payload['rungs'])
+        counts.append(n)
+        # The payload's fallback ramp and the emitted CSS both have exactly
+        # one color per rung, and no two the same.
+        assert len(payload['rungColors']) == n
+        assert len(set(payload['rungColors'])) == n
+        css = html[html.index('<style>'):html.index('</style>')]
+        for k in range(n):
+            assert f'--wb-r{k}:' in css
+        assert f'--wb-r{n}:' not in css
+        # ...and the rung keys are distinct strings too, so two groups can
+        # never read as one.
+        labels = [r['label'] for r in payload['rungs']]
+        assert len(set(labels)) == n, labels
+    assert max(counts) >= 7, counts
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_terms_used_here_prints_the_registry_once(shadow_sableye):
+    """A phone reader never sees a title= tooltip: no hover, <abbr> takes no
+    focus, and the guide links navigate away rather than define. The same
+    registry sentences are printed once at the foot of the section."""
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    import html as _h
+    assert '<p class="wb-terms-head">Terms used here</p>' in html
+    block = html[html.index('<p class="wb-terms-head">'):]
+    block = _h.unescape(block[:block.index('</dl>')])
+    marked = [_h.unescape(t) for t in
+              re.findall(r'<abbr class="wb-term" title="([^"]*)"', html)]
+    assert marked, 'the section marked no terms at all'
+    for title in set(marked):
+        # Every term the marker used is defined once in the list, in the
+        # registry's own words -- and the definition is not typed twice.
+        assert block.count(title) == 1, title
+        assert title in glossary.TERMS.values()
+    # One row per marked term, in the order a reader met them.
+    names = re.findall(r'<dt>(?:<a[^>]*>)?([^<]+)', block)
+    assert len(names) == len(set(marked)) == len(marked)
+    assert [glossary.TERMS[n.lower()] for n in names] == marked
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_shared_line_moveset_states_the_line_and_counts_it_once(
+        shadow_sableye):
+    """Moveset 2+ of a page opens "Same line as <another file's moveset>",
+    which is a reference, not an answer -- and the spread extension then
+    printed the reach count twice, once as a total and once as a remainder."""
+    _state, all_facts, _path = shadow_sableye
+    first = W.extended_first_sentence(all_facts[1])
+    assert 'reached by 2220' in first
+    assert first.count('2220') == 1
+    assert 'other spreads reach' not in first
+    html = W.section_html(all_facts, 1)
+    summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
+                        html, re.S).group(1)
+    assert 'Most Sableye (Shadow) should have at least 148.10 attack' in summary
+    assert 'the same line as its other 3 movesets' in summary

@@ -102,3 +102,32 @@ def abbr_html(term, text=None, cls='wb-term', prefix=GUIDES_PREFIX):
         return mark
     return (f'<a class="{cls}-link" href="{_html.escape(href, quote=True)}">'
             f'{mark}</a>')
+
+
+def terms_html(terms, cls='wb-terms', prefix=GUIDES_PREFIX):
+    """A definition list for the terms one section actually marked.
+
+    The hover definitions above are ``title=`` text, which a phone reader
+    never sees: there is no hover, ``<abbr>`` is not focusable, and a tap on
+    the two terms that carry a guide link is a navigation rather than a
+    definition. So the same registry entries are printed once, in reading
+    order, at the foot of the section. Built from :data:`TERMS`, never from a
+    second copy of the sentences -- the registry test scans for exactly that.
+
+    ``terms`` is the marked terms in the order they were first used; an
+    unregistered one raises, for the same reason :func:`abbr_html` does.
+    """
+    rows = []
+    for term in terms:
+        key = term.lower()
+        if key not in TERMS:
+            raise KeyError(f"no glossary entry for {term!r}")
+        href = guide_href(term, prefix=prefix)
+        name = _html.escape(term)
+        if href is not None:
+            name = (f'<a href="{_html.escape(href, quote=True)}">{name}</a>')
+        rows.append(f'<dt>{name}</dt>'
+                    f'<dd>{_html.escape(TERMS[key])}</dd>')
+    if not rows:
+        return ''
+    return f'<dl class="{cls}">' + ''.join(rows) + '</dl>'

@@ -38,6 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import deep_dive_analysis as analysis  # noqa: E402
 import deep_dive_brief as brief  # noqa: E402
 import glossary  # noqa: E402
 
@@ -69,12 +70,103 @@ _TERM_PATTERNS = (
     ('bulkpoint', r'bulkpoints?'),
 )
 
+# A legend label drops a moveset-variant parenthetical -- "Thievul (Sucker
+# Punch / Night Slash+Icy Wind)" is four words of opponent moveset inside a
+# key that has to fit beside five others. A FORM parenthetical ("(Shadow)")
+# is part of the opponent's name and stays; the two are told apart by the
+# move-list punctuation, which a form never carries. The full name is in the
+# hover.
+_VARIANT_PAREN = re.compile(r'\s*\(([^()]*[/+][^()]*)\)\s*$')
+
 _TAG_SPLIT = re.compile(r'(<[^>]*>)')
 _SENTENCE_END = re.compile(r'(?<=[.!?])(?=\s|$)')
 
 
 def _esc(s):
     return _html.escape(str(s), quote=True)
+
+
+def display_moveset(label):
+    """A moveset the way the rest of the page spells it.
+
+    The blob's label is the gamemaster's ids ("SHADOW_CLAW / DRAIN_PUNCH,
+    FOUL_PLAY"); the page header, the Moveset dropdown and every other
+    reader-facing surface print "Shadow Claw / Drain Punch, Foul Play". The
+    section's own sentences sit two inches under that header, so they use the
+    page's spelling. ``deep_dive_analysis.pretty_moveset`` is the one rule for
+    the conversion (it goes through the gamemaster's own ``name``, so
+    SUPER_POWER reads "Superpower" here exactly as it does up there).
+
+    The brief's fields and its guards block keep the identifiers: those are
+    the audit, and the id is what a re-run is keyed on.
+    """
+    return analysis.pretty_moveset(label)
+
+
+def relabel(text, all_facts):
+    """Re-spell every raw moveset id in one of the brief's sentences.
+
+    The brief writes "Same line as SHADOW_CLAW / DRAIN_PUNCH, FOUL_PLAY" into
+    the headline of every moveset after the first. That is a reader-facing
+    sentence on a page that spells the same moveset four different places in
+    title case, so the label -- and only the label, by exact match against the
+    page's own list -- is swapped for the display spelling. No other word of
+    the brief's prose is touched.
+    """
+    for f in all_facts or []:
+        raw = f['header']['arm_label']
+        pretty = display_moveset(raw)
+        if pretty != raw:
+            text = text.replace(raw, pretty)
+    return text
+
+
+def short_movesets(all_facts):
+    """One distinguishing name per moveset, or the full labels.
+
+    Four movesets that share a fast move and a charged move differ in exactly
+    one slot, and the lead reads as four near-identical strings unless it
+    names that slot: "Drain Punch", "Power Gem", "Shadow Sneak", "Dazzling
+    Gleam". Falls back to the full display label whenever the short names
+    would not be unique (or there is nothing shared to drop), so the lead can
+    never name two movesets the same way.
+    """
+    full = [display_moveset(f['header']['arm_label']) for f in all_facts]
+    if len(all_facts) < 2:
+        return full
+    parsed = [analysis.parse_moveset_label(f['header']['arm_label'])
+              for f in all_facts]
+    if any(not charged for _fast, charged in parsed):
+        return full
+    common = set(parsed[0][1])
+    for _fast, charged in parsed[1:]:
+        common &= set(charged)
+    short = []
+    for _fast, charged in parsed:
+        rest = [c for c in charged if c not in common]
+        short.append(', '.join(analysis.pretty_name(c) for c in rest))
+    if len(set(short)) != len(short) or any(not x for x in short):
+        return full
+    return short
+
+
+def plain_value(fl):
+    """The line's value at two places, with no precision parenthetical.
+
+    :func:`printed_value` speaks the line the way the headline does, which on
+    a page where stage 7 had to escalate is "123.42 (123.419)". That is the
+    right string inside a paragraph that explains it, and the wrong one in a
+    collapsed one-liner or under a plot, where it reads as a typo. The
+    three-place selector still prints in the headline and in field 2.
+    """
+    if fl['axis'] == 'hp':
+        return brief._n(fl['printed'])
+    return brief.fmt(fl['printed'], 2)
+
+
+def stat_words(fl):
+    """'148.10 attack' / '125 HP' -- two places, no parenthetical."""
+    return f"{plain_value(fl)} {brief.AXIS_WORD[fl['axis']]}"
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +183,17 @@ class TermMarker:
     """
 
     def __init__(self):
-        self.used = set()
+        # term -> (fragment number, offset of the first use in it). A set
+        # would do for "have I marked this", but the terms list at the foot
+        # of the section prints them in READING order, and the loop below
+        # walks terms longest-first rather than left-to-right -- so within
+        # one fragment the marking order is not the reading order.
+        self.used = {}
+        self._frag = 0
+
+    def ordered(self):
+        """The marked terms, in the order a reader meets them."""
+        return sorted(self.used, key=lambda t: self.used[t])
 
     def mark(self, fragment):
         # One term per outer pass, re-splitting the fragment each time. The
@@ -114,9 +216,16 @@ class TermMarker:
                 pieces[k] = (piece[:m.start()]
                              + glossary.abbr_html(term, text=m.group(0))
                              + piece[m.end():])
-                self.used.add(term)
+                # Offset in the WHOLE fragment, not in this piece: two
+                # terms in one paragraph land in different pieces, and a
+                # per-piece offset would order them by which pass claimed
+                # them. Earlier marks shift only the text AFTER their own
+                # insertion point, so the offsets stay comparable.
+                self.used[term] = (self._frag,
+                                   sum(len(x) for x in pieces[:k]) + m.start())
                 fragment = ''.join(pieces)
                 break
+        self._frag += 1
         return fragment
 
 
@@ -159,11 +268,14 @@ def extended_first_sentence(facts):
     spreads named); nothing is recomputed.
 
     Returns the sentence unchanged on a page with no line -- there is no set
-    of spreads that reach anything to name.
+    of spreads that reach anything to name -- and on a moveset that shares an
+    earlier moveset's line, whose opening sentence ALREADY ends in "reached by
+    2220 of the 4096 IV spreads (54.2%)". Extending that one printed the same
+    count twice in one sentence, once as a total and once as a remainder.
     """
     first = sentences(facts['_headline'][0])[0]
     fl = facts['floor']
-    if fl is None:
+    if fl is None or 'reached by' in first:
         return first
     exs = example_spreads(facts)
     if not exs:
@@ -181,70 +293,154 @@ def extended_first_sentence(facts):
 # The lead: which movesets on this page carry a line
 # ---------------------------------------------------------------------------
 
+def _line_words(f):
+    """This moveset's line as the lead speaks it, or None."""
+    fl = f['floor']
+    return None if fl is None else stat_words(fl)
+
+
 def lead_sentences(all_facts, arm):
-    """The page-wide count, this file's line, then the other movesets'.
+    """Two sentences: what the page's movesets share, then which one this is.
 
-    One sentence on a single-moveset page, three on a multi-moveset one --
-    two rendered lines either way. The first is the brief's own page-lead
-    sentence, verbatim (``deep_dive_brief.lead_block``). The other two exist
-    because each split file carries only ITS moveset's section: a reader on
-    the Power Gem file has no way to see that Drain Punch prints the same
-    line unless this sentence says so.
+    Round 1 wrote this in the machinery's voice -- "All 4 movesets rendered
+    here carry a build line. This file is SHADOW_CLAW / DRAIN_PUNCH,
+    FOUL_PLAY at Atk >= 148.10." -- which is three pieces of internal
+    vocabulary ("rendered here", "this file", "build line") before the reader
+    reaches a number. It says "page", never "file"; "line", never "build
+    line"; and it names the movesets the way the Moveset dropdown does.
+
+    The second sentence exists because each split file carries only ITS
+    moveset's section: a reader who landed on the Power Gem page from a
+    search has no way to see that Drain Punch prints the same line unless
+    this sentence says so.
     """
-    _, lead_strings = brief.lead_block(all_facts)
-    out = [lead_strings[0]]
-    if len(all_facts) < 2:
-        return out
+    n = len(all_facts)
+    mine = _line_words(all_facts[arm])
+    names = short_movesets(all_facts)
+    if n == 1:
+        return [f"The only moveset on this page is {names[0]}"
+                + (", and it carries no line."
+                   if mine is None else f", at least {mine}.")]
 
-    def line_of(f):
-        fl = f['floor']
-        if fl is None:
-            return None
-        return brief.stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])
+    values = [_line_words(f) for f in all_facts]
+    with_line = [v for v in values if v is not None]
+    if not with_line:
+        first = f"None of the {n} movesets on this page carries a line."
+    elif len(with_line) == n and len(set(with_line)) == 1:
+        first = (f"All {n} movesets on this page share one line: at least "
+                 f"{with_line[0]}.")
+    elif len(with_line) == n:
+        first = f"All {n} movesets on this page carry a line, at different values."
+    else:
+        carries = 'carries' if len(with_line) == 1 else 'carry'
+        first = (f"{len(with_line)} of the {n} movesets on this page "
+                 f"{carries} a line.")
 
-    mine = line_of(all_facts[arm])
-    out.append(
-        f"This file is {all_facts[arm]['header']['arm_label']}"
-        + (" and carries no line." if mine is None else f" at {mine}."))
-    # Semicolons, not "A, B and C": every moveset label already contains a
-    # comma ("SHADOW_CLAW / FOUL_PLAY, POWER_GEM"), so a comma-joined list
-    # reads as twice as many movesets as the page has.
-    bits = []
+    second = (f"This page is {names[arm]}"
+              + (", and it carries no line" if mine is None
+                 else f", at least {mine}"))
+    # Grouped by what they print, so a four-moveset page reads as one clause
+    # and not as four. Semicolons between the groups: a moveset named by two
+    # charged moves already carries a comma.
+    same, other, none = [], [], []
     for i, f in enumerate(all_facts):
         if i == arm:
             continue
-        lbl = f['header']['arm_label']
-        val = line_of(f)
+        val = values[i]
         if val is None:
-            bits.append(f"{lbl}, no line")
+            none.append(names[i])
         elif val == mine:
-            bits.append(f"{lbl}, the same line")
+            same.append(names[i])
         else:
-            bits.append(f"{lbl} at {val}")
-    out.append("Other movesets on this page: " + '; '.join(bits) + '.')
-    return out
+            other.append((names[i], val))
+    bits = []
+    if same:
+        bits.append(f"{brief._and_list(same)} "
+                    f"{'prints' if len(same) == 1 else 'print'} the same line")
+    for name, val in other:
+        bits.append(f"{name} is at least {val}")
+    if none:
+        bits.append(f"{brief._and_list(none)} "
+                    f"{'carries' if len(none) == 1 else 'carry'} no line")
+    if bits:
+        second += '; ' + '; '.join(bits)
+    return [first, second + '.']
 
 
 # ---------------------------------------------------------------------------
 # The summary line (what a reader sees before opening the section)
 # ---------------------------------------------------------------------------
 
-def summary_sentence(facts):
+def _shared_clause(facts, all_facts):
+    """'(the same line as its other 3 movesets)' / '(Power Gem)' / ''.
+
+    A split file's summary is the whole verdict for a reader who never opens
+    the section, so on a multi-moveset dive it has to say WHICH moveset it is
+    the verdict for -- or, when every moveset prints the same line, that the
+    choice of moveset does not change it.
+    """
+    if not all_facts or len(all_facts) < 2:
+        return ''
+    arm = facts['header']['arm']
+    values = [_line_words(f) for f in all_facts]
+    if values[arm] is not None and len(set(values)) == 1:
+        return f"(the same line as its other {len(all_facts) - 1} movesets)"
+    return f"({short_movesets(all_facts)[arm]})"
+
+
+def summary_sentence(facts, all_facts=None):
     """The one sentence in the collapsed ``<summary>``.
 
-    A page WITH a line shows the headline's opening sentence, which already
-    says the stat and the value. A page without one cannot: its headline
-    opens on the negative, which is a fine paragraph and a poor label. The
-    two replacements say what a reader who only reads the summary should do.
+    It is a DIRECTIVE, built here from the facts, not the headline's opening
+    sentence quoted:
+
+    - On a moveset that shares an earlier moveset's line the brief opens
+      "Same line as SHADOW_CLAW / DRAIN_PUNCH, FOUL_PLAY: ...", which makes
+      the answer to "which one to build?" a reference to a moveset on a
+      DIFFERENT file. Here every file says the value.
+    - The brief keeps its directive whenever the line's net cost is inside
+      the materiality band, so the summary could say "should have at least
+      123.42 attack" on a page whose own second paragraph says rank-1 wins
+      one MORE matchup. A reader who reads only the summary would be sent
+      after a line the evidence prices. The clause is in the same sentence.
+    - The value prints at two places; the proven three-place selector stays
+      in the headline and field 2, where the sentence around it explains why
+      there are two numbers.
+
+    A page with no line cannot be directive: its two replacements say what a
+    reader who only reads the summary should do.
     """
-    if facts['floor'] is not None:
-        return sentences(facts['_headline'][0])[0]
-    gb = facts['grid_best']
-    r1 = facts['rank1']
-    if gb['total'] <= r1['total_won']:
-        return ("Your rank-1: it already wins more matchups than any "
-                "other spread.")
-    return "Any of them: no single stat threshold decides a matchup here."
+    fl = facts['floor']
+    if fl is None:
+        gb = facts['grid_best']
+        r1 = facts['rank1']
+        # n_tied: "wins more than any other spread" is a strict claim, and
+        # the same fact dict says how many spreads share the top count.
+        if gb['total'] <= r1['total_won'] and int(gb.get('n_tied') or 1) == 1:
+            return ("Your rank-1: it already wins more matchups than any "
+                    "other spread.")
+        return "Any of them: no single stat threshold decides a matchup here."
+    who = brief.focal_name(facts['header'])
+    cost = facts.get('floor_cost') or {}
+    if cost.get('material'):
+        # The brief demoted its own directive here; the summary follows it
+        # rather than re-promoting the line in the one line a reader reads.
+        return (f"{who} has a line at {stat_words(fl)}, and clearing it "
+                f"costs more than it buys.")
+    out = f"Most {who} should have at least {stat_words(fl)}"
+    clause = _shared_clause(facts, all_facts)
+    if clause:
+        out += ' ' + clause
+    net = int(cost.get('net', 1) if cost else 1)
+    if net <= 0:
+        r1 = brief._ivs(facts['rank1']['ivs'])
+        if net == 0:
+            out += (f" -- though rank-1 {r1} already wins as many matchups "
+                    f"as anything above it")
+        else:
+            out += (f" -- though rank-1 {r1} still wins {brief._n(-net)} "
+                    f"more {brief._noun(-net, 'matchup')} overall")
+    return out + '.'
 
 
 # ---------------------------------------------------------------------------
@@ -327,13 +523,111 @@ def printed_value(fl):
     return brief.headline_value(fl['printed'], fl['dp'])
 
 
-def _rung_label(printed, dp, names, n_cells):
-    head = brief.fmt(printed, dp)
+def _rung_label(printed, dp, names, n_cells, short=False):
+    """'148.10 (0v1 Annihilape)' -- one rung of the ladder, for a legend key.
+
+    Two places ALWAYS, including the floor: the ladder is six keys in one
+    horizontal legend, and a floor printed at three places under a headline
+    that says two reads as a different kind of number. The value labels a
+    group whose membership comes from the packed mask, so it is a name, not a
+    selector -- the selector prints at full precision in field 2.
+
+    ``short`` drops the opponent's moveset-variant parenthetical, which the
+    hover still carries in full.
+    """
+    head = brief.fmt(printed, 2)
     if not names:
         return head
+    name = names[0]
+    if short:
+        name = _VARIANT_PAREN.sub('', name)
     more = n_cells - 1
-    tail = f"{names[0]}{f' +{more}' if more > 0 else ''}"
+    tail = f"{name}{f' +{more}' if more > 0 else ''}"
     return f"{head} ({tail})"
+
+
+# The brief's example-selection rules are audit vocabulary ("cells",
+# "clearers", "SP"), and the panel would otherwise print them as legend keys
+# under a caption written for a reader. Same three spreads, same rules, said
+# the way the rest of the section says them. An unmapped rule falls through
+# unchanged rather than being dropped: a legend key with no label is worse
+# than one in the brief's words.
+_EXAMPLE_LABELS = {
+    'highest stat product clearing the floor':
+        'highest stat product above the line',
+    'most cells won on the whole grid':
+        'most contested matchups won on this grid',
+    'highest stat product (the rank-1 spread)':
+        'highest stat product (rank-1)',
+}
+_EXAMPLE_PREFIXES = (
+    ('most cells won among clearers with SP >= ',
+     'most contested matchups won above the line, stat product >= '),
+    ('most cells won among the whole grid with SP >= ',
+     'most contested matchups won on this grid, stat product >= '),
+    ('bulkiest (max Def x HP) among clearers with SP >= ',
+     'bulkiest above the line, stat product >= '),
+    ('bulkiest (max Def x HP) among the whole grid with SP >= ',
+     'bulkiest on this grid, stat product >= '),
+)
+
+
+def example_label(rule):
+    """One example-spread selection rule, in the section's own words."""
+    if rule in _EXAMPLE_LABELS:
+        return _EXAMPLE_LABELS[rule]
+    for raw, reader in _EXAMPLE_PREFIXES:
+        if rule.startswith(raw):
+            return reader + rule[len(raw):]
+    return rule
+
+
+# ---------------------------------------------------------------------------
+# The rung ramp
+# ---------------------------------------------------------------------------
+
+# The two ends of the ramp per theme, light first. Every step between them is
+# interpolated for the number of rungs the page actually prints: a fixed
+# six-color ramp painted the 6th and 7th rung of a seven-rung page in the same
+# color, on the one view whose entire encoding is color. The ends (not the
+# steps) are what the contrast test pins; interpolation stays inside the
+# segment they bound.
+RUNG_ENDS = {'light': ('#9d61d1', '#301547'),
+             'dark': ('#9859cf', '#e6d7f4')}
+
+
+def _hex_to_rgb(value):
+    v = value.lstrip('#')
+    return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def rung_ramp(n, theme='light'):
+    """``n`` distinct colors along this theme's rung ramp, floor first."""
+    n = max(int(n), 0)
+    if n == 0:
+        return []
+    a, b = (_hex_to_rgb(x) for x in RUNG_ENDS[theme])
+    if n == 1:
+        return [RUNG_ENDS[theme][0]]
+    out = []
+    for i in range(n):
+        t = i / (n - 1)
+        out.append('#' + ''.join(
+            f"{round(a[c] + (b[c] - a[c]) * t):02x}" for c in range(3)))
+    return out
+
+
+def ramp_css(n):
+    """The ``--wb-r*`` custom properties for a page with ``n`` rungs."""
+    if n <= 0:
+        return ''
+    def block(theme, sel):
+        vals = '; '.join(f"--wb-r{k}: {c}"
+                         for k, c in enumerate(rung_ramp(n, theme)))
+        return f"{sel} {{ {vals}; }}\n"
+    return (block('light', f"#{SECTION_ID}")
+            + block('dark', f'[data-theme="gruvbox-dark"] #{SECTION_ID},\n'
+                            f'[data-theme="pokemon-dark"] #{SECTION_ID}'))
 
 
 def _corroboration_sentence(fields):
@@ -352,13 +646,45 @@ def _corroboration_sentence(fields):
     return None
 
 
-def _caption_for(view, facts, fields):
+# The clusters view's caption when the brief found no corroboration to
+# quote -- a live path: cluster_corroboration is None whenever the clustering
+# does not clear the floor. Section-authored, so prepare() puts it through the
+# brief's word gates with the rest of this module's prose ("partition", the
+# word the first draft used, is barred from reader-facing text by G-voice).
+CLUSTERS_FALLBACK_CAPTION = (
+    "The Matchup clusters section's own groups over this same grid, drawn "
+    "here on the same axes.")
+
+
+def fixed_note(facts, page_movesets=1):
+    """The sentence under the panel: which view it is pinned to, and why."""
+    out = ("Stat-product rank against matchups won over every baked shield "
+           "scenario and the whole opponent pool, with PvPoke-default "
+           "opponent IVs at the league cap -- the exact view the line above "
+           "was derived from, so this panel does not follow the scatter's "
+           "dropdowns or the opponent filter.")
+    if page_movesets > 1:
+        out += (f" This whole section is about "
+                f"{display_moveset(facts['header']['arm_label'])}, which the "
+                f"Moveset dropdown above does not change.")
+    return out
+
+
+def _caption_for(view, facts, fields, all_facts=None):
     """One sentence of the brief's prose per view, chosen by what it shows."""
     head = facts['_headline']
-    first = sentences(head[0])
-    rest = sentences(head[1]) if len(head) > 1 else []
+    first = [relabel(x, all_facts) for x in sentences(head[0])]
+    rest = ([relabel(x, all_facts) for x in sentences(head[1])]
+            if len(head) > 1 else [])
     if view == 'line':
-        return first[0]
+        # NOT the summary sentence: that one is six inches above and in the
+        # collapsed <summary> above that, and a caption's job is to say what
+        # the picture shows. The brief's own two sentences about the split
+        # and about where rank-1 lands are exactly that.
+        reach = next((x for x in first[1:] if ' reach' in x),
+                     first[0] if 'reached by' in first[0] else None)
+        pair = [x for x in (reach, rest[0] if rest else None) if x]
+        return ' '.join(pair) if pair else first[0]
     if view == 'rank1':
         return rest[-1] if rest else first[0]
     if view == 'rungs':
@@ -381,12 +707,12 @@ def _caption_for(view, facts, fields):
         cc = _corroboration_sentence(fields)
         if cc:
             return cc
-        return ("The Matchup clusters section's own partition of this same "
-                "grid, drawn here on the same axes.")
+        return CLUSTERS_FALLBACK_CAPTION
     return first[0]
 
 
-def build_payload(facts, fields, moveset_idx, mode='pvpoke'):
+def build_payload(facts, fields, moveset_idx, mode='pvpoke',
+                  all_facts=None):
     """The section plot's inline JSON.
 
     Thresholds, marked spreads, and one packed membership mask per printed
@@ -412,7 +738,7 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke'):
                      'level': float(gb['level']),
                      'nTied': int(gb['n_tied'])},
         'views': [{'id': vid, 'label': lbl,
-                   'caption': _caption_for(vid, facts, fields)}
+                   'caption': _caption_for(vid, facts, fields, all_facts)}
                   for vid, lbl in views],
         # The corroboration line the clusters caption quotes is computed on
         # the ALL-scenario concatenated fingerprint, so that is the partition
@@ -437,16 +763,42 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke'):
         pay['rungs'].append(
             {'axis': fl['axis'], 'T': float(fl['T']), 'n': int(fl['n_above']),
              'mask': masks['rungs'][0],
-             'label': _rung_label(fl['printed'], fl['dp'], [fl['cell']], 1)})
+             'label': _rung_label(fl['printed'], fl['dp'], [fl['cell']], 1,
+                                  short=True),
+             'full': _rung_label(fl['printed'], fl['dp'], [fl['cell']], 1)})
         for k, row in enumerate(facts.get('rungs_above') or []):
             pay['rungs'].append(
                 {'axis': fl['axis'], 'T': float(row['T']),
                  'n': int(row['n_pass']), 'mask': masks['rungs'][k + 1],
                  'label': _rung_label(row['printed'], row['dp'],
-                                      row['names'], row['n_cells'])})
+                                      row['names'], row['n_cells'],
+                                      short=True),
+                 'full': _rung_label(row['printed'], row['dp'],
+                                     row['names'], row['n_cells'])})
+        # The light-theme ramp, for the same reason WB_FALLBACK exists in the
+        # engine: getComputedStyle can come back empty and a trace with no
+        # color is a legend key pointing at invisible points. The CSS
+        # properties are what normally drives the colors, so the ramp still
+        # re-themes with the picker.
+        pay['rungColors'] = rung_ramp(len(pay['rungs']), 'light')
         pay['examples'] = [
             {'iv': [int(x) for x in ex['ivs']], 'level': float(ex['level']),
-             'rule': ex['rule']} for ex in example_spreads(facts)]
+             'rule': ex['rule'], 'label': example_label(ex['rule'])}
+             for ex in example_spreads(facts)]
+        # The spread the headline names as winning the most above the line.
+        # It is NOT one of the examples whenever the example rules' stat-
+        # product filter excludes it, and a reader who just read that
+        # sentence and clicked Compare did not find the spread it named.
+        cost = facts.get('floor_cost') or {}
+        best = cost.get('best_ivs')
+        if best is not None:
+            best = [int(x) for x in best]
+            known = [list(e['iv']) for e in pay['examples']]
+            known.append([int(x) for x in facts['rank1']['ivs']])
+            if best not in known:
+                pay['bestAbove'] = {
+                    'iv': best,
+                    'label': 'wins the most matchups above the line'}
         alt = facts.get('alternative')
         if alt is not None and not alt['too_wide']:
             pay['alt'] = {'label': brief.alt_pair_short(alt),
@@ -466,7 +818,14 @@ def compare_spreads(facts):
     out = [('rank-1', [int(x) for x in r1['ivs']])]
     if facts['floor'] is not None:
         for ex in example_spreads(facts):
-            out.append((ex['rule'], [int(x) for x in ex['ivs']]))
+            out.append((example_label(ex['rule']),
+                        [int(x) for x in ex['ivs']]))
+        cost = facts.get('floor_cost') or {}
+        best = cost.get('best_ivs')
+        if best is not None:
+            best = [int(x) for x in best]
+            if best not in [iv for _rule, iv in out]:
+                out.append(('wins the most matchups above the line', best))
     else:
         gb = facts['grid_best']
         if list(gb['ivs']) != list(r1['ivs']):
@@ -494,15 +853,11 @@ CSS = """
 #dd-which-build { background: var(--surface); padding: 14px 18px;
   border-radius: 8px; margin: 16px 0; border: 1px solid var(--border);
   --wb-line: #7a4fc0; --wb-below: #7f858f; --wb-alt: #a63089;
-  --wb-mark1: #16706a; --wb-mark2: #2f5fd0;
-  --wb-r0: #9d61d1; --wb-r1: #8840c7; --wb-r2: #7232ab;
-  --wb-r3: #5c288a; --wb-r4: #461e68; --wb-r5: #301547; }
+  --wb-mark1: #16706a; --wb-mark2: #2f5fd0; }
 [data-theme="gruvbox-dark"] #dd-which-build,
 [data-theme="pokemon-dark"] #dd-which-build {
   --wb-line: #b18cf0; --wb-below: #9aa3ad; --wb-alt: #ec93d6;
-  --wb-mark1: #55d9c9; --wb-mark2: #8fb4ff;
-  --wb-r0: #9859cf; --wb-r1: #a872d6; --wb-r2: #b78cdd;
-  --wb-r3: #c7a5e5; --wb-r4: #d7beec; --wb-r5: #e6d7f4; }
+  --wb-mark1: #55d9c9; --wb-mark2: #8fb4ff; }
 #dd-which-build > summary { cursor: pointer; font-size: 1.05rem;
   color: var(--title); list-style: revert; padding: 2px 0; }
 #dd-which-build > summary b { color: var(--title); margin-right: 6px; }
@@ -566,6 +921,19 @@ CSS = """
   margin: 4px 0 0; }
 #dd-which-build .wb-fixed { font-size: 0.78rem; color: var(--text-muted);
   margin: 4px 0 0; }
+#dd-which-build .wb-terms { display: grid; grid-template-columns: auto 1fr;
+  gap: 2px 12px; margin: 14px 0 0; padding: 10px 12px; font-size: 0.82rem;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: 6px; }
+#dd-which-build .wb-terms dt { font-weight: 600; white-space: nowrap; }
+#dd-which-build .wb-terms dd { margin: 0; color: var(--text-muted); }
+#dd-which-build .wb-terms a { color: var(--accent); }
+#dd-which-build .wb-terms-head { font-size: .74rem; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--text-muted); margin: 14px 0 0;
+  font-weight: 600; }
+@media (max-width: 34rem) {
+  #dd-which-build .wb-terms { grid-template-columns: 1fr; }
+  #dd-which-build .wb-terms dd { margin: 0 0 6px; } }
 """
 
 
@@ -574,8 +942,8 @@ CSS = """
 # ---------------------------------------------------------------------------
 
 def _guards_html(evidence):
-    out = ['<details class="wb-guards"><summary>Evidence and guards'
-           '</summary>']
+    out = ['<details class="wb-guards"><summary>How the line was selected '
+           '(gates and guards)</summary>']
     for line in evidence['lines']:
         out.append(f'<p>{_esc(line)}</p>')
     out.append(brief._table_html(evidence['head'], evidence['rows']))
@@ -599,22 +967,27 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
     """
     facts = all_facts[arm]
     marker = TermMarker()
-    pay = build_payload(facts, facts['_fields'], moveset_idx, mode=mode)
+    pay = build_payload(facts, facts['_fields'], moveset_idx, mode=mode,
+                        all_facts=all_facts)
 
     lead = ' '.join(lead_sentences(all_facts, arm))
-    parts = [f'<style>{CSS}</style>',
+    # A literal space after the title, not the 6px CSS margin alone: copy /
+    # paste, a screen reader and the stripped-text tests all read the two
+    # runs with nothing between them ("build?Most Sableye").
+    parts = [f'<style>{CSS}{ramp_css(len(pay["rungs"]))}</style>',
              f'<details class="wb-root" id="{SECTION_ID}">',
-             f'<summary class="wb-summary"><b>{_esc(SECTION_TITLE)}</b>'
-             f'<span class="wb-head">{_esc(summary_sentence(facts))}</span>'
+             f'<summary class="wb-summary"><b>{_esc(SECTION_TITLE)}</b> '
+             f'<span class="wb-head">'
+             f'{_esc(summary_sentence(facts, all_facts))}</span>'
              f'</summary>',
              '<div class="wb-body">',
              marker.mark(f'<p class="wb-lead">{_esc(lead)}</p>'),
              marker.mark(brief.strip_html(facts['_strip']))]
 
     # ---- headline, with the opening sentence extended + the line expander --
-    head = facts['_headline']
+    head = [relabel(x, all_facts) for x in facts['_headline']]
     first_para = sentences(head[0])
-    opening = _esc(extended_first_sentence(facts))
+    opening = _esc(relabel(extended_first_sentence(facts), all_facts))
     fl = facts['floor']
     expander = False
     if fl is not None:
@@ -653,15 +1026,7 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
         f'wbSelectView(this)">{opts}</select></label>'
         '<div class="wb-panel"></div>'
         f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
-        '<p class="wb-fixed">Stat-product rank against matchups won over '
-        'every baked shield scenario and the whole opponent pool, with '
-        'PvPoke-default opponent IVs at the league cap -- the exact view '
-        'the line above was derived from, so this panel does not follow the '
-        'scatter\'s dropdowns or the opponent filter.'
-        + (f' This whole section is about {_esc(facts["header"]["arm_label"])}'
-           f', which the Moveset dropdown above does not change.'
-           if page_movesets > 1 else '')
-        + '</p>'
+        f'<p class="wb-fixed">{_esc(fixed_note(facts, page_movesets))}</p>'
         '</div>')
 
     # ---- compare button ---------------------------------------------------
@@ -669,6 +1034,11 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
     listed = ', '.join(
         f"{'rank-1 ' if rule == 'rank-1' else ''}"
         f"{iv[0]}/{iv[1]}/{iv[2]}" for rule, iv in spreads)
+    if len(spreads) == 1:
+        # A no-line page whose most-winning spread IS rank-1 names exactly
+        # one spread, and a "compare these spreads" button that fills in one
+        # candidate looks broken rather than settled.
+        listed += ' -- the only spread this page names'
     parts.append(
         '<p><button type="button" class="wb-btn" '
         'onclick="if(window.wbCompare)wbCompare(this)">'
@@ -678,12 +1048,22 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
     # ---- evidence ---------------------------------------------------------
     fields = facts['_fields']
     ev = ['<details class="wb-evidence">'
-          f'<summary>Evidence ({len(fields)} fields)</summary>']
+          '<summary>Evidence</summary>']
     for field in fields:
         ev.append(brief.field_html(field))
     ev.append(_guards_html(facts['_evidence']))
     ev.append('</details>')
     parts.append(marker.mark(''.join(ev)))
+
+    # ---- the terms this section marked ------------------------------------
+    # Built last, because it lists what the marker actually used. The hover
+    # definitions are title= text: no hover on a phone, <abbr> takes no
+    # focus, and the four terms that carry a guide link navigate AWAY rather
+    # than define. This prints the same registry sentences once, in the order
+    # a reader met them.
+    terms = glossary.terms_html(marker.ordered())
+    if terms:
+        parts.append('<p class="wb-terms-head">Terms used here</p>' + terms)
 
     # sort_keys so two renders of one blob are byte-identical; '<' escaped so
     # nothing inside the payload can close the <script> element early.
@@ -720,18 +1100,27 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
         facts['_evidence'] = evidence
         facts['_masks'] = compute_masks(state, arm, facts, mode, level)
         all_facts.append(facts)
-    # The section's OWN prose -- the second lead sentence and the two summary
-    # replacements -- goes through the brief's word gates too, so the page
-    # cannot smuggle a banned adjective past them in the one block the brief
-    # module did not write. The headline sentence the summary quotes is NOT
-    # re-gated: it is already gated once per arm above, and 'should have at
-    # least' is allowed exactly once per rendered section.
+    # Every reader-facing string this module AUTHORS -- the lead, the note
+    # under the panel, the clusters caption that stands in when the brief
+    # has no corroboration sentence to quote, and the two no-line summaries
+    # -- goes through the brief's word gates, so a banned adjective cannot
+    # enter the page through the one block the brief module did not write.
+    # The clusters fallback is gated whether or not this page uses it: it is
+    # a constant, and a gate that fires only on the pages that happen to hit
+    # the branch is a gate that ships the bad string.
+    #
+    # The DIRECTIVE summary is not in this list. It says 'Most X should have
+    # at least Y', which the word gate allows at most once per call, and the
+    # headline's own opening sentence (gated per arm above) is the other
+    # instance of that fixed phrase. Gating a restatement of an already-
+    # gated sentence would fail on the duplicate, not on a defect.
     ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode}
-    own = []
+    own = [CLUSTERS_FALLBACK_CAPTION]
     for arm, facts in enumerate(all_facts):
-        own.extend(lead_sentences(all_facts, arm)[1:])
+        own.extend(lead_sentences(all_facts, arm))
+        own.append(fixed_note(facts, page_movesets=2))
         if facts['floor'] is None:
-            own.append(summary_sentence(facts))
+            own.append(summary_sentence(facts, all_facts))
     brief.gate_words(own, ctx)
     brief.gate_caveat(own, ctx)
     return all_facts
