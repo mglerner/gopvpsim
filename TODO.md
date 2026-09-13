@@ -32,6 +32,37 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+- **ENGINE BUG FOUND 2026-09-12 (fixed on `cramorant-reinvestigate`, NOT in
+  main; the running rebake is reproducing it): Aegislash (Blade) columns are
+  contaminated across battles.** Two cross-battle leaks on a reused
+  BattlePokemon pair (the sweep/slayer/robustness/joint-IV workers all reuse
+  one pair across the 9 scenarios): (1) priority-shuffle clause 4
+  (`aegislash_shield`, added 9fe11e2 2026-09-02) stamps every charged-move
+  dict `selfDebuffing=True / buffs=[0,0] / sentinel buffTarget` IN PLACE and
+  `reset_for_battle` never undid it -- Blade shares those dicts, so later
+  scenarios ran Blade with self-debuffing Shadow Ball / Gyro Ball; (2) when
+  a fight ends back in Blade form, reset skips the form swap and so never
+  invalidates `_dp_init_cache` / `_dp_cache`, which were recomputed
+  mid-fight in Shield form. Found because `cramorant_mini_sweep.py`
+  (fresh pair per cell) disagreed with the baked tensor on ONE cell (GL iv 0
+  vs Aegislash (Blade) 1v2: tensor 500, live 490); the investigating agent
+  ruled out signature dedup, cache vintage, construction and nondeterminism
+  by measurement. Blast radius (measured): in the Cramorant-vs-Blade column
+  8803/36864 cells wrong (24%), 4024 win/loss flips, essentially all of 1v2
+  and 2v0; ONLY Aegislash (Blade) as opponent is affected (Shield starts in
+  the stamped form = fixed point); as FOCAL (the aegislash-blade dives) every
+  opponent column is hit (Azumarill 279/576, Registeel 307/576). 75 of 140
+  rendered dive dirs carry a Blade opponent column. Fix: snapshot+restore of
+  the stamp and unconditional DP-cache invalidation for form-changers in
+  `reset_for_battle`; failing-first test = the new `aegislash-blade-azumarill`
+  param of `test_reset_for_battle_reuse_matches_fresh` (the Shield param
+  alone was the fixed point and could never catch it). ENGINE HASH BUMPS.
+  Migration is cleanly predicate-able, no schema change: re-sim iff either
+  side's species starts with 'Aegislash' (the sidecars store both species);
+  bless everything else. Do NOT publish the current bake's Aegislash (Blade)
+  dive or trust any dive's Blade column until the migration re-sim has run.
+  Merge only after the rebake is published (mixed-vintage rule); pair the
+  bump with NO other engine change so the predicate stays sound.
 - **FILE PvPoke Report 9** (Michael 2026-09-12: "make report 9 a TODO for
   later"): the `hasActed`-survives-`Pokemon.reset()` bug, drafted and
   browser-verified in `docs/pvpoke_bug_reports.md`. Follows that file's
