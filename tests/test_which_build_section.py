@@ -859,11 +859,11 @@ function eq(name, got, want) {
 // wins: rows are 1,2,3,4,4,4 wins
 eq('wins', Array.from(wins), [1,2,3,4,4,4]);
 
-const line = out._wbGroups(pay, 'line', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
+const line = out._wbGroups(pay, 'line', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7'],scenRungs:['#8','#9','#a','#b']});
 const byName = {}; line.traces.forEach(t => byName[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
 eq('line groups', byName, {'Below the line': 2, 'At or above the line': 4});
 
-const rungs = out._wbGroups(pay, 'rungs', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
+const rungs = out._wbGroups(pay, 'rungs', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7'],scenRungs:['#8','#9','#a','#b']});
 const rn = {}; rungs.traces.forEach(t => rn[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
 // atk 140,145 below; 148.2,149 -> rung0; 150.5,151 -> rung1
 eq('rung groups', rn, {'Below the line': 2, '148.10 (a)': 2, '150.00 (b)': 2});
@@ -877,7 +877,7 @@ rungs.traces.forEach(t => { if (/^1\d\d\./.test(t.name) && / \(\d+\)$/.test(t.na
 const rh = rungs.traces.find(t => t.name.indexOf('148.10 (a)') === 0).text[0];
 if (rh.indexOf('Sucker Punch') < 0) fail.push('rung hover lost the full name');
 
-const trade = out._wbGroups(pay, 'trade', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
+const trade = out._wbGroups(pay, 'trade', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7'],scenRungs:['#8','#9','#a','#b']});
 const tn = {}; trade.traces.forEach(t => tn[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
 // idx0 (def110,hp130) and idx1 (def105,hp128) qualify for the rectangle and are below the line
 eq('trade groups', tn, {'Neither': 0, 'At or above the line': 4, 'Bulk alternative, below the line: Def >= 105, HP >= 128': 2});
@@ -891,7 +891,7 @@ if (lineTrace.text[0].indexOf('attack at or above the 148.10 line') < 0)
 eq('mask bit 2 is a clearer', out._wbBit(out._wbMask('PA=='), 2), 1);
 eq('mask bit 1 is not', out._wbBit(out._wbMask('PA=='), 1), 0);
 
-const clusters = out._wbGroups(pay, 'clusters', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']});
+const clusters = out._wbGroups(pay, 'clusters', L, wins, {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7'],scenRungs:['#8','#9','#a','#b']});
 eq('clusters missing when no mc payload', clusters.missing, true);
 
 // Cluster keys say which side of the clusters section's own split they sit
@@ -923,7 +923,7 @@ if (out._wbHover(2, L, wins, 'side').indexOf('2/13/13') !== 0) fail.push('hover 
 if (out._wbHover(2, L, wins, 'side').indexOf('wins 3 of 4') < 0) fail.push('hover wins');
 
 // ---- the section's own Shield scenario control -------------------------
-const COL = {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']};
+const COL = {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7'],scenRungs:['#8','#9','#a','#b']};
 // 'OA==' = 0b00111000 = spreads 3..5 (atk >= 149), 'MA==' = spreads 4..5
 // (atk >= 150.5): the same LSB-first packing deep_dive_which_build.mask_b64
 // emits, pooled by (axis, value) the way the payload pools them.
@@ -1137,8 +1137,9 @@ def test_reader_facing_text_never_says_brief_verdict_or_recommended(
 # it a second time by design).
 _SECTION_CHROME = (
     'Stat-product rank against matchups won with PvPoke-default opponent '
-    'IVs at the league cap over the whole opponent pool -- the view the line '
-    'above was derived on. The Shield scenario control beside Show: is this '
+    'IVs at the league cap over the whole opponent pool and, with Shield '
+    'scenario on all, every baked shield state -- the view the line above '
+    'was derived on. The Shield scenario selector on this row is the '
     "section's own; the scatter's dropdowns and the opponent filter do not "
     'drive this panel.',
     'Compare these spreads',
@@ -1603,24 +1604,42 @@ def test_a_scenario_with_no_line_says_so_and_names_the_closest_rule(
     pay = W.build_payload(facts, facts['_fields'], 0, all_facts=all_facts)
     for view in ('line', 'rungs'):
         cap = pay['scen']['2v1']['captions'][view]
-        assert 'No single stat threshold in 2v1 shields' in cap
-        assert 'The closest rule is' in cap
+        assert 'No attack, defense or HP threshold in 2v1 shields' in cap
+        assert 'The nearest, 155.43 attack (Forretress (Bug Bite)),' in cap
         # With its numbers, both of them: the value and how much of the grid
-        # is on its passing side.
+        # is on its passing side -- AND which side of the band it missed on,
+        # in words, so the percentage is not doing all the work.
         assert re.search(r'\d+ of \d+ spreads \(\d', cap), cap
+        assert 'too little of the grid' in cap, cap
+        # The degenerate scenario states its absence in the Matchup clusters
+        # section's own sentence and its own numbers -- not in a second set
+        # the reader would have to reconcile with it.
         degen = pay['scen']['2v0']['captions'][view]
-        assert degen.startswith('2v0 shields is degenerate on this grid:')
+        assert degen == (
+            'In 2v0 shields little turns on IVs at all: every spread wins '
+            '74-76 of 76 opponents here, so the IV choice moves at most 2 '
+            'matchups in this shield state. There is no line to draw.'), degen
+        assert 'closest' not in degen and 'nearest' not in degen
     # A scenario that HAS a line names it and what it decides.
     one = pay['scen']['1v1']['captions']['line']
     assert one.startswith('At or above 148.55 attack every spread wins '
                           'Sableye (Shadow) in 1v1 shields')
     assert pay['scen']['1v1']['captions']['rungs'].startswith(
-        '4 lines turn a matchup over in 1v1 shields, from 148.55 attack '
-        'up to 150.24 attack')
+        '4 attack thresholds each turn a matchup over in 1v1 shields, from '
+        '148.55 (Sableye (Shadow)) up to 150.24 (Empoleon (Shadow))')
+    # The scope of a scenario line, stated once per caption.
+    assert one.endswith(W.SCOPE_CLAUSE)
+    # ... and NOT on the one scenario whose line IS the page's line, which
+    # the gates did run on.
+    floor_cap = pay['scen']['0v1']['captions']['line']
+    assert not floor_cap.endswith(W.SCOPE_CLAUSE), floor_cap
+    assert floor_cap.endswith("These are the same 2220 spreads as this "
+                              "page's line."), floor_cap
     # The trade is a whole-grid trade and says so rather than being rewritten.
     trade_all = next(v['caption'] for v in pay['views'] if v['id'] == 'trade')
     assert pay['scen']['1v1']['captions']['trade'] == (
-        trade_all + ' (all scenarios)')
+        trade_all + ' Counted over every shield scenario; the y-axis here is '
+        '1v1 wins only.')
 
 
 @pytest.mark.local_artifacts
@@ -1744,25 +1763,41 @@ def test_the_control_leaves_the_summary_and_the_headline_alone(shadow_sableye):
     assert 'wb-scen' not in head, 'the control is emitted above the panel'
 
 
-def test_a_muted_scenario_marks_only_rank1():
-    """No example spread is labelled against a line the scenario does not have.
+def test_a_single_scenario_marks_only_rank1():
+    """No example spread is labelled against a line the panel is not drawing.
 
     Every example key is named for where the spread sits relative to the
-    PAGE's line ("highest stat product above the line"). Under a caption
-    saying this shield state has no line, those keys read as a claim about
-    it, so the muted views keep rank-1 -- whose key claims nothing -- and the
-    collection overlay, and drop the rest.
+    PAGE's line ("highest stat product above the line"), and under a single
+    shield scenario the two threshold views draw a DIFFERENT line. Both
+    halves of that go wrong on screen:
+
+    * on a scenario with NO line the keys claim one exists;
+    * on a scenario WITH one the marker is plotted inside the "Below
+      <scenario line>" group while its own key says "above the line" -- on
+      Shadow Sableye 1v1, 6/9/7 (148.23 atk) and 10/13/11 (148.19 atk) both
+      sit below the 148.55 scenario line and both carried "above the line"
+      keys.
+
+    So the examples are dropped for ANY single scenario on those two views.
+    Rank-1 stays: its key claims nothing about any line.
     """
     # The raw body, located on the stripped source: the pins below are about
     # view NAMES, which strip_js blanks out.
     render = _fn_body(ENGINE_JS.read_text(), _engine(), 'wbRenderRoot')
-    assert ("var muted = !!(scen && (view === 'line' || view === 'rungs') "
-            "&& !line);") in render
-    assert 'muted ? false : e < pay.examples.length' in render
-    assert 'pay.bestAbove && !muted' in render
-    # ...and the side string names the scenario rather than the page.
+    assert ("var hideExamples = !!(scen && (view === 'line' || "
+            "view === 'rungs'));") in render
+    # The '&& !line' that used to gate this is GONE: that is the whole fix,
+    # and a positive control for the pin above (a revert re-introduces it).
+    assert "|| view === 'rungs') && !line" not in render
+    assert 'hideExamples ? false : e < pay.examples.length' in render
+    assert 'pay.bestAbove && !hideExamples' in render
+    # ...and the side string names the scenario only when the PAGE has a line
+    # to contrast it with. On a negative page the absence is the page's, and
+    # the selected scenario may well carry a threshold of its own.
     assert '(line ? _wbSideAt(L, line, r1i) : noLine)' in render
-    assert "'no line in ' + scen.label + ' shields'" in render
+    assert ("var noLine = (scen && pay.hasFloor)\n"
+            "                    ? ('no line in ' + scen.label + ' shields')"
+            ) in render
 
 
 @pytest.mark.local_artifacts
@@ -1800,9 +1835,35 @@ def test_the_negative_page_carries_the_control_and_its_captions():
     assert len(withline) < len(pay2['scen']), 'expected empty scenarios here'
     empty = next(k for k, v in pay2['scen'].items() if not v['lines'])
     cap = pay2['scen'][empty]['captions']['rungs']
-    assert ('No single stat threshold' in cap
-            or 'is degenerate on this grid' in cap), cap
-    assert 'closest rule is' in cap
+    assert ('No attack, defense or HP threshold' in cap
+            or 'little turns on IVs at all' in cap), cap
+    assert 'The nearest, ' in cap
+
+    # A degenerate scenario that DOES carry an in-band cut says both things.
+    # G-scenario is a hard exclusion for the page's line and is applied to
+    # nothing here, so without this the panel claimed a threshold decides
+    # matchups in a shield state the clusters view calls dead two clicks away.
+    deg = pay2['scen']['2v0']
+    assert deg['degenerate'] and deg['lines'], deg
+    dcap = deg['captions']['line']
+    assert dcap.startswith('Every spread at or above 122.54 attack wins '
+                           'Charjabug in 2v0 shields'), dcap
+    assert ('In 2v0 shields little turns on IVs at all: every spread wins '
+            '73-76 of 76 opponents here, so the IV choice moves at most 3 '
+            'matchups in this shield state.') in dcap, dcap
+
+    # The NEGATIVE arm's rank-1 caption names the scenario's own threshold
+    # where it has one -- that page offers neither threshold view, so this is
+    # the only place a reader asking "is there really nothing, even in one
+    # shield state?" can be answered.
+    ncap = pay['scen']['1v0']['captions']['rank1']
+    assert ('1v0 shields does carry a threshold of its own: at or above '
+            '122.01 attack every spread wins Hippowdon, and below it none '
+            'does.') in ncap, ncap
+    assert "It is not this page's line" in ncap
+    # ...and stays silent where the scenario has none.
+    assert 'carry a threshold of its own' not in (
+        pay['scen']['1v1']['captions']['rank1'])
 
 
 @pytest.mark.local_artifacts
@@ -1825,3 +1886,357 @@ def test_the_section_is_byte_deterministic_with_the_control(shadow_sableye):
     # scenario -- not a per-IV array per scenario.
     assert len(json.dumps(pay)) < 32_000, len(json.dumps(pay))
     assert len(json.dumps(pay['scen'])) < 12_000, len(json.dumps(pay['scen']))
+
+
+# ---------------------------------------------------------------------------
+# 5b. Round 4: one ladder, one axis, one number per threshold
+# ---------------------------------------------------------------------------
+
+SABLEYE_PLAIN = '20260911_051621_Sableye_great.replay.pkl.gz'
+
+
+@pytest.fixture(scope='module')
+def sableye_plain():
+    path = require_blob(SABLEYE_PLAIN)
+    state = B.load_blob(str(path))
+    return state, W.prepare(state, str(path)), str(path)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_every_scenario_ladder_is_one_axis_and_nests(blob):
+    """The drawn rungs are a NESTING claim, so they have to actually nest.
+
+    The panel colors a spread "by the highest line it clears" and prints one
+    grey key, "Below <the lowest line>", for everything else. Both are only
+    true of a ladder on ONE axis: ``atk >= 123.92`` and ``def >= 119.55`` do
+    not nest in either direction, and on Sableye GL 1v1 the two sets differ
+    by 1295 spreads each way -- so a mixed ladder colored a quarter of the
+    grid as clearing a rung under a grey key saying it was below the line.
+
+    Recomputed here from the blob's own stat planes, not from the payload's
+    counts: this is the invariant the encoding rests on.
+    """
+    import numpy as np
+    path = require_blob(blob)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))
+    seen_multi = 0
+    for arm, facts in enumerate(all_facts):
+        _scores, meta = B.arm_view(state, arm, 'pvpoke', level='l50')
+        atk, dfn, hp = B.stat_planes(meta)
+        planes = {'atk': atk, 'def': dfn, 'hp': hp}
+        for scen, entry in (facts.get('scenario_lines') or {}).items():
+            rows = entry['lines']
+            axes = {r['axis'] for r in rows}
+            assert len(axes) <= 1, (blob, arm, scen, axes)
+            masks = [planes[r['axis']] >= r['T'] for r in rows]
+            for k in range(1, len(masks)):
+                assert masks[k - 1][masks[k]].all(), (
+                    f"{blob} arm {arm} {scen}: rung {k} is not inside rung "
+                    f"{k - 1}")
+            if len(rows) > 1:
+                seen_multi += 1
+            # Off-axis lines are on OTHER stats, in the band, and named --
+            # never silently dropped.
+            for o in entry['off_axis']:
+                assert o['axis'] not in axes, (blob, arm, scen)
+                cap = W.scenario_caption('rungs', scen, entry, facts)
+                assert o['names'][0].split(' ', 1)[-1] in cap, cap
+                assert 'not a rung of this ladder' in cap or (
+                    'not rungs of this ladder' in cap), cap
+    # Floors set BELOW today's counts (9 / 19 / 1 across the three blobs), so
+    # the nesting assertion cannot pass by finding nothing to assert on.
+    floor = {SABLEYE_SHADOW: 6, SABLEYE_PLAIN: 2, MELMETAL: 1}[blob]
+    assert seen_multi >= floor, (blob, seen_multi)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_off_axis_line_is_stated_not_ranked(sableye_plain):
+    """Sableye GL 1v1: the exact case the mixed ladder got wrong.
+
+    Four attack lines and one defense line. The ladder is the four; the
+    defense line is a sentence of its own, in its own primitive's words.
+    """
+    _state, all_facts, _path = sableye_plain
+    facts = all_facts[0]
+    entry = facts['scenario_lines']['1v1']
+    assert [r['printed'] for r in entry['lines']] == [123.92, 123.97,
+                                                      124.74, 125.2]
+    assert [(r['axis'], r['printed']) for r in entry['off_axis']] == [
+        ('def', 119.55)]
+    cap = W.scenario_caption('rungs', '1v1', entry, facts)
+    assert cap.startswith(
+        '4 attack thresholds each decide a matchup in 1v1 shields '
+        '(3 outright, 1 in one direction only), from 123.92 '
+        '(Feraligatr (Shadow)) up to 125.20 (Empoleon (Shadow)); each '
+        'spread is colored by the highest it clears.'), cap
+    assert ('At or above 119.55 defense every spread wins Toxapex in 1v1 '
+            'shields, and below it none does. That is a defense line, not a '
+            'rung of this ladder.') in cap, cap
+    # The "line" view draws the lowest of the LADDER, not the lowest number.
+    lcap = W.scenario_caption('line', '1v1', entry, facts)
+    assert lcap.startswith('At or above 123.92 attack'), lcap
+    assert 'It is the lowest of 4 attack lines in 1v1 shields.' in lcap
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_floor_prints_one_value_everywhere_on_the_page(sableye_plain):
+    """Sableye GL: the floor needs three places, and says so once.
+
+    Stage 7 escalated this line to 123.419 because two places could not
+    select its 2220 spreads; the headline speaks it "123.42 (123.419)". The
+    scenario ladder printed the same T freshly and got "123.41", so the panel
+    and the paragraph above it disagreed about the value of the line they
+    both describe.
+    """
+    _state, all_facts, _path = sableye_plain
+    facts = all_facts[0]
+    fl = facts['floor']
+    assert (fl['printed'], fl['dp']) == (123.419, 3)
+    floor_rows = [r for e in facts['scenario_lines'].values()
+                  for r in e['lines'] + e['off_axis'] if r['is_floor']]
+    assert len(floor_rows) >= 2, floor_rows
+    for r in floor_rows:
+        assert (r['printed'], r['dp']) == (fl['printed'], fl['dp']), r
+        assert W._axis_value(r) == W.plain_value(fl) == '123.42'
+        assert W.scen_line_label('0v0', r).startswith('123.42 ('), r
+    # And the tail is a statement about the SET, not about the cell: the 0v0
+    # owner (Marowak) is not the cell the strip names as deciding the line.
+    cap = W.scenario_caption('line', '0v0', facts['scenario_lines']['0v0'],
+                             facts)
+    assert cap.startswith('At or above 123.42 attack every spread wins '
+                          'Marowak in 0v0 shields'), cap
+    assert "These are the same 2220 spreads as this page's line." in cap
+    assert "It is this page's own line" not in cap
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_no_shipped_closest_rule_is_one_every_spread_clears(blob):
+    """"The closest rule" has to have somebody on both sides of it.
+
+    Shadow Sableye 2v0 named "92.68 defense (Moltres (Galarian)), which 4096
+    of 4096 spreads (100.0%) clear" -- a sentence shaped like a finding about
+    a threshold nobody can miss. Those are dropped from the candidate pool
+    now; the caption says which side of the band the survivor missed on.
+    """
+    path = require_blob(blob)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))
+    n_iv = int(all_facts[0]['header']['n_iv'])
+    seen = 0
+    for facts in all_facts:
+        for scen, entry in (facts.get('scenario_lines') or {}).items():
+            c = entry.get('closest')
+            if c is None:
+                continue
+            seen += 1
+            assert 0 < int(c['n_pass']) < n_iv, (blob, scen, c)
+            if entry['lines'] or entry['degenerate']:
+                continue
+            cap = W.scenario_caption('rungs', scen, entry, facts)
+            assert 'The nearest, ' in cap, cap
+            assert ('too little of the grid' in cap
+                    or 'too much of the grid' in cap
+                    or 'on the wrong side of it' in cap), cap
+    # Floors BELOW today's counts (7 / 3 / 25), so the assertions above
+    # cannot pass by finding no closest rule to check.
+    floor = {SABLEYE_SHADOW: 4, SABLEYE_PLAIN: 2, MELMETAL: 15}[blob]
+    assert seen >= floor, (blob, seen)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_shadow_sableye_2v0_closest_rule_is_gone(shadow_sableye):
+    """The concrete case: every 2v0 candidate is vacuous, so none is named."""
+    _state, all_facts, _path = shadow_sableye
+    entry = all_facts[0]['scenario_lines']['2v0']
+    assert entry['closest'] is None, entry['closest']
+    cap = W.scenario_caption('line', '2v0', entry, all_facts[0])
+    assert 'Moltres' not in cap and '100.0%' not in cap, cap
+
+
+def test_a_scenario_group_takes_its_name_from_the_cell_it_quotes():
+    """The claim and the name come from the SAME cell.
+
+    The caption's primitive, gate side and counts are the representative
+    cell's (strongest primitive first); the name used to be ``cells[0]`` --
+    pool insertion order. A group with no exact cut in it, mixing a
+    near-exact and a gate, printed the gate's stronger claim ("No spread
+    below V wins X") under the near-exact cell's name, for which it is false.
+
+    Synthetic, because no shipped page reaches that shape: every group on the
+    three preview blobs contains an exact cut, which sorts first either way.
+    """
+    import numpy as np
+    n_iv = 100
+    atk = np.arange(n_iv, dtype=float)
+    planes = {'atk': atk, 'def': atk.copy(), 'hp': atk.copy()}
+    win = np.zeros((n_iv, 1, 2), dtype=bool)
+    win[50:, 0, 0] = True
+    state = {'shield_scenarios': [(0, 0)]}
+    triage = {'degenerate': {0: False}}
+
+    def cell(label, kind, gate_side, oi):
+        return {'si': 0, 'oi': oi, 'axis': 'atk', 'T': 50.0, 'n_pass': 50,
+                'kind': kind, 'gate_side': gate_side, 'label': label,
+                'n_above': 50, 'n_win_above': 50, 'n_below': 50,
+                'n_win_below': 0, 'n_wrong': 3, 'rank': 1}
+    # Insertion order puts the NEAR-EXACT cell first; the gate is the rep.
+    pool = [cell('0v0 Wrong', 'near_exact', 'both', 0),
+            cell('0v0 Right', 'gate', 'necessary', 1)]
+    out = B.scenario_lines(pool, win, planes, triage, [], {}, state, n_iv,
+                           None)
+    row = out['0v0']['lines'][0]
+    assert row['kind'] == 'gate'
+    assert row['names'][0] == '0v0 Right', row['names']
+    assert 'No spread below 50.00 attack wins Right' in (
+        W._decides_sentence('0v0', row))
+
+
+def test_js_draws_a_scenario_ladder_on_its_own_colour_ramp():
+    """A scenario's ladder can be LONGER than the page's own rung ladder.
+
+    Read off ``--wb-r*`` (sized to ``pay.rungs.length``), the overflow rungs
+    fell back to one colour and two steps of an encoding whose whole content
+    is colour became indistinguishable. ``--wb-s*`` is sized server-side to
+    the longest ladder the control can select, and is separate so that
+    lengthening it does not re-colour the default view's rungs.
+    """
+    raw, src = ENGINE_JS.read_text(), _engine()
+    colors = _fn_body(raw, src, '_wbColors')
+    assert "'--wb-s' + k2" in colors
+    assert 'pay.scenColors' in colors and 'pay.nScenRamp' in colors
+    assert 'scenRungs: sramp' in colors
+    groups = _fn_body(raw, src, '_wbGroups')
+    assert 'colors.scenRungs[k] ||' in groups
+    # ...and the page's own ramp is still sized to the page's own rungs.
+    assert 'pay.rungs.length : 0' in colors
+
+
+def test_the_two_colour_ramps_are_sized_independently():
+    """Extending the scenario ramp must not move the printed rungs."""
+    assert W.ramp_css(3) == W.ramp_css(3, 'r')
+    assert '--wb-r0' in W.ramp_css(3) and '--wb-s0' in W.ramp_css(3, 's')
+    # The page ramp for n rungs is byte-identical however long the scenario
+    # ramp is -- they are two calls, not one stretched over both.
+    assert W.rung_ramp(3) != W.rung_ramp(6)[:3], 'ramp is length-dependent'
+    assert W.ramp_css(0, 's') == ''
+
+
+def test_js_caption_enrichment_is_scenario_only():
+    """The two captions the JS extends, and the state it must not touch.
+
+    Under "all" the section renders exactly what Python wrote -- the round-2
+    pin -- so both additions are inside a ``scen &&`` guard.
+    """
+    render = _fn_body(ENGINE_JS.read_text(), _engine(), 'wbRenderRoot')
+    assert "if (scen && view === 'rank1')" in render
+    assert "if (scen && view === 'clusters')" in render
+    # The clusters caption carries that scenario's own K and its depth-1
+    # split as the clusters payload spells it -- this file formats no
+    # threshold.
+    assert 'msc.k' in render and 'msc.split' in render
+    assert 'toFixed' not in render
+    # The clusters section's `display` already carries the word "shields";
+    # appending a second one printed "for 0v1 shields shields" in the
+    # browser, which is what the headless probe caught.
+    assert "(msc.display || (scen.label + ' shields')) + \": \"" in render
+    assert '+ " shields: "' not in render
+    # ...and only where those labels describe what the panel is drawing. The
+    # clusters section bakes for moveset 0 at the default opponent-IV mode;
+    # on any other page the view draws nothing, so the caption must not
+    # describe groups the reader cannot see. One predicate, both callers.
+    assert '_wbMcApplies(pay, mcP)' in render
+    src_raw = ENGINE_JS.read_text()
+    assert src_raw.count('function _wbMcApplies(') == 1
+    assert src_raw.count('_wbMcApplies(') == 4, 'view + both caption branches'
+    assert 'pay.mi === 0 &&' in _fn_body(src_raw, _engine(), '_wbMcApplies')
+    # The rank-1 caption's two integers come off the wins array the panel is
+    # already plotting.
+    assert 'wins[r1x]' in render and 'the most any spread wins is' in render
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_payload_scenario_keys_are_the_pages_own_vocabulary(
+        shadow_sableye):
+    """``_wbScen`` fails OPEN: a label it cannot match renders "all".
+
+    The lookup string-matches the selected option against
+    ``DATA.scenarioLabels``, so if the payload's keys and the page's labels
+    ever drift the panel silently draws the all-scenario view while the
+    selector still reads "1v1". Nothing else pins the two vocabularies
+    against each other, so this does -- against ``deep_dive.py``'s own
+    expression, not against a copy of it.
+    """
+    import deep_dive_rendering
+    state, all_facts, _path = shadow_sableye
+    pay = W.build_payload(all_facts[0], all_facts[0]['_fields'], 0,
+                          all_facts=all_facts)
+    page_labels = [deep_dive_rendering.scenario_label(s)
+                   for s in state['shield_scenarios']]
+    assert list(pay['scen'].keys()) == page_labels
+    assert page_labels == [B.scenario_label(state, si)
+                           for si in range(len(state['shield_scenarios']))]
+    # The source the labels come from on the page, so a renamed helper fails
+    # here rather than in a browser.
+    src = (SCRIPTS_DIR / 'deep_dive.py').read_text()
+    assert "'scenarioLabels': [scenario_label(s) for s in shield_scenarios]" \
+        in src
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_page_rounded_matches_the_array_the_page_actually_embeds(
+        shadow_sableye):
+    """The exactness guard has to be a CROSS-implementation check.
+
+    ``compute_masks`` asserts that its own rounded array reconstructs the
+    brief's split -- but it rounds with numpy while ``deep_dive.py`` embeds
+    ``[round(m[5], 2) for m in meta]``, Python's own round. If the two ever
+    disagreed on a value the guard would still pass and the browser would
+    mis-colour that spread. This runs deep_dive.py's expression against the
+    same meta and compares element for element.
+    """
+    import numpy as np
+    state, _all_facts, _path = shadow_sableye
+    _scores, meta = B.arm_view(state, 0, 'pvpoke', level='l50')
+    atk, dfn, hp = B.stat_planes(meta)
+    page_atk = [round(m[5], 2) for m in meta]        # deep_dive.py:1451
+    page_def = [round(m[6], 2) for m in meta]
+    assert np.array_equal(W.page_rounded(atk, 'atk'), np.array(page_atk))
+    assert np.array_equal(W.page_rounded(dfn, 'def'), np.array(page_def))
+    assert np.array_equal(W.page_rounded(hp, 'hp'), hp)
+
+
+def test_the_degenerate_sentence_has_one_source():
+    """The section quotes the clusters module rather than counting again.
+
+    The section used to state a dead shield state in the brief's counts ("2
+    contested matchups over 3 distinct win patterns") while the clusters view
+    of the SAME state stated it in the clusters section's ("1 opponent is a
+    sharp marginal"), two clicks apart, neither defined where it was printed.
+    """
+    import deep_dive_matchup_clusters as M
+    # The split-out finding is BYTE-IDENTICAL inside the reason string it came
+    # out of, so the clusters section's own sentence did not move.
+    assert M.degenerate_reason(1, 2, 74, 76, 76).startswith(
+        'every spread wins 74-76 of 76 opponents here, so the IV choice '
+        'moves at most 2 matchups in this shield state. Only 1 opponent is '
+        'a sharp marginal (2 distinct win patterns)')
+    assert M.degenerate_reason(1, 1, 76, 76, 76).startswith(
+        'every spread wins exactly 76 of 76 opponents here -- no IV choice '
+        'changes this shield state.')
+    # ...and the section reaches it through the same function, not a copy.
+    entry = {'degenerate': True, 'win_lo': 74, 'win_hi': 76, 'n_opp': 76}
+    assert W._degeneracy_finding(entry) == M.degenerate_finding(
+        74, 76, 76)
+    src = (SCRIPTS_DIR / 'deep_dive_which_build.py').read_text()
+    assert 'brief.clusters.degenerate_finding(' in src
+    assert 'contested win patterns' not in src
