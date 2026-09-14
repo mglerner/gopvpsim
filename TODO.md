@@ -397,6 +397,17 @@ plot (SP rank vs wins; at-or-above-the-line filled, bulk alternative in its
 own color, rest muted; hover = IVs/level/stats/side of the line), drawn
 client-side like the cluster panels; plus the main scatter's color mode.
 
+Shield scenarios in "Which one to build?" (Michael, 2026-09-13): accepted
+as a middle point that the section is inert to the main plot's Shields
+dropdown (every fact in it is scenario-tagged and the floor is chosen across
+all nine; the y-axis is wins of 684). Follow-ups, in order: (1) a "scenario"
+control on the section's OWN selector (filter rungs to one scenario, y-axis
+= that scenario's wins, summary reworded), never coupled to the main plot's
+dropdowns; (2) the real synthesis: a usage prior over shield states (lead /
+safe swap / closer) so floor selection can weight cells and the headline can
+say "in the shield states Sableye usually sees". (2) needs an expert-supplied
+or usage-derived prior; the sim does not have one.
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
