@@ -36,6 +36,8 @@ import os
 import re
 import sys
 
+import numpy as np
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import deep_dive_analysis as analysis  # noqa: E402
@@ -469,8 +471,59 @@ def mask_b64(flags):
     return base64.b64encode(bytes(buf)).decode('ascii')
 
 
+def line_key(axis, T):
+    """Pool key for one threshold. Two lines at the same value on the same
+    axis are the same set of spreads, and nine shield scenarios share their
+    values often enough to be worth saying once (the Shadow Sableye page's
+    1v1 and 2v2 both turn over at 148.71)."""
+    return f"{axis}:{float(T):.9f}"
+
+
+def page_rounded(plane, axis):
+    """The plane as the PAGE carries it.
+
+    ``deep_dive.py`` embeds ``iv_atk = [round(m[5], 2) for m in meta]`` and
+    the same for defense; HP is an integer and is embedded whole. This is
+    that array, so a cut selected here selects the same spreads in the
+    browser.
+    """
+    return plane if axis == 'hp' else np.round(plane, 2)
+
+
+def rounded_cut(plane, axis, T):
+    """One threshold, re-expressed against the page's own 2-dp stats.
+
+    The panel has to split the grid at a full-precision value using an array
+    that is rounded to two places. The section's own line does it with a
+    packed 512-byte membership mask (:func:`mask_b64`), which is the right
+    trade for a value the whole section is about -- but there is one of those
+    per printed rung, and the Shield scenario control asks for up to a dozen
+    MORE thresholds on one page.
+
+    So a scenario line ships two things instead: the cut in the page's OWN
+    rounded array -- ``min(rounded[at or above T])``, the smallest value a
+    clearer displays -- and the indices where comparing against it disagrees
+    with the full-precision plane. The second list is the exactness: it is
+    computed here and applied in the browser, so the split the panel draws is
+    the split the brief measured whether or not the rounding happens to be
+    kind. On all three preview blobs it comes back EMPTY for every scenario
+    line (the naive 19-spread hazard is comparing the rounded array against
+    the raw threshold, not against the lowest rounded clearer), which is why
+    this costs a float and an empty array per line rather than 684 base64
+    characters.
+
+    Returns ``(cut, wrong_indices)``.
+    """
+    exact = plane >= T
+    rd = page_rounded(plane, axis)
+    cut = float(rd[exact].min())
+    wrong = np.nonzero((rd >= cut) != exact)[0]
+    return cut, [int(x) for x in wrong]
+
+
 def compute_masks(state, arm, facts, mode='pvpoke', level='l50'):
-    """Membership masks for the line, each rung above it, and the bulk pair.
+    """Membership masks for the line, each rung above it, the bulk pair, and
+    every per-scenario line the Shield scenario control can draw.
 
     Recomputed from the blob's own stat planes rather than carried out of
     ``compute_brief`` (which drops every numpy array on the way to JSON).
@@ -478,13 +531,46 @@ def compute_masks(state, arm, facts, mode='pvpoke', level='l50'):
     anything is packed: a mismatch means the plot would draw a different set
     from the one the page describes, and there is no honest way to render
     that.
+
+    The per-scenario lines do NOT get masks: they get a cut in the page's own
+    rounded array plus the indices it gets wrong (:func:`rounded_cut`), which
+    is a float and (so far always) an empty list per distinct value instead
+    of 684 base64 characters. Pooled by (axis, value) all the same, since
+    scenarios share their values.
     """
-    fl = facts['floor']
-    if fl is None:
-        return {'rungs': [], 'alt': None}
     _scores, meta = brief.arm_view(state, arm, mode, level=level)
     atk, dfn, hp = brief.stat_planes(meta)
     planes = {'atk': atk, 'def': dfn, 'hp': hp}
+    lines = {}
+    for entry in (facts.get('scenario_lines') or {}).values():
+        for row in entry['lines']:
+            key = line_key(row['axis'], row['T'])
+            if key in lines:
+                continue
+            plane = planes[row['axis']]
+            flags = plane >= row['T']
+            got = int(flags.sum())
+            if got != int(row['n_pass']):
+                raise ValueError(
+                    f"scenario line {row['printed']} covers {got} "
+                    f"spreads, the brief counts {row['n_pass']}")
+            cut, wrong = rounded_cut(plane, row['axis'], row['T'])
+            # The reconstruction the browser will do, checked here against
+            # the plane the brief measured on. It cannot fail by
+            # construction; it is asserted anyway, because the whole point of
+            # shipping the exceptions rather than a mask is that the two
+            # sides agree, and a silent disagreement is 4096 points drawn in
+            # the wrong colors under a sentence that says the split is exact.
+            rebuilt = page_rounded(plane, row['axis']) >= cut
+            rebuilt[wrong] = ~rebuilt[wrong]
+            if not np.array_equal(rebuilt, flags):
+                raise ValueError(
+                    f"scenario line {row['printed']} does not reconstruct "
+                    f"from the page's rounded stats")
+            lines[key] = {'cut': cut, 'wrong': wrong}
+    fl = facts['floor']
+    if fl is None:
+        return {'rungs': [], 'alt': None, 'lines': lines}
     plane = planes[fl['axis']]
     rungs = []
     for row, count in [(fl, fl['n_above'])] + [
@@ -506,7 +592,7 @@ def compute_masks(state, arm, facts, mode='pvpoke', level='l50'):
                 f"bulk-pair mask covers {got} spreads, the page prints "
                 f"{alt['n']}")
         alt_mask = mask_b64(flags)
-    return {'rungs': rungs, 'alt': alt_mask}
+    return {'rungs': rungs, 'alt': alt_mask, 'lines': lines}
 
 
 def printed_value(fl):
@@ -657,12 +743,20 @@ CLUSTERS_FALLBACK_CAPTION = (
 
 
 def fixed_note(facts, page_movesets=1):
-    """The sentence under the panel: which view it is pinned to, and why."""
-    out = ("Stat-product rank against matchups won over every baked shield "
-           "scenario and the whole opponent pool, with PvPoke-default "
-           "opponent IVs at the league cap -- the exact view the line above "
-           "was derived from, so this panel does not follow the scatter's "
-           "dropdowns or the opponent filter.")
+    """The sentence under the panel: which view it is pinned to, and why.
+
+    Round 3 replaced "this panel is inert to the page's dropdowns" with what
+    is now true: the panel HAS a shield control, its own, on the selector row
+    above. The rest of the pinning is unchanged -- PvPoke-default opponent
+    IVs, the league cap, the whole opponent pool -- because those are the
+    view the line was derived on, and the scatter's dropdowns still do not
+    reach in here.
+    """
+    out = ("Stat-product rank against matchups won with PvPoke-default "
+           "opponent IVs at the league cap over the whole opponent pool -- "
+           "the view the line above was derived on. The Shield scenario "
+           "control beside Show: is this section's own; the scatter's "
+           "dropdowns and the opponent filter do not drive this panel.")
     if page_movesets > 1:
         out += (f" This whole section is about "
                 f"{display_moveset(facts['header']['arm_label'])}, which the "
@@ -709,6 +803,196 @@ def _caption_for(view, facts, fields, all_facts=None):
             return cc
         return CLUSTERS_FALLBACK_CAPTION
     return first[0]
+
+
+# ---------------------------------------------------------------------------
+# The Shield scenario control
+# ---------------------------------------------------------------------------
+
+# The "every scenario" entry of the section's own Shield scenario selector.
+# It is the section's default and it is what every sentence outside the panel
+# -- the collapsed summary, the lead, the headline, the evidence -- is about;
+# the control changes the panel, its caption and the rung list note, and
+# nothing else.
+ALL_SCEN = 'all'
+ALL_SCEN_LABEL = 'all'
+
+
+def _axis_value(row):
+    """One threshold's value, two places, no parenthetical."""
+    if row['axis'] == 'hp':
+        return brief._n(row['printed'])
+    return brief.fmt(row['printed'], 2)
+
+
+def _axis_words(row):
+    """'148.10 attack' / '92.68 defense' / '125 HP'."""
+    return f"{_axis_value(row)} {brief.AXIS_WORD[row['axis']]}"
+
+
+def _cell_name(scen, label):
+    """A cell label with its scenario prefix dropped.
+
+    Inside a view that draws ONE shield scenario, "0v1 Annihilape" says the
+    scenario twice: once in the selector the reader just set and once in
+    every legend key under it.
+    """
+    prefix = scen + ' '
+    return label[len(prefix):] if label.startswith(prefix) else label
+
+
+def scen_line_label(scen, row, short=False):
+    """'148.10 (Annihilape)' -- one per-scenario line, for a legend key.
+
+    The axis word rides along only when the axis is NOT attack: every page
+    that has printed a line so far prints an attack one, and a legend of six
+    keys each carrying the same redundant word is six keys of noise. A
+    defense or HP line has to say so, because the x-axis and the hover are
+    both about stat product and nothing else on the panel names the axis.
+    """
+    head = _axis_value(row)
+    if row['axis'] != 'atk':
+        head += ' ' + brief.AXIS_WORD[row['axis']]
+    name = _cell_name(scen, row['names'][0])
+    if short:
+        name = _VARIANT_PAREN.sub('', name)
+    more = row['n_cells'] - 1
+    return f"{head} ({name}{f' +{more}' if more > 0 else ''})"
+
+
+def _decides_sentence(scen, row):
+    """What one per-scenario line decides, in the primitive's own terms."""
+    who = _cell_name(scen, row['names'][0])
+    v = _axis_words(row)
+    if row['kind'] == 'exact':
+        return (f"At or above {v} every spread wins {who} in {scen} shields, "
+                f"and below it none does.")
+    if row['kind'] == 'gate' and row['gate_side'] == 'necessary':
+        return (f"No spread below {v} wins {who} in {scen} shields, and "
+                f"{brief._n(row['n_win_above'])} of the "
+                f"{brief._n(row['n_above'])} spreads at or above it do.")
+    if row['kind'] == 'gate':
+        return (f"Every spread at or above {v} wins {who} in {scen} shields, "
+                f"and {brief._n(row['n_win_below'])} of the "
+                f"{brief._n(row['n_below'])} below it win it as well.")
+    return (f"{v} splits {who} in {scen} shields with "
+            f"{brief._n(row['n_wrong'])} of {brief._n(row['n_above'] + row['n_below'])} "
+            f"spreads on the wrong side of it.")
+
+
+def _no_line_caption(scen, entry, facts):
+    """What the muted grid says when one scenario has no line to draw.
+
+    Two different absences, and they are not the same claim. A DEGENERATE
+    scenario (G-scenario) barely turns over at all, and the counts say so. A
+    scenario with cuts that all sit outside the decision band has rules --
+    they are simply not build decisions, because almost everything or almost
+    nothing clears them -- and the closest one is named with its share so a
+    reader can see which side of the band it missed on.
+    """
+    lo, hi = brief.DECISION_BAND
+    n_iv = int(facts['header']['n_iv'])
+    det = (facts['triage'].get('degenerate_detail') or {}).get(scen)
+    if entry.get('degenerate') and det:
+        head = (f"{scen} shields is degenerate on this grid: "
+                f"{brief._n(det[0])} contested "
+                f"{brief._noun(det[0], 'matchup')} over {brief._n(det[1])} "
+                f"distinct win patterns.")
+    else:
+        head = (f"No single stat threshold in {scen} shields sits in the "
+                f"{brief.pct(lo, 0)}-{brief.pct(hi, 0)} band this section "
+                f"picks a line out of.")
+    c = entry.get('closest')
+    if not c:
+        return head
+    who = _cell_name(scen, c['names'][0])
+    v = _axis_words(c)
+    return (f"{head} The closest rule is {v} ({who}), which "
+            f"{brief._n(c['n_pass'])} of {brief._n(n_iv)} spreads "
+            f"({brief.pct(c['pool_share'])}) clear.")
+
+
+def scenario_caption(view, scen, entry, facts, base=''):
+    """One caption, for one view, with one shield scenario selected.
+
+    ``base`` is the view's all-scenario caption (the brief's own sentence),
+    which two of the views keep: the trade is a whole-grid trade whatever the
+    selector says, so its caption is tagged rather than rewritten.
+    """
+    rows = entry.get('lines') or []
+    if view in ('line', 'rungs') and not rows:
+        return _no_line_caption(scen, entry, facts)
+    if view == 'line':
+        out = _decides_sentence(scen, rows[0])
+        if rows[0]['is_floor']:
+            out += " It is this page's own line."
+        elif len(rows) > 1:
+            out += f" It is the lowest of {brief._n(len(rows))} in {scen} shields."
+        return out
+    if view == 'rungs':
+        if len(rows) == 1:
+            return (_decides_sentence(scen, rows[0])
+                    + f" It is the only line in {scen} shields.")
+        return (f"{brief._n(len(rows))} lines turn a matchup over in {scen} "
+                f"shields, from {_axis_words(rows[0])} up to "
+                f"{_axis_words(rows[-1])}; each spread is colored by the "
+                f"highest one it clears.")
+    if view == 'trade':
+        return f"{base} (all scenarios)"
+    if view == 'clusters':
+        return (f"The Matchup clusters section's own groups for {scen} "
+                f"shields, drawn here on the same axes.")
+    if view == 'rank1':
+        return (f"Every spread on this grid, by stat product rank against "
+                f"its {scen} shields win count.")
+    return base
+
+
+def scenario_payload(facts, pay):
+    """``pay['scen']``: per shield scenario, its lines and its captions.
+
+    Lines are emitted only on a page that HAS a line: the two views that draw
+    them ("the line", "the rungs") exist only there, and a payload carrying
+    groups no view can select is a payload that has to be kept honest for
+    nothing.
+
+    A line costs a label, five numbers and (so far always) an empty
+    exceptions list -- see :func:`rounded_cut`. No per-IV array, packed or
+    otherwise, enters the payload through this control.
+    """
+    base = {v['id']: v['caption'] for v in pay['views']}
+    view_ids = [v['id'] for v in pay['views']]
+    has_floor = facts['floor'] is not None
+    out = {}
+    for scen in facts['header']['scenarios']:
+        entry = (facts.get('scenario_lines') or {}).get(scen) or {
+            'lines': [], 'closest': None, 'degenerate': False}
+        rows = []
+        if has_floor:
+            for row in entry['lines']:
+                sel = facts['_masks']['lines'][line_key(row['axis'], row['T'])]
+                rows.append({
+                    'axis': row['axis'],
+                    'axisWord': brief.AXIS_WORD[row['axis']],
+                    'printed': _axis_value(row),
+                    'n': int(row['n_pass']),
+                    'kind': row['kind'],
+                    'cut': sel['cut'], 'wrong': sel['wrong'],
+                    'isFloor': bool(row['is_floor']),
+                    'label': scen_line_label(scen, row, short=True),
+                    'full': scen_line_label(scen, row)})
+        # The captions are authored against the ENTRY, not against ``rows``:
+        # on a page with no line of its own a scenario can still have one,
+        # and a caption that said "no line here" because this payload drops
+        # the group would be false. The two views that would draw it do not
+        # exist on that page; the caption still never lies about the data.
+        out[scen] = {
+            'lines': rows,
+            'degenerate': bool(entry['degenerate']),
+            'captions': {vid: scenario_caption(vid, scen, entry, facts,
+                                               base.get(vid, ''))
+                         for vid in view_ids}}
+    return out
 
 
 def build_payload(facts, fields, moveset_idx, mode='pvpoke',
@@ -804,6 +1088,15 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke',
             pay['alt'] = {'label': brief.alt_pair_short(alt),
                           'mask': facts['_masks']['alt'],
                           'n': int(alt['n'])}
+    # ---- the section's own Shield scenario control ------------------------
+    # Labels in grid order, from the brief's header, which built them with
+    # the same deep_dive_rendering.scenario_label the page's DATA.
+    # scenarioLabels comes from -- the panel looks a selected label up in
+    # THAT array to get the index it slices the score grid with, so the two
+    # vocabularies cannot drift apart.
+    pay['scenLabels'] = list(facts['header']['scenarios'])
+    pay['band'] = [float(x) for x in brief.DECISION_BAND]
+    pay['scen'] = scenario_payload(facts, pay)
     return pay
 
 
@@ -916,6 +1209,9 @@ CSS = """
 #dd-which-build .wb-spreads { font-size: 0.82rem; color: var(--text-muted);
   margin-left: 8px; }
 #dd-which-build .wb-plotbox { margin: 12px 0; }
+#dd-which-build .wb-controls { display: flex; flex-wrap: wrap;
+  align-items: center; gap: 6px 18px; font-size: 0.85rem; }
+#dd-which-build .wb-controls label { white-space: nowrap; }
 #dd-which-build .wb-panel { height: 400px; min-height: 400px; }
 #dd-which-build .wb-caption { font-size: 0.85rem; color: var(--text-muted);
   margin: 4px 0 0; }
@@ -1019,11 +1315,26 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
         f'<option value="{_esc(v["id"])}"'
         f'{" selected" if i == 0 else ""}>{_esc(v["label"])}</option>'
         for i, v in enumerate(pay['views']))
+    # The section's OWN shield control. It is NOT wired to the scatter's
+    # Shields dropdown in either direction: this panel is the view the line
+    # was derived on, and a reader who narrows it to one shield state is
+    # asking a question about this section, not re-pointing the page.
+    # "all" first and selected, then the nine scenarios in grid order.
+    scen_opts = ''.join(
+        [f'<option value="{ALL_SCEN}" selected>{_esc(ALL_SCEN_LABEL)}'
+         f'</option>']
+        + [f'<option value="{_esc(s)}">{_esc(s)}</option>'
+           for s in pay['scenLabels']])
     parts.append(
         '<div class="wb-plotbox">'
-        '<label style="font-size:0.85rem">Show: '
+        '<div class="wb-controls">'
+        '<label>Show: '
         f'<select class="wb-view" onchange="if(window.wbSelectView)'
         f'wbSelectView(this)">{opts}</select></label>'
+        '<label>Shield scenario: '
+        f'<select class="wb-scen" onchange="if(window.wbSelectView)'
+        f'wbSelectView(this)">{scen_opts}</select></label>'
+        '</div>'
         '<div class="wb-panel"></div>'
         f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
         f'<p class="wb-fixed">{_esc(fixed_note(facts, page_movesets))}</p>'
@@ -1121,6 +1432,16 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
         own.append(fixed_note(facts, page_movesets=2))
         if facts['floor'] is None:
             own.append(summary_sentence(facts, all_facts))
+        # Every caption the Shield scenario control can put under the panel,
+        # for every scenario and every view -- gated whether or not this page
+        # reaches the branch, for the same reason the clusters fallback is:
+        # a gate that fires only on the pages that happen to hit a branch is
+        # a gate that ships the bad string. The trade caption is the brief's
+        # own sentence plus a tag, so only the tag is new; it is cheaper to
+        # gate the whole set than to special-case it.
+        for scen, entry in (facts.get('scenario_lines') or {}).items():
+            for view in ('line', 'rungs', 'clusters', 'rank1'):
+                own.append(scenario_caption(view, scen, entry, facts))
     brief.gate_words(own, ctx)
     brief.gate_caveat(own, ctx)
     return all_facts
