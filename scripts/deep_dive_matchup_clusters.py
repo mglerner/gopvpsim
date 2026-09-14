@@ -774,6 +774,26 @@ def flip_table(W, sharp, wr, stats, is_named):
 # Top-level per-scenario driver
 # ---------------------------------------------------------------------------
 
+def degenerate_finding(wins_lo, wins_hi, nO):
+    """No IV choice moves this shield state, with the numbers behind it.
+
+    Split out of :func:`degenerate_reason` so the dive page's "Which one to
+    build?" section can say the SAME thing in the SAME numbers when its own
+    Shield scenario control lands on a degenerate scenario. Two sections
+    counting one absence two different ways ("2 contested matchups over 3
+    distinct win patterns" here, "1 sharp marginal" there) is two claims a
+    reader has to reconcile, two clicks apart; this is one claim with one
+    source.
+    """
+    if wins_lo == wins_hi:
+        return (f"every spread wins exactly {wins_lo} of {nO} opponents "
+                f"here -- no IV choice changes this shield state")
+    moved = wins_hi - wins_lo
+    return (f"every spread wins {wins_lo}-{wins_hi} of {nO} opponents "
+            f"here, so the IV choice moves at most {moved} "
+            f"{'matchup' if moved == 1 else 'matchups'} in this shield state")
+
+
 def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
     """Why a scenario is below the degeneracy floor, with its own counts.
 
@@ -786,15 +806,7 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
     printing at all; the floor arithmetic that made us stop clustering is
     the explanation that follows it, not the headline.
     """
-    if wins_lo == wins_hi:
-        finding = (f"every spread wins exactly {wins_lo} of {nO} opponents "
-                   f"here -- no IV choice changes this shield state")
-    else:
-        moved = wins_hi - wins_lo
-        finding = (f"every spread wins {wins_lo}-{wins_hi} of {nO} opponents "
-                   f"here, so the IV choice moves at most {moved} "
-                   f"{'matchup' if moved == 1 else 'matchups'} in this "
-                   f"shield state")
+    finding = degenerate_finding(wins_lo, wins_hi, nO)
     subj = ("opponent is a sharp marginal" if n_sharp == 1
             else "opponents are sharp marginals")
     pat = "pattern" if n_patterns == 1 else "patterns"

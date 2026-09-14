@@ -703,12 +703,22 @@ def rung_ramp(n, theme='light'):
     return out
 
 
-def ramp_css(n):
-    """The ``--wb-r*`` custom properties for a page with ``n`` rungs."""
+def ramp_css(n, prefix='r'):
+    """The ``--wb-<prefix>*`` custom properties for a ramp of ``n`` steps.
+
+    TWO ramps ship, not one stretched over both: ``--wb-r*`` is the page's own
+    rung ladder and ``--wb-s*`` is whatever the Shield scenario control draws.
+    A scenario's ladder can be LONGER than the page's (six on Shadow Sableye
+    1v1 against the page's own count), and sizing one shared ramp to the
+    longer of the two would have re-colored every printed rung on the page --
+    a visible change to the default state, to fix a case the default state
+    never reaches. Sized separately, the overflow rungs stop sharing a color
+    and the "all" view is untouched.
+    """
     if n <= 0:
         return ''
     def block(theme, sel):
-        vals = '; '.join(f"--wb-r{k}: {c}"
+        vals = '; '.join(f"--wb-{prefix}{k}: {c}"
                          for k, c in enumerate(rung_ramp(n, theme)))
         return f"{sel} {{ {vals}; }}\n"
     return (block('light', f"#{SECTION_ID}")
@@ -753,10 +763,11 @@ def fixed_note(facts, page_movesets=1):
     reach in here.
     """
     out = ("Stat-product rank against matchups won with PvPoke-default "
-           "opponent IVs at the league cap over the whole opponent pool -- "
-           "the view the line above was derived on. The Shield scenario "
-           "control beside Show: is this section's own; the scatter's "
-           "dropdowns and the opponent filter do not drive this panel.")
+           "opponent IVs at the league cap over the whole opponent pool and, "
+           "with Shield scenario on all, every baked shield state -- the view "
+           "the line above was derived on. The Shield scenario selector on "
+           "this row is the section's own; the scatter's dropdowns and the "
+           "opponent filter do not drive this panel.")
     if page_movesets > 1:
         out += (f" This whole section is about "
                 f"{display_moveset(facts['header']['arm_label'])}, which the "
@@ -860,56 +871,177 @@ def scen_line_label(scen, row, short=False):
     return f"{head} ({name}{f' +{more}' if more > 0 else ''})"
 
 
-def _decides_sentence(scen, row):
-    """What one per-scenario line decides, in the primitive's own terms."""
+def _decides_sentence(scen, row, where=None):
+    """What one per-scenario line decides, in the primitive's own terms.
+
+    ``where`` drops the "in 0v0 shields" phrase (pass ``''``) for a caller
+    that has just named the shield state in the clause before it.
+    """
     who = _cell_name(scen, row['names'][0])
     v = _axis_words(row)
+    w = f" in {scen} shields" if where is None else where
     if row['kind'] == 'exact':
-        return (f"At or above {v} every spread wins {who} in {scen} shields, "
+        return (f"At or above {v} every spread wins {who}{w}, "
                 f"and below it none does.")
     if row['kind'] == 'gate' and row['gate_side'] == 'necessary':
-        return (f"No spread below {v} wins {who} in {scen} shields, and "
+        return (f"No spread below {v} wins {who}{w}, and "
                 f"{brief._n(row['n_win_above'])} of the "
                 f"{brief._n(row['n_above'])} spreads at or above it do.")
     if row['kind'] == 'gate':
-        return (f"Every spread at or above {v} wins {who} in {scen} shields, "
+        return (f"Every spread at or above {v} wins {who}{w}, "
                 f"and {brief._n(row['n_win_below'])} of the "
                 f"{brief._n(row['n_below'])} below it win it as well.")
-    return (f"{v} splits {who} in {scen} shields with "
+    return (f"{v} splits {who}{w} with "
             f"{brief._n(row['n_wrong'])} of {brief._n(row['n_above'] + row['n_below'])} "
             f"spreads on the wrong side of it.")
 
 
+# A per-scenario line is a WEAKER claim than the page's own: it is a real cut
+# in a real cell, but stage 6's cross-setting gates never ran on it. Nothing
+# else on the panel says so, and "at or above X every spread wins Y" reads
+# exactly as strong as the printed line's own sentence. One clause, once per
+# caption, stating the scope rather than apologising for it.
+SCOPE_CLAUSE = ("Unlike this page's line, a scenario line is not checked "
+                "against the other baked opponent-IV settings.")
+
+
+def _degeneracy_finding(entry):
+    """The Matchup clusters section's OWN sentence about a dead scenario.
+
+    Imported rather than rewritten. The section used to state this absence in
+    the brief's counts ("2 contested matchups over 3 distinct win patterns")
+    while the clusters view of the SAME shield state stated it in the clusters
+    section's ("1 opponent is a sharp marginal"), and a reader flipping Show:
+    met two different numbers for what reads as one quantity, neither defined
+    where it was printed. One claim, one source, one set of numbers.
+    """
+    return brief.clusters.degenerate_finding(
+        int(entry['win_lo']), int(entry['win_hi']), int(entry['n_opp']))
+
+
+def _degeneracy_tail(scen, entry):
+    """The degeneracy note beside a line, when the scenario has both.
+
+    G-scenario is a hard exclusion for the PAGE's line, and it is not applied
+    to a scenario line -- so a shield state where the IV choice moves three
+    matchups can still carry an in-band cut, and did (Melmetal 2v0). Stating
+    the cut without the scale reads as "this threshold matters here"; the
+    clusters view of the same state says the opposite two clicks away.
+    """
+    if not entry.get('degenerate'):
+        return ''
+    return (f" In {scen} shields little turns on IVs at all: "
+            f"{_degeneracy_finding(entry)}.")
+
+
+def _scope_tail(rows, off):
+    """The scope clause, unless every line drawn IS the page's own."""
+    if off or any(not r['is_floor'] for r in rows):
+        return ' ' + SCOPE_CLAUSE
+    return ''
+
+
+def _off_axis_sentence(scen, off):
+    """The in-band thresholds this scenario carries on the OTHER stats.
+
+    They are named and they are not drawn. A ladder is a nesting claim --
+    every clearer of a rung clears the rungs below it -- and across axes that
+    is simply false: on Sableye GL 1v1, 1295 spreads clear the 123.92 attack
+    line and miss the 119.55 defense one, and 1288 the reverse. Ranked into
+    one ramp they were colored "by the highest line cleared" under a grey key
+    reading "Below 119.55 defense", which mis-described a quarter of the grid.
+    """
+    if not off:
+        return ''
+    if len(off) == 1:
+        o = off[0]
+        return (f" {_decides_sentence(scen, o)} That is a "
+                f"{brief.AXIS_WORD[o['axis']]} line, not a rung of this "
+                f"ladder.")
+    body = ' '.join(_decides_sentence(scen, o) for o in off)
+    return (f" {body} Those are {brief._n(len(off))} thresholds on the other "
+            f"stats, not rungs of this ladder.")
+
+
 def _no_line_caption(scen, entry, facts):
-    """What the muted grid says when one scenario has no line to draw.
+    """What the muted grid says when one scenario has no ladder to draw.
 
     Two different absences, and they are not the same claim. A DEGENERATE
-    scenario (G-scenario) barely turns over at all, and the counts say so. A
-    scenario with cuts that all sit outside the decision band has rules --
-    they are simply not build decisions, because almost everything or almost
-    nothing clears them -- and the closest one is named with its share so a
-    reader can see which side of the band it missed on.
+    scenario (G-scenario) barely turns over at all, and it says so in the
+    Matchup clusters section's own words and numbers. A scenario with cuts
+    that all sit outside the decision band has rules -- they are simply not
+    build decisions, because almost everything or almost nothing clears them
+    -- and the nearest one is named with its share AND with which side of the
+    band it missed on, so the number is not doing all the work.
     """
     lo, hi = brief.DECISION_BAND
     n_iv = int(facts['header']['n_iv'])
-    det = (facts['triage'].get('degenerate_detail') or {}).get(scen)
-    if entry.get('degenerate') and det:
-        head = (f"{scen} shields is degenerate on this grid: "
-                f"{brief._n(det[0])} contested "
-                f"{brief._noun(det[0], 'matchup')} over {brief._n(det[1])} "
-                f"distinct win patterns.")
-    else:
-        head = (f"No single stat threshold in {scen} shields sits in the "
-                f"{brief.pct(lo, 0)}-{brief.pct(hi, 0)} band this section "
-                f"picks a line out of.")
+    if entry.get('degenerate'):
+        # No "closest rule" here on purpose: the finding is that nothing
+        # moves, and naming a threshold under it tells the reader there is
+        # something to reach for.
+        return (f"In {scen} shields little turns on IVs at all: "
+                f"{_degeneracy_finding(entry)}. There is no line to "
+                f"draw.")
+    head = (f"No attack, defense or HP threshold in {scen} shields splits "
+            f"between {brief.pct(lo, 0)} and {brief.pct(hi, 0)} of the grid, "
+            f"which is the range a line has to sit in to be a build "
+            f"decision.")
     c = entry.get('closest')
-    if not c:
+    # A cut every spread clears (or none does) is not a rule a reader can act
+    # on; stage 13 drops those, and this is the belt to that braces.
+    if not c or not (0 < int(c['n_pass']) < n_iv):
         return head
     who = _cell_name(scen, c['names'][0])
-    v = _axis_words(c)
-    return (f"{head} The closest rule is {v} ({who}), which "
+    share = float(c['pool_share'])
+    if c.get('dirty') and lo <= share <= hi:
+        tail = (f"but {brief._n(c['n_wrong'])} spreads fall on the wrong "
+                f"side of it")
+    elif share > hi:
+        tail = 'too much of the grid for that to be a build decision'
+    else:
+        tail = 'too little of the grid for that to be a build decision'
+    return (f"{head} The nearest, {_axis_words(c)} ({who}), is cleared by "
             f"{brief._n(c['n_pass'])} of {brief._n(n_iv)} spreads "
-            f"({brief.pct(c['pool_share'])}) clear.")
+            f"({brief.pct(share)}) -- {tail}.")
+
+
+def _rungs_head(scen, rows):
+    """'4 attack thresholds each turn a matchup over in 1v1 shields, from ...'
+
+    The primitives are counted rather than flattened: a one-sided gate does
+    not turn a matchup over, and the multi-line caption used to say every
+    line on the ladder did.
+    """
+    aw = brief.AXIS_WORD[rows[0]['axis']]
+    kinds = [r['kind'] for r in rows]
+    n_ex = kinds.count('exact')
+    if n_ex == len(rows):
+        head = (f"{brief._n(len(rows))} {aw} thresholds each turn a matchup "
+                f"over in {scen} shields")
+    else:
+        n_gate = kinds.count('gate')
+        n_ne = kinds.count('near_exact')
+        if n_gate == len(rows):
+            note = 'all one-sided'
+        elif n_ne == len(rows):
+            note = 'all near-exact'
+        else:
+            bits = []
+            if n_ex:
+                bits.append(f"{brief._n(n_ex)} outright")
+            if n_gate:
+                bits.append(f"{brief._n(n_gate)} in one direction only")
+            if n_ne:
+                bits.append(f"{brief._n(n_ne)} with spreads on the wrong side")
+            note = ', '.join(bits)
+        head = (f"{brief._n(len(rows))} {aw} thresholds each decide a matchup "
+                f"in {scen} shields ({note})")
+    return (f"{head}, from {_axis_value(rows[0])} "
+            f"({_cell_name(scen, rows[0]['names'][0])}) up to "
+            f"{_axis_value(rows[-1])} "
+            f"({_cell_name(scen, rows[-1]['names'][0])}); each spread is "
+            f"colored by the highest it clears.")
 
 
 def scenario_caption(view, scen, entry, facts, base=''):
@@ -917,34 +1049,61 @@ def scenario_caption(view, scen, entry, facts, base=''):
 
     ``base`` is the view's all-scenario caption (the brief's own sentence),
     which two of the views keep: the trade is a whole-grid trade whatever the
-    selector says, so its caption is tagged rather than rewritten.
+    selector says, so its caption is extended rather than rewritten.
     """
     rows = entry.get('lines') or []
+    off = entry.get('off_axis') or []
     if view in ('line', 'rungs') and not rows:
         return _no_line_caption(scen, entry, facts)
     if view == 'line':
         out = _decides_sentence(scen, rows[0])
+        if len(rows) > 1:
+            out += (f" It is the lowest of {brief._n(len(rows))} "
+                    f"{brief.AXIS_WORD[rows[0]['axis']]} lines in {scen} "
+                    f"shields.")
         if rows[0]['is_floor']:
-            out += " It is this page's own line."
-        elif len(rows) > 1:
-            out += f" It is the lowest of {brief._n(len(rows))} in {scen} shields."
-        return out
+            # A statement about the SET, not about the cell. The same value
+            # can be the page's line and be owned in THIS scenario by a
+            # different opponent (0v0 Marowak against 0v1 Annihilape on
+            # Sableye GL), and "it is this page's own line" then read as a
+            # claim about the cell that the evidence table contradicts.
+            out += (f" These are the same {brief._n(rows[0]['n_pass'])} "
+                    f"spreads as this page's line.")
+        return (out + _off_axis_sentence(scen, off)
+                + _degeneracy_tail(scen, entry) + _scope_tail(rows, off))
     if view == 'rungs':
         if len(rows) == 1:
-            return (_decides_sentence(scen, rows[0])
-                    + f" It is the only line in {scen} shields.")
-        return (f"{brief._n(len(rows))} lines turn a matchup over in {scen} "
-                f"shields, from {_axis_words(rows[0])} up to "
-                f"{_axis_words(rows[-1])}; each spread is colored by the "
-                f"highest one it clears.")
+            out = (_decides_sentence(scen, rows[0])
+                   + f" It is the only "
+                     f"{brief.AXIS_WORD[rows[0]['axis']]} line in {scen} "
+                     f"shields.")
+        else:
+            out = _rungs_head(scen, rows)
+        return (out + _off_axis_sentence(scen, off)
+                + _degeneracy_tail(scen, entry) + _scope_tail(rows, off))
     if view == 'trade':
-        return f"{base} (all scenarios)"
+        return (f"{base} Counted over every shield scenario; the y-axis here "
+                f"is {scen} wins only.")
     if view == 'clusters':
         return (f"The Matchup clusters section's own groups for {scen} "
                 f"shields, drawn here on the same axes.")
     if view == 'rank1':
-        return (f"Every spread on this grid, by stat product rank against "
-                f"its {scen} shields win count.")
+        out = (f"Every spread on this grid, by stat product rank against "
+               f"its {scen} shields win count.")
+        # A NEGATIVE page offers neither threshold view, so a shield state
+        # that does carry a line of its own had nowhere to say so -- and this
+        # is the page whose reader most wants to know ("is there really
+        # nothing, even in one shield state?").
+        if facts['floor'] is None and rows:
+            said = _decides_sentence(scen, rows[0], where='')
+            out += (f" {scen} shields does carry a threshold of its own: "
+                    f"{said[0].lower()}{said[1:]}"
+                    f"{_off_axis_sentence(scen, off)}"
+                    f"{_degeneracy_tail(scen, entry)} It is not this page's "
+                    f"line: a line has to hold across the other baked "
+                    f"opponent-IV settings as well, and this one is not "
+                    f"checked against them.")
+        return out
     return base
 
 
@@ -966,7 +1125,9 @@ def scenario_payload(facts, pay):
     out = {}
     for scen in facts['header']['scenarios']:
         entry = (facts.get('scenario_lines') or {}).get(scen) or {
-            'lines': [], 'closest': None, 'degenerate': False}
+            'lines': [], 'off_axis': [], 'closest': None,
+            'degenerate': False, 'win_lo': 0, 'win_hi': 0,
+            'n_opp': int(facts['header']['pool_size'])}
         rows = []
         if has_floor:
             for row in entry['lines']:
@@ -1097,6 +1258,13 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke',
     pay['scenLabels'] = list(facts['header']['scenarios'])
     pay['band'] = [float(x) for x in brief.DECISION_BAND]
     pay['scen'] = scenario_payload(facts, pay)
+    # The scenario ladder's own ramp, sized to the longest ladder the control
+    # can select. See ramp_css: the page's --wb-r* ramp stays sized to the
+    # page's own rungs, so the default view does not move.
+    pay['nScenRamp'] = max([len(e['lines']) for e in pay['scen'].values()]
+                           + [0])
+    if pay['nScenRamp']:
+        pay['scenColors'] = rung_ramp(pay['nScenRamp'], 'light')
     return pay
 
 
@@ -1270,7 +1438,8 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
     # A literal space after the title, not the 6px CSS margin alone: copy /
     # paste, a screen reader and the stripped-text tests all read the two
     # runs with nothing between them ("build?Most Sableye").
-    parts = [f'<style>{CSS}{ramp_css(len(pay["rungs"]))}</style>',
+    parts = [f'<style>{CSS}{ramp_css(len(pay["rungs"]))}'
+             f'{ramp_css(pay.get("nScenRamp", 0), "s")}</style>',
              f'<details class="wb-root" id="{SECTION_ID}">',
              f'<summary class="wb-summary"><b>{_esc(SECTION_TITLE)}</b> '
              f'<span class="wb-head">'

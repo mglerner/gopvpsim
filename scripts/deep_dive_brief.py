@@ -2291,7 +2291,7 @@ def near_floor_rule(floor_rung, floor_cell, floor_rungs, atk):
 # ---------------------------------------------------------------------------
 
 def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
-                   n_iv, floor_rung, band=DECISION_BAND):
+                   n_iv, floor_rung, floor_axis=None, band=DECISION_BAND):
     """Per shield scenario: the in-band lines, and the closest rule if none.
 
     ``pool`` is ``cuts_claimed + prims_claimed`` -- the SAME exact / gate /
@@ -2304,10 +2304,24 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
 
     Returned per scenario label:
 
-    - ``lines``: the values inside ``band``, ascending, cells at the same
-      value merged (a value is a build target; the cells sharing it need not
-      share a cause, so each carries its own name list). The page's own line
-      is included when its cell sits in this scenario, whatever its share.
+    - ``lines``: the values inside ``band`` ON ONE AXIS, ascending, cells at
+      the same value merged (a value is a build target; the cells sharing it
+      need not share a cause, so each carries its own name list). The page's
+      own line is included when its cell sits in this scenario, whatever its
+      share.
+    - ``off_axis``: the in-band values this scenario carries on the OTHER
+      two stats. They are real thresholds and they are named, but they are
+      not rungs of ``lines``: "at or above X you clear the rung above" is a
+      nesting claim, and ``atk >= 123.92`` and ``def >= 119.55`` do not nest
+      in either direction (on Sableye GL 1v1, 1295 spreads clear the attack
+      line and miss the defense one, and 1288 the reverse). Ranking them
+      together as one ladder, coloring by "the highest cleared" and printing
+      one grey "below" key would be false for a quarter of the grid.
+    - ``win_lo`` / ``win_hi`` / ``n_opp``: this scenario's win-count range
+      over the whole grid, which is the same measurement the Matchup
+      clusters section states a degenerate scenario in (see
+      :func:`deep_dive_matchup_clusters.degenerate_finding`), so the two
+      sections say one absence in one set of numbers.
     - ``closest``: what to name when ``lines`` is empty. The nearest cut in
       this scenario to the band, with its share -- or, when the scenario has
       no cut at all, the dirty-threshold row for it (stage 12b, top 1), which
@@ -2319,6 +2333,7 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
     the rest of the brief already read.
     """
     n_sc = len(state['shield_scenarios'])
+    n_opp = win.shape[2]
     by_scen = {si: [] for si in range(n_sc)}
     for c in pool:
         by_scen[c['si']].append(c)
@@ -2340,8 +2355,14 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
                            for c in cells)
             if not (band[0] <= share <= band[1]) and not is_floor:
                 continue
+            # The REP carries the claim (its primitive, its gate side and its
+            # counts are what the caption prints), so it has to carry the
+            # NAME too. Taking the name from cells[0] -- pool insertion order
+            # -- prints one cell's claim under another cell's name the moment
+            # a group mixes primitives without an exact cut in it.
             rep = sorted(cells, key=lambda x: PRIMITIVE_RANK[x['kind']])[0]
-            names = [c['label'] for c in cells]
+            names = ([rep['label']]
+                     + [c['label'] for c in cells if c is not rep])
             pr, dp = printed_cut(rep['T'], planes[axis],
                                  field='Scenario line', ctx={'cell': names[0]})
             lines.append({
@@ -2356,6 +2377,7 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
                 'names': names[:NAME_CAP], 'omitted': max(0, len(names) - NAME_CAP),
                 'n_cells': len(names), 'is_floor': bool(is_floor)})
         lines.sort(key=lambda r: (r['T'], r['axis']))
+        lines, off_axis = _split_by_axis(lines, floor_axis)
         closest = None
         if not lines:
             closest = _closest_rule(by_scen[si], planes, n_iv, band)
@@ -2378,9 +2400,44 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
                            'n_wrong': int(d['n_wrong']), 'names': [d['cell']],
                            'kind': ('gate' if d['one_sided'] else
                                     'near_exact' if d['near_exact'] else None)}
-        out[label] = {'lines': lines, 'closest': closest,
+        tot = win[:, si, :].sum(axis=1)
+        out[label] = {'lines': lines, 'off_axis': off_axis,
+                      'closest': closest,
+                      'win_lo': int(tot.min()), 'win_hi': int(tot.max()),
+                      'n_opp': int(n_opp),
                       'degenerate': bool(triage['degenerate'][si])}
     return out
+
+
+# The axis a scenario's ladder is drawn on, when its in-band values are split
+# over more than one stat. The page's own axis wins when the page's own line
+# is one of them (the panel must not draw the printed line as an also-ran);
+# otherwise the axis carrying the most values, which is the one whose ladder
+# says the most.
+_AXIS_DRAW_ORDER = ('atk', 'def', 'hp')
+
+
+def _split_by_axis(lines, floor_axis):
+    """One scenario's in-band values, split into a ladder and the rest.
+
+    A ladder is a NESTING claim: same axis, ascending, every clearer of a
+    rung a clearer of the rungs below it. Across axes that is simply false,
+    so the off-axis values come back separately for the caption to state as
+    their own claims rather than being ranked into the ramp.
+    """
+    if not lines:
+        return [], []
+    primary = next((r['axis'] for r in lines if r['is_floor']), None)
+    if primary is None:
+        counts = {}
+        for r in lines:
+            counts[r['axis']] = counts.get(r['axis'], 0) + 1
+        primary = sorted(
+            counts,
+            key=lambda a: (-counts[a], 0 if a == floor_axis else 1,
+                           _AXIS_DRAW_ORDER.index(a)))[0]
+    return ([r for r in lines if r['axis'] == primary],
+            [r for r in lines if r['axis'] != primary])
 
 
 def _closest_rule(cells, planes, n_iv, band):
@@ -2389,14 +2446,29 @@ def _closest_rule(cells, planes, n_iv, band):
     "Nearest" is distance from the band on POOL SHARE, which is the axis the
     band is stated on: a cut 87% of the grid already clears and a cut 14% of
     it reaches are both outside, and the page has to say which side it missed
-    on. Ties go to the stronger primitive, then to the lower value.
+    on.
+
+    A cut EVERY spread clears (or none does) is dropped rather than ranked. It
+    is not a rule a reader can act on -- nobody is on the other side of it --
+    and naming it under "the closest rule" told the reader there was something
+    there when there was not ("92.68 defense (Moltres (Galarian)), which 4096
+    of 4096 spreads (100.0%) clear"). When that empties the candidate list the
+    caller falls through to the dirty-threshold row, which is the same thing
+    the negative page prints.
+
+    Ties go to the stronger primitive, then to a FIXED axis order, then to the
+    lower value. The axis order matters: ranking a tie by raw ``T`` compares
+    numbers on incommensurable scales, so a defense cut (two-digit) beat an
+    attack cut (three-digit) on magnitude alone, every time.
     """
+    cells = [c for c in cells if 0 < c['n_pass'] < n_iv]
     if not cells:
         return None
     def gap(c):
         share = c['n_pass'] / n_iv
         return max(band[0] - share, share - band[1], 0.0)
     rep = sorted(cells, key=lambda c: (gap(c), PRIMITIVE_RANK[c['kind']],
+                                       _AXIS_DRAW_ORDER.index(c['axis']),
                                        c['T']))[0]
     share = rep['n_pass'] / n_iv
     pr, dp = printed_cut(rep['T'], planes[rep['axis']],
@@ -2663,7 +2735,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
     # implementation of stages 1-4.
     scen_lines = scenario_lines(cuts_claimed + prims_claimed, win, planes,
                                 triage, contested_cells, ranks, state, n_iv,
-                                floor_rung)
+                                floor_rung, floor_axis)
     cmp_near_misses = [c['label'] for c in cuts
                        if c['mech'].get('cmp_near_miss')]
 
@@ -2980,6 +3052,17 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
             for r in floor_rung.get('merged_from', [])],
         'merge_tol': MERGE_SPREAD_TOL,
     }
+    # ONE threshold, ONE number on the page. Stage 7 escalates the FLOOR to
+    # three places when two cannot select its set, and the headline speaks it
+    # that way ("123.42 (123.419)"). Stage 13 printed the same T freshly, got
+    # "123.41" at two places, and the panel then disagreed with the paragraph
+    # above it about the value of the line they both describe. The floor's own
+    # rendering wins wherever a scenario line IS the floor. (Post-hoc rather
+    # than inside stage 13: ``pp`` is computed here, well after the ladder.)
+    for _entry in (facts.get('scenario_lines') or {}).values():
+        for _row in _entry['lines'] + _entry['off_axis']:
+            if _row['is_floor']:
+                _row['printed'], _row['dp'] = pp['printed'], pp['dp']
     _catch = catch_model(floor_mask, meta, facts['acquisition'])
     facts['catch'] = _catch.pop('rows')
     facts['catch_model'] = _catch

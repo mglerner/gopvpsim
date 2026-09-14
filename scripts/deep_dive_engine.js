@@ -4559,13 +4559,25 @@ function _wbColors(root, pay) {
     var got = cs.getPropertyValue('--wb-r' + k).trim();
     ramp.push(got || fb[k] || WB_FALLBACK['--wb-line']);
   }
+  // The SCENARIO ladder's own ramp (--wb-s*), sized server-side to the
+  // longest ladder the Shield scenario control can select. It is separate
+  // from --wb-r* because a scenario's ladder can be longer than the page's
+  // own: read off the page ramp, its overflow rungs fell back to one color
+  // and two steps of the encoding became indistinguishable.
+  var sramp = [], sfb = (pay && pay.scenColors) || [];
+  var nS = (pay && pay.nScenRamp) || 0;
+  for (var k2 = 0; k2 < nS; k2++) {
+    var got2 = cs.getPropertyValue('--wb-s' + k2).trim();
+    sramp.push(got2 || sfb[k2] || WB_FALLBACK['--wb-line']);
+  }
   return {
     line: v('--wb-line'),
     below: v('--wb-below'),
     alt: v('--wb-alt'),
     mark1: v('--wb-mark1'),
     mark2: v('--wb-mark2'),
-    rungs: ramp
+    rungs: ramp,
+    scenRungs: sramp
   };
 }
 
@@ -4744,7 +4756,8 @@ function _wbGroups(pay, view, L, wins, colors, scen, den) {
     var sts = use.map(function(r, k) {
       return _wbTrace((use.length === 1 ? 'At or above ' : '') + r.label,
                       (use.length === 1 ? colors.line
-                                        : (colors.rungs[k] || colors.line)),
+                                        : (colors.scenRungs[k] ||
+                                           colors.rungs[k] || colors.line)),
                       'circle', 4);
     });
     for (i = 0; i < n; i++) {
@@ -4854,8 +4867,7 @@ function _wbGroups(pay, view, L, wins, colors, scen, den) {
     // the labels describe what is on screen exactly when the two agree --
     // which is NOT _mcLabelsApply()'s question (that one tracks the scatter's
     // live dropdowns, and this panel deliberately ignores them).
-    var mcApplies = mcPay && pay.mi === 0 &&
-                    (!DATA.oppIvModes || pay.mode === DATA.oppIvModes[0]);
+    var mcApplies = _wbMcApplies(pay, mcPay);
     if (!mcApplies || !mcPay.scens) return { traces: [], missing: true };
     // With the section's Shield scenario control set, the view draws THAT
     // scenario's clusters -- the clusters payload carries every scenario it
@@ -4937,6 +4949,16 @@ function _wbClusterSides(sc, L) {
     });
   }
   return out;
+}
+
+// Do the Matchup clusters section's baked labels describe what THIS panel is
+// drawing? That section bakes for moveset 0 at the default opponent-IV mode,
+// and the panel is pinned to its own moveset and mode. Shared by the view
+// (which draws nothing when they disagree) and by the caption (which must not
+// then describe groups the reader cannot see).
+function _wbMcApplies(pay, mcPay) {
+  return !!(mcPay && pay.mi === 0 &&
+            (!DATA.oppIvModes || pay.mode === DATA.oppIvModes[0]));
 }
 
 // Your pasted collection, on this panel, in every view -- same gold star the
@@ -5041,14 +5063,23 @@ function wbRenderRoot(root) {
   // views say their side of the line actually drawn.
   var line = (view === 'trade') ? _wbActiveLine(pay, null)
                                 : _wbActiveLine(pay, scen);
-  // A scenario with no line of its own draws a muted grid, and the example
-  // spreads are all named for where they sit relative to the PAGE's line
-  // ("highest stat product above the line") -- six inches under a caption
-  // saying this shield state has no line, those keys read as a claim about
-  // it. Rank-1 stays: it is the spread a reader already owns and its key
-  // makes no claim about any line.
-  var muted = !!(scen && (view === 'line' || view === 'rungs') && !line);
-  var noLine = scen ? ('no line in ' + scen.label + ' shields')
+  // The example spreads are named for where they sit relative to the PAGE's
+  // line ("highest stat product above the line", "bulkiest above the line"),
+  // and under a single shield scenario these two views draw a DIFFERENT line.
+  // Both halves of that are wrong on screen: on a scenario with no line the
+  // keys claim one exists, and on a scenario WITH one the marker is plotted
+  // inside the "Below <scenario line>" group while its own key says "above
+  // the line" -- the contradiction is visible in the plot. So the examples
+  // are dropped for any single scenario on the threshold views. Rank-1 stays:
+  // it is the spread a reader already owns and its key makes no claim about
+  // any line.
+  var hideExamples = !!(scen && (view === 'line' || view === 'rungs'));
+  // Whose absence it is. On a page with NO line the emptiness is a property
+  // of the page, not of the selected shield state (which may well carry a
+  // threshold of its own -- the rank-1 caption says so), and the collection
+  // overlay must not assert otherwise.
+  var noLine = (scen && pay.hasFloor)
+                    ? ('no line in ' + scen.label + ' shields')
                     : 'no line on this page';
   if (pay.hasFloor && (view === 'line' || view === 'rungs' || view === 'trade')) {
     var r1i = _wbIvIdx(pay.rank1.iv);
@@ -5059,7 +5090,7 @@ function wbRenderRoot(root) {
                            L, wins, 'the stat-product rank-1 spread; ' +
                            (line ? _wbSideAt(L, line, r1i) : noLine), den);
     if (r1t) traces.push(r1t);
-    for (var e = 0; muted ? false : e < pay.examples.length; e++) {
+    for (var e = 0; hideExamples ? false : e < pay.examples.length; e++) {
       var ei = _wbIvIdx(pay.examples[e].iv);
       // The reader label, not the brief's selection rule: the rules are
       // written in the audit's vocabulary ("most cells won among clearers
@@ -5071,7 +5102,7 @@ function wbRenderRoot(root) {
                             elabel + '; ' + _wbSideAt(L, line, ei), den);
       if (et) traces.push(et);
     }
-    if (pay.bestAbove && !muted) {
+    if (pay.bestAbove && !hideExamples) {
       var bi = _wbIvIdx(pay.bestAbove.iv);
       var bt = _wbMarkTrace(_wbIvStr(bi) + ': ' + pay.bestAbove.label, bi,
                             colors.mark2, 'triangle-down', L, wins,
@@ -5151,9 +5182,35 @@ function wbRenderRoot(root) {
     // same absence.
     if (scen && view === 'clusters') {
       var mcP = _mcPayloadPage();
-      if (mcP && !(mcP.scens && mcP.scens[scen.label])) {
+      var msc = _wbMcApplies(pay, mcP) && mcP.scens && mcP.scens[scen.label];
+      if (_wbMcApplies(pay, mcP) && !msc) {
         var dg = mcP.degenerate && mcP.degenerate[scen.label];
         if (dg) capText = (dg.display || scen.label) + ': ' + dg.reason + '.';
+      } else if (msc) {
+        // The all-scenario clusters caption is a FINDING (K, silhouette,
+        // where the split lands against the printed line); the per-scenario
+        // one was a pointer. The clusters payload carries that scenario's own
+        // K and its depth-1 split as a Python-formatted string, so the
+        // per-scenario caption can say the same kind of thing without this
+        // file formatting a threshold.
+        // `display` is the clusters section's own spelling and ALREADY
+        // carries the word ("0v1 shields"); only the bare label needs it.
+        capText = "The Matchup clusters section's own groups for " +
+          (msc.display || (scen.label + ' shields')) + ": " + msc.k +
+          " groups" + (msc.split ? ", split at " + msc.split : "") +
+          ", drawn here on the same axes.";
+      }
+    }
+    // The one number a rank-1 caption can add client-side, and the one the
+    // negative page's reader is actually after: what rank-1 wins in THIS
+    // shield state, and whether anything beats it.
+    if (scen && view === 'rank1') {
+      var r1x = _wbIvIdx(pay.rank1.iv), best = -1;
+      for (var q = 0; q < wins.length; q++) if (wins[q] > best) best = wins[q];
+      if (r1x >= 0) {
+        capText += ' In ' + scen.label + ' shields the stat-product rank-1 ' +
+          'spread wins ' + wins[r1x] + ' of ' + den +
+          ', and the most any spread wins is ' + best + '.';
       }
     }
     cap.textContent = capText;
