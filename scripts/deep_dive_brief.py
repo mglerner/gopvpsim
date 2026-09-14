@@ -2286,6 +2286,128 @@ def near_floor_rule(floor_rung, floor_cell, floor_rungs, atk):
             'modes_fail': list(c['holds']['modes_fail'])}
 
 
+# ---------------------------------------------------------------------------
+# Stage 13 -- the ladder, one shield scenario at a time
+# ---------------------------------------------------------------------------
+
+def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
+                   n_iv, floor_rung, band=DECISION_BAND):
+    """Per shield scenario: the in-band lines, and the closest rule if none.
+
+    ``pool`` is ``cuts_claimed + prims_claimed`` -- the SAME exact / gate /
+    near-exact ladder on all three axes that stage 6 selects the page's line
+    out of, before the band and the gates narrow it to one value. The dive
+    page's "Which one to build?" section has its own Shield scenario control,
+    and that control asks a narrower question than the page's line does
+    ("what turns over in 1v1 alone"), so it re-partitions this pool by
+    scenario rather than deriving anything new.
+
+    Returned per scenario label:
+
+    - ``lines``: the values inside ``band``, ascending, cells at the same
+      value merged (a value is a build target; the cells sharing it need not
+      share a cause, so each carries its own name list). The page's own line
+      is included when its cell sits in this scenario, whatever its share.
+    - ``closest``: what to name when ``lines`` is empty. The nearest cut in
+      this scenario to the band, with its share -- or, when the scenario has
+      no cut at all, the dirty-threshold row for it (stage 12b, top 1), which
+      is the same thing the negative page prints.
+    - ``degenerate``: G-scenario's own verdict for this scenario, so a caller
+      can say "too little turns over here" rather than "no line".
+
+    Nothing here is a new measurement: every number is a count off the cube
+    the rest of the brief already read.
+    """
+    n_sc = len(state['shield_scenarios'])
+    by_scen = {si: [] for si in range(n_sc)}
+    for c in pool:
+        by_scen[c['si']].append(c)
+    floor_cells = set()
+    if floor_rung is not None:
+        floor_cells = {(c['si'], c['oi']) for c in floor_rung['cells']}
+    out = {}
+    for si in range(n_sc):
+        label = scenario_label(state, si)
+        groups = {}
+        for c in by_scen[si]:
+            groups.setdefault((c['axis'], round(float(c['T']), 9)), []).append(c)
+        lines = []
+        for (axis, _key), cells in groups.items():
+            share = cells[0]['n_pass'] / n_iv
+            is_floor = any((c['si'], c['oi']) in floor_cells
+                           and floor_rung is not None
+                           and abs(c['T'] - floor_rung['T']) <= 1e-9
+                           for c in cells)
+            if not (band[0] <= share <= band[1]) and not is_floor:
+                continue
+            rep = sorted(cells, key=lambda x: PRIMITIVE_RANK[x['kind']])[0]
+            names = [c['label'] for c in cells]
+            pr, dp = printed_cut(rep['T'], planes[axis],
+                                 field='Scenario line', ctx={'cell': names[0]})
+            lines.append({
+                'axis': axis, 'T': float(rep['T']), 'printed': pr, 'dp': dp,
+                'n_pass': int(rep['n_pass']), 'pool_share': float(share),
+                'kind': rep['kind'], 'gate_side': rep['gate_side'],
+                'n_above': int(rep['n_above']),
+                'n_win_above': int(rep['n_win_above']),
+                'n_below': int(rep['n_below']),
+                'n_win_below': int(rep['n_win_below']),
+                'n_wrong': int(rep['n_wrong']),
+                'names': names[:NAME_CAP], 'omitted': max(0, len(names) - NAME_CAP),
+                'n_cells': len(names), 'is_floor': bool(is_floor)})
+        lines.sort(key=lambda r: (r['T'], r['axis']))
+        closest = None
+        if not lines:
+            closest = _closest_rule(by_scen[si], planes, n_iv, band)
+        if closest is None and not lines:
+            cells_here = [(s, o) for s, o in contested_cells if s == si]
+            rows = stage12b_dirty_thresholds(win, planes, cells_here, set(),
+                                             ranks, triage, state, top_n=4)
+            # G-caveat is an EXCLUSION everywhere else in this module, and a
+            # caption is a reader-facing string: a dirty row naming Aegislash
+            # bare would fail the render gate rather than ship, so the cell is
+            # dropped here the way the clean-cut census drops it.
+            rows = [r for r in rows
+                    if not any(cs in r['cell'] for cs in CAVEAT_SPECIES)]
+            if rows:
+                d = rows[0]
+                closest = {'dirty': True, 'axis': d['axis'],
+                           'printed': d['printed'], 'dp': d['dp'],
+                           'n_pass': int(d['n_above']),
+                           'pool_share': float(d['n_above'] / n_iv),
+                           'n_wrong': int(d['n_wrong']), 'names': [d['cell']],
+                           'kind': ('gate' if d['one_sided'] else
+                                    'near_exact' if d['near_exact'] else None)}
+        out[label] = {'lines': lines, 'closest': closest,
+                      'degenerate': bool(triage['degenerate'][si])}
+    return out
+
+
+def _closest_rule(cells, planes, n_iv, band):
+    """The cut in one scenario nearest the decision band, or None.
+
+    "Nearest" is distance from the band on POOL SHARE, which is the axis the
+    band is stated on: a cut 87% of the grid already clears and a cut 14% of
+    it reaches are both outside, and the page has to say which side it missed
+    on. Ties go to the stronger primitive, then to the lower value.
+    """
+    if not cells:
+        return None
+    def gap(c):
+        share = c['n_pass'] / n_iv
+        return max(band[0] - share, share - band[1], 0.0)
+    rep = sorted(cells, key=lambda c: (gap(c), PRIMITIVE_RANK[c['kind']],
+                                       c['T']))[0]
+    share = rep['n_pass'] / n_iv
+    pr, dp = printed_cut(rep['T'], planes[rep['axis']],
+                         field='Scenario closest rule',
+                         ctx={'cell': rep['label']})
+    return {'dirty': False, 'axis': rep['axis'], 'printed': pr, 'dp': dp,
+            'n_pass': int(rep['n_pass']), 'pool_share': float(share),
+            'n_wrong': int(rep['n_wrong']), 'names': [rep['label']],
+            'kind': rep['kind']}
+
+
 def cell_cuts_by_view(si, oi, cubes, axis='atk'):
     """The same cell's clean cut in every other mode / arm view (D5).
 
@@ -2534,6 +2656,14 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                                       ranks, triage, state)
     for d in dirty:
         d['disqualified'] = disqualifier(d, prims)
+    # D13: the same ladder, split by shield scenario, for the dive section's
+    # own Shield scenario control. Computed here rather than in the section
+    # renderer because every cut in it is already in scope, gated and
+    # mechanism-labelled; recomputing the pool page-side would be a second
+    # implementation of stages 1-4.
+    scen_lines = scenario_lines(cuts_claimed + prims_claimed, win, planes,
+                                triage, contested_cells, ranks, state, n_iv,
+                                floor_rung)
     cmp_near_misses = [c['label'] for c in cuts
                        if c['mech'].get('cmp_near_miss')]
 
@@ -2571,6 +2701,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         'degradation': degradation,
         'caps': caps,
         'dirty_thresholds': dirty,
+        'scenario_lines': scen_lines,
         'primitive_picks': primitive_picks,
         'floor_axis': floor_axis,
         # Which axes the page actually TESTED. G-material-gap wants a number

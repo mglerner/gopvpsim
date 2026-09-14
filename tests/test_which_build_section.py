@@ -37,7 +37,10 @@ Vocabulary (docs style rule, per document):
 - Mask: a 512-byte bitmask saying which spreads clear one threshold. It
   exists because the page's ``DATA.ivAtk`` is rounded to 2 dp and a line is
   not, so a client-side comparison would mis-side the spreads inside the
-  rounding window.
+  rounding window. The section's own line and its rungs carry one each.
+- Rounded cut: the cheaper encoding the per-scenario lines use instead --
+  the cut in the page's own 2-dp array plus the indices that comparison gets
+  wrong. Equally exact, a float and (so far) an empty list per line.
 """
 import importlib.util
 import json
@@ -677,7 +680,7 @@ def test_section_panel_reads_the_page_arrays_and_embeds_no_second_grid():
     # Wins are counted from the embedded score grid, over every scenario and
     # every opponent -- the brief's own denominator.
     wins = src[src.index('function wbWins('):src.index('function _wbColors(')]
-    assert 'SCORES[key]' in wins
+    assert 'SCORES[mi + SCORE_KEY_SEP + mode]' in wins
     assert 'DATA.nScenarios' in wins and 'DATA.nOpponents' in wins
     assert 'isWin(' in wins
     # Stats come from the league-cap arrays, not whatever best-buddy swapped in.
@@ -798,8 +801,12 @@ if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.ex
 const block = src.slice(start, end);
 
 const N = 6;
+// Two scenarios x two opponents, which is the SAME flat (iv, scenario,
+// opponent) layout as the one-scenario grid this harness started with -- the
+// score bytes below are unchanged -- and it lets the section's own Shield
+// scenario control be exercised for real rather than pinned in source.
 const DATA = {
-  nIvs: N, nScenarios: 1, nOpponents: 4,
+  nIvs: N, nScenarios: 2, nOpponents: 2, scenarioLabels: ['0v0', '1v1'],
   ivA: [0,1,2,3,4,5], ivD: [15,14,13,12,11,10], ivS: [15,14,13,12,11,10],
   ivAtk: [140,145,148.2,149,150.5,151], ivDef: [110,105,101.5,100,99,98],
   ivHp: [130,128,126,124,122,120], ivLv: [50,50,50,50,50,50],
@@ -810,6 +817,7 @@ const SCORES = { '0|pvpoke': new Uint16Array([
   600,600,600,600,  600,600,600,600,  600,600,600,600]) };
 const SCORE_KEY_SEP = '|';
 function isWin(v) { return v > 500; }
+function scenLabel(si) { return DATA.scenarioLabels[si]; }
 function plotChrome() { return {ink:'#000', paper:'', plot:'', font:'', grid:'',
   legendBg:'', legendBorder:'', hoverBg:'', hoverBorder:''}; }
 function _mcPayloadPage() { return null; }
@@ -823,7 +831,7 @@ const Plotly = { react: () => {}, restyle: () => {}, Plots: { resize: () => {} }
 const getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 let out;
-eval(block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit, _wbOwnedTrace, _wbClusterSides};');
+eval(block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit, _wbOwnedTrace, _wbClusterSides, _wbScen, _wbActiveLine, _wbSideAt, _wbOn};');
 
 // Masks are LSB-first per byte, exactly as deep_dive_which_build.mask_b64
 // packs them: 'PA==' = 0b00111100 = spreads 2..5, 'MA==' = spreads 4..5,
@@ -913,6 +921,96 @@ eq('ivIdx', out._wbIvIdx([2,13,13]), 2);
 eq('ivIdx missing', out._wbIvIdx([9,9,9]), -1);
 if (out._wbHover(2, L, wins, 'side').indexOf('2/13/13') !== 0) fail.push('hover ivs');
 if (out._wbHover(2, L, wins, 'side').indexOf('wins 3 of 4') < 0) fail.push('hover wins');
+
+// ---- the section's own Shield scenario control -------------------------
+const COL = {line:'#1',below:'#2',alt:'#3',mark1:'#4',mark2:'#5',rungs:['#6','#7']};
+// 'OA==' = 0b00111000 = spreads 3..5 (atk >= 149), 'MA==' = spreads 4..5
+// (atk >= 150.5): the same LSB-first packing deep_dive_which_build.mask_b64
+// emits, pooled by (axis, value) the way the payload pools them.
+// A scenario line carries a CUT in the page's own 2-dp array plus the
+// indices that comparison gets wrong, not a packed mask: atk >= 149 is
+// spreads 3..5 and atk >= 150.5 is 4..5 on this grid. Spread 2's `wrong`
+// entry is the rounding hazard made explicit -- 148.2 is below 149 but this
+// line claims it, and the payload says so rather than hoping.
+const scenPay = Object.assign({}, pay, {
+  scenLabels: ['0v0', '1v1'],
+  scen: {
+    '0v0': {lines: [], degenerate: false,
+            captions: {line: 'nothing in 0v0', rungs: 'nothing in 0v0'}},
+    '1v1': {lines: [
+        {axis:'atk', axisWord:'attack', printed:'149.00', n:3, kind:'exact',
+         cut:149, wrong:[], isFloor:false, label:'149.00 (c)', full:'149.00 (c)'},
+        {axis:'atk', axisWord:'attack', printed:'150.50', n:2, kind:'exact',
+         cut:150.5, wrong:[], isFloor:false, label:'150.50 (d)', full:'150.50 (d)'}],
+      degenerate: false, captions: {line: 'lowest in 1v1', rungs: 'two in 1v1'}},
+  }});
+// The exception list is what makes the cheap encoding exact: with spread 2
+// listed, the line owns it even though the page's rounded stat is below the
+// cut -- and unlisted, it does not.
+eq('cut alone sides spread 2 below',
+   out._wbOn(L, {axis:'atk', cut:149, wrong:[]}, 2), 0);
+eq('the exception list flips it',
+   out._wbOn(L, {axis:'atk', cut:149, wrong:[2]}, 2), 1);
+eq('a mask line still reads its mask',
+   out._wbOn(L, {mask:'PA=='}, 2), 1);
+function fakeRoot(v) {
+  return { querySelector: (s) => (s === 'select.wb-scen' ? {value: v} : null) };
+}
+eq('control default is every scenario', out._wbScen(fakeRoot('all'), scenPay), null);
+eq('control resolves a label to its grid index',
+   out._wbScen(fakeRoot('1v1'), scenPay).idx, 1);
+eq('control ignores a label this page does not carry',
+   out._wbScen(fakeRoot('9v9'), scenPay), null);
+
+const s1 = {idx: 1, label: '1v1', entry: scenPay.scen['1v1']};
+const s0 = {idx: 0, label: '0v0', entry: scenPay.scen['0v0']};
+const w1 = out.wbWins(0, 'pvpoke', 1);
+const w0 = out.wbWins(0, 'pvpoke', 0);
+eq('per-scenario wins, 1v1', Array.from(w1), [0,0,1,2,2,2]);
+eq('per-scenario wins, 0v0', Array.from(w0), [1,2,2,2,2,2]);
+eq('every-scenario wins are unchanged', Array.from(out.wbWins(0, 'pvpoke')),
+   [1,2,3,4,4,4]);
+
+const sr = out._wbGroups(scenPay, 'rungs', L, w1, COL, s1, 2);
+const srn = {}; sr.traces.forEach(t => srn[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
+eq('scenario rung groups', srn,
+   {'Below 149.00 (c)': 3, '149.00 (c)': 1, '150.50 (d)': 2});
+const slv = out._wbGroups(scenPay, 'line', L, w1, COL, s1, 2);
+const sln = {}; slv.traces.forEach(t => sln[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
+eq('the line view draws only the lowest line in the scenario', sln,
+   {'Below 149.00 (c)': 3, 'At or above 149.00 (c)': 3});
+const slt = slv.traces.find(t => t.name.indexOf('At or above') === 0);
+// The denominator is the opponent pool, not scenarios x opponents...
+if (slt.text[0].indexOf('wins 2 of 2') < 0)
+  fail.push('scenario hover denominator: ' + slt.text[0]);
+// ...and the side string names the line being drawn, not the page's.
+if (slt.text[0].indexOf('attack at or above the 149.00 line') < 0)
+  fail.push('scenario side string: ' + slt.text[0]);
+const srh = sr.traces.find(t => t.name.indexOf('150.50 (d)') === 0);
+if (srh.text[0].indexOf('highest line cleared: 150.50 (d)') < 0)
+  fail.push('scenario rung hover: ' + srh.text[0]);
+
+// A scenario with no line is a muted grid carrying every spread, not an
+// empty panel: the caption is the only thing that says why.
+const g0 = out._wbGroups(scenPay, 'line', L, w0, COL, s0, 2);
+eq('muted grid is one group', g0.traces.length, 1);
+eq('muted grid holds every spread', g0.traces[0].x.length, 6);
+if (g0.traces[0].text[0].indexOf('no line in 0v0 shields') < 0)
+  fail.push('muted hover: ' + g0.traces[0].text[0]);
+
+// The trade is a whole-grid trade and does not move with the control.
+const tr1 = out._wbGroups(scenPay, 'trade', L, w1, COL, s1, 2);
+const tr1n = {}; tr1.traces.forEach(t => tr1n[t.name.replace(/ \(\d+\)$/,'')] = t.x.length);
+eq('trade is whole-grid under a scenario', tr1n, tn);
+
+// The marked spreads and the collection overlay follow the drawn line.
+eq('active line under a scenario', out._wbActiveLine(scenPay, s1).printed, '149.00');
+eq('active line under all scenarios', out._wbActiveLine(scenPay, null).printed, '148.10');
+eq('no active line where the scenario has none',
+   out._wbActiveLine(scenPay, s0), null);
+if (out._wbSideAt(L, out._wbActiveLine(scenPay, s1), 2)
+      .indexOf('attack below the 149.00 line') < 0)
+  fail.push('marked-spread side under a scenario');
 
 if (fail.length) { console.error(fail.join('\n')); process.exit(1); }
 console.log('OK');
@@ -1038,13 +1136,15 @@ def test_reader_facing_text_never_says_brief_verdict_or_recommended(
 # least" is allowed exactly once per rendered section, and the summary quotes
 # it a second time by design).
 _SECTION_CHROME = (
-    'Stat-product rank against matchups won over every baked shield scenario '
-    'and the whole opponent pool, with PvPoke-default opponent IVs at the '
-    'league cap -- the exact view the line above was derived from, so this '
-    "panel does not follow the scatter's dropdowns or the opponent filter.",
+    'Stat-product rank against matchups won with PvPoke-default opponent '
+    'IVs at the league cap over the whole opponent pool -- the view the line '
+    'above was derived on. The Shield scenario control beside Show: is this '
+    "section's own; the scatter's dropdowns and the opponent filter do not "
+    'drive this panel.',
     'Compare these spreads',
     'All 4 movesets on this page share one line: at least 148.10 attack.',
     'Show: ',
+    'Shield scenario: ',
     'Terms used here',
 )
 
@@ -1341,3 +1441,387 @@ def test_a_shared_line_moveset_states_the_line_and_counts_it_once(
                         html, re.S).group(1)
     assert 'Most Sableye (Shadow) should have at least 148.10 attack' in summary
     assert 'the same line as its other 3 movesets' in summary
+
+
+# ---------------------------------------------------------------------------
+# 6. The section's own Shield scenario control
+# ---------------------------------------------------------------------------
+#
+# Vocabulary for this group: a SCENARIO LINE is one value in the brief's
+# exact / gate / near-exact cut ladder whose cell sits in ONE shield scenario
+# and whose pool share is inside the decision band -- the narrower question
+# the control asks. The page's own line is a whole-grid claim and does not
+# move with the control.
+
+def _fn_body(raw, stripped, name):
+    """One JS function's RAW source, located on the STRIPPED source.
+
+    The boundaries are found on the stripped text, so a function name inside
+    a comment or a string cannot move them; the slice is then taken from the
+    raw text at the same offsets (strip_js preserves them), because what this
+    group asserts about is which DOM selector STRINGS a handler touches.
+    """
+    start = stripped.index('function ' + name + '(')
+    nxt = stripped.find('\nfunction ', start + 1)
+    end = len(stripped) if nxt < 0 else nxt
+    return raw[start:end]
+
+
+def test_js_wires_the_sections_own_scenario_control():
+    src = _engine()
+    wins = src[src.index('function wbWins('):src.index('var WB_ALL_SCEN')]
+    # The scenario slice is a BOUND on the same loop, not a second decoding:
+    # the section and the main plot must count a win the same way.
+    assert 'function wbWins(mi, mode, si)' in src
+    assert 'si == null' in wins and 'si + 1' in wins
+    assert 'isWin(' in wins
+    scen = src[src.index('function _wbScen('):src.index('function _wbColors(')]
+    # The label -> index lookup goes through the page's own scenLabel(), so
+    # the option the reader picks and the grid slice it selects cannot drift.
+    assert 'scenLabel(si)' in scen
+    assert 'WB_ALL_SCEN' in scen
+    groups = src[src.index('function _wbGroups('):
+                 src.index('function _wbClusterSides(')]
+    assert 'function _wbGroups(pay, view, L, wins, colors, scen, den)' in src
+    assert '_wbOn(L, use[sk], i)' in groups
+    assert '_wbMutedTrace(' in groups
+    # The clusters view follows the control to THAT scenario's labels.
+    assert 'scen ? scen.label' in groups
+    render = src[src.index('function wbRenderRoot('):
+                 src.index('function wbSelectView(')]
+    assert 'wbWins(pay.mi, pay.mode, scen ? scen.idx : null)' in render
+    assert 'DATA.nOpponents' in render and 'scen.label' in render
+    assert 'scen.entry.captions[view]' in render
+
+
+def test_the_js_all_scenarios_label_matches_the_renderers():
+    """One spelling of the "every scenario" option, on both sides."""
+    raw = ENGINE_JS.read_text()
+    assert f"var WB_ALL_SCEN = '{W.ALL_SCEN}';" in raw
+
+
+def test_the_control_moves_the_panel_and_nothing_else():
+    """The handler may touch the plot, its caption and its own selectors.
+
+    The collapsed summary line and the headline paragraphs are the
+    ALL-scenario verdict; a control that rewrote them would make the one
+    sentence a reader reads depend on a dropdown they may never touch.
+    """
+    raw = ENGINE_JS.read_text()
+    stripped = _engine()
+    body = (_fn_body(raw, stripped, 'wbRenderRoot')
+            + _fn_body(raw, stripped, 'wbSelectView')
+            + _fn_body(raw, stripped, '_wbScen'))
+    touched = set(re.findall(r"querySelector\(\s*'([^']+)'", body))
+    assert touched == {'.wb-panel', '.wb-caption', 'select.wb-view',
+                       'select.wb-scen'}, touched
+    # Positive control: the scan sees the selectors that ARE there, so an
+    # empty match set cannot pass this silently.
+    assert '.wb-panel' in touched
+    for banned in ('.wb-summary', '.wb-head', '.wb-headline', '.wb-clearers',
+                   '.wb-fixed', '.wb-terms'):
+        assert banned not in body, banned
+    # wbSelectView is the only thing the two <select>s call, and all it does
+    # is re-render the panel.
+    sel = _fn_body(raw, stripped, 'wbSelectView')
+    assert 'wbRenderRoot(root)' in sel
+    assert 'textContent' not in sel and 'innerHTML' not in sel
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_scenario_control_markup_is_all_then_the_grid_order(shadow_sableye):
+    state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    block = re.search(r'<select class="wb-scen".*?</select>', html, re.S)
+    assert block, 'no Shield scenario control on the selector row'
+    opts = re.findall(r'<option value="([^"]+)"([^>]*)>([^<]*)</option>',
+                      block.group(0))
+    values = [v for v, _a, _t in opts]
+    assert values[0] == W.ALL_SCEN
+    assert ' selected' in opts[0][1], 'every-scenario is not the default'
+    assert all(' selected' not in a for _v, a, _t in opts[1:])
+    # The nine scenarios, in the grid's own order, in the page's own
+    # vocabulary (deep_dive_rendering.scenario_label).
+    assert values[1:] == [B.scenario_label(state, si)
+                          for si in range(len(state['shield_scenarios']))]
+    assert values[1:] == ['0v0', '0v1', '0v2', '1v0', '1v1', '1v2',
+                          '2v0', '2v1', '2v2']
+    assert 'Shield scenario: ' in html
+    # It sits on the section's OWN row, beside Show:, not in the page's
+    # scatter controls.
+    row = re.search(r'<div class="wb-controls">.*?</div>', html, re.S).group(0)
+    assert 'wb-view' in row and 'wb-scen' in row
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_per_scenario_lines_pin_the_shadow_sableye_ladder(shadow_sableye):
+    """The values each shield scenario turns a matchup over at.
+
+    Recorded here as the numbers, not as "whatever the code produces": the
+    0v1 line IS the page's own line, 1v1 carries the mirror and the Shadow
+    Feraligatr steps, and 2v1's cuts all sit outside the decision band so it
+    has none.
+    """
+    _state, all_facts, _path = shadow_sableye
+    facts = all_facts[0]
+    pay = W.build_payload(facts, facts['_fields'], 0, all_facts=all_facts)
+    got = {k: [l['label'] for l in v['lines']] for k, v in pay['scen'].items()}
+    assert got['0v1'] == ['148.10 (Annihilape +2)']
+    assert pay['scen']['0v1']['lines'][0]['isFloor'] is True
+    assert pay['scen']['0v1']['lines'][0]['printed'] == pay['printed']
+    assert got['1v1'] == ['148.55 (Sableye (Shadow))',
+                          '148.71 (Feraligatr (Shadow))',
+                          '149.68 (Hippowdon)',
+                          '150.24 (Empoleon (Shadow))']
+    assert got['2v2'] == ['148.71 (Feraligatr (Shadow))',
+                          '150.60 (Tinkaton)']
+    assert got['0v0'] == ['148.77 (Araquanid)']
+    assert got['1v0'] == ['148.18 (Feraligatr)']
+    assert got['1v2'] == ['148.63 (Wartortle)']
+    # 2v1's Thievul / Florges cuts are real and 86.8% of the grid already
+    # clears them, so they are not build decisions and not lines here.
+    assert got['0v2'] == [] and got['2v1'] == [] and got['2v0'] == []
+    assert pay['scen']['2v0']['degenerate'] is True
+    assert pay['scen']['2v1']['degenerate'] is False
+    # Ascending, and inside the band the brief selects a line from.
+    lo, hi = pay['band']
+    for lbl, entry in pay['scen'].items():
+        vals = [float(l['printed']) for l in entry['lines']]
+        assert vals == sorted(vals), lbl
+    for row in (facts['scenario_lines']['1v1']['lines']):
+        assert lo <= row['pool_share'] <= hi
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_scenario_with_no_line_says_so_and_names_the_closest_rule(
+        shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    facts = all_facts[0]
+    pay = W.build_payload(facts, facts['_fields'], 0, all_facts=all_facts)
+    for view in ('line', 'rungs'):
+        cap = pay['scen']['2v1']['captions'][view]
+        assert 'No single stat threshold in 2v1 shields' in cap
+        assert 'The closest rule is' in cap
+        # With its numbers, both of them: the value and how much of the grid
+        # is on its passing side.
+        assert re.search(r'\d+ of \d+ spreads \(\d', cap), cap
+        degen = pay['scen']['2v0']['captions'][view]
+        assert degen.startswith('2v0 shields is degenerate on this grid:')
+    # A scenario that HAS a line names it and what it decides.
+    one = pay['scen']['1v1']['captions']['line']
+    assert one.startswith('At or above 148.55 attack every spread wins '
+                          'Sableye (Shadow) in 1v1 shields')
+    assert pay['scen']['1v1']['captions']['rungs'].startswith(
+        '4 lines turn a matchup over in 1v1 shields, from 148.55 attack '
+        'up to 150.24 attack')
+    # The trade is a whole-grid trade and says so rather than being rewritten.
+    trade_all = next(v['caption'] for v in pay['views'] if v['id'] == 'trade')
+    assert pay['scen']['1v1']['captions']['trade'] == (
+        trade_all + ' (all scenarios)')
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_scenario_lines_carry_a_cut_and_its_exceptions_not_a_mask(
+        shadow_sableye):
+    """No per-IV array, packed or otherwise, enters through this control.
+
+    A scenario line ships a cut in the page's OWN 2-dp array plus the indices
+    that comparison gets wrong. The exceptions are what make it exact; they
+    are empty on this grid, and the test recomputes the split from the cut to
+    prove the browser will draw what the brief measured.
+    """
+    import numpy as np
+    state, all_facts, _path = shadow_sableye
+    facts = all_facts[0]
+    pay = W.build_payload(facts, facts['_fields'], 0, all_facts=all_facts)
+    rows = [l for e in pay['scen'].values() for l in e['lines']]
+    assert len(rows) == 10, rows          # ten lines across the nine scenarios
+    assert 'lineMasks' not in pay
+    blob = json.dumps(pay['scen'])
+    assert 'mask' not in blob
+    _scores, meta = B.arm_view(state, 0, 'pvpoke')
+    atk, dfn, hp = B.stat_planes(meta)
+    planes = {'atk': atk, 'def': dfn, 'hp': hp}
+    exceptions = 0
+    for row in rows:
+        plane = planes[row['axis']]
+        rounded = W.page_rounded(plane, row['axis'])
+        side = rounded >= row['cut']
+        for i in row['wrong']:
+            side[i] = not side[i]
+        assert int(side.sum()) == row['n'], (row['label'], int(side.sum()))
+        # ...and the reconstructed set IS the brief's set, spread for spread,
+        # not merely the same size.
+        T = next(r['T'] for e in facts['scenario_lines'].values()
+                 for r in e['lines']
+                 if W._axis_value(r) == row['printed']
+                 and r['axis'] == row['axis'])
+        assert np.array_equal(side, plane >= T), row['label']
+        exceptions += len(row['wrong'])
+    # Recorded, not required: if this stops being zero the encoding still
+    # works, it just costs more.
+    assert exceptions == 0, exceptions
+    # A line whose count disagrees with the brief's is refused, not drawn.
+    bad = dict(facts)
+    bad['scenario_lines'] = {
+        '1v1': {'lines': [{'axis': 'atk', 'T': 148.5539982, 'n_pass': 7,
+                           'printed': 148.55}], 'closest': None,
+                'degenerate': False}}
+    with pytest.raises(ValueError):
+        W.compute_masks(state, 0, bad, 'pvpoke', 'l50')
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_rounded_cut_reproduces_the_full_precision_split(shadow_sableye):
+    """The encoding, against the hazard it has to survive.
+
+    Comparing the page's 2-dp array against the RAW threshold mis-sides 19 of
+    the 4096 Shadow Sableye spreads -- that is why the section's own line
+    carries a mask. Comparing it against the lowest rounded value a clearer
+    displays does not, and rounded_cut reports any spread it would.
+    """
+    import numpy as np
+    state, all_facts, _path = shadow_sableye
+    facts = all_facts[0]
+    _scores, meta = B.arm_view(state, 0, 'pvpoke')
+    atk, _d, _h = B.stat_planes(meta)
+    T = facts['floor']['T']
+    naive = int(((np.round(atk, 2) >= T) != (atk >= T)).sum())
+    assert naive == 19, naive          # the hazard, still live on this grid
+    cut, wrong = W.rounded_cut(atk, 'atk', T)
+    side = np.round(atk, 2) >= cut
+    for i in wrong:
+        side[i] = not side[i]
+    assert np.array_equal(side, atk >= T)
+    assert int(side.sum()) == facts['floor']['n_above'] == 2220
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_every_scenario_caption_passes_the_briefs_word_gates(shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    ctx = {'blob': 'test', 'arm': 0, 'mode': 'pvpoke'}
+    blocks = []
+    for facts in all_facts:
+        for scen, entry in facts['scenario_lines'].items():
+            for view in ('line', 'rungs', 'clusters', 'rank1'):
+                blocks.append(W.scenario_caption(view, scen, entry, facts))
+    assert len(blocks) >= 4 * 9
+    assert all(b and b[-1] == '.' for b in blocks)
+    B.gate_words(blocks, ctx)
+    B.gate_caveat(blocks, ctx)
+    B.gate_voice(blocks, ctx)
+    # Positive control: the same gates still fail on a bad string.
+    with pytest.raises(B.GuardError):
+        B.gate_words(blocks + ['this is the best line'], ctx)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_control_leaves_the_summary_and_the_headline_alone(shadow_sableye):
+    """The all-scenario verdict is baked once and is not per-scenario.
+
+    Nothing in the payload's per-scenario block can reach the summary or the
+    headline: those are rendered as text, the control's handler never
+    rewrites them (see test_the_control_moves_the_panel_and_nothing_else),
+    and the payload does not carry a second copy of either.
+    """
+    _state, all_facts, _path = shadow_sableye
+    facts = all_facts[0]
+    pay = W.build_payload(facts, facts['_fields'], 0, all_facts=all_facts)
+    summary = W.summary_sentence(facts, all_facts)
+    blob = json.dumps(pay['scen'])
+    assert summary not in blob
+    for para in facts['_headline']:
+        assert para not in blob
+    html = W.section_html(all_facts, 0)
+    head = html[:html.index('<div class="wb-plotbox">')]
+    assert 'wb-scen' not in head, 'the control is emitted above the panel'
+
+
+def test_a_muted_scenario_marks_only_rank1():
+    """No example spread is labelled against a line the scenario does not have.
+
+    Every example key is named for where the spread sits relative to the
+    PAGE's line ("highest stat product above the line"). Under a caption
+    saying this shield state has no line, those keys read as a claim about
+    it, so the muted views keep rank-1 -- whose key claims nothing -- and the
+    collection overlay, and drop the rest.
+    """
+    # The raw body, located on the stripped source: the pins below are about
+    # view NAMES, which strip_js blanks out.
+    render = _fn_body(ENGINE_JS.read_text(), _engine(), 'wbRenderRoot')
+    assert ("var muted = !!(scen && (view === 'line' || view === 'rungs') "
+            "&& !line);") in render
+    assert 'muted ? false : e < pay.examples.length' in render
+    assert 'pay.bestAbove && !muted' in render
+    # ...and the side string names the scenario rather than the page.
+    assert '(line ? _wbSideAt(L, line, r1i) : noLine)' in render
+    assert "'no line in ' + scen.label + ' shields'" in render
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_negative_page_carries_the_control_and_its_captions():
+    """Melmetal Great League: the section's own control on a no-line page.
+
+    Arm 0 prints no line at all, so the two threshold views do not exist and
+    the control drives the y-axis, the clusters view and the caption. Arm 2
+    DOES print one, and most of its shield scenarios still have no line of
+    their own -- which is the case the captions have to say out loud.
+    """
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))
+    neg = all_facts[0]
+    assert neg['floor'] is None
+    pay = W.build_payload(neg, neg['_fields'], 0, all_facts=all_facts)
+    assert [v['id'] for v in pay['views']] == ['clusters', 'rank1']
+    assert len(pay['scen']) == len(state['shield_scenarios'])
+    for lbl, entry in pay['scen'].items():
+        assert entry['lines'] == []
+        assert set(entry['captions']) == {'clusters', 'rank1'}
+        assert lbl in entry['captions']['rank1']
+    html = W.section_html(all_facts, 0)
+    assert 'Shield scenario: ' in html
+    assert f'<option value="{W.ALL_SCEN}" selected>' in html
+
+    # The arm that DOES carry a line: 1v1 has one, most scenarios do not.
+    pos = all_facts[2]
+    assert pos['floor'] is not None
+    pay2 = W.build_payload(pos, pos['_fields'], 0, all_facts=all_facts)
+    withline = [k for k, v in pay2['scen'].items() if v['lines']]
+    assert '1v1' in withline
+    assert len(withline) < len(pay2['scen']), 'expected empty scenarios here'
+    empty = next(k for k, v in pay2['scen'].items() if not v['lines'])
+    cap = pay2['scen'][empty]['captions']['rungs']
+    assert ('No single stat threshold' in cap
+            or 'is degenerate on this grid' in cap), cap
+    assert 'closest rule is' in cap
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_section_is_byte_deterministic_with_the_control(shadow_sableye):
+    """Two renders of one blob stay identical with the control's payload in.
+
+    The per-scenario block is a dict keyed by scenario label and a pooled
+    list of masks; both are emitted through the same sort_keys dump as the
+    rest, so a set-iteration order cannot leak into the page bytes.
+    """
+    _state, all_facts, _path = shadow_sableye
+    a = W.section_html(all_facts, 0)
+    b = W.section_html(all_facts, 0)
+    assert a == b
+    assert a.isascii()
+    pay = json.loads(
+        re.search(r'class="wb-data">(.*?)</script>', a, re.S).group(1))
+    # Small: ten lines, nine pooled masks and a caption per view per
+    # scenario -- not a per-IV array per scenario.
+    assert len(json.dumps(pay)) < 32_000, len(json.dumps(pay))
+    assert len(json.dumps(pay['scen'])) < 12_000, len(json.dumps(pay['scen']))
