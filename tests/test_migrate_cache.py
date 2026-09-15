@@ -497,3 +497,28 @@ def test_pogodives_sheet_v5_predicate():
     assert p({'species': 'X'}, {'species': 'Medicham', 'policy': 'pogodives'}) is True
     assert p({'species': 'X'}, {'species': 'Medicham'}) is False
     assert p(None, None) is True
+
+
+def test_form_change_either_side_predicate():
+    """Aegislash reuse-leak fix (2e8d36b): affected iff a form-change
+    species is on EITHER side; fail-safe on missing metadata."""
+    from migrate_cache import PREDICATES
+    pred = PREDICATES['form_change_either_side_20260912']
+    plain = {'species': 'Azumarill'}
+    for sp in ('Aegislash (Blade)', 'Aegislash (Shield)', 'Cramorant',
+               'Mimikyu', 'Morpeko (Full Belly)'):
+        assert pred({'species': sp}, plain)
+        assert pred(plain, {'species': sp})
+    assert not pred(plain, {'species': 'Registeel'})
+    assert not pred({'species': 'Swampert'}, {'species': 'Talonflame'})
+    assert pred(None, plain) and pred(plain, {}) and pred({'species': ''}, plain)
+
+
+def test_pogodives_sheet_v6_predicate_is_tier_scoped():
+    from migrate_cache import PREDICATES
+    pred = PREDICATES['pogodives_sheet_v6_20260912']
+    assert pred({'species': 'Cramorant'}, {'species': 'Azumarill', 'policy': 'pogodives'})
+    assert not pred({'species': 'Cramorant'}, {'species': 'Azumarill'})
+    assert not pred({'species': 'Azumarill'}, {'species': 'Cramorant'})
+    assert pred({'species': 'Cramorant'}, None)
+

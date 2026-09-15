@@ -196,9 +196,61 @@ def _cramorant_port_20260824(f, c):
     return _hit(f) or _hit(c)
 
 
+_FORM_CHANGE_SPECIES_PREFIXES = ('Aegislash', 'Cramorant', 'Mimikyu', 'Morpeko')
+
+
+def _form_change_either_side(f, c):
+    """Aegislash reuse leak fix, clone commit 2e8d36b (pin --from-engine
+    e4d380ec3e5e, the 2026-09-12/14 rebake's engine).
+
+    The hashed delta is two edits to battle.py, both reachable ONLY through
+    a Pokemon that owns a form change:
+      (1) priority-shuffle clause 4 now snapshots the three keys it stamps
+          (guarded by `active_form_sid == 'aegislash_shield'`, i.e. an
+          Aegislash in Shield form) and reset_for_battle restores them --
+          a dict that was never stamped is untouched (_restore_shuffle_stamp
+          returns on a missing snapshot);
+      (2) reset_for_battle's `self._form_change is not None` branch grew an
+          `else` (form-changer ending in its base form) that invalidates the
+          damage / DP caches on both sides.
+    A pair with NO form-change species on either side never enters either
+    branch, so its columns are byte-identical -- blessed. Any pair with a
+    form-change species on EITHER side (the opponent's form change reaches
+    the focal's caches through the both-sides invalidation) is re-simmed.
+    Form-change species = the gamemaster entries carrying `formChange`:
+    Aegislash (Blade/Shield), Cramorant (+ Gulping/Gorging), Mimikyu
+    (+ Busted), Morpeko (Full Belly). Measured blast radius is narrower
+    (only Aegislash (Blade) columns actually moved: 24% of a Cramorant-vs-
+    Blade column, every column of the Blade dive; Cramorant / Mimikyu /
+    Morpeko / Shield seq-vs-fresh identical on 128 IVs x 76 opponents), but
+    the PROVABLE superset is what a predicate must be. Fail-safe: missing
+    species metadata -> AFFECTED. Pinned by tests/test_migrate_cache.py and
+    the engine reuse test (aegislash-blade-azumarill param)."""
+    def _hit(side):
+        if not side:
+            return True
+        sp = side.get('species')
+        if not sp:
+            return True
+        return str(sp).startswith(_FORM_CHANGE_SPECIES_PREFIXES)
+    return _hit(f) or _hit(c)
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
+    'form_change_either_side_20260912': _form_change_either_side,
+    # 2026-09-12 sheet v6 (pin --from-engine 1436a17ffbb2, the engine AFTER
+    # the Aegislash fix): (1,0) 'lead_ready_ko' and (2,2) 'lead_ready_chip'
+    # -- two new tank_rule branches inside _cram_tank_mult, reachable only
+    # under `defender._pogodives` (the sheet lookup is inside that guard),
+    # plus the two sheet-row strings. Unmarked battles are byte-identical
+    # (stride-61 adjacency: 560 slices of the unchanged rows identical to
+    # the shipped tensors; full battle tier green). Affected = pogodives-
+    # tier columns only, same shape as the v3/v4/v5 sheet migrations;
+    # fail-safe on unreadable fields.
+    'pogodives_sheet_v6_20260912': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
     'self_debuff_either_side': _self_debuff_either_side,
     'neutral_batch_20260810': _neutral_batch_20260810,
