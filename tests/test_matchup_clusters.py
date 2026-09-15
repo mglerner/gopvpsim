@@ -40,6 +40,28 @@ def planted_scores(block_sizes, patterns, nS=9, scen_idx=4, n_opp=None):
     return a.ravel().tolist(), nIvs, n_opp
 
 
+def staircase_scores(n_opp=8, block=40, nS=9, scen_idx=None):
+    """A grid that CLEARS the degeneracy floor, for the render fixtures.
+
+    ``n_opp + 1`` blocks of ``block`` IVs; block i wins the first i
+    opponents. Every opponent's win rate is then (n_opp - j) / (n_opp + 1),
+    i.e. strictly inside the sharp window for every j, and the blocks are
+    n_opp + 1 distinct win patterns -- so with the defaults it is 8 sharp
+    marginals and 9 patterns, just over the 6 / 8 floor that
+    ``planted_scores``'s 2-4 opponent grids sit under.
+
+    ``scen_idx=None`` plants the same staircase in EVERY scenario (so every
+    scenario clusters); an int plants it in that one.
+    """
+    n_iv = block * (n_opp + 1)
+    a = np.full((n_iv, nS, n_opp), 200, dtype=np.int32)
+    sis = range(nS) if scen_idx is None else [scen_idx]
+    for si in sis:
+        for i in range(n_opp + 1):
+            a[i * block:(i + 1) * block, si, :i] = 800
+    return a.ravel().tolist(), n_iv, n_opp
+
+
 def no_anchors(opp_idx, stat):
     return None
 
@@ -280,31 +302,47 @@ def test_flip_table_named_flags():
 SCENARIOS9 = [(a, b) for a in range(3) for b in range(3)]
 
 
-def test_compute_matchup_clusters_end_to_end():
-    flat, nIvs, nO = planted_scores(
-        [100, 100], [[1, 1, 0, 0], [1, 1, 1, 1]], scen_idx=4)
+def test_compute_covers_every_scenario_plus_the_combined_view():
+    """Pre-fix (through 2026-09-12) this returned ONLY the even scenarios:
+    ``set(out) <= {"0v0", "1v1", "2v2"}`` was the pinned contract, and there
+    was no combined entry. It now runs every scenario the dive baked, in
+    grid order, and appends ALL_SCEN_KEY."""
+    flat, nIvs, nO = staircase_scores()
     atk = np.linspace(100, 110, nIvs)
     out = mc.compute_matchup_clusters(
         flat, nIvs, 9, nO, SCENARIOS9, atk, atk[::-1].copy(),
         np.full(nIvs, 135.0), no_anchors)
-    assert set(out) <= {"0v0", "1v1", "2v2"}
+    assert list(out) == [mc.scenario_label(p) for p in SCENARIOS9] + ["all"]
+    # the pre-fix key set is a strict subset of what ships now
+    assert {"0v0", "1v1", "2v2"} < set(out)
     r = out["1v1"]
-    assert r["res"]["k"] == 2
-    assert len(r["flips"]) == 2          # opponents 2,3 sharp; 0,1 settled
+    assert r["res"]["k"] >= 2
+    assert len(r["flips"]) == nO         # every opponent is a sharp marginal
     assert all(row["named"] is None for row in r["flips"])
-    # 0v0 has zero sharp marginals -> honest reason, no clusters
-    assert "reason" in out["0v0"]
+    comb = out["all"]["combined"]
+    assert comb["n_bits"] == 9 * nO      # 9 scenarios x 8 sharp marginals
+    assert comb["excluded"] == []
+    assert len(out["all"]["flips"]) == comb["n_bits"]
+
+
+def test_compute_can_still_be_restricted_to_a_scenario_subset():
+    flat, nIvs, nO = staircase_scores()
+    atk = np.linspace(100, 110, nIvs)
+    out = mc.compute_matchup_clusters(
+        flat, nIvs, 9, nO, SCENARIOS9, atk, atk, atk, no_anchors,
+        scen_pairs=[(0, 0), (1, 1)])
+    assert list(out) == ["0v0", "1v1", "all"]
 
 
 def test_compute_handles_missing_scenarios():
-    # dive run with a single scenario: only that pair is computable
-    flat, nIvs, nO = planted_scores([50, 50], [[0, 0], [1, 1]],
-                                    nS=1, scen_idx=0)
+    # dive run with a single scenario: only that pair is computable, and one
+    # scenario is not a combination -- no "all" entry is emitted.
+    flat, nIvs, nO = staircase_scores(nS=1, scen_idx=0)
     atk = np.linspace(100, 110, nIvs)
     out = mc.compute_matchup_clusters(
         flat, nIvs, 1, nO, [(1, 1)], atk, atk, atk, no_anchors)
     assert list(out) == ["1v1"]
-    assert out["1v1"]["res"]["k"] == 2
+    assert out["1v1"]["res"]["k"] >= 2
 
 
 def test_all_settled_scenario_reports_reason():
@@ -314,6 +352,76 @@ def test_all_settled_scenario_reports_reason():
         flat, nIvs, 9, nO, SCENARIOS9, atk, atk, atk, no_anchors)
     assert out["1v1"]["n_sharp"] == 0
     assert "reason" in out["1v1"]
+
+
+def test_degeneracy_floor_reports_counts_and_leaves_the_bits_out_of_all():
+    """A too-thin scenario is named with its own numbers, not hidden.
+
+    Scenarios 4 and 8 (1v1, 2v2) get the full staircase; scenario 0 (0v0)
+    gets a two-opponent split -- 2 sharp marginals, under the 6 / 8 floor.
+    Two clean scenarios, because one is not a combination.
+    """
+    flat, nIvs, nO = staircase_scores(scen_idx=4)
+    arr = np.array(flat, dtype=np.int32).reshape(nIvs, 9, nO)
+    arr[:, 8, :] = arr[:, 4, :]             # 2v2: the same staircase
+    arr[nIvs // 2:, 0, :2] = 800            # 0v0: 2 sharp, 2 patterns
+    atk = np.linspace(100, 110, nIvs)
+    out = mc.compute_matchup_clusters(
+        arr.ravel().tolist(), nIvs, 9, nO, SCENARIOS9, atk, atk, atk,
+        no_anchors)
+    d = out["0v0"]
+    assert d["degenerate"] is True
+    assert d["n_sharp"] == 2 and d["n_patterns"] == 2
+    # the reason carries every number it is a claim about, and leads with
+    # the FINDING (what the shield state does) rather than the floor
+    assert d["reason"].startswith("every spread wins ")
+    assert f"of {nO} opponents here" in d["reason"]
+    assert "Only 2 opponents are sharp marginals" in d["reason"]
+    assert "2 distinct win patterns" in d["reason"]
+    assert (f"below the {mc.DEGEN_MIN_SHARP}-opponent / "
+            f"{mc.DEGEN_MIN_PATTERNS}-pattern floor") in d["reason"]
+    assert mc.ALL_SCEN_DISPLAY in d["reason"]
+    # and its bits are NOT in the concatenated fingerprint
+    comb = out["all"]["combined"]
+    assert "0v0" in comb["excluded"] and "0v0" not in comb["scens"]
+    assert comb["scens"] == ["1v1", "2v2"]
+    assert comb["n_bits"] == 2 * nO         # 0v0's 2 bits are not in it
+
+
+def test_fragmented_reason_is_distinct_from_degenerate():
+    """Feraligatr UL 0v0's case: plenty of marginals, still no partition.
+
+    Measured there as 12 sharp marginals and 61 distinct win patterns with
+    every K in KMIN..KMAX failing the min-cluster floor. Reproduced here
+    with 8 tight core patterns (24 IVs each) plus one distant 8-IV outlier:
+    the outlier is its own cluster at every K in 2..6 and 8 < the 25-IV
+    floor for this population, so no K survives -- while 7 sharp marginals
+    and 9 patterns clear the degeneracy floor comfortably.
+    """
+    nO, nS = 7, 9
+    rows = []
+    for i in range(8):                       # 8 core patterns, 24 IVs each
+        rows += [[(i >> b) & 1 for b in range(3)] + [0] * 4] * 24
+    rows += [[0, 0, 0, 1, 1, 1, 1]] * 8      # the distant speck
+    W = np.array(rows, dtype=bool)
+    nIvs = len(W)
+    arr = np.full((nIvs, nS, nO), 200, dtype=np.int32)
+    arr[:, 4, :][W] = 800
+    atk = np.linspace(100, 110, nIvs)
+    out = mc.compute_matchup_clusters(
+        arr.ravel().tolist(), nIvs, nS, nO, SCENARIOS9, atk, atk, atk,
+        no_anchors, scen_pairs=[(1, 1)])
+    e = out["1v1"]
+    assert "res" not in e
+    assert e["degenerate"] is False              # NOT the degenerate reason
+    assert e["n_sharp"] == 7 and e["n_patterns"] == 9
+    assert e["reason"].startswith("no clusters here:")
+    assert "too fragmented" in e["reason"]
+    # and it says the opposite of the degenerate reason about the bits
+    assert f"still count toward the {mc.ALL_SCEN_DISPLAY}" in e["reason"]
+    assert "7 sharp marginal opponents" in e["reason"]
+    assert "9 distinct win patterns" in e["reason"]
+    assert str(mc._small_pop_floor(mc.MIN_CLUSTER_IVS, nIvs)) in e["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -332,8 +440,103 @@ def test_hamming_is_the_fraction_of_differing_bits():
 def test_hamming_definition_lives_in_exactly_one_place():
     """The linkage and the silhouette must score the SAME geometry."""
     src = (REPO_ROOT / "scripts" / "deep_dive_matchup_clusters.py").read_text()
-    assert src.count("patterns[None, :, :]") == 1, (
+    # Pre-2026-09-13 the expression was the broadcast form
+    # ``(patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)``; the
+    # matmul below replaced it for cost, not for behaviour.
+    assert src.count("a @ b.T + b @ a.T") == 1, (
         "the pairwise-distance expression was re-inlined; call _hamming()")
+    assert "patterns[None, :, :]" not in src
+
+
+def _hamming_broadcast(patterns):
+    """The pre-2026-09-13 definition, kept HERE as the equivalence oracle."""
+    return (patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)
+
+
+def test_hamming_is_bit_identical_to_the_broadcast_definition():
+    """The matmul form is an optimization, so equality is EXACT, not approx.
+
+    Every product is 0 or 1 and every partial sum is an exact integer, so no
+    summation order can change the result -- and the linkage's tie-breaks
+    ride on exact equality, so `pytest.approx` here would hide the only
+    failure that matters.
+    """
+    rng = np.random.default_rng(0)
+    for u, d in ((2, 1), (5, 3), (40, 9), (200, 21), (300, 113)):
+        p = (rng.random((u, d)) < 0.5).astype(np.uint8)
+        got, want = mc._hamming(p), _hamming_broadcast(p)
+        assert np.array_equal(got, want), (u, d)
+    # degenerate rows: all-equal and all-opposite
+    p = np.array([[1, 1, 1], [1, 1, 1], [0, 0, 0]], dtype=np.uint8)
+    assert np.array_equal(mc._hamming(p), _hamming_broadcast(p))
+
+
+def _linkage_full_scan(patterns, counts, ks, diff):
+    """The pre-2026-09-13 merge loop: re-scan the whole active submatrix.
+
+    The row-minimum cache that replaced it must choose the SAME pair at every
+    merge, ties included -- which is the whole risk, since Hamming distances
+    on short fingerprints tie constantly.
+    """
+    u = patterns.shape[0]
+    out = {}
+    ks = sorted(set(int(k) for k in ks if 2 <= k <= u))
+    dist = diff.astype(np.float64)
+    np.fill_diagonal(dist, np.inf)
+    size = counts.astype(np.float64).copy()
+    active = np.ones(u, dtype=bool)
+    labels = np.arange(u, dtype=np.int32)
+    n_active = u
+    if n_active in ks:
+        out[n_active] = labels.copy()
+    while n_active > 2:
+        sub = np.where(active)[0]
+        block = dist[np.ix_(sub, sub)]
+        i_s, j_s = divmod(int(np.argmin(block)), block.shape[1])
+        i, j = int(sub[i_s]), int(sub[j_s])
+        if i > j:
+            i, j = j, i
+        ni, nj = size[i], size[j]
+        new_row = (ni * dist[i, :] + nj * dist[j, :]) / (ni + nj)
+        dist[i, :] = new_row
+        dist[:, i] = new_row
+        dist[i, i] = np.inf
+        dist[j, :] = np.inf
+        dist[:, j] = np.inf
+        size[i] = ni + nj
+        active[j] = False
+        labels[labels == j] = i
+        n_active -= 1
+        if n_active in ks:
+            out[n_active] = labels.copy()
+    if 2 in ks and 2 not in out:
+        out[2] = labels.copy()
+    for k, lab in out.items():
+        _, norm = np.unique(lab, return_inverse=True)
+        out[k] = norm.astype(np.int32).ravel()
+    return out
+
+
+def test_linkage_cache_picks_the_same_merges_as_a_full_scan():
+    ks = [2, 3, 4, 5, 6]
+    rng = np.random.default_rng(0)
+    checked = 0
+    for u, d in ((9, 7), (60, 13), (150, 21), (400, 8), (600, 113)):
+        p = np.unique((rng.random((u, d)) < 0.5).astype(np.uint8), axis=0)
+        counts = rng.integers(1, 40, len(p)).astype(np.int64)
+        diff = mc._hamming(p)
+        got = mc._linkage_labels(p, counts, ks, diff)
+        want = _linkage_full_scan(p, counts, ks, diff)
+        assert set(got) == set(want), (u, d)
+        for k in want:
+            assert np.array_equal(got[k], want[k]), (u, d, k)
+        checked += len(want)
+    assert checked >= 20, "the oracle produced almost no partitions to compare"
+    # tie-heavy by construction: 8 bits over 400 rows forces duplicate
+    # distances everywhere, which is where a tie-break change would show
+    p = np.unique((rng.random((400, 8)) < 0.5).astype(np.uint8), axis=0)
+    diff = mc._hamming(p)
+    assert (np.unique(diff).size < diff.size), "fixture has no tied distances"
 
 
 def test_linkage_does_not_mutate_a_shared_distance_matrix():
@@ -390,13 +593,17 @@ def test_base_opponent_folds_variant_only_when_stem_is_in_the_pool():
 # render_section: named-anchor inheritance, tint tokens, param note
 # ---------------------------------------------------------------------------
 
-OPP_NAMES = ["Sableye", "Sableye (Shadow)", "Sableye (Bug Bite)"]
+# Eight opponents, because the section's degeneracy floor needs at least
+# six sharp marginals before a scenario gets a cluster view at all. The
+# three Sableye rows are the ones the anchor-inheritance test reads; the
+# rest are pool filler.
+OPP_NAMES = ["Sableye", "Sableye (Shadow)", "Sableye (Bug Bite)",
+             "Azumarill", "Medicham", "Registeel", "Bastiodon", "Umbreon"]
 
 
 def _render(anchor_names):
-    """Render a 100-IV / 3-opponent section; every opponent is sharp."""
-    flat, nIvs, nO = planted_scores(
-        [50, 50], [[0, 0, 0], [1, 1, 1]], scen_idx=4)
+    """Render a 360-IV / 8-opponent section; every opponent is sharp."""
+    flat, nIvs, nO = staircase_scores(n_opp=len(OPP_NAMES))
     atk = np.linspace(100, 110, nIvs)
     data_obj = {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
                 "ivHp": np.full(nIvs, 135.0).tolist()}
@@ -686,10 +893,14 @@ def test_in_page_note_quotes_the_module_constants(monkeypatch):
 
 
 def test_weak_separation_headline_follows_weak_sil(monkeypatch):
+    # The HEADLINE form, not the phrase: "How this works" now defines the
+    # flag ('below 0.30 the headline says "weak separation"') and so carries
+    # the words on every page.
+    flag = "- weak separation)"
     monkeypatch.setattr(mc, "WEAK_SIL", 1.5)     # everything reads as weak
-    assert "weak separation" in _render([])
+    assert flag in _render([])
     monkeypatch.setattr(mc, "WEAK_SIL", 0.0)     # nothing does
-    assert "weak separation" not in _render([])
+    assert flag not in _render([])
 
 
 # ---------------------------------------------------------------------------
@@ -717,3 +928,264 @@ def test_render_smoke_from_real_blob(tmp_path):
     assert html.count('"opponents": [') == 1   # verify_overnight extraction
     # (the retired-surface denylist moved to the free source scan above --
     # it needed no blob, no render and no 8.5s, and it ran on one machine)
+
+
+# ---------------------------------------------------------------------------
+# Pinned reference values: Shadow Sableye GL, moveset 0, PvPoke opponent IVs
+# ---------------------------------------------------------------------------
+#
+# The dive the all-scenario work came from (docs/scenario_clusters_plan.md).
+# Pre-fix (through 2026-09-12) this section computed 0v0 / 1v1 / 2v2 only, so
+# every number below except 1v1's was UNCOMPUTED, not different.
+#
+# Ks and root rules are pinned exactly -- they are discrete, load-bearing and
+# quoted on the page. Silhouettes are pinned as FLOORS (a linkage tie-break
+# can legitimately move the fourth decimal; see the module's fidelity note).
+
+SABLEYE_SHADOW_BLOB = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
+
+
+def _find_blob(name):
+    """This clone's blob store, then the sibling main checkout's.
+
+    A working clone shares the machine's replay blobs rather than
+    duplicating them (same lookup as tests/test_deep_dive_brief.py).
+    """
+    for d in (REPO_ROOT / "userdata" / "replay",
+              REPO_ROOT.parent / "gopvpsim" / "userdata" / "replay"):
+        p = d / name
+        if p.exists():
+            return p
+    return None
+
+
+def _blob_cluster_run(name):
+    import gzip
+    import pickle
+    path = _find_blob(name)
+    if path is None:
+        pytest.skip(f"{name} is not on this machine")
+    with gzip.open(path, "rb") as f:
+        st = pickle.load(f)
+    m = st["moveset_data"][0]
+    opps = st["opponent_names"]
+    scen = [tuple(s) for s in st["shield_scenarios"]]
+    flat = np.asarray(m["scores"]["pvpoke"], dtype=np.int32)
+    nO, nS = len(opps), len(scen)
+    nIvs = flat.size // (nS * nO)
+    meta = np.array(m["meta"])
+    # Rounded the way the PAGE rounds (deep_dive.py's DATA.ivAtk/ivDef), so
+    # the thresholds pinned below are the ones a reader sees. Only the
+    # 1v1 / all root moves: 148.67 unrounded, 148.68 as shipped.
+    dp = mc.SECTION_STAT_DP
+    return mc.compute_matchup_clusters(
+        flat, nIvs, nS, nO, scen, np.round(meta[:, 5], dp),
+        np.round(meta[:, 6], dp), meta[:, 7], no_anchors), nO
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_shadow_sableye_gl_reference_values():
+    out, nO = _blob_cluster_run(SABLEYE_SHADOW_BLOB)
+    assert list(out)[-1] == "all"
+
+    # 0v1 -- the finding that motivated the whole change: the two bands on
+    # the main scatter are one attack line (a CMP line against the default
+    # Annihilape), at a HIGHER silhouette than the even scenarios carry.
+    e = out["0v1"]
+    assert e["res"]["k"] == 2
+    assert e["res"]["silhouette"] >= 0.60             # measured 0.654
+    assert e["root_rule"] == "atk < 148.06"
+    assert e["root_split"] == "atk 148.06"
+    assert e["cluster_rules"] == ["atk < 148.06", "atk >= 148.06"]
+    assert e["res"]["clusters"][1]["size"] == 2220    # the upper band
+    assert e["tree_acc"] == 1.0
+
+    # 1v0 -- the five-band attack ladder. Its root separates no cluster
+    # cleanly (tree accuracy 0.84), so NO cluster carries a legend rule:
+    # before the iff tightening three of the five were named
+    # "atk < 151.20", which is true of all three and identifies none.
+    assert out["1v0"]["res"]["k"] == 5
+    assert out["1v0"]["cluster_rules"] == [None] * 5
+    assert out["1v0"]["root_split"] == "atk 151.20"
+
+    # Both lopsided extremes fall under the degeneracy floor, and say why.
+    two_v_zero = out["2v0"]
+    assert two_v_zero["degenerate"] is True
+    assert two_v_zero["n_sharp"] == 1
+    assert f"of {nO} opponents here" in two_v_zero["reason"]
+    assert "1 opponent is a sharp marginal" in two_v_zero["reason"]
+    zero_v_two = out["0v2"]
+    assert zero_v_two["degenerate"] is True
+    assert (zero_v_two["n_sharp"], zero_v_two["n_patterns"]) == (5, 16)
+
+    # The combined view. K matches the plan's A3 reading; the line does not
+    # (the plan measured atk < 148.06 over ~118 bits in an offline run that
+    # predates the degeneracy floor and included 0v2's 5 bits). With the
+    # floor the concatenation is 113 bits over 7 scenarios and lands on the
+    # 1v1 line. Both readings are recorded in the module comment beside the
+    # exclusion; this pins what ships.
+    a = out["all"]
+    assert a["combined"]["n_bits"] == 113
+    assert a["combined"]["excluded"] == ["0v2", "2v0"]
+    assert len(a["combined"]["scens"]) == 7
+    assert a["res"]["k"] == 2
+    assert a["res"]["silhouette"] >= 0.43             # measured 0.451
+    assert a["root_rule"] == "atk < 148.68"   # 148.67 on unrounded stats
+    assert a["tree_acc"] >= 0.97                      # measured 0.983
+    # bits are (scenario, opponent) pairs, and the flip table names both
+    assert len(a["combined"]["bit_scen"]) == a["combined"]["n_bits"]
+    assert len(a["flips"]) == a["combined"]["n_bits"]
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_combined_bits_are_ordered_most_discriminating_first():
+    """The combined column order is a CHOSEN tie-break, not an accident.
+
+    Hamming distance is permutation-invariant in the columns, so the order
+    cannot move a point -- but it sets ``np.unique``'s lexicographic order
+    of the unique patterns, which is the linkage tie-break, and on this grid
+    that moves K. Pinned two ways: the shipped order is |wr - 0.5| ascending
+    (what ``sharp_marginals`` hands every per-scenario entry), and the raw
+    grid order it replaced really does give a different answer here, so a
+    silent revert to collection order cannot pass.
+    """
+    import gzip
+    import pickle
+    path = _find_blob(SABLEYE_SHADOW_BLOB)
+    if path is None:
+        pytest.skip(f"{SABLEYE_SHADOW_BLOB} is not on this machine")
+    with gzip.open(path, "rb") as f:
+        st = pickle.load(f)
+    m = st["moveset_data"][0]
+    scen = [tuple(x) for x in st["shield_scenarios"]]
+    nO, nS = len(st["opponent_names"]), len(scen)
+    flat = np.asarray(m["scores"]["pvpoke"], dtype=np.int32)
+    nIvs = flat.size // (nS * nO)
+    meta = np.array(m["meta"])
+    dp = mc.SECTION_STAT_DP
+    atk, dfn, hp = np.round(meta[:, 5], dp), np.round(meta[:, 6], dp), meta[:, 7]
+
+    ws = [(mc.scenario_label(p), mc.win_matrix(flat, nIvs, nS, nO, i))
+          for i, p in enumerate(scen)]
+    cf = mc.concat_fingerprint(ws)
+    W = cf["W"]
+    assert W.shape[1] == 113
+
+    # (a) the shipped order is sharpest-first, ties stable
+    sharpness = np.abs(W.mean(axis=0) - 0.5)
+    assert np.all(np.diff(sharpness) >= -1e-12), "columns are not sharpest-first"
+
+    # (b) it is load-bearing: collection order answers differently
+    cols = []
+    for lbl, Wi in ws:
+        sharp, _wr, _ns, _np_, degen = mc.screen_scenario(Wi)
+        if not degen:
+            cols.append(Wi[:, sharp])
+    grid = np.hstack(cols).astype(np.uint8)
+    assert grid.shape == W.shape
+    k_ship, lab_ship, sil_ship, _ = mc.choose_k(W.astype(np.uint8))
+    k_grid, lab_grid, sil_grid, _ = mc.choose_k(grid)
+    assert (k_ship, k_grid) == (2, 3)                 # measured
+    assert sil_ship > sil_grid                        # 0.451 vs 0.395
+    acc_ship, _ = mc.stat_rules({"k": k_ship, "labels": lab_ship}, atk, dfn, hp)
+    acc_grid, _ = mc.stat_rules({"k": k_grid, "labels": lab_grid}, atk, dfn, hp)
+    assert acc_ship > acc_grid                        # 0.983 vs 0.961
+
+
+def test_signpost_names_the_sharpest_single_scenarios_with_their_size():
+    """The combined block points at the page's cleanest SINGLE partitions.
+
+    The combined view is the default and is routinely the least separated
+    one, so without this the page's best result is an unlabelled click away.
+    "Sharpest" is comparative and a silhouette rises as fingerprints get
+    shorter, so each entry carries the marginal count it was measured over.
+    """
+    flat, nIvs, nO = staircase_scores(scen_idx=4)
+    arr = np.array(flat, dtype=np.int32).reshape(nIvs, 9, nO)
+    arr[:, 8, :] = arr[:, 4, :]
+    arr[:, 0, :] = arr[:, 4, :]
+    atk = np.linspace(100, 110, nIvs)
+    computed = mc.compute_matchup_clusters(
+        arr.ravel().tolist(), nIvs, 9, nO, SCENARIOS9, atk, atk, atk,
+        no_anchors)
+    line = mc._sharpest_signpost(computed)
+    assert line.startswith("<p")
+    assert "Sharpest single scenarios" in line
+    # names real, clustered, NON-combined scenarios, best silhouette first
+    # highest silhouette first, ties broken by label -- the function's order
+    ranked = sorted(((e["res"]["silhouette"], lbl) for lbl, e
+                     in computed.items()
+                     if "res" in e and lbl != mc.ALL_SCEN_KEY),
+                    key=lambda t: (-t[0], t[1]))
+    assert mc.ALL_SCEN_DISPLAY not in line
+    assert mc._scen_display(ranked[0][1]) in line
+    assert line.index(mc._scen_display(ranked[0][1])) < \
+        line.index(mc._scen_display(ranked[1][1]))
+    # ... with K, the silhouette and the count it was measured over
+    top = computed[ranked[0][1]]
+    assert f'K={top["res"]["k"]}' in line
+    assert f'silhouette {ranked[0][0]:.2f} over {len(top["res"]["sharp"])} ' \
+        'sharp marginal' in line
+    # and it only appears in the combined block
+    html = mc.render_section(
+        arr.ravel().tolist(), nIvs, 9, nO, SCENARIOS9,
+        [f"Opp{i}" for i in range(nO)],
+        {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+         "ivHp": atk.tolist()}, "rank-1", "FAST / CM", [])
+    assert html.count("Sharpest single scenarios") == 1
+
+
+def test_root_rule_is_emitted_only_when_the_split_is_an_iff():
+    """A legend NAME is read as a definition, so only an iff may be one.
+
+    Three clusters split by two attack lines: the root separates the top
+    cluster exactly (every member above it, nothing else above it) and is
+    merely NECESSARY for the other two (both lie below it). Before the
+    tightening both of those were named "atk < T" -- one rule, two clusters,
+    identifying neither. Only the iff side is named now.
+    """
+    n = 300
+    atk = np.linspace(100.0, 130.0, n)
+    flat = np.full(n, 0)
+    labels = np.zeros(n, dtype=int)
+    labels[atk >= 110.0] = 1
+    labels[atk >= 120.0] = 2
+    res = {"k": 3, "labels": labels}
+    root, per, split = mc.root_rules(res, atk, atk, atk, min_leaf=10)
+    assert root is not None and split is not None
+    assert root.startswith("atk < ") and split.startswith("atk ")
+    assert split == root.replace(" < ", " ")
+    # exactly one cluster is an iff for the root split; the other two share
+    # the other side and so are left unnamed
+    named = [i for i, r in enumerate(per) if r]
+    assert len(named) == 1, per
+    thr = float(root.split("< ")[1])
+    rule = per[named[0]]
+    # the named cluster IS its side of the root, exactly
+    side = atk < thr if rule.startswith("atk < ") else atk >= thr
+    assert np.array_equal(side, labels == named[0])
+    # sanity: the two unnamed ones share the OTHER side, which is why
+    # neither can wear that side's rule as a name
+    for c in range(3):
+        if c != named[0]:
+            assert (~side[labels == c]).all()
+
+
+def test_section_stat_dp_matches_what_the_page_actually_bakes():
+    """The section's tree is fitted on DATA.ivAtk/ivDef, which deep_dive.py
+    rounds. SECTION_STAT_DP exists so a consumer quoting the section's split
+    (the build brief's corroboration line) can round the same way; if
+    deep_dive.py changes places, the two drift by a cent with nothing to
+    catch it.
+
+    Tolerant pattern plus a positive control: a rename of ``meta``/``m`` is
+    not a contract change, a change of PLACES is.
+    """
+    src = (REPO_ROOT / "scripts" / "deep_dive.py").read_text()
+    dp = mc.SECTION_STAT_DP
+    for stat in ("iv_atk", "iv_def"):
+        m = re.search(r"%s\s*=\s*\[\s*round\([^,]+,\s*(\d+)\s*\)" % stat, src)
+        assert m, f"{stat} is no longer a rounded comprehension; re-pin this"
+        assert int(m.group(1)) == dp, (stat, m.group(1), dp)

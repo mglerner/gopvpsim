@@ -1,14 +1,19 @@
 """One even-shield scenario set for every surface that follows the convention.
 
-The XehrFelrose convention the ML IV guide, the owned-collection breakdown,
-and the dive's matchup-cluster section all use is "even shields only" -- both
-sides bring the same count, so the comparison isolates the spread rather than
-the shield read. That set was written out three times
-(``iv_envelope_analysis.EVEN_SHIELDS``, ``owned_breakdown.EVEN_SHIELDS``,
-``deep_dive_matchup_clusters.EVEN_SHIELD_PAIRS``) and agreed only by luck:
-dropping 2-2 meant editing three files, and a missed one silently sims a
-different scenario set with no error. It now lives in
-``deep_dive_lib.shields``.
+The XehrFelrose convention the ML IV guide and the owned-collection
+breakdown follow is "even shields only" -- both sides bring the same count,
+so the comparison isolates the spread rather than the shield read. That set
+was written out three times (``iv_envelope_analysis.EVEN_SHIELDS``,
+``owned_breakdown.EVEN_SHIELDS``, ``deep_dive_matchup_clusters.
+EVEN_SHIELD_PAIRS``) and agreed only by luck: dropping 2-2 meant editing
+three files, and a missed one silently sims a different scenario set with no
+error. It now lives in ``deep_dive_lib.shields``.
+
+The matchup-cluster section LEFT the convention on 2026-09-13: it clusters
+every scenario the dive baked plus a concatenated "all scenarios" view, so
+it no longer imports the set at all. The test below pins that departure
+(the name is gone, not silently re-declared), because a re-appearing local
+copy is exactly what the consolidation removes.
 
 Identity (``is``), not equality: equality still passes against a fresh copy,
 which is exactly the failure mode the consolidation removes.
@@ -38,13 +43,21 @@ def test_even_shields_is_immutable():
     assert all(isinstance(p, tuple) for p in EVEN_SHIELDS)
 
 
-def test_matchup_clusters_uses_the_shared_set():
+def test_matchup_clusters_left_the_convention_without_re_declaring_it():
     spec = importlib.util.spec_from_file_location(
         "deep_dive_matchup_clusters", SCRIPTS / "deep_dive_matchup_clusters.py")
     mc = importlib.util.module_from_spec(spec)
     sys.modules["deep_dive_matchup_clusters"] = mc
     spec.loader.exec_module(mc)
-    assert mc.EVEN_SHIELD_PAIRS is EVEN_SHIELDS
+    # Pre-2026-09-13 this module imported the shared set as
+    # EVEN_SHIELD_PAIRS and defaulted its driver to it. It now clusters
+    # every baked scenario; what must NOT come back is a local copy of the
+    # even set under any name.
+    assert not hasattr(mc, "EVEN_SHIELD_PAIRS")
+    src = (SCRIPTS / "deep_dive_matchup_clusters.py").read_text()
+    assert "((0, 0), (1, 1), (2, 2))" not in src
+    # positive control: the shared declaration is still the one place it lives
+    assert EVEN_SHIELDS == ((0, 0), (1, 1), (2, 2))
 
 
 def test_owned_breakdown_uses_the_shared_set():

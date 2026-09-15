@@ -61,6 +61,11 @@ from deep_dive_lib.opponents import (
     resolve_opp_ivs, parse_opponent_spec, build_opp_meta_ranks,
     rankings_snapshot_date, register_opponent_variant,
 )
+# The dive page's own Matchup clusters section. Imported, not reimplemented:
+# the corroboration line below quotes THAT section's partition of THIS grid,
+# so both must cluster the same bits with the same machinery or the page and
+# the brief would print two partitions under one name.
+import deep_dive_matchup_clusters as clusters
 
 # ---------------------------------------------------------------------------
 # Selection constants. Every one is a parameter of the stage that uses it and
@@ -85,6 +90,13 @@ MATERIAL_HI = 0.90                # G-material-hi
 # a test that never ran. 5 is roughly the quarter-of-the-axis share that 20 is
 # of a typical attack grid. atk and def are unchanged from v2.
 MIN_ATTAINED_BELOW = {'atk': 20, 'def': 20, 'hp': 5}
+# Stage 14: the cluster corroboration line is printed only when the
+# partition is actually separated. 0.40 is the section's own reading of a
+# usable silhouette (its WEAK_SIL is 0.30, below which the section itself
+# prints "weak separation"), set one notch higher here because this line is
+# a corroboration -- a weakly-separated partition corroborates nothing, and
+# an unprinted line is the honest outcome.
+CLUSTER_SIL_MIN = 0.40
 RANK_GATE = 50                    # G-rank / D3
 DIRECTION_MIN_ABOVE = 0.90        # G-direction
 MODES_TO_LIST = 2                 # a rung needs this many passing modes to list
@@ -1901,10 +1913,12 @@ def stage12_degradation(triage, cuts, rungs, floor, n_modes, n_arms, n_iv,
 #   "not a clean cut in this bake: N of M clearers win" rather than
 #   substituting it.
 #
-# Stage 14 -- cluster corroboration line ("the cluster partition splits at
-#   X"). Deferred: it needs `scripts/deep_dive_lib/clusters.py` `choose_k`,
-#   and the plan itself marks that number as CITED rather than recomputed, so
-#   shipping it here would print a number this module never derived.
+# Stage 14 -- cluster corroboration line. NO LONGER DEFERRED (2026-09-13):
+#   the number is now DERIVED here, from this arm's own win cube, by calling
+#   deep_dive_matchup_clusters' choose_k / cluster_tree on the concatenated
+#   all-scenario fingerprint -- see cluster_corroboration() below. It was
+#   deferred while it would have been a CITED number the module never
+#   computed. It is re-derived by G-recompute like every other printed value.
 #
 # G-recompute, the numbers it does NOT re-derive, and why. Round 3 closed
 #   the 25 reader-facing leaves a corruption probe found unguarded (rank-1's
@@ -1945,6 +1959,49 @@ def stage12_degradation(triage, cuts, rungs, floor, n_modes, n_arms, n_iv,
 #   evidence block, which is as close as a blob with no gamemaster stamp
 #   (plan Phase 0 item 1) can get.
 # ---------------------------------------------------------------------------
+
+
+def cluster_corroboration(win, planes, state):
+    """Stage 14: the dive page's all-scenario cluster partition, in one line.
+
+    Independent evidence for the printed floor: the brief selects a line by
+    clean cuts on single cells, while the Matchup clusters section partitions
+    the SAME grid by whole win/loss fingerprints and reads a stat rule off
+    the result. When the two land on the same stat and a nearby value, that
+    is corroboration from a method that shares no machinery with stages 2-6.
+
+    Returns None when there is nothing honest to say -- fewer than two
+    non-degenerate scenarios, no K clearing the cluster floor, or a tree that
+    does not split -- and the caller drops the sentence entirely rather than
+    printing a hedge. The silhouette is returned unfiltered; CLUSTER_SIL_MIN
+    is applied at the PRINT site, so G-recompute checks the number whether or
+    not this page printed it.
+    """
+    n_sc = win.shape[1]
+    cf = clusters.concat_fingerprint(
+        [(scenario_label(state, si), win[:, si, :]) for si in range(n_sc)])
+    if cf['W'] is None:
+        return None
+    k, labels, sil, _ = clusters.choose_k(cf['W'].astype(np.uint8))
+    if k is None:
+        return None
+    # Fitted on the stats ROUNDED the way the page rounds them: the section
+    # this line quotes fits its tree on DATA.ivAtk/ivDef (2dp), so on the
+    # Shadow Sableye 1v1 grid the full-precision split prints 148.67 where
+    # the page prints 148.68. Same partition either way -- the clustering is
+    # on win bits, not stats -- but a corroboration that cites a number the
+    # reader cannot find on the page is worse than no corroboration.
+    dp = clusters.SECTION_STAT_DP
+    tree, _X, _y = clusters.cluster_tree(
+        {'k': k, 'labels': labels},
+        np.round(planes['atk'], dp), np.round(planes['def'], dp),
+        np.round(planes['hp'], dp))
+    if 'feat' not in tree:
+        return None
+    return {'stat': clusters.TREE_FEATURES[tree['feat']],
+            'value': float(tree['thr']), 'k': int(k), 'sil': float(sil),
+            'n_bits': int(cf['n_bits']), 'n_scens': len(cf['scens']),
+            'excluded': list(cf['excluded'])}
 
 
 def stage12_caps(n_modes, n_arms):
@@ -2229,6 +2286,200 @@ def near_floor_rule(floor_rung, floor_cell, floor_rungs, atk):
             'modes_fail': list(c['holds']['modes_fail'])}
 
 
+# ---------------------------------------------------------------------------
+# Stage 13 -- the ladder, one shield scenario at a time
+# ---------------------------------------------------------------------------
+
+def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
+                   n_iv, floor_rung, floor_axis=None, band=DECISION_BAND):
+    """Per shield scenario: the in-band lines, and the closest rule if none.
+
+    ``pool`` is ``cuts_claimed + prims_claimed`` -- the SAME exact / gate /
+    near-exact ladder on all three axes that stage 6 selects the page's line
+    out of, before the band and the gates narrow it to one value. The dive
+    page's "Which one to build?" section has its own Shield scenario control,
+    and that control asks a narrower question than the page's line does
+    ("what turns over in 1v1 alone"), so it re-partitions this pool by
+    scenario rather than deriving anything new.
+
+    Returned per scenario label:
+
+    - ``lines``: the values inside ``band`` ON ONE AXIS, ascending, cells at
+      the same value merged (a value is a build target; the cells sharing it
+      need not share a cause, so each carries its own name list). The page's
+      own line is included when its cell sits in this scenario, whatever its
+      share.
+    - ``off_axis``: the in-band values this scenario carries on the OTHER
+      two stats. They are real thresholds and they are named, but they are
+      not rungs of ``lines``: "at or above X you clear the rung above" is a
+      nesting claim, and ``atk >= 123.92`` and ``def >= 119.55`` do not nest
+      in either direction (on Sableye GL 1v1, 1295 spreads clear the attack
+      line and miss the defense one, and 1288 the reverse). Ranking them
+      together as one ladder, coloring by "the highest cleared" and printing
+      one grey "below" key would be false for a quarter of the grid.
+    - ``win_lo`` / ``win_hi`` / ``n_opp``: this scenario's win-count range
+      over the whole grid, which is the same measurement the Matchup
+      clusters section states a degenerate scenario in (see
+      :func:`deep_dive_matchup_clusters.degenerate_finding`), so the two
+      sections say one absence in one set of numbers.
+    - ``closest``: what to name when ``lines`` is empty. The nearest cut in
+      this scenario to the band, with its share -- or, when the scenario has
+      no cut at all, the dirty-threshold row for it (stage 12b, top 1), which
+      is the same thing the negative page prints.
+    - ``degenerate``: G-scenario's own verdict for this scenario, so a caller
+      can say "too little turns over here" rather than "no line".
+
+    Nothing here is a new measurement: every number is a count off the cube
+    the rest of the brief already read.
+    """
+    n_sc = len(state['shield_scenarios'])
+    n_opp = win.shape[2]
+    by_scen = {si: [] for si in range(n_sc)}
+    for c in pool:
+        by_scen[c['si']].append(c)
+    floor_cells = set()
+    if floor_rung is not None:
+        floor_cells = {(c['si'], c['oi']) for c in floor_rung['cells']}
+    out = {}
+    for si in range(n_sc):
+        label = scenario_label(state, si)
+        groups = {}
+        for c in by_scen[si]:
+            groups.setdefault((c['axis'], round(float(c['T']), 9)), []).append(c)
+        lines = []
+        for (axis, _key), cells in groups.items():
+            share = cells[0]['n_pass'] / n_iv
+            is_floor = any((c['si'], c['oi']) in floor_cells
+                           and floor_rung is not None
+                           and abs(c['T'] - floor_rung['T']) <= 1e-9
+                           for c in cells)
+            if not (band[0] <= share <= band[1]) and not is_floor:
+                continue
+            # The REP carries the claim (its primitive, its gate side and its
+            # counts are what the caption prints), so it has to carry the
+            # NAME too. Taking the name from cells[0] -- pool insertion order
+            # -- prints one cell's claim under another cell's name the moment
+            # a group mixes primitives without an exact cut in it.
+            rep = sorted(cells, key=lambda x: PRIMITIVE_RANK[x['kind']])[0]
+            names = ([rep['label']]
+                     + [c['label'] for c in cells if c is not rep])
+            pr, dp = printed_cut(rep['T'], planes[axis],
+                                 field='Scenario line', ctx={'cell': names[0]})
+            lines.append({
+                'axis': axis, 'T': float(rep['T']), 'printed': pr, 'dp': dp,
+                'n_pass': int(rep['n_pass']), 'pool_share': float(share),
+                'kind': rep['kind'], 'gate_side': rep['gate_side'],
+                'n_above': int(rep['n_above']),
+                'n_win_above': int(rep['n_win_above']),
+                'n_below': int(rep['n_below']),
+                'n_win_below': int(rep['n_win_below']),
+                'n_wrong': int(rep['n_wrong']),
+                'names': names[:NAME_CAP], 'omitted': max(0, len(names) - NAME_CAP),
+                'n_cells': len(names), 'is_floor': bool(is_floor)})
+        lines.sort(key=lambda r: (r['T'], r['axis']))
+        lines, off_axis = _split_by_axis(lines, floor_axis)
+        closest = None
+        if not lines:
+            closest = _closest_rule(by_scen[si], planes, n_iv, band)
+        if closest is None and not lines:
+            cells_here = [(s, o) for s, o in contested_cells if s == si]
+            rows = stage12b_dirty_thresholds(win, planes, cells_here, set(),
+                                             ranks, triage, state, top_n=4)
+            # G-caveat is an EXCLUSION everywhere else in this module, and a
+            # caption is a reader-facing string: a dirty row naming Aegislash
+            # bare would fail the render gate rather than ship, so the cell is
+            # dropped here the way the clean-cut census drops it.
+            rows = [r for r in rows
+                    if not any(cs in r['cell'] for cs in CAVEAT_SPECIES)]
+            if rows:
+                d = rows[0]
+                closest = {'dirty': True, 'axis': d['axis'],
+                           'printed': d['printed'], 'dp': d['dp'],
+                           'n_pass': int(d['n_above']),
+                           'pool_share': float(d['n_above'] / n_iv),
+                           'n_wrong': int(d['n_wrong']), 'names': [d['cell']],
+                           'kind': ('gate' if d['one_sided'] else
+                                    'near_exact' if d['near_exact'] else None)}
+        tot = win[:, si, :].sum(axis=1)
+        out[label] = {'lines': lines, 'off_axis': off_axis,
+                      'closest': closest,
+                      'win_lo': int(tot.min()), 'win_hi': int(tot.max()),
+                      'n_opp': int(n_opp),
+                      'degenerate': bool(triage['degenerate'][si])}
+    return out
+
+
+# The axis a scenario's ladder is drawn on, when its in-band values are split
+# over more than one stat. The page's own axis wins when the page's own line
+# is one of them (the panel must not draw the printed line as an also-ran);
+# otherwise the axis carrying the most values, which is the one whose ladder
+# says the most.
+_AXIS_DRAW_ORDER = ('atk', 'def', 'hp')
+
+
+def _split_by_axis(lines, floor_axis):
+    """One scenario's in-band values, split into a ladder and the rest.
+
+    A ladder is a NESTING claim: same axis, ascending, every clearer of a
+    rung a clearer of the rungs below it. Across axes that is simply false,
+    so the off-axis values come back separately for the caption to state as
+    their own claims rather than being ranked into the ramp.
+    """
+    if not lines:
+        return [], []
+    primary = next((r['axis'] for r in lines if r['is_floor']), None)
+    if primary is None:
+        counts = {}
+        for r in lines:
+            counts[r['axis']] = counts.get(r['axis'], 0) + 1
+        primary = sorted(
+            counts,
+            key=lambda a: (-counts[a], 0 if a == floor_axis else 1,
+                           _AXIS_DRAW_ORDER.index(a)))[0]
+    return ([r for r in lines if r['axis'] == primary],
+            [r for r in lines if r['axis'] != primary])
+
+
+def _closest_rule(cells, planes, n_iv, band):
+    """The cut in one scenario nearest the decision band, or None.
+
+    "Nearest" is distance from the band on POOL SHARE, which is the axis the
+    band is stated on: a cut 87% of the grid already clears and a cut 14% of
+    it reaches are both outside, and the page has to say which side it missed
+    on.
+
+    A cut EVERY spread clears (or none does) is dropped rather than ranked. It
+    is not a rule a reader can act on -- nobody is on the other side of it --
+    and naming it under "the closest rule" told the reader there was something
+    there when there was not ("92.68 defense (Moltres (Galarian)), which 4096
+    of 4096 spreads (100.0%) clear"). When that empties the candidate list the
+    caller falls through to the dirty-threshold row, which is the same thing
+    the negative page prints.
+
+    Ties go to the stronger primitive, then to a FIXED axis order, then to the
+    lower value. The axis order matters: ranking a tie by raw ``T`` compares
+    numbers on incommensurable scales, so a defense cut (two-digit) beat an
+    attack cut (three-digit) on magnitude alone, every time.
+    """
+    cells = [c for c in cells if 0 < c['n_pass'] < n_iv]
+    if not cells:
+        return None
+    def gap(c):
+        share = c['n_pass'] / n_iv
+        return max(band[0] - share, share - band[1], 0.0)
+    rep = sorted(cells, key=lambda c: (gap(c), PRIMITIVE_RANK[c['kind']],
+                                       _AXIS_DRAW_ORDER.index(c['axis']),
+                                       c['T']))[0]
+    share = rep['n_pass'] / n_iv
+    pr, dp = printed_cut(rep['T'], planes[rep['axis']],
+                         field='Scenario closest rule',
+                         ctx={'cell': rep['label']})
+    return {'dirty': False, 'axis': rep['axis'], 'printed': pr, 'dp': dp,
+            'n_pass': int(rep['n_pass']), 'pool_share': float(share),
+            'n_wrong': int(rep['n_wrong']), 'names': [rep['label']],
+            'kind': rep['kind']}
+
+
 def cell_cuts_by_view(si, oi, cubes, axis='atk'):
     """The same cell's clean cut in every other mode / arm view (D5).
 
@@ -2477,6 +2728,14 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                                       ranks, triage, state)
     for d in dirty:
         d['disqualified'] = disqualifier(d, prims)
+    # D13: the same ladder, split by shield scenario, for the dive section's
+    # own Shield scenario control. Computed here rather than in the section
+    # renderer because every cut in it is already in scope, gated and
+    # mechanism-labelled; recomputing the pool page-side would be a second
+    # implementation of stages 1-4.
+    scen_lines = scenario_lines(cuts_claimed + prims_claimed, win, planes,
+                                triage, contested_cells, ranks, state, n_iv,
+                                floor_rung, floor_axis)
     cmp_near_misses = [c['label'] for c in cuts
                        if c['mech'].get('cmp_near_miss')]
 
@@ -2505,6 +2764,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
                                    triage['n_patterns'][si])
                                   for si in range(n_sc)},
         },
+        'cluster_corroboration': cluster_corroboration(win, planes, state),
         'clean_counts': dict(Counter(c['axis'] for c in cuts)),
         'clean_excluded': len(cuts_caveat),
         'clean_claimed': len(cuts_claimed),
@@ -2513,6 +2773,7 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         'degradation': degradation,
         'caps': caps,
         'dirty_thresholds': dirty,
+        'scenario_lines': scen_lines,
         'primitive_picks': primitive_picks,
         'floor_axis': floor_axis,
         # Which axes the page actually TESTED. G-material-gap wants a number
@@ -2791,6 +3052,17 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
             for r in floor_rung.get('merged_from', [])],
         'merge_tol': MERGE_SPREAD_TOL,
     }
+    # ONE threshold, ONE number on the page. Stage 7 escalates the FLOOR to
+    # three places when two cannot select its set, and the headline speaks it
+    # that way ("123.42 (123.419)"). Stage 13 printed the same T freshly, got
+    # "123.41" at two places, and the panel then disagreed with the paragraph
+    # above it about the value of the line they both describe. The floor's own
+    # rendering wins wherever a scenario line IS the floor. (Post-hoc rather
+    # than inside stage 13: ``pp`` is computed here, well after the ladder.)
+    for _entry in (facts.get('scenario_lines') or {}).values():
+        for _row in _entry['lines'] + _entry['off_axis']:
+            if _row['is_floor']:
+                _row['printed'], _row['dp'] = pp['printed'], pp['dp']
     _catch = catch_model(floor_mask, meta, facts['acquisition'])
     facts['catch'] = _catch.pop('rows')
     facts['catch_model'] = _catch
@@ -5631,9 +5903,26 @@ def _f14_how_sure(facts):
     if facts['triage']['degenerate']:
         dd = facts['triage']['degenerate_detail']
         bits = [f"{s} ({_n(dd[s][0])} contested, {_n(dd[s][1])} distinct "
-                f"win patterns)" for s in facts['triage']['degenerate']]
-        lines.append("Scenarios flagged degenerate and barred from carrying a "
-                     "floor: " + ', '.join(bits) + ".")
+                f"opponent columns)" for s in facts['triage']['degenerate']]
+        # The dive page's Matchup clusters section applies the SAME two
+        # numbers (6 / 8) to DIFFERENT quantities under the same word: its
+        # "sharp marginals" are the cells 2%-98% of spreads win (a subset of
+        # these contested cells) and its "distinct win patterns" are the
+        # distinct IV FINGERPRINTS over those cells, where this screen
+        # counts distinct opponent COLUMNS. Neither count dominates the
+        # other, so the two documents legitimately print different numbers
+        # for one scenario. Naming the tests here, instead of reusing the
+        # page's word, keeps a reader holding both from seeing a
+        # contradiction. (Unifying on clusters.screen_scenario would change
+        # WHICH scenarios can carry a floor, which is a behaviour change,
+        # not a wording one.)
+        lines.append(
+            f"Scenarios barred from carrying a floor -- fewer than "
+            f"{_n(DEGENERATE_SHARP)} contested cells, or fewer than "
+            f"{_n(DEGENERATE_PATTERNS)} distinct opponent columns among "
+            f"them; the dive page's \"degenerate\" flag applies the same "
+            f"two numbers to its own stricter counts, so it can flag a "
+            f"different set: " + ', '.join(bits) + ".")
     if fl is not None:
         if fl['kind'] != 'exact':
             lines.append(
@@ -5679,6 +5968,40 @@ def _f14_how_sure(facts):
                 f"grid would select {_n(l51['n_selected_by_l50_literal'])}.")
         else:
             lines.append("The same cell has no clean cut in the level-51 view.")
+    cc = facts.get('cluster_corroboration')
+    # Gated on the silhouette AS PRINTED (2dp, the precision the dive page's
+    # headline uses too). Gating on the raw value would suppress this line
+    # at 0.3954 beside a page headline reading "silhouette 0.40", which is a
+    # threshold the reader can see the page meet and the brief ignore.
+    if cc and round(cc['sil'], 2) >= CLUSTER_SIL_MIN:
+        # ONE sentence, in the evidence block only. It is corroboration, not
+        # a result: it never reaches the headline, and a partition that does
+        # not PRINT at CLUSTER_SIL_MIN or better says nothing at all.
+        # It names its SOURCE and its RELATION to the printed line: the same
+        # sentence under agreement and disagreement would leave the reader
+        # no cue which one they are looking at.
+        src = (f"the dive page's Matchup clusters section, which partitions "
+               f"this same grid by whole win/loss fingerprint across all "
+               f"{_n(cc['n_scens'])} non-degenerate shield scenarios")
+        if fl is None:
+            lines.append(
+                f"Independent check: {src}, splits it at "
+                f"{AXIS_WORD[cc['stat']]} {fmt(cc['value'])} "
+                f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
+        elif cc['stat'] == fl['axis']:
+            gap = abs(cc['value'] - fl['printed'])
+            where = ('above' if cc['value'] > fl['printed'] else 'below')
+            lines.append(
+                f"Independent check: {src}, also splits it on "
+                f"{AXIS_WORD[cc['stat']]} -- at {fmt(cc['value'])}, "
+                f"{fmt(gap)} {where} the line printed here "
+                f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
+        else:
+            lines.append(
+                f"Independent check: {src}, splits it on "
+                f"{AXIS_WORD[cc['stat']]} (at {fmt(cc['value'])}), not "
+                f"{AXIS_WORD[fl['axis']]} -- the two methods do not agree on "
+                f"this dive (K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
     lines.append(
         "Not measured here: opponent IVs outside the baked cohorts, "
         "post-match HP and shields, XL or dust cost, and any live-game check "
@@ -5702,8 +6025,11 @@ def _f15_provenance(facts):
         "That is stricter than the two numbers the dive page prints for the "
         "same opponent: the Threats \"flips at\" boundary (a 75/25 gate, so "
         "spreads on the passing side can still lose) and the Matchup clusters "
-        "single-stat split (the most accurate one, misclassifications "
-        "allowed).",
+        "flip table's single-stat split for that one opponent (the most "
+        "accurate such split, misclassifications allowed). The cluster line "
+        "in \"How sure\" above is a third thing again: not one opponent but "
+        "the stat rule that reproduces that section's "
+        f"\"{clusters.ALL_SCEN_DISPLAY}\" partition of the whole grid.",
         "Priority ties: the coverage ladder counts an exact attack tie as NOT "
         "beaten. The engine is seat-dependent on an exact tie, so a tied line "
         "is not a guarantee in either direction.",
@@ -5909,6 +6235,16 @@ def gate_recompute(state, arm, blob_path, mode, level, facts, ctx):
     check('How sure', '-', facts['triage']['all_lose'], int((nwin == 0).sum()))
     check('How sure', '-', facts['triage']['contested'],
           int(((nwin > 0) & (nwin < n_iv)).sum()))
+
+    # Stage 14's corroboration line: re-clustered from the cube, not carried.
+    cc = facts.get('cluster_corroboration')
+    cc_r = cluster_corroboration(win, planes_r, state)
+    check('How sure', 'clusters', cc is None, cc_r is None)
+    if cc is not None and cc_r is not None:
+        for key in ('stat', 'k', 'n_bits', 'n_scens', 'excluded'):
+            check('How sure', 'clusters', cc[key], cc_r[key])
+        check('How sure', 'clusters', cc['value'], cc_r['value'], tol=1e-9)
+        check('How sure', 'clusters', cc['sil'], cc_r['sil'], tol=1e-12)
 
     fl = facts['floor']
     if fl is not None:
@@ -7057,9 +7393,18 @@ def shared_line_with(facts, earlier):
     return None
 
 
-def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
+def render_parts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
                  same_as=None):
-    """Render an already-computed fact set, running every stage-15 gate."""
+    """Gate an already-computed fact set and return its four rendered parts.
+
+    Returns ``(headline, strip, fields, evidence)`` -- the same four objects
+    ``render_facts`` hands to ``arm_html``. Split out so a SECOND renderer
+    (the dive page's "Which one to build?" section,
+    ``scripts/deep_dive_which_build.py``) can lay the parts out differently
+    without re-running, re-ordering or re-implementing the stage-15 gates.
+    Every gate below still runs exactly once per rendered section, in the
+    order the plan fixes; the standalone brief page is unchanged.
+    """
     ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
     gate_recompute(state, arm, blob_path, mode, level, facts, ctx)
     gate_names(facts, ctx)
@@ -7078,6 +7423,14 @@ def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
     gate_words(blocks + strip_strings, ctx)
     gate_caveat(blocks + strip_strings, ctx)
     gate_voice(list(headline) + strip_strings, ctx)
+    return headline, strip, fields, evidence
+
+
+def render_facts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
+                 same_as=None):
+    """Render an already-computed fact set, running every stage-15 gate."""
+    headline, strip, fields, evidence = render_parts(
+        state, arm, blob_path, facts, mode, level, same_as=same_as)
     return arm_html(facts, headline, strip, fields, evidence)
 
 

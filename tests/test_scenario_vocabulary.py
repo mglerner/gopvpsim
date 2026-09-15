@@ -179,7 +179,10 @@ def test_clusters_module_imports_the_helper():
     (silently) when it misses."""
     assert mc.scenario_label is rendering.scenario_label or (
         mc.scenario_label((1, 1)) == rendering.scenario_label((1, 1)))
-    assert mc.EVEN_SHIELD_PAIRS == ((0, 0), (1, 1), (2, 2))
+    # The combined entry shares that keyspace and must not collide with an
+    # '{a}v{b}' label (it keys the same payload map).
+    assert mc.ALL_SCEN_KEY == "all"
+    assert "v" not in mc.ALL_SCEN_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -237,15 +240,21 @@ def test_flip_entries_carry_the_shared_label():
 # ---------------------------------------------------------------------------
 
 SCENARIOS9 = [(a, b) for a in range(3) for b in range(3)]
-OPP_NAMES = ['Azumarill', 'Medicham', 'Registeel']
+OPP_NAMES = ['Azumarill', 'Medicham', 'Registeel', 'Bastiodon',
+             'Umbreon', 'Sableye', 'Mandibuzz', 'Skarmory']
 
 
 def _render_clusters():
-    nIvs, nO = 100, len(OPP_NAMES)
+    # A staircase in EVERY scenario: block i beats the first i opponents, so
+    # all eight opponents are sharp marginals and there are nine distinct
+    # win patterns -- comfortably over the section's 6 sharp / 8 pattern
+    # degeneracy floor, which a 3-opponent grid sits under.
+    nO = len(OPP_NAMES)
+    block, nIvs = 40, 40 * (len(OPP_NAMES) + 1)
     arr = np.full((nIvs, 9, nO), 200, dtype=np.int32)
-    for si in (0, 4, 8):                       # 0v0, 1v1, 2v2
-        arr[50:, si, :] = 800
-        arr[:50, si, 0] = 800
+    for si in range(9):
+        for i in range(nO + 1):
+            arr[i * block:(i + 1) * block, si, :i] = 800
     atk = np.linspace(100, 110, nIvs)
     data_obj = {'ivAtk': atk.tolist(), 'ivDef': atk.tolist(),
                 'ivHp': np.full(nIvs, 135.0).tolist()}
@@ -257,7 +266,11 @@ def _render_clusters():
 def test_rendered_scenario_blocks_use_the_canonical_labels():
     html = _render_clusters()
     got = set(re.findall(r'data-scen="([^"]+)"', html))
-    assert got == {'0v0', '1v1', '2v2'}
+    # Pre-2026-09-13 this was the even three; the section now blocks every
+    # baked scenario plus the combined entry. The combined key deliberately
+    # is NOT an '{a}v{b}' label, and every other key must still be one.
+    assert got == {rendering.scenario_label(p) for p in SCENARIOS9} | {'all'}
+    assert all(re.fullmatch(r'\dv\d', g) for g in got - {'all'})
     # and the selector options agree with the blocks
     assert set(re.findall(r'<option value="([^"]+)"', html)) == got
 

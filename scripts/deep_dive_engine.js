@@ -529,8 +529,14 @@ function toggleAllScenarios() {
   var box = document.getElementById('allscen-toggle');
   var grid = document.getElementById('allscen-grid');
   if (!box || !grid) return;
-  if (!box.checked) { grid.style.display = 'none'; return; }
+  var note = document.getElementById('allscen-note');
+  if (!box.checked) {
+    grid.style.display = 'none';
+    if (note) note.style.display = 'none';
+    return;
+  }
   grid.style.display = 'grid';
+  if (note) note.style.display = 'block';
   var key = state.movesetIdx + '|' + state.oppIvMode;
   if (!_allscenRendered || key !== _allscenKey) {
     var g2 = document.getElementById('allscen-grid');
@@ -554,10 +560,49 @@ function renderAllScenarios() {
       grid.appendChild(d);
       var y = computeScenarioAvgPure(state.movesetIdx, si);
       if (!y) return;
-      Plotly.newPlot(d, [{x: Array.prototype.slice.call(DATA.spRanks),
-        y: Array.prototype.slice.call(y), mode: 'markers', type: 'scatter',
-        marker: {size: 2, opacity: 0.5}}],
-        {title: {text: labels[si] || ('scenario ' + si), font: {size: 12}},
+      // Each mini wears its OWN scenario's clusters, with that scenario's
+      // K / silhouette / split in the title -- the one-glance "which shield
+      // state actually has structure" view. Uncolored AND untitled beyond
+      // the label when the baked labels do not describe this moveset/mode
+      // (state.oppIvMode is composed from the Opponent IVs AND Bait
+      // dropdowns, so one click off either default falsifies it), or when
+      // that scenario carried no clusters. The gate covers the TITLE and
+      // not just the colors: a headline is a claim about the data on
+      // screen, and "K=2, silhouette 0.65, split atk 148.06" over a grid
+      // those labels do not describe is a false one.
+      var mLbl = scenLabel(si);
+      var mPay = _mcPayloadPage();
+      var mApply = _mcLabelsApply();
+      var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;
+      var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';
+      var mDispS = mPay && ((mPay.scens && mPay.scens[mLbl] &&
+                             mPay.scens[mLbl].display) ||
+                            (mPay.degenerate && mPay.degenerate[mLbl] &&
+                             mPay.degenerate[mLbl].display));
+      var mTitle = (mDispS || labels[si] || ('scenario ' + si)) +
+                   (mHead ? ': ' + mHead : '');
+      var mTraces;
+      if (mSc && mSc.labels) {
+        mTraces = [];
+        for (var mc0 = 0; mc0 < mSc.k; mc0++) {
+          mTraces.push({x: [], y: [], mode: 'markers', type: 'scatter',
+            hoverinfo: 'skip',
+            marker: {size: 2, opacity: 0.55,
+                     color: mPay.palette[mc0 % mPay.palette.length]}});
+        }
+        for (var mIv = 0; mIv < nIvs; mIv++) {
+          var mc1 = mSc.labels[mIv];
+          if (mc1 == null || !mTraces[mc1]) continue;
+          mTraces[mc1].x.push(DATA.spRanks[mIv]);
+          mTraces[mc1].y.push(y[mIv]);
+        }
+      } else {
+        mTraces = [{x: Array.prototype.slice.call(DATA.spRanks),
+          y: Array.prototype.slice.call(y), mode: 'markers', type: 'scatter',
+          marker: {size: 2, opacity: 0.5}}];
+      }
+      Plotly.newPlot(d, mTraces,
+        {title: {text: mTitle, font: {size: 11}},
          margin: {l: 40, r: 6, t: 26, b: 28}, showlegend: false,
          xaxis: {autorange: 'reversed', title: {text: 'SP rank', font: {size: 9}}},
          font: {size: 9}},
@@ -1240,6 +1285,7 @@ function loadCollection(csvText) {
   annotateAnchorBullets();
   updateView();
   mcRefreshAll();
+  wbRefresh();
 }
 
 // For each anchor-flip bullet in the analysis layer, look up which of
@@ -1832,6 +1878,7 @@ function clearCollection() {
   renderManualList();
   updateView();
   mcRefreshAll();
+  wbRefresh();
 }
 
 // ---- Manual one-at-a-time IV entry ----
@@ -1937,6 +1984,7 @@ function removeManualMon(idx) {
     annotateAnchorBullets();
     updateView();
     mcRefreshAll();
+    wbRefresh();
     return;
   }
   loadCollection(null);
@@ -2324,23 +2372,30 @@ function buildTraces() {
     }
   } else if (cm === 'cluster') {
     // --- Matchup-fingerprint cluster coloring ---
+    // var (not let): read back below, after the overlay traces are pushed.
+    var _clusterTraces = null;
     // Labels come from the live Matchup clusters section's inline JSON
     // payload (baked for moveset 0 + the default opp-IV mode at this
     // page's displayed level; the best-buddy swap keeps the live section
     // and DATA arrays level-consistent). On any other moveset/mode the
     // labels would not describe the displayed grid, so render neutral
     // points and say so in the legend instead of mis-coloring.
-    var mcRoot0 = document.querySelector('.dd-mc-root');
-    var mcPay = mcRoot0 ? _mcPayload(mcRoot0) : null;
+    var mcPay = _mcPayloadPage();
     var mcHasScens = !!(mcPay && mcPay.scens &&
                         Object.keys(mcPay.scens).length > 0);
-    var mcModeOk = state.movesetIdx === 0 &&
-                   (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
-    var mcOk = mcHasScens && mcModeOk;
+    var mcOk = mcHasScens && _mcLabelsApply();
     var mcScen = null;
     if (mcOk) {
+      // The Shields dropdown drives this. 'avg' (all scenarios at once) maps
+      // to the payload's combined entry -- the concatenated fingerprint over
+      // every non-degenerate scenario -- which is the same question the
+      // averaged y-axis is asking. It used to fall through to the payload
+      // default (1v1) and colored by a single scenario without saying so.
       var sis0 = getActiveScenarioIndices();
-      if (sis0.length === 1) {
+      var allKey0 = mcPay.allKey || 'all';
+      if (state.scenarioMode === 'avg' && mcPay.scens[allKey0]) {
+        mcScen = allKey0;
+      } else if (sis0.length === 1) {
         var lbl0 = scenLabel(sis0[0]);
         if (mcPay.scens[lbl0]) mcScen = lbl0;
       }
@@ -2349,12 +2404,43 @@ function buildTraces() {
     }
     if (mcOk) {
       var msc = mcPay.scens[mcScen];
+      var mcDisp = msc.display || mcScen;
       var ctr = [];
+      // Legend key naming which scenario's clusters are on screen (and the
+      // one-time y-axis switch, when it fired). Carries no points: the
+      // cluster names below carry the rule, not the scenario.
+      ctr.push({
+        name: wrapLegendName('Matchup clusters: ' + mcDisp +
+                             (_mcYAxisSwitched
+                              ? " (y-axis switched to 'Wins vs PvPoke " +
+                                "default' once: the clusters are horizontal " +
+                                'bands there; switch it back any time)' : '')),
+        // [null], not []: Plotly builds the legend from calcdata, and a trace
+        // with NO points gets no legend entry at all -- this note key was
+        // invisible on every clustered dive, and its missing entry is what
+        // put every later legend item one row out of step with its trace
+        // (see the C0 isolation bug below). One null point renders nothing
+        // and legends normally. Verified in Plotly 2.35.2 against a page
+        // built from this engine.
+        x: [null], y: [null], text: [],
+        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
+        legendrank: 100,
+        marker: {size: 6, color: themeColor('--text-muted'), opacity: 0.55}
+      });
       for (var c0 = 0; c0 < msc.k; c0++) {
+        // B2: the legend carries the depth-1 stat rule when the tree root
+        // separates that cluster cleanly. Python emits the string (null
+        // otherwise); nothing here formats a threshold.
+        var mcRule0 = (msc.rules && msc.rules[c0]) ? ': ' + msc.rules[c0] : '';
         ctr.push({
-          name: 'C' + c0 + ' - ' + mcScen + ' (n=' + msc.sizes[c0] + ')',
+          name: wrapLegendName('C' + c0 + mcRule0 +
+                               ' (n=' + msc.sizes[c0] + ')'),
           x: [], y: [], text: [],
           mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+          // Legend position, independent of draw order: these traces are
+          // pushed LAST (z-order, below) but the color mode the reader chose
+          // reads first in the legend, in cluster order, as it always did.
+          legendrank: 101 + c0,
           marker: {size: 4, color: mcPay.palette[c0 % mcPay.palette.length],
                    opacity: 0.75},
           hoverlabel: {bordercolor: mcPay.palette[c0 % mcPay.palette.length]}
@@ -2364,14 +2450,31 @@ function buildTraces() {
         if (currentYIsSparse && !isFinite(yValues[civ])) continue;
         if (!isOwnedFilter(civ)) continue;
         var clab = msc.labels[civ];
-        if (clab == null || !ctr[clab]) continue;
-        ctr[clab].x.push(DATA.spRanks[civ]);
-        ctr[clab].y.push(yValues[civ]);
-        ctr[clab].text.push(buildHoverText(civ) +
-                            '<br>Matchup cluster: C' + clab + ' (' + mcScen + ')');
+        // +1: ctr[0] is the legend note key, so cluster c lives at c + 1.
+        if (clab == null || !ctr[clab + 1]) continue;
+        ctr[clab + 1].x.push(DATA.spRanks[civ]);
+        ctr[clab + 1].y.push(yValues[civ]);
+        ctr[clab + 1].text.push(buildHoverText(civ) +
+                            '<br>Matchup cluster: C' + clab + ' (' + mcDisp + ')');
       }
+      // Collected, not pushed: Plotly z-order is insertion order, and the
+      // anchor / Efficient / slayer overlays are pushed further down. The
+      // color mode a reader selected should own the top of the canvas, which
+      // is the same reason the tier traces are appended after the overlays;
+      // they are appended alongside them below.
+      //
+      // This is NOT what made C0 isolate to an empty plot (Michael's
+      // screenshots). That was the legend/trace off-by-one above: the note
+      // key carried no points, so it got no legend entry, every later legend
+      // row addressed the trace BEFORE its own, and hovering "C0" brightened
+      // the empty note trace and dimmed C0 to 0.03. Measured on a rendered
+      // preview page in headless Chrome (7 traces, 6 legend rows, legend row
+      // 4 -> trace 5). Two fixes, both kept: the null point above, and
+      // _legendTraceIndex below, which reads the index Plotly itself bound to
+      // the legend node instead of counting DOM position.
+      _clusterTraces = [];
       for (var c1 = 0; c1 < ctr.length; c1++) {
-        if (ctr[c1].x.length) traces.push(ctr[c1]);
+        if (c1 === 0 || ctr[c1].x.length) _clusterTraces.push(ctr[c1]);
       }
     } else {
       var ncx = [], ncy = [], nct = [];
@@ -2666,6 +2769,16 @@ function buildTraces() {
   // when a tier circle sits on the same point.
   var recTrace = buildOverlayTrace('Spec Card Spreads', DATA.recIvs, '#e94560', false, false, true);
   if (recTrace) traces.push(recTrace);
+
+  // Matchup-cluster traces go on top of the overlays, for the same reason
+  // the tier traces do: the color mode a reader selected has to be the thing
+  // they can isolate. Order inside the group is left as built (legend note
+  // key first, then C0..Ck) so the legend reads in cluster order.
+  if (typeof _clusterTraces !== 'undefined' && _clusterTraces) {
+    for (var _ci = 0; _ci < _clusterTraces.length; _ci++) {
+      traces.push(_clusterTraces[_ci]);
+    }
+  }
 
   // Tier traces go next so they render on top of slayer/anchor overlays.
   // Sort largest first so smallest tiers (most selective) draw on top.
@@ -3395,6 +3508,23 @@ function updateMethodology() {
 
 // ---- Plot ----
 var origOpacities = [];
+
+// B5 state. The cluster bands are HORIZONTAL lines on a wins y-axis (each
+// band is a set of spreads with the same win count) and a smear on the
+// averaged-score axis, so the first time the reader picks cluster coloring
+// the y-axis moves with them -- ONCE. `_mcYAxisNudged` makes it a nudge
+// rather than a lock: switch back and it stays back. `_mcYAxisSwitched`
+// tells the legend to say it happened.
+var _mcYAxisNudged = false;
+var _mcYAxisSwitched = false;
+function _selHasValue(sel, v) {
+  if (!sel) return false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === v) return true;
+  }
+  return false;
+}
+
 function updateView() {
   // Read state from dropdowns
   var msel = document.getElementById('moveset-sel');
@@ -3420,6 +3550,23 @@ function updateView() {
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
   if (ysel) state.yAxisMode = ysel.value;
+  // The legend's "y-axis switched to ..." note is a claim about the axis as
+  // it stands; a reader who switches back must stop reading it. (The NUDGE
+  // itself stays spent -- _mcYAxisNudged is never cleared -- so switching
+  // back keeps it back.)
+  if (state.yAxisMode !== 'winsPvpoke') _mcYAxisSwitched = false;
+  // Spend the one-shot nudge only where the clusters can actually be drawn:
+  // on a non-default moveset / opponent-IV mode the cluster branch renders
+  // neutral points, and consuming the nudge there would mean the reader
+  // never gets it on the view it was written for.
+  if (state.colorMode === 'cluster' && !_mcYAxisNudged && _mcLabelsApply()) {
+    _mcYAxisNudged = true;
+    if (state.yAxisMode === 'avgScore' && _selHasValue(ysel, 'winsPvpoke')) {
+      ysel.value = 'winsPvpoke';
+      state.yAxisMode = 'winsPvpoke';
+      _mcYAxisSwitched = true;
+    }
+  }
   var asel = document.getElementById('anchor-display-sel');
   if (asel) state.anchorDisplayMode = asel.value;
   lockedIdx = -1;
@@ -3686,6 +3833,22 @@ function applyHistogramHash() {
 }
 
 // ---- Legend hover/click ----
+// The trace index Plotly bound to a legend node, NOT the node's position in
+// the legend. The two differ whenever a trace is missing from the legend (a
+// pointless trace gets no entry) or legendrank reorders it, and the
+// difference is silent: the reader hovers one key and a different trace
+// lights up. Falls back to the DOM position when the binding is not there.
+function _legendTraceIndex(el, fallback) {
+  try {
+    var d = el.__data__;
+    var item = Array.isArray(d) ? d[0] : d;
+    if (Array.isArray(item)) item = item[0];
+    var tr = item && item.trace;
+    if (tr && typeof tr.index === 'number') return tr.index;
+  } catch (e) { /* fall through to the DOM position */ }
+  return fallback;
+}
+
 function highlightTrace(idx) {
   var gd = document.getElementById('plot');
   for (var j=0; j<origOpacities.length; j++) {
@@ -3731,11 +3894,16 @@ function reattachLegendHandlers() {
       if (el._ddLegendWired) { return; }
       el._ddLegendWired = true;
       el.style.cursor = 'pointer';
-      el.addEventListener('mouseenter', function() { if (lockedIdx<0) highlightTrace(idx); });
+      // Resolved at EVENT time, not wiring time: Plotly reuses these nodes
+      // across react calls, so the binding a handler closed over could be a
+      // previous render's.
+      el.addEventListener('mouseenter', function() {
+        if (lockedIdx<0) highlightTrace(_legendTraceIndex(el, idx)); });
       el.addEventListener('mouseleave', function() { if (lockedIdx<0) restoreAll(); });
       el.addEventListener('click', function() {
-        if (lockedIdx===idx) { lockedIdx=-1; restoreAll(); }
-        else { lockedIdx=idx; highlightTrace(idx); }
+        var ti = _legendTraceIndex(el, idx);
+        if (lockedIdx===ti) { lockedIdx=-1; restoreAll(); }
+        else { lockedIdx=ti; highlightTrace(ti); }
       });
     });
   }
@@ -3877,6 +4045,30 @@ function cmpAdd() {
   cmpRender();
 }
 window.cmpAdd = cmpAdd;
+// Prefill the widget from ANOTHER section (today: the "Which one to build?"
+// button). Replaces the candidate list rather than appending, so the button is
+// idempotent -- two clicks give the same cards, not a doubled list that trips
+// CMP_MAX. `list` is an array of [atk, def, hp] IV triples; out-of-range,
+// non-integer and duplicate entries are dropped, and the same 0-15 validation
+// cmpAdd applies to typed input applies here. Returns how many were kept.
+function cmpSetCandidates(list) {
+  var out = [], seen = {};
+  function okIv(x) { return x >= 0 && x <= 15; }
+  for (var i = 0; i < list.length && out.length < CMP_MAX; i++) {
+    var t = list[i] || [];
+    var a = parseInt(t[0], 10), d = parseInt(t[1], 10), sv = parseInt(t[2], 10);
+    if (!(okIv(a) && okIv(d) && okIv(sv))) continue;
+    var k = a + '/' + d + '/' + sv;
+    if (seen[k]) continue;
+    seen[k] = 1;
+    out.push({ a: a, d: d, s: sv, level: null });
+  }
+  state.compareCandidates = out;
+  cmpStatus('', 'var(--text-muted)');
+  cmpRender();
+  return out.length;
+}
+window.cmpSetCandidates = cmpSetCandidates;
 function cmpStatus(t, c) {
   var el = document.getElementById('cmp-status'); if (el) { el.textContent = t; el.style.color = c; }
 }
@@ -4052,6 +4244,41 @@ function _mcPayload(root) {
   try { return JSON.parse(s.textContent); } catch (e) { return null; }
 }
 
+// The page's cluster payload, read from whichever Matchup clusters section is
+// live (the best-buddy swap replaces the section wholesale). Three surfaces
+// need it now -- the section's own panels, the main scatter's cluster color
+// mode, and the all-scenarios mini-grid -- so the lookup and the
+// "do the baked labels describe what is on screen" gate live here once.
+function _mcPayloadPage() {
+  var root = document.querySelector('.dd-mc-root');
+  return root ? _mcPayload(root) : null;
+}
+
+// Labels are baked for moveset 0 at the default opp-IV mode. On any other
+// moveset/mode they would not describe the displayed grid, so every consumer
+// falls back to uncolored points rather than mis-coloring.
+function _mcLabelsApply() {
+  return state.movesetIdx === 0 &&
+         (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
+}
+
+// Legend / title text for one scenario key: "K=2, silhouette 0.65, split
+// atk 148.06", or the short no-clusters note. Python emits every number and
+// every string; this only concatenates them. Words are spelled out ("sil"
+// and a bare "atk < 148.06" read as an abbreviation and a filter condition
+// to a reader who has met neither before).
+function _mcHeadline(pay, lbl) {
+  if (!pay) return '';
+  var sc = pay.scens ? pay.scens[lbl] : null;
+  if (sc) {
+    return 'K=' + sc.k + ', silhouette ' + Number(sc.sil).toFixed(2) +
+           (sc.split ? ', split ' + sc.split : '');
+  }
+  var dg = pay.degenerate ? pay.degenerate[lbl] : null;
+  if (dg) return dg.short || (dg.degenerate ? 'degenerate' : 'no clusters');
+  return '';
+}
+
 // One scattergl trace spec for the cluster panels. The per-cluster traces and
 // the owned-mon overlay differ ONLY in name + marker (and whether their arrays
 // arrive prebuilt), so the shared plumbing -- type/mode/hoverinfo -- is named
@@ -4092,7 +4319,11 @@ function _mcRenderRoot(root) {
     if (!xs || !ys) return;
     var traces = [];
     for (var c = 0; c < sc.k; c++) {
-      traces.push(_mcTrace('C' + c + ' (n=' + sc.sizes[c] + ')',
+      // Same legend rule the main scatter carries (Python emits the
+      // string; null when the depth-1 root does not separate that cluster).
+      traces.push(_mcTrace('C' + c +
+                           ((sc.rules && sc.rules[c]) ? ': ' + sc.rules[c] : '') +
+                           ' (n=' + sc.sizes[c] + ')',
                            {size: 4,
                             color: payload.palette[c % payload.palette.length],
                             opacity: 0.75}));
@@ -4214,6 +4445,899 @@ document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(functio
   if (root.offsetParent !== null) _mcRenderRoot(root);
 });
 
+// ---------------------------------------------------------------------------
+// "Which one to build?" section (scripts/deep_dive_which_build.py).
+//
+// One scattergl panel owned by the section, drawn the same way the Matchup
+// clusters panels are: server-side JSON carrying thresholds and marked
+// spreads only, every per-IV array read from the DATA / SCORES blobs the page
+// already embeds once. Axes are the main scatter's: stat-product rank
+// (reversed) against matchups won.
+//
+// The panel is deliberately INERT to the page's dropdowns. The line above it
+// was derived at the league cap, over every baked shield scenario and the
+// whole opponent pool, with PvPoke-default opponent IVs; following the
+// Shields / Opponent-IV / Bait selectors or the opponent filter would draw a
+// grid the printed numbers were never measured on. The note under the panel
+// says so on the page.
+// ---------------------------------------------------------------------------
+// Located by CLASS, like the clusters section's .dd-mc-root: the section is
+// optional (a dive with no replay blob renders no brief), and a literal
+// getElementById for a conditionally-emitted id is exactly what
+// tests/test_dive_dom_ids.py exists to flag.
+function _wbRoot() { return document.querySelector('.wb-root'); }
+
+function _wbPayload(root) {
+  var s = root.querySelector('script.wb-data');
+  if (!s) return null;
+  try { return JSON.parse(s.textContent); } catch (e) { return null; }
+}
+
+// The league-cap (L50) per-IV arrays. setBestBuddyLevel rebinds DATA.iv* to
+// the L51 grid; this section must keep reading the level its line was derived
+// at, or the threshold would be compared against stats it never saw.
+function wbLevelArrays() {
+  return (DATA.ivL51 && _bbL50) ? _bbL50 : DATA;
+}
+
+var _wbWinsCache = {};
+// Matchups won, per IV, at the league cap: over ALL baked scenarios and ALL
+// opponents (the brief's own denominator, its `total_cells`) when `si` is
+// null, or inside ONE shield scenario when the section's Shield scenario
+// control names it. Same win predicate as everywhere else on the page
+// (isWin: score > 500), and the same flat (iv, scenario, opponent) decoding
+// the main plot's winsPvpoke mode and computeScenarioAvgPure use -- only the
+// scenario loop's bounds move, so there is one decoding on the page and not
+// two that can drift.
+function wbWins(mi, mode, si) {
+  var key = mi + SCORE_KEY_SEP + mode + SCORE_KEY_SEP +
+            (si == null ? 'all' : si);
+  if (_wbWinsCache[key]) return _wbWinsCache[key];
+  var g = SCORES[mi + SCORE_KEY_SEP + mode];
+  if (!g) return null;
+  var nO = DATA.nOpponents, nS = DATA.nScenarios, n = DATA.nIvs;
+  var lo = (si == null) ? 0 : si, hi = (si == null) ? nS : si + 1;
+  var out = new Float64Array(n);
+  for (var iv = 0; iv < n; iv++) {
+    var c = 0, base0 = iv * nS * nO;
+    for (var sj = lo; sj < hi; sj++) {
+      var base = base0 + sj * nO;
+      for (var oi = 0; oi < nO; oi++) { if (isWin(g[base + oi])) c++; }
+    }
+    out[iv] = c;
+  }
+  _wbWinsCache[key] = out;
+  return out;
+}
+
+// The label the section's "every scenario" entry carries. Kept in step with
+// deep_dive_which_build.ALL_SCEN by tests/test_which_build_section.py.
+var WB_ALL_SCEN = 'all';
+
+// Which shield scenario the section's own control names, as an index into
+// the page's DATA.scenarioLabels -- null for "all". The lookup goes through
+// scenLabel() rather than a parallel list in the payload, so the option the
+// reader picked and the slice of the score grid it selects are the same
+// vocabulary by construction.
+function _wbScen(root, pay) {
+  var sel = root.querySelector('select.wb-scen');
+  var v = sel ? sel.value : WB_ALL_SCEN;
+  if (!v || v === WB_ALL_SCEN || !pay.scen) return null;
+  for (var si = 0; si < DATA.nScenarios; si++) {
+    if (scenLabel(si) === v && pay.scen[v]) {
+      return { idx: si, label: v, entry: pay.scen[v] };
+    }
+  }
+  return null;
+}
+
+// Section palette. Declared as CSS custom properties on #dd-which-build (with
+// a dark-theme override) so the colors live with the rest of the section's
+// styling and re-theme with the picker like everything else.
+//
+// WB_FALLBACK is the LIGHT-theme half of that declaration, copied. Same
+// deliberate-fallback pattern as LEVEL_CAP_FALLBACK / THEME_FALLBACK above:
+// getComputedStyle can come back empty (an environment that did not apply the
+// inline <style>), and a trace with no color is a legend entry pointing at
+// invisible points. The copy is pinned to the CSS by
+// tests/test_which_build_section.py so the two cannot drift.
+var WB_FALLBACK = {
+  '--wb-line': '#7a4fc0', '--wb-below': '#7f858f', '--wb-alt': '#a63089',
+  '--wb-mark1': '#16706a', '--wb-mark2': '#2f5fd0'
+};
+// The rung ramp has exactly as many steps as the page prints rungs, emitted
+// as --wb-r0..--wb-r(n-1) by deep_dive_which_build.ramp_css (and repeated in
+// the payload's rungColors as the light-theme fallback). A fixed six-color
+// ramp painted the 6th and 7th rung of a seven-rung page the same color, on
+// the one view whose whole encoding is color.
+function _wbColors(root, pay) {
+  var cs = getComputedStyle(root);
+  function v(n) { var x = cs.getPropertyValue(n).trim(); return x || WB_FALLBACK[n]; }
+  var ramp = [], fb = (pay && pay.rungColors) || [];
+  var nR = (pay && pay.rungs) ? pay.rungs.length : 0;
+  for (var k = 0; k < nR; k++) {
+    var got = cs.getPropertyValue('--wb-r' + k).trim();
+    ramp.push(got || fb[k] || WB_FALLBACK['--wb-line']);
+  }
+  // The SCENARIO ladder's own ramp (--wb-s*), sized server-side to the
+  // longest ladder the Shield scenario control can select. It is separate
+  // from --wb-r* because a scenario's ladder can be longer than the page's
+  // own: read off the page ramp, its overflow rungs fell back to one color
+  // and two steps of the encoding became indistinguishable.
+  var sramp = [], sfb = (pay && pay.scenColors) || [];
+  var nS = (pay && pay.nScenRamp) || 0;
+  for (var k2 = 0; k2 < nS; k2++) {
+    var got2 = cs.getPropertyValue('--wb-s' + k2).trim();
+    sramp.push(got2 || sfb[k2] || WB_FALLBACK['--wb-line']);
+  }
+  return {
+    line: v('--wb-line'),
+    below: v('--wb-below'),
+    alt: v('--wb-alt'),
+    mark1: v('--wb-mark1'),
+    mark2: v('--wb-mark2'),
+    rungs: ramp,
+    scenRungs: sramp
+  };
+}
+
+// Membership masks, packed server-side (deep_dive_which_build.mask_b64).
+//
+// The page's DATA.ivAtk / ivDef are rounded to 2 dp, while a line is a
+// full-precision value, so `DATA.ivAtk[i] >= T` mis-sides every spread inside
+// the rounding window -- 19 of 4096 on the Shadow Sableye grid, drawn in the
+// wrong color under a sentence saying the split is exact. The masks are
+// computed from the same full-precision plane the brief selected the line on,
+// and their counts are checked against the page's printed counts before they
+// are packed, so the plot and the prose cannot disagree. 512 bytes each.
+var _wbMaskCache = {};
+function _wbMask(b64) {
+  if (_wbMaskCache[b64]) return _wbMaskCache[b64];
+  var bin = atob(b64), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  _wbMaskCache[b64] = out;
+  return out;
+}
+function _wbBit(m, i) { return (m[i >> 3] >> (i & 7)) & 1; }
+
+// Is spread `i` at or above one line? Two encodings, because the two kinds
+// of line cost differently:
+//
+//   * the page's OWN line and its rungs carry a packed membership mask --
+//     one 512-byte classification each, which is the right price for the
+//     values the whole section is about;
+//   * a per-scenario line carries a `cut` in the page's own 2-dp array plus
+//     the indices that comparison gets wrong (deep_dive_which_build.
+//     rounded_cut). There can be a dozen of those on one page, and they cost
+//     a float and (so far always) an empty list instead.
+//
+// Both are exact, and both were checked against the brief's own counts
+// before they were emitted.
+function _wbOn(L, line, i) {
+  if (line.mask != null) return _wbBit(_wbMask(line.mask), i);
+  var arr = (line.axis === 'def') ? L.ivDef
+          : (line.axis === 'hp') ? L.ivHp : L.ivAtk;
+  var on = (arr[i] >= line.cut) ? 1 : 0;
+  var w = line.wrong;
+  if (w && w.length) {
+    if (!line._w) {
+      line._w = {};
+      for (var k = 0; k < w.length; k++) line._w[w[k]] = 1;
+    }
+    if (line._w[i]) on = on ? 0 : 1;
+  }
+  return on;
+}
+
+// Grid index of an IV triple. The IV arrays are level-invariant, so this
+// needs no level view.
+function _wbIvIdx(t) {
+  for (var i = 0; i < DATA.nIvs; i++) {
+    if (DATA.ivA[i] === t[0] && DATA.ivD[i] === t[1] && DATA.ivS[i] === t[2]) return i;
+  }
+  return -1;
+}
+
+// Hover body shared by every view: who the spread is, then its side of
+// whatever the current view is grouping by.
+function _wbHover(i, L, wins, side, den) {
+  return DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i] +
+         ' at L' + Number(L.ivLv[i]).toFixed(1) +
+         '<br>atk ' + Number(L.ivAtk[i]).toFixed(2) +
+         ' / def ' + Number(L.ivDef[i]).toFixed(2) +
+         ' / hp ' + L.ivHp[i] +
+         '<br>wins ' + wins[i] + ' of ' +
+         (den == null ? (DATA.nScenarios * DATA.nOpponents) : den) +
+         '<br>' + side;
+}
+
+// Which side of a line one spread is on, in the order the words are read:
+// "attack at or above the 148.10 line", not "at or above attack 148.10".
+// `line` is anything carrying axisWord + printed: the payload itself for the
+// page's own line, or one entry of pay.scen[S].lines for a scenario's.
+function _wbSideOf(line, on) {
+  return line.axisWord + (on ? ' at or above the ' : ' below the ') +
+         line.printed + ' line';
+}
+function _wbSide(pay, on) { return _wbSideOf(pay, on); }
+
+// The line the CURRENT panel is drawing, or null when it draws none: the
+// page's own line under "all", the lowest of that scenario's lines under a
+// single one. Marked spreads and the collection overlay say their side of
+// THIS line, which is the one the legend and the caption are about.
+function _wbActiveLine(pay, scen) {
+  if (scen) {
+    var sl = scen.entry.lines || [];
+    return sl.length ? sl[0] : null;
+  }
+  if (!pay.hasFloor) return null;
+  return { axisWord: pay.axisWord, printed: pay.printed,
+           mask: pay.rungs[0].mask };
+}
+
+function _wbTrace(name, color, symbol, size, opacity) {
+  return { type: 'scattergl', mode: 'markers', x: [], y: [], text: [],
+           hoverinfo: 'text', name: name,
+           marker: { size: size, color: color, symbol: symbol || 'circle',
+                     opacity: opacity == null ? 0.75 : opacity },
+           hoverlabel: { bordercolor: color } };
+}
+
+function _wbIvStr(i) {
+  return i < 0 ? '?' : (DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i]);
+}
+
+// One marked spread's side of the line the panel is drawing, for its hover
+// and its legend key.
+function _wbSideAt(L, line, i) {
+  if (!line || i < 0) return 'no line on this panel';
+  // (callers that know WHICH scenario has no line say so themselves)
+  return _wbSideOf(line, _wbOn(L, line, i));
+}
+
+// A named spread (rank-1, an example, the most-winning spread) as its own
+// one-point trace: distinct symbol, a text label on the point, and a legend
+// entry that carries the IVs.
+function _wbMarkTrace(label, iv, color, symbol, L, wins, side, den) {
+  if (iv < 0) return null;
+  var t = _wbTrace(label, color, symbol, 13, 1);
+  t.mode = 'markers+text';
+  t.textposition = 'top center';
+  t.textfont = { size: 10, color: color };
+  t.marker.line = { width: 1.5, color: plotChrome().ink };
+  t.x = [L.spRanks[iv]];
+  t.y = [wins[iv]];
+  // `text` is the on-point label (mode carries 'text'); `hovertext` is the
+  // hover card. Putting the multi-line hover body in `text` would print the
+  // whole card next to the marker.
+  t.text = [DATA.ivA[iv] + '/' + DATA.ivD[iv] + '/' + DATA.ivS[iv]];
+  t.hovertext = [_wbHover(iv, L, wins, side, den)];
+  return t;
+}
+
+// Every spread in one grey group, for a view that has nothing to split the
+// grid by: a single shield scenario with no line of its own, or one the
+// Matchup clusters section did not cluster. Drawn rather than blanked so the
+// reader still sees the population the caption is talking about.
+function _wbMutedTrace(L, wins, colors, den, side) {
+  var t = _wbTrace('All spreads', colors.below, 'circle', 3, 0.4);
+  for (var i = 0; i < DATA.nIvs; i++) {
+    t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+    t.text.push(_wbHover(i, L, wins, side, den));
+  }
+  t.name += ' (' + t.x.length + ')';
+  return t;
+}
+
+// Group every spread for one view. Returns {traces, missing}: the population
+// traces (the caller adds the marked spreads and the collection overlay), and
+// whether the view had nothing to draw -- today only the clusters view, when
+// the section baked no labels for this panel's moveset and mode.
+function _wbGroups(pay, view, L, wins, colors, scen, den) {
+  var n = DATA.nIvs, i;
+  var traces = [];
+  // ---- one shield scenario, on the two threshold views ------------------
+  // The page's line and its rungs are whole-grid claims. With one scenario
+  // selected these two views draw THAT scenario's own ladder instead
+  // (deep_dive_brief.scenario_lines: the same exact / gate / near-exact cut
+  // pool, restricted to cells in this shield state and to the decision
+  // band), which is a different set of values with different owners. The
+  // trade is a whole-grid trade and is left alone; clusters reads the label
+  // set for this scenario further down.
+  if (scen && (view === 'line' || view === 'rungs')) {
+    var sl = scen.entry.lines || [];
+    if (!sl.length) {
+      return { traces: [_wbMutedTrace(L, wins, colors, den,
+                                      'no line in ' + scen.label + ' shields')],
+               missing: false };
+    }
+    var use = (view === 'line') ? [sl[0]] : sl;
+    var sbelow = _wbTrace('Below ' + use[0].label, colors.below, 'circle', 3, 0.5);
+    var sts = use.map(function(r, k) {
+      return _wbTrace((use.length === 1 ? 'At or above ' : '') + r.label,
+                      (use.length === 1 ? colors.line
+                                        : (colors.scenRungs[k] ||
+                                           colors.rungs[k] || colors.line)),
+                      'circle', 4);
+    });
+    for (i = 0; i < n; i++) {
+      var shit = -1;
+      for (var sk = 0; sk < use.length; sk++) {
+        if (_wbOn(L, use[sk], i)) shit = sk;
+      }
+      var str = shit < 0 ? sbelow : sts[shit];
+      str.x.push(L.spRanks[i]); str.y.push(wins[i]);
+      str.text.push(_wbHover(i, L, wins, shit < 0
+        ? _wbSideOf(use[0], false)
+        : (use.length === 1 ? _wbSideOf(use[0], true)
+                            : 'highest line cleared: ' + use[shit].full),
+        den));
+    }
+    sbelow.name += ' (' + sbelow.x.length + ')';
+    if (use.length === 1) sts[0].name += ' (' + sts[0].x.length + ')';
+    traces.push(sbelow);
+    for (var sk2 = 0; sk2 < sts.length; sk2++) {
+      if (sts[sk2].x.length) traces.push(sts[sk2]);
+    }
+    return { traces: traces, missing: false };
+  }
+  if (view === 'line') {
+    var lineMask = _wbMask(pay.rungs[0].mask);
+    var above = _wbTrace('At or above the line', colors.line, 'circle', 4);
+    var below = _wbTrace('Below the line', colors.below, 'circle', 3, 0.5);
+    for (i = 0; i < n; i++) {
+      var on = _wbBit(lineMask, i);
+      var t = on ? above : below;
+      t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+      t.text.push(_wbHover(i, L, wins, _wbSide(pay, on), den));
+    }
+    above.name += ' (' + above.x.length + ')';
+    below.name += ' (' + below.x.length + ')';
+    traces.push(below, above);
+  } else if (view === 'rungs') {
+    var rmasks = pay.rungs.map(function(r) { return _wbMask(r.mask); });
+    var below2 = _wbTrace('Below the line', colors.below, 'circle', 3, 0.5);
+    var rts = pay.rungs.map(function(r, k) {
+      // No '(N)' on a rung key. Every count in the prose above is CUMULATIVE
+      // ("2220 reach it"), while a drawn rung group is the spreads whose
+      // HIGHEST cleared rung is that one -- 250 of the 2220 on the Shadow
+      // Sableye page. The same label carrying both numbers on one screen is
+      // the ambiguity; the hover says which relation it is.
+      return _wbTrace(r.label, colors.rungs[k] || colors.line, 'circle', 4);
+    });
+    for (i = 0; i < n; i++) {
+      var hit = -1;
+      for (var k = 0; k < pay.rungs.length; k++) {
+        if (_wbBit(rmasks[k], i)) hit = k;
+      }
+      var tr = hit < 0 ? below2 : rts[hit];
+      tr.x.push(L.spRanks[i]); tr.y.push(wins[i]);
+      tr.text.push(_wbHover(i, L, wins, hit < 0
+        ? _wbSide(pay, false)
+        : 'highest rung cleared: ' + (pay.rungs[hit].full ||
+                                      pay.rungs[hit].label), den));
+    }
+    traces.push(below2);
+    for (var k2 = 0; k2 < rts.length; k2++) {
+      if (rts[k2].x.length) traces.push(rts[k2]);
+    }
+    below2.name += ' (' + below2.x.length + ')';
+  } else if (view === 'trade') {
+    var tLine = _wbMask(pay.rungs[0].mask);
+    var tAlt = pay.alt ? _wbMask(pay.alt.mask) : null;
+    var cl = _wbTrace('At or above the line', colors.line, 'circle', 4);
+    // "below the line" in the key because the group DRAWN here is the bulk
+    // rectangle minus the line's own spreads -- the two can overlap, and a
+    // count that silently excluded the overlap would contradict the caption's
+    // printed rectangle count.
+    var al = _wbTrace(pay.alt ? 'Bulk alternative, below the line: ' + pay.alt.label
+                              : 'Bulk alternative, below the line',
+                      colors.alt, 'square', 5);
+    var ne = _wbTrace('Neither', colors.below, 'circle', 3, 0.45);
+    for (i = 0; i < n; i++) {
+      var side, tt;
+      if (_wbBit(tLine, i)) { tt = cl; side = _wbSide(pay, true); }
+      else if (tAlt && _wbBit(tAlt, i)) {
+        tt = al; side = 'in the bulk alternative (' + pay.alt.label +
+                        '), ' + _wbSide(pay, false);
+      } else { tt = ne; side = 'neither'; }
+      tt.x.push(L.spRanks[i]); tt.y.push(wins[i]);
+      tt.text.push(_wbHover(i, L, wins, side, den));
+    }
+    ne.name += ' (' + ne.x.length + ')';
+    cl.name += ' (' + cl.x.length + ')';
+    al.name += ' (' + al.x.length + ')';
+    traces.push(ne, cl);
+    if (al.x.length) traces.push(al);
+  } else if (view === 'rank1') {
+    var all = _wbTrace('All spreads', colors.below, 'circle', 3, 0.45);
+    for (i = 0; i < n; i++) {
+      all.x.push(L.spRanks[i]); all.y.push(wins[i]);
+      all.text.push(_wbHover(i, L, wins, 'no line on this page', den));
+    }
+    all.name += ' (' + all.x.length + ')';
+    traces.push(all);
+  } else if (view === 'clusters') {
+    // The Matchup clusters section's own labels, read from ITS payload. No
+    // second clustering runs here: a section that printed a different
+    // partition under the same name would be worse than no view at all.
+    var mcPay = _mcPayloadPage();
+    // The clusters section bakes its labels for moveset 0 at the default
+    // opponent-IV mode. This panel is pinned to ITS OWN moveset and mode, so
+    // the labels describe what is on screen exactly when the two agree --
+    // which is NOT _mcLabelsApply()'s question (that one tracks the scatter's
+    // live dropdowns, and this panel deliberately ignores them).
+    var mcApplies = _wbMcApplies(pay, mcPay);
+    if (!mcApplies || !mcPay.scens) return { traces: [], missing: true };
+    // With the section's Shield scenario control set, the view draws THAT
+    // scenario's clusters -- the clusters payload carries every scenario it
+    // could cluster, not only the combined fingerprint. A scenario it could
+    // NOT cluster is a muted grid whose caption is that section's own
+    // degenerate sentence (wbRenderRoot reads it); an empty panel with no
+    // explanation is the one outcome worse than not offering the view.
+    var want = scen ? scen.label
+      : (pay.clusterScen && mcPay.scens[pay.clusterScen]
+         ? pay.clusterScen : mcPay['default']);
+    var sc = mcPay.scens[want];
+    if (!sc) {
+      if (scen) {
+        return { traces: [_wbMutedTrace(L, wins, colors, den,
+                          'no matchup clusters in ' + scen.label + ' shields')],
+                 missing: false };
+      }
+      return { traces: [], missing: true };
+    }
+    // Cluster names. sc.rules[c] is the clusters section's own depth-1 rule,
+    // printed by Python, and null whenever that split is not an iff for the
+    // cluster -- which is the usual case, and left "C0 (n=2072)" under a
+    // caption that talks about a split at atk 148.68 with no way to tell
+    // which color is which side. Where there is a split to lean on, the side
+    // each cluster MOSTLY sits on is named instead. The threshold string is
+    // the payload's (`sc.split`); nothing here formats a number.
+    var sides = _wbClusterSides(sc, L);
+    var cts = [];
+    for (var c = 0; c < sc.k; c++) {
+      var cname = 'C' + c;
+      if (sc.rules && sc.rules[c]) cname += ': ' + sc.rules[c];
+      else if (sides && sides[c]) cname += ': ' + sides[c].label;
+      cts.push(_wbTrace(cname + ' (n=' + sc.sizes[c] + ')',
+                        mcPay.palette[c % mcPay.palette.length], 'circle', 4));
+    }
+    for (i = 0; i < n; i++) {
+      var lab = sc.labels[i];
+      if (lab == null || !cts[lab]) continue;
+      cts[lab].x.push(L.spRanks[i]); cts[lab].y.push(wins[i]);
+      cts[lab].text.push(_wbHover(i, L, wins, 'matchup cluster C' + lab +
+                                  ' (' + (sc.display || want) + ')' +
+                                  ((sides && sides[lab])
+                                     ? '; ' + sides[lab].hover : ''), den));
+    }
+    for (var c3 = 0; c3 < cts.length; c3++) {
+      if (cts[c3].x.length) traces.push(cts[c3]);
+    }
+  }
+  return { traces: traces, missing: false };
+}
+
+// Which side of the clusters section's own depth-1 split each cluster mostly
+// sits on. `sc.split` is that section's string ('atk 148.68'); the stat word
+// selects the page's own array and the value is read back out of the same
+// string, so the two sections cannot print different thresholds.
+function _wbClusterSides(sc, L) {
+  if (!sc.split) return null;
+  var bits = String(sc.split).split(/\s+/);
+  var arr = {atk: L.ivAtk, def: L.ivDef, hp: L.ivHp}[bits[0]];
+  var thr = parseFloat(bits[1]);
+  if (!arr || !isFinite(thr)) return null;
+  var above = [], tot = [];
+  for (var c = 0; c < sc.k; c++) { above.push(0); tot.push(0); }
+  for (var i = 0; i < DATA.nIvs; i++) {
+    var lab = sc.labels[i];
+    if (lab == null || lab >= sc.k) continue;
+    tot[lab]++;
+    if (arr[i] >= thr) above[lab]++;
+  }
+  var out = [];
+  for (var c2 = 0; c2 < sc.k; c2++) {
+    if (!tot[c2]) { out.push(null); continue; }
+    var share = above[c2] / tot[c2];
+    var on = share >= 0.5;
+    var pctTxt = Math.round((on ? share : 1 - share) * 100) + '%';
+    out.push({
+      label: 'mostly ' + (on ? 'at or above ' : 'below ') + sc.split,
+      hover: pctTxt + ' of it is ' + (on ? 'at or above ' : 'below ') + sc.split
+    });
+  }
+  return out;
+}
+
+// Do the Matchup clusters section's baked labels describe what THIS panel is
+// drawing? That section bakes for moveset 0 at the default opponent-IV mode,
+// and the panel is pinned to its own moveset and mode. Shared by the view
+// (which draws nothing when they disagree) and by the caption (which must not
+// then describe groups the reader cannot see).
+function _wbMcApplies(pay, mcPay) {
+  return !!(mcPay && pay.mi === 0 &&
+            (!DATA.oppIvModes || pay.mode === DATA.oppIvModes[0]));
+}
+
+// Your pasted collection, on this panel, in every view -- same gold star the
+// cluster panels use, hover naming the mon and its side of the line.
+function _wbOwnedTrace(pay, L, wins, line, den, noLine) {
+  if (!state.ownedByIv) return null;
+  // The same tiny y-nudge the cluster panels and the main scatter apply, for
+  // the same measured reason: a star sitting at the EXACT coordinates of a
+  // scattergl population point loses the hover contest (3 of 24 stars hovered
+  // as the wrong spread when the cluster panel shipped without it), and then
+  // the overlay's whole point -- "Yours: <mon>" on hover -- is gone. The
+  // y-axis is an integer win count, so 0.05% of the range is invisible.
+  var ymin = Infinity, ymax = -Infinity;
+  for (var w = 0; w < wins.length; w++) {
+    if (wins[w] < ymin) ymin = wins[w];
+    if (wins[w] > ymax) ymax = wins[w];
+  }
+  var ynudge = (isFinite(ymin) && ymax > ymin) ? (ymax - ymin) * 0.0005 : 0;
+  var ox = [], oy = [], ot = [];
+  for (var key in state.ownedByIv) {
+    var i = parseInt(key, 10);
+    if (!(i >= 0 && i < DATA.nIvs)) continue;
+    var names = state.ownedByIv[i].map(function(r) {
+      return ((r.mon && r.mon.name) || 'mon') + ' CP' +
+             ((r.stats && r.stats.cp) || '?');
+    }).join(', ');
+    var side = line ? _wbSideAt(L, line, i) : (noLine || 'no line on this page');
+    ox.push(L.spRanks[i]); oy.push(wins[i] + ynudge);
+    ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side, den));
+  }
+  if (!ox.length) return null;
+  var t = _wbTrace('Yours (' + ox.length + ')', '#ffd700', 'star', 12, 1);
+  t.marker.line = { width: 1.5, color: plotChrome().ink };
+  t.x = ox; t.y = oy; t.text = ot;
+  return t;
+}
+
+// Legend hover isolates a group, the same affordance the main scatter has.
+// Scoped to this panel and guarded per legend node (Plotly's d3 join reuses
+// them across react calls).
+function _wbWireLegend(panel, ops) {
+  var attempts = 0;
+  var gen = (panel._wbLegendGen || 0) + 1;
+  panel._wbLegendGen = gen;
+  // Read at EVENT time, not captured: Plotly's d3 join reuses legend nodes
+  // across react calls, so a handler wired under "the line" would otherwise
+  // restore that view's opacities after the reader switched to "the rungs".
+  panel._wbOps = ops;
+  function tryAttach() {
+    if (panel._wbLegendGen !== gen) return;
+    var items = panel.querySelectorAll('.legend .traces');
+    if (items.length === 0 && attempts < 50) { attempts++; setTimeout(tryAttach, 100); return; }
+    items.forEach(function(el, idx) {
+      if (el._wbWired) return;
+      el._wbWired = true;
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function() {
+        var cur = panel._wbOps || [];
+        var ti = _legendTraceIndex(el, idx);
+        for (var j = 0; j < cur.length; j++) {
+          Plotly.restyle(panel, { 'marker.opacity': (j === ti) ? 1 : 0.03 }, [j]);
+        }
+      });
+      el.addEventListener('mouseleave', function() {
+        var cur = panel._wbOps || [];
+        for (var j = 0; j < cur.length; j++) {
+          Plotly.restyle(panel, { 'marker.opacity': cur[j] }, [j]);
+        }
+      });
+    });
+  }
+  tryAttach();
+}
+
+function wbRenderRoot(root) {
+  if (!root) return;
+  var pay = _wbPayload(root);
+  var panel = root.querySelector('.wb-panel');
+  if (!pay || !panel) return;
+  var L = wbLevelArrays();
+  var scen = _wbScen(root, pay);
+  var wins = wbWins(pay.mi, pay.mode, scen ? scen.idx : null);
+  // The y-axis denominator moves with the control and nothing else does:
+  // over every scenario it is (scenarios x opponents), inside one it is the
+  // opponent pool.
+  var den = scen ? DATA.nOpponents : (DATA.nScenarios * DATA.nOpponents);
+  var cap = root.querySelector('.wb-caption');
+  if (!wins) {
+    panel.innerHTML = '';
+    if (cap) cap.textContent = 'This dive did not bake the score grid this ' +
+      'panel reads, so it is not drawn.';
+    root.setAttribute('data-wb-rendered', '1');
+    return;
+  }
+  var sel = root.querySelector('select.wb-view');
+  var view = sel ? sel.value : (pay.views[0] && pay.views[0].id);
+  var colors = _wbColors(root, pay);
+  var g = _wbGroups(pay, view, L, wins, colors, scen, den);
+  var traces = g.traces.slice();
+  // The trade is a whole-grid claim, so its marked spreads keep saying their
+  // side of the PAGE's line even under a single scenario; the two threshold
+  // views say their side of the line actually drawn.
+  var line = (view === 'trade') ? _wbActiveLine(pay, null)
+                                : _wbActiveLine(pay, scen);
+  // The example spreads are named for where they sit relative to the PAGE's
+  // line ("highest stat product above the line", "bulkiest above the line"),
+  // and under a single shield scenario these two views draw a DIFFERENT line.
+  // Both halves of that are wrong on screen: on a scenario with no line the
+  // keys claim one exists, and on a scenario WITH one the marker is plotted
+  // inside the "Below <scenario line>" group while its own key says "above
+  // the line" -- the contradiction is visible in the plot. So the examples
+  // are dropped for any single scenario on the threshold views. Rank-1 stays:
+  // it is the spread a reader already owns and its key makes no claim about
+  // any line.
+  var hideExamples = !!(scen && (view === 'line' || view === 'rungs'));
+  // Whose absence it is. On a page with NO line the emptiness is a property
+  // of the page, not of the selected shield state (which may well carry a
+  // threshold of its own -- the rank-1 caption says so), and the collection
+  // overlay must not assert otherwise.
+  var noLine = (scen && pay.hasFloor)
+                    ? ('no line in ' + scen.label + ' shields')
+                    : 'no line on this page';
+  if (pay.hasFloor && (view === 'line' || view === 'rungs' || view === 'trade')) {
+    var r1i = _wbIvIdx(pay.rank1.iv);
+    // Every marked point says its side of the line as well as its role: the
+    // role alone ("the stat-product rank-1 spread") is the one hover on the
+    // panel that did not answer the question the panel is about.
+    var r1t = _wbMarkTrace('Stat-product rank-1', r1i, colors.mark1, 'diamond',
+                           L, wins, 'the stat-product rank-1 spread; ' +
+                           (line ? _wbSideAt(L, line, r1i) : noLine), den);
+    if (r1t) traces.push(r1t);
+    for (var e = 0; hideExamples ? false : e < pay.examples.length; e++) {
+      var ei = _wbIvIdx(pay.examples[e].iv);
+      // The reader label, not the brief's selection rule: the rules are
+      // written in the audit's vocabulary ("most cells won among clearers
+      // with SP >= 95%"), which is exactly what the voice gate keeps out of
+      // the prose this legend sits under.
+      var elabel = pay.examples[e].label || pay.examples[e].rule;
+      var et = _wbMarkTrace(_wbIvStr(ei) + ': ' + elabel, ei, colors.mark2,
+                            'triangle-up', L, wins,
+                            elabel + '; ' + _wbSideAt(L, line, ei), den);
+      if (et) traces.push(et);
+    }
+    if (pay.bestAbove && !hideExamples) {
+      var bi = _wbIvIdx(pay.bestAbove.iv);
+      var bt = _wbMarkTrace(_wbIvStr(bi) + ': ' + pay.bestAbove.label, bi,
+                            colors.mark2, 'triangle-down', L, wins,
+                            pay.bestAbove.label + '; ' + _wbSideAt(L, line, bi),
+                            den);
+      if (bt) traces.push(bt);
+    }
+  }
+  if (!pay.hasFloor && view === 'rank1') {
+    var nr1 = _wbIvIdx(pay.rank1.iv);
+    var nr1t = _wbMarkTrace('Stat-product rank-1', nr1, colors.mark1, 'diamond',
+                            L, wins, 'the stat-product rank-1 spread', den);
+    if (nr1t) traces.push(nr1t);
+    var gbi = _wbIvIdx(pay.gridBest.iv);
+    if (gbi !== nr1) {
+      var gbt = _wbMarkTrace('Wins the most matchups', gbi, colors.mark2,
+                             'triangle-up', L, wins, 'wins the most matchups',
+                             den);
+      if (gbt) traces.push(gbt);
+    }
+  }
+  var ownT = _wbOwnedTrace(pay, L, wins, line, den, noLine);
+  if (ownT) traces.push(ownT);
+
+  var chrome = plotChrome();
+  var layout = {
+    xaxis: { title: 'Stat product rank', autorange: 'reversed',
+             showgrid: false, zeroline: false },
+    // The denominator in the title: the main scatter's own "Wins vs PvPoke
+    // default" axis honours the Shields dropdown, so a reader flipping
+    // between the two meets two different scales. This one never moves, and
+    // says what it is out of.
+    yaxis: { title: (scen
+              ? ('Matchups won in ' + scen.label + ' shields (of ' +
+                 DATA.nOpponents + ' opponents)')
+              : ('Matchups won (of ' + (DATA.nScenarios * DATA.nOpponents) +
+                 ': ' + DATA.nScenarios + ' shield scenarios x ' +
+                 DATA.nOpponents + ' opponents)')),
+             showgrid: true, gridcolor: chrome.grid, zeroline: false },
+    paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
+    font: { color: chrome.font, size: 11 },
+    margin: { t: 8, b: 44, l: 56, r: 8 },
+    showlegend: true,
+    // A horizontal legend under a 400px panel wraps to three or four rows
+    // once the rung ladder is long (seven rungs plus "Below the line" plus
+    // the marked spreads), and the rows eat the plot. Past six keys it goes
+    // vertical, outside the plot on the right.
+    legend: (traces.length > 6
+             ? { orientation: 'v', x: 1.02, xanchor: 'left', y: 1,
+                 bgcolor: chrome.legendBg, bordercolor: chrome.legendBorder,
+                 borderwidth: 1 }
+             : { orientation: 'h', y: -0.22, bgcolor: chrome.legendBg,
+                 bordercolor: chrome.legendBorder, borderwidth: 1 }),
+    hoverlabel: { bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder }
+  };
+  if (g.missing) {
+    layout.annotations = [{
+      text: 'No cluster labels apply to this view.',
+      showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5,
+      font: { color: chrome.font, size: 12 }
+    }];
+  }
+  Plotly.react(panel, traces, layout,
+               { responsive: true, displayModeBar: false });
+  _wbWireLegend(panel, traces.map(function(t) { return t.marker.opacity; }));
+  if (cap) {
+    var capText = '';
+    for (var vi = 0; vi < pay.views.length; vi++) {
+      if (pay.views[vi].id === view) capText = pay.views[vi].caption;
+    }
+    if (scen && scen.entry.captions && scen.entry.captions[view] != null) {
+      capText = scen.entry.captions[view];
+    }
+    // The one caption this section does not author: a scenario the Matchup
+    // clusters section could not cluster is explained in THAT section's own
+    // words, counts and all, rather than in a second sentence about the
+    // same absence.
+    if (scen && view === 'clusters') {
+      var mcP = _mcPayloadPage();
+      var msc = _wbMcApplies(pay, mcP) && mcP.scens && mcP.scens[scen.label];
+      if (_wbMcApplies(pay, mcP) && !msc) {
+        var dg = mcP.degenerate && mcP.degenerate[scen.label];
+        if (dg) capText = (dg.display || scen.label) + ': ' + dg.reason + '.';
+      } else if (msc) {
+        // The all-scenario clusters caption is a FINDING (K, silhouette,
+        // where the split lands against the printed line); the per-scenario
+        // one was a pointer. The clusters payload carries that scenario's own
+        // K and its depth-1 split as a Python-formatted string, so the
+        // per-scenario caption can say the same kind of thing without this
+        // file formatting a threshold.
+        // `display` is the clusters section's own spelling and ALREADY
+        // carries the word ("0v1 shields"); only the bare label needs it.
+        capText = "The Matchup clusters section's own groups for " +
+          (msc.display || (scen.label + ' shields')) + ": " + msc.k +
+          " groups" + (msc.split ? ", split at " + msc.split : "") +
+          ", drawn here on the same axes.";
+      }
+    }
+    // The one number a rank-1 caption can add client-side, and the one the
+    // negative page's reader is actually after: what rank-1 wins in THIS
+    // shield state, and whether anything beats it.
+    if (scen && view === 'rank1') {
+      var r1x = _wbIvIdx(pay.rank1.iv), best = -1;
+      for (var q = 0; q < wins.length; q++) if (wins[q] > best) best = wins[q];
+      if (r1x >= 0) {
+        capText += ' In ' + scen.label + ' shields the stat-product rank-1 ' +
+          'spread wins ' + wins[r1x] + ' of ' + den +
+          ', and the most any spread wins is ' + best + '.';
+      }
+    }
+    cap.textContent = capText;
+  }
+  root.setAttribute('data-wb-rendered', '1');
+}
+
+function wbSelectView(sel) {
+  var root = sel.closest('.wb-root');
+  if (root) wbRenderRoot(root);
+}
+window.wbSelectView = wbSelectView;
+
+// Collection load / clear and theme switches both change what the panel
+// should draw. A closed section drops its rendered flag instead, so it picks
+// the change up on its next open (Plotly sizes to zero inside a closed
+// <details>).
+function wbRefresh() {
+  var root = _wbRoot();
+  if (!root || !root.hasAttribute('data-wb-rendered')) return;
+  if (root.offsetParent !== null && root.open) wbRenderRoot(root);
+  else root.removeAttribute('data-wb-rendered');
+}
+window.wbRefresh = wbRefresh;
+
+// "Compare these spreads": prefill the page's Compare candidates widget with
+// rank-1 plus the spreads this section names, then open it and scroll there.
+function wbCompare(btn) {
+  var root = btn.closest('.wb-root') || _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay) return;
+  var list = [pay.rank1.iv];
+  if (pay.hasFloor) {
+    for (var i = 0; i < pay.examples.length; i++) list.push(pay.examples[i].iv);
+    // The spread the headline names as winning the most above the line, when
+    // the example rules' stat-product filter left it out: a reader who read
+    // that sentence and clicked this button did not find it in the widget.
+    if (pay.bestAbove) list.push(pay.bestAbove.iv);
+  } else if (pay.gridBest) {
+    list.push(pay.gridBest.iv);
+  }
+  if (window.cmpSetCandidates) window.cmpSetCandidates(list);
+  var sec = document.getElementById('cmp-section');
+  if (sec) {
+    sec.open = true;
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.wbCompare = wbCompare;
+
+// The printed line value expands to the spreads that reach it: top 25 by
+// stat product, then a control for the rest. Built here rather than baked:
+// a 2220-row table server-side would be ~150 KB of markup per moveset file
+// for a list most readers never open, and every column it needs is already
+// in DATA.
+function _wbClearerRows(L, from, to, rows) {
+  var h = '';
+  for (var i = from; i < to && i < rows.length; i++) {
+    var iv = rows[i];
+    h += '<tr><td>' + DATA.ivA[iv] + '/' + DATA.ivD[iv] + '/' + DATA.ivS[iv] +
+         '</td><td>' + Number(L.ivAtk[iv]).toFixed(2) +
+         '</td><td>' + Number(L.ivDef[iv]).toFixed(2) +
+         '</td><td>' + L.ivHp[iv] +
+         '</td><td>L' + Number(L.ivLv[iv]).toFixed(1) +
+         '</td><td>#' + L.spRanks[iv] + '</td></tr>';
+  }
+  return h;
+}
+
+function wbRenderClearers(box, all) {
+  var root = _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay || !pay.hasFloor) return;
+  var L = wbLevelArrays();
+  var mask = _wbMask(pay.rungs[0].mask);
+  var rows = [];
+  for (var i = 0; i < DATA.nIvs; i++) { if (_wbBit(mask, i)) rows.push(i); }
+  rows.sort(function(a, b) { return L.spRanks[a] - L.spRanks[b]; });
+  var shown = all ? rows.length : Math.min(pay.topN || 25, rows.length);
+  var h = '<p style="margin:0 0 6px">The ' + rows.length + ' spreads at or above ' +
+    pay.axisWord + ' ' + pay.printed + ', by stat product' +
+    (all ? '' : ' (top ' + shown + ')') + ':</p>' +
+    '<table><thead><tr><th>IV</th><th>Atk</th><th>Def</th><th>HP</th>' +
+    '<th>Level</th><th>SP rank</th></tr></thead><tbody>' +
+    _wbClearerRows(L, 0, shown, rows) + '</tbody></table>';
+  if (!all && rows.length > shown) {
+    h += '<button type="button" class="wb-btn" style="margin-top:6px" ' +
+         'onclick="wbShowAllClearers(this)">Show all ' + rows.length + '</button>';
+  }
+  box.innerHTML = h;
+}
+
+function wbToggleClearers(btn) {
+  var root = _wbRoot();
+  if (!root) return;
+  var box = root.querySelector('.wb-clearers');
+  if (!box) return;
+  if (!box.hidden) { box.hidden = true; return; }
+  box.hidden = false;
+  wbRenderClearers(box, false);
+}
+window.wbToggleClearers = wbToggleClearers;
+
+function wbShowAllClearers(btn) {
+  var root = _wbRoot();
+  var box = root && root.querySelector('.wb-clearers');
+  if (box) wbRenderClearers(box, true);
+}
+window.wbShowAllClearers = wbShowAllClearers;
+
+// Lazy render on first open, and a resize when an already-rendered panel
+// comes back into view -- same two reasons as the cluster panels.
+document.addEventListener('toggle', function(ev) {
+  var det = ev.target;
+  if (!det || !det.open || !det.classList) return;
+  var root = det.classList.contains('wb-root') ? det : det.closest('.wb-root');
+  if (!root) return;
+  if (!root.hasAttribute('data-wb-rendered')) {
+    if (root.offsetParent !== null) wbRenderRoot(root);
+    return;
+  }
+  var p = root.querySelector('.wb-panel');
+  if (p && p.children.length && window.Plotly && Plotly.Plots) {
+    try { Plotly.Plots.resize(p); } catch (e) {}
+  }
+}, true);
+
 // ---- Re-theme the canvases when the theme picker flips data-theme ----
 //
 // theme.py's picker sets data-theme on <html>. CSS re-themes instantly, but
@@ -4231,6 +5355,7 @@ if (typeof MutationObserver !== 'undefined' && document.documentElement) {
     _themeVarCache = {};
     try { updateView(); } catch (e) {}
     try { mcRefreshAll(); } catch (e) {}
+    try { wbRefresh(); } catch (e) {}
   }).observe(document.documentElement,
              {attributes: true, attributeFilter: ['data-theme']});
 }
