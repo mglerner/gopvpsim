@@ -24,7 +24,9 @@ On the reference
 (a 2026-07 snapshot; your dive shows live values), that's 15 of 87
 opponents: 28 are always-win, 37 are always-lose, and 15 actually
 flip depending on your IVs. Each spread's fingerprint is its win/loss
-vector over just those 15.
+vector over just those 15. (A live page opens on the combined
+{{mc:all_scen_display}} view, so pick **1v1** in the Shield scenario
+dropdown to follow this example.)
 
 ## Clusters: fingerprints, not score bands
 
@@ -68,11 +70,49 @@ clusters usually overlap completely on the main scatter's score axis,
 but fall into clean stat regions here, because crossing a breakpoint
 or bulkpoint is what moves a spread from one cluster to the next.
 
-The **Shield scenario** dropdown (0v0 / 1v1 / 2v2, defaulting to 1v1)
-switches everything in the section at once - panels and tables. There
-is deliberately no "average across scenarios" view: different shield
-counts reward different stats, and averaging them washes out exactly
-the structure this section exists to show.
+The **Shield scenario** dropdown switches everything in the section at
+once - panels and tables. It lists **every shield scenario the dive
+baked**, lopsided ones included, and each entry carries its own K and
+silhouette, so the list itself tells you where the structure on that
+page is. The lopsided scenarios (0v1, 1v0, 2v1) are often the sharpest
+ones - worth a click before you conclude a dive has no clean bands.
+
+The last entry, **{{mc:all_scen_display}}**, is the default. It is the
+**concatenated fingerprint**: every non-degenerate scenario's
+marginal-matchup bits laid side by side into one long fingerprint,
+clustered with the same machinery. It is deliberately *not* an average
+of scores across scenarios - a mean score above 500 is not a fight
+won, and averaging washes out exactly the structure this section
+exists to show. Concatenating asks the section's own question once
+instead of nine times: *which fights do you win across every shield
+state?* In that view each table row is one **(opponent, scenario)**
+pair - "Furret [0v0]" - because the same opponent can be a sharp
+marginal in several shield states and flip differently in each. Its
+bits are ordered most-discriminating first, which is the tie-break the
+clustering uses when several merges are equally close.
+
+Because the combined view asks the hardest version of the question, it
+is usually the *least* cleanly separated entry on a page. So its block
+ends by naming the two sharpest single scenarios, with the number of
+sharp marginals each silhouette was measured over - a short
+fingerprint separates more easily, so 0.76 over 7 marginals and 0.48
+over 28 are not the same kind of evidence.
+
+Some scenarios have nothing to cluster, and they say so with their
+counts rather than disappearing. A scenario is **degenerate** when
+fewer than {{mc:degen_min_sharp}} opponents are sharp marginals, or
+when those opponents produce fewer than {{mc:degen_min_patterns}}
+distinct win patterns: on that little data every candidate cluster
+count scores near-perfectly, which is a property of the measurement
+and not of your IVs. Those scenarios are left out of the
+{{mc:all_scen_display}} fingerprint too. A scenario that clears the
+floor but still has no split keeping every cluster above the minimum
+size is reported as **fragmented** instead - different message, and
+its bits still count toward the combined view. The absence is
+informative either way, and the page leads with the finding rather
+than the apology: "0v2 shields: every spread wins 0-5 of 76 opponents
+here, so the IV choice moves at most 5 matchups in this shield state"
+tells you no IV choice saves that shield state.
 
 ## The tables under the panels
 
@@ -119,6 +159,12 @@ when it caught a real tier, it couldn't say *which matchups defined
 it*. The matchup-space reframe comes from a dedicated methodology
 re-evaluation across 17 dived species; the section's collapsed "How
 this works" note carries the short version.
+
+Until 2026-09 the section clustered only the even scenarios
+(0v0 / 1v1 / 2v2) and had no combined view. In the 9-species survey
+that motivated the change, the odd scenarios most often carried the
+highest silhouette on the page, so the section was leaving out its own
+best material.
 
 ## Where to go next
 

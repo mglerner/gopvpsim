@@ -75,15 +75,17 @@ def test_no_layout_carries_a_hardcoded_background_or_font():
     assert offenders == [], offenders
 
 
-def test_the_three_canvases_all_source_chrome_from_plotchrome():
+def test_every_canvas_sources_chrome_from_plotchrome():
     """Every Plotly layout in the file gets its backgrounds from the shim.
 
-    Counted rather than located: a fourth canvas added later must opt in
-    too, or this fails.
+    Counted rather than located: a canvas added later must opt in too, or
+    this fails. It has already caught one -- the "Which one to build?"
+    section's panel (2026-09-13) was the fourth, and this test is where the
+    count moved from three to four.
     """
     n_layouts = len(re.findall(r'paper_bgcolor', JS))
     n_shimmed = len(re.findall(r'paper_bgcolor:\s*\w+\.paper', JS))
-    assert n_layouts == 3, f"expected 3 Plotly layouts, found {n_layouts}"
+    assert n_layouts == 4, f"expected 4 Plotly layouts, found {n_layouts}"
     assert n_shimmed == n_layouts
 
 

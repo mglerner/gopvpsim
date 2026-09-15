@@ -1363,7 +1363,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
                               opp_movesets=None, mechanics='legacy',
                               best_buddy=None, slayer_iter_result_l51=None,
-                              cup=None, cup_label=None):
+                              cup=None, cup_label=None,
+                              which_build_html=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -1380,6 +1381,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         this file's slice (typically [current] for the reference file, or
         [current, reference] for non-reference files so the "vs Ref" hover
         diff keeps working).
+
+    which_build_html: optional pre-rendered "Which one to build?" section for
+        THIS file's moveset (scripts/deep_dive_which_build.py). Rendered by
+        the caller, which is the only layer holding the replay blob the brief
+        is computed from; emitted verbatim just above the scatter controls.
+        None = the section is omitted, which is what a dive with no replay
+        blob path gets.
     """
     opp_iv_modes = opp_iv_modes or ['pvpoke']
     shield_scenarios = shield_scenarios or [(1, 1)]
@@ -2281,6 +2289,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '<div class="dd-toc-bb dd-toc-bb-note">'
             f'{_bb_esc(best_buddy["note"])}</div>\n')
 
+    # "Which one to build?" -- the build brief, collapsed, directly above the
+    # scatter controls (docs/expert_verdict_plan.md; the placement is
+    # Michael's 2026-09-13 decision). Pre-rendered by the caller because the
+    # brief is computed from the replay blob, which this function never sees.
+    if which_build_html:
+        html += which_build_html
+
     # Controls
     html += '<div class="controls" id="dd-scatter">\n'
     if split_info is not None:
@@ -2578,6 +2593,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '</div>\n'
     )
     if n_scenarios > 1:
+        # Caption first, then the grid. The minis plot the AVERAGED score on
+        # y (that is what this strip has always shown) while their colors
+        # come from the Matchup clusters section, whose bands are horizontal
+        # only on a win-count axis -- so the caption says where to look for
+        # the bands rather than letting the smear read as the clustering.
+        html += ('<p id="allscen-note" style="display:none;font-size:11px;'
+                 'color:var(--text-muted);margin:6px 0 0 0">Each mini plots '
+                 'average score against stat-product rank, colored by that '
+                 'scenario\'s own matchup clusters (title: K, silhouette '
+                 'and the first stat split). On this y-axis the clusters '
+                 'smear rather than band -- the Matchup clusters section '
+                 'below, and the main plot on a win-count y-axis, show them '
+                 'as bands. Click a mini to select that shield scenario.'
+                 '</p>\n')
         html += ('<div id="allscen-grid" style="display:none;'
                  'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
                  '</div>\n')
@@ -3395,6 +3424,50 @@ def article_slug_from_thresholds(species, shadow=False, thresholds_dir=None):
     return _raw.get(_key, {}).get('article', {}).get('slug', '')
 
 
+def _which_build_sections(state):
+    """Pre-render the "Which one to build?" section for every moveset.
+
+    Returns ``{arm index: html}``. The brief is computed from the replay
+    BLOB (scripts/deep_dive_brief.py reads the whole score cube out of it),
+    so this is the only layer that can build it: ``generate_interactive_html``
+    sees one file's slice of the moveset data and never the blob.
+
+    Three honest no-ops, each logged rather than silent, because a missing
+    section is a section a reader can see is missing:
+
+    * no blob path on the state (``--no-replay-dump``, or a caller that did
+      not record which file it replayed) -- the brief's provenance field
+      quotes the blob by name and date, so there is nothing to compute from;
+    * a guard failure inside the brief -- the brief's whole contract is that
+      a printed number was re-derived, so a page that swallowed a guard and
+      rendered anyway would be the one outcome worse than no section;
+    * any other exception -- the dive's own output must not die for an
+      analysis block that sits above it.
+    """
+    blob_path = state.get('replay_blob_path')
+    if not blob_path:
+        logger.info("  Which one to build?: skipped (no replay blob path on "
+                    "this render; the brief is computed from the blob)")
+        return {}
+    # How many movesets each FILE will embed. Split mode gives every file
+    # exactly one; a single-file dive embeds them all behind a Moveset
+    # dropdown this section does not follow, and the note under the panel
+    # says which moveset it is about in that case.
+    per_file = (1 if (state['split_movesets']
+                      and len(state['moveset_data']) > 1)
+                else len(state['moveset_data']))
+    try:
+        import deep_dive_which_build as which_build
+        all_facts = which_build.prepare(state, blob_path)
+        return {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
+                                              page_movesets=per_file)
+                for arm in range(len(all_facts))}
+    except Exception as e:
+        logger.warning(f"  Which one to build?: omitted "
+                       f"({type(e).__name__}: {e})")
+        return {}
+
+
 def render_dive_html(state):
     """Render the interactive HTML output (split or single) from a
     replayable state dict. Keys mirror generate_interactive_html's
@@ -3409,6 +3482,7 @@ def render_dive_html(state):
             state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
+    which_build = _which_build_sections(state)
     if state['split_movesets'] and len(moveset_data) > 1:
         # Per-moveset split: emit N files, one per moveset. The
         # filesystem plan is computed up-front so every file
@@ -3459,6 +3533,7 @@ def render_dive_html(state):
                 slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
                 cup=state.get('cup'),
                 cup_label=state.get('cup_label'),
+                which_build_html=which_build.get(mi),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -3492,6 +3567,7 @@ def render_dive_html(state):
             slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
             cup=state.get('cup'),
             cup_label=state.get('cup_label'),
+            which_build_html=which_build.get(0),
         )
 
 
@@ -5211,6 +5287,7 @@ def main():
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
             if _replay_path:
+                state['replay_blob_path'] = os.path.abspath(_replay_path)
                 logger.info(f"  Replay state: {_replay_path}")
                 logger.info(f"    (re-render without re-simming: "
                             f"python scripts/replay_analysis.py "
