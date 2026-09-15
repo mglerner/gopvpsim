@@ -63,11 +63,14 @@ our cluster stuff first." State after this session:
   Lens-grid item: a launch-time preflight should refuse a bare
   run_website_dives.py run without the TTL keeper, or the runner should
   own the keeper.
-- TOOL GAP: `migrate_cache.py --from-gamemaster ... --slayer` silently
-  ignores `--slayer` (migrate_gamemaster runs on the sweep dir only). The
-  slayer cache's gamemaster stamps are therefore still the old vintages,
-  so mirror-slayer rounds re-sim on the next re-dive (a few minutes per
-  dive). Fix before a bake where that matters.
+- TOOL GAP, FIXED the same day (f783255): `migrate_cache.py
+  --from-gamemaster ... --slayer` used to ignore `--slayer` and run the sweep
+  migration. `migrate_slayer_gamemaster` now mirrors the sweep path (shared
+  guards/delta front half; affected(scenario, scenario)). Applied to the real
+  slayer cache with the same engine-swap trick (battle.py stepped back to the
+  pre-v6 version for the two gamemaster migrations, then restored, then the
+  v6 engine migration): 129 mirror entries now at 36037e51a2ee /
+  9de08819ae0f; the other 99 are legacy pre-rebalance vintages.
 - NEXT: the warm re-dive (`direnv exec . scripts/overnight_redive.sh`
   or run_website_dives.py WITH the TTL keeper), verification per the
   hand-off below, publish on Michael's go. Blocked on Michael's cluster
