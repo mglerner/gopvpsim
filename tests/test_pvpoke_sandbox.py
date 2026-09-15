@@ -81,32 +81,76 @@ def test_level_cap_sandbox_url_refused():
 def test_verify_url_reproduces_showcase_and_start_state():
     """Gating fixes 4+5 and the E1 gate: verify_url decodes the URL
     STRING (routing + dropdown indices + pinned spread + actions) and
-    runs PvPoke's Battle.js. Showcase 1 (GL Azumarill 0-0) must
-    reproduce the certified 674 with the exact end state; and an
-    energy-segment URL must actually apply the start state (pre-fix:
-    start_hp was silently clobbered -- a false green)."""
+    runs PvPoke's Battle.js. The GL Azumarill 0-0 PoGoDives line, as the
+    current encoder emits it, must replay our engine's 690 / [48, 0] with
+    EVERY scripted action executed; and an energy-segment URL must
+    actually apply the start state (pre-fix: start_hp was silently
+    clobbered -- a false green).
+
+    History: until 2026-09-12 this test pinned the 2026-08-27 PUBLISHED
+    link (pre-fix turn clock) at whatever PvPoke replayed it as (634 after
+    the turn-system merge) -- i.e. it certified a replay in which 2 of 3
+    scripted actions never fired. Engine-level (page=False) because the
+    page's own double run drops this line's T15 Dive (446-class hasActed
+    bug, see the Lapras test)."""
     url = ('https://pvpoke.com/battle/sandbox/1500/'
            'cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/'
-           '00/0-1-2/0-2-3/15.100000-19.110000-28.101000/')
-    got = verify_url(url)
-    # RE-PINNED 2026-09-09. These numbers come FROM PvPoke by construction --
-    # verify_url runs their Battle.js -- so the new turn system moved them
-    # from 674/[44,0] to 634/[34,0]. Nothing to cross-check against here;
-    # the value IS the oracle.
-    assert round(got['score'][0]) == 634
-    assert got['hp'] == [34, 0]
+           '00/0-1-2/0-2-3/15.100000-20.110000-30.101000/')
+    got = verify_url(url, page=False)
+    assert round(got['score'][0]) == 690
+    assert got['hp'] == [48, 0]
     assert got['shields'] == [0, 0]
+    # Every scripted charged action must actually have fired: 3 scripted +
+    # the auto-fired Gulp Missile = 4 charged uses in PvPoke's own useLog.
+    fired = [u for u in got['useLog']
+             if u['move'] in ('DIVE', 'FLY', 'ICE_BEAM', 'GULP_MISSILE_ARROKUDA')]
+    assert [u['move'] for u in fired] == ['DIVE', 'ICE_BEAM',
+                                          'GULP_MISSILE_ARROKUDA', 'FLY']
     # start-state grammar: identity control (full HP, zero energy) must
     # match the plain run exactly; a lowered start_hp must not.
-    ident = verify_url(url.replace('/00/', '/00/').replace(
-        '/15.100000', '/126-191/0-0/15.100000'))
-    # Stated RELATIVE to the plain run rather than against a literal. The
-    # invariant is "identity start-state == plain run"; hardcoding 674 made a
-    # statement about equality drift the moment PvPoke's own number moved.
+    ident = verify_url(url.replace('/15.100000', '/126-191/0-0/15.100000'),
+                       page=False)
     assert round(ident['score'][0]) == round(got['score'][0])
-    hurt = verify_url(url.replace('/15.100000',
-                                  '/60-191/0-0/15.100000'))
+    hurt = verify_url(url.replace('/15.100000', '/60-191/0-0/15.100000'),
+                      page=False)
     assert round(hurt['score'][0]) != round(got['score'][0])
+
+
+def test_same_turn_charged_pair_shifts_one_turn_not_two():
+    """Turn-clock rule (corrected 2026-09-12): Battle.js applies ONE
+    post-charge cooldown per ROUND with a charged move (Battle.js:540), so
+    a same-turn pair must shift later actions by +1, not +2. Fixture: UL
+    Cramorant (15/15/15, Peck / Dive+Fly) vs Swampert (PvPoke default IVs,
+    Mud Shot / Hydro Cannon+Earthquake), 0-0, pvpoke_dp both sides so both
+    engines agree on the fight. Pre-fix the link replayed 815 / [99, 0]
+    against the sim's 703 / [64, 0]."""
+    from gopvpsim.battle import pvpoke_dp, simulate
+    from cramorant_policy_lab import make_bp
+    from gopvpsim.pokemon import pvpoke_default_ivs
+    lv, a_, d_, s_ = pvpoke_default_ivs('Swampert', league='ultra')
+    a = make_bp('Cramorant', 'ultra', False, 'PECK', ['DIVE', 'FLY'],
+                ivs=(15, 15, 15))
+    b = make_bp('Swampert', 'ultra', False, 'MUD_SHOT',
+                ['HYDRO_CANNON', 'EARTHQUAKE'], ivs=(a_, d_, s_))
+    a.reset_for_battle(0, b)
+    b.reset_for_battle(0, a)
+    r = simulate(a, b, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                 log=True)
+    acts, _auto = timeline_to_actions(r, a, b)
+    # Positive control on the fixture: it must contain a same-turn pair
+    # with at least one later action, or this test exercises nothing.
+    by_turn = {}
+    for x in acts:
+        by_turn.setdefault(x.turn, []).append(x)
+    pairs = [t for t, xs in by_turn.items() if len(xs) == 2]
+    assert pairs and max(x.turn for x in acts) > min(pairs), acts
+    s0 = PokeSpec('cramorant', 'PECK', ['DIVE', 'FLY'], ivs=(15, 15, 15),
+                  level=50.0)
+    s1 = PokeSpec('swampert', 'MUD_SHOT', ['HYDRO_CANNON', 'EARTHQUAKE'],
+                  ivs=(a_, d_, s_), level=lv)
+    got = verify_url(sandbox_url(2500, s0, s1, (0, 0), acts), page=False)
+    assert (round(got['score'][0]), got['hp']) == (
+        r.pvpoke_score(0), r.hp_remaining)
 
 
 # ---------------------------------------------------------------------------
@@ -212,11 +256,23 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     s1 = PokeSpec('lapras', level=pb.level, ivs=(15, 15, 15),
                   fast='PSYWAVE', charged=['SPARKLING_ARIA', 'ICE_BEAM'])
     url = sandbox_url(2500, s0, s1, (1, 1), acts)
-    got = verify_url(url)
+    # ENGINE-level round trip (one simulate()): the encoder's contract.
+    got = verify_url(url, page=False)
     assert (round(got['score'][0]), got['hp'], got['shields']) == (
         662, [51, 0], [0, 0]), (
         f'the link does not replay the sim (662 / [51, 0]): {url}')
     assert round(got['score'][0]) == r.pvpoke_score(0)
+    # PAGE-level (what pvpoke.com shows, verified in a browser 2026-09-12):
+    # 446, a LOSS. Upstream bug -- the page simulates a sandbox link twice
+    # and Pokemon.reset() never clears hasActed, so Cramorant (who acted on
+    # run 1's KO turn) loses its turn-1 action in run 2 and every scripted
+    # Cramorant action lands off-parity. Pinned so a PvPoke fix is noticed:
+    # when this assertion fails with 662, delete it and the page=False
+    # split above (docs/pvpoke_bug_reports.md Report 9).
+    page = verify_url(url)
+    assert (round(page['score'][0]), page['hp']) == (446, [0, 24]), (
+        'pvpoke.com now replays this link differently -- did they fix '
+        f'hasActed? got {page["score"][0]} {page["hp"]}')
 
     # POSITIVE CONTROL: the replay must actually be driven by our action
     # script, not merely coincide with PvPoke's own AI. Corrupt one REAL
@@ -231,7 +287,7 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     # that it changes THIS fight would now be asserting something false.
     dropped = url.replace('25.101100-', '')
     assert dropped != url, f'the turn-25 Fly is missing from {url}'
-    without_fly = verify_url(dropped)
+    without_fly = verify_url(dropped, page=False)
     assert (round(without_fly['score'][0]), without_fly['hp']) != (
         round(got['score'][0]), got['hp']), (
         'dropping a real action changed nothing -- the replay is not being '

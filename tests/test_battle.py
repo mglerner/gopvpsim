@@ -1959,6 +1959,20 @@ _REUSE_MATCHUPS = [
         ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
          'great', 4, 15, 13, False),
         id='aegislash-azumarill'),
+    # The OTHER Aegislash start (found 2026-09-12): Blade starts pristine
+    # and becomes Shield mid-battle, where priority-shuffle clause 4 stamps
+    # every charged-move dict selfDebuffing/buffs=[0,0]/sentinel buffTarget
+    # in place. Pre-fix, reset_for_battle never undid that, so scenarios
+    # after the first shield burn ran Blade with self-debuffing Shadow Ball
+    # and Gyro Ball: 5/9 scenarios diverged (winner flips at 1v1), and every
+    # baked Aegislash (Blade) column since 9fe11e2 (2026-09-02) carried it.
+    # The Shield param above is the fixed point of that stamp and passed.
+    pytest.param(
+        ('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'],
+         'great', 4, 14, 15, False),
+        ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+         'great', 4, 15, 13, False),
+        id='aegislash-blade-azumarill'),
     # Stateful one-shot form mechanics (review finding T7): the disguise
     # is consumed once per battle and leaves a permanent -1 def stage
     # after busting — exactly the state most likely to leak across the

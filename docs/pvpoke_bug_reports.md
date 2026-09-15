@@ -502,3 +502,61 @@ moveId` twice, plus (if the intent read is right) `false -> true` at
 **Pre-filing checklist:** re-run `git log 78c64048a..master -- src/js/`
 for upstream fixes; search the issue tracker for "moveID"/"Cramorant"
 duplicates; re-verify both line numbers against master tip.
+
+## Drafted 2026-09-12, NOT YET FILED - Report 9 - `hasActed` survives `Pokemon.reset()`, so a sandbox link's displayed battle is not the battle it encodes
+
+**Status:** drafted from a browser-verified reproduction (pvpoke.com
+1.40.1.6, engine JS byte-identical to master `a93147bf1`; gamemaster
+2026-09-10). Not yet filed. Possibly the same root cause as the
+unresolved site-vs-harness discrepancy noted under Report 3 on
+2026-07-16 (site 429 where headless runs gave 510) - that page also
+ran the same battle twice.
+
+**Summary.** `Pokemon.reset()` (Pokemon.js:1924) restores HP, energy,
+cooldown, shields, buffs and form, but not `hasActed`. `Battle.start()`
+does not clear it either. So a Pokemon that acted on the final turn of
+one `simulate()` starts the next `simulate()` on the same objects flagged
+as having already acted, `getTurnAction` (Battle.js:724) skips its
+turn-1 action, and its whole fast-move cycle runs one turn late for the
+rest of the fight. In sandbox mode the scripted actions are matched by
+exact turn (Battle.js:745), so every action of that Pokemon on the old
+parity is silently dropped.
+
+**Why users see it.** Loading a `/battle/sandbox/...` link simulates
+twice: `loadGetData()` calls `runSandboxSim()` synchronously (Interface.js:
+2233-2248: setActions + simulate + displayTimeline), and the
+`.battle-btn` click triggered just before it (Interface.js:2223) fires
+`startBattle()`'s `setTimeout` afterwards, which simulates again with
+the same actions still set and re-renders. The page shows run 2.
+
+**Reproduction (browser).** Cramorant (L26 5/15/13, Peck / Dive + Fly)
+vs Azumarill (L43 4/15/13, Bubble / Ice Beam + Play Rough), 0-0,
+scripted Dive T15, Ice Beam T20, Fly T30:
+
+    /battle/sandbox/1500/cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/00/0-1-2/0-2-3/15.100000-20.110000-30.101000/
+
+One `simulate()` (headless, or the page's first run): Cramorant wins,
+rating 690, 48 HP left, all three actions execute. The page displays:
+Cramorant wins, rating 547, 12 HP left, "Energy Used 45" - the T15 Dive
+never fires (Cramorant's Pecks now resolve on odd turns, so its cooldown
+is not 0 on turn 15), no Gulp Missile, Fly does 57 instead of 71. A
+second reproduction in the other direction: the UL Cramorant vs Lapras
+(L36) 1-1 link in gopvpsim's tests replays 662 (win) once and 446 (loss)
+on the page.
+
+**Reproduction (headless).** Load Battle.js, set up the two Pokemon,
+`setSandboxMode(true)`, `setActions(...)`, then call `simulate()` twice
+and compare `getPokemon()[0].hp`; between the runs
+`getPokemon()[0].hasActed` is `true` while everything else `reset()`
+touches is back to its start value.
+
+**Suggested fix.** Add `self.hasActed = false;` to `Pokemon.reset()`
+(or clear it for both Pokemon in `Battle.start()` next to the
+`processed` reset, Battle.js:249). Either makes consecutive
+`simulate()` calls idempotent; the per-turn clear at Battle.js:302
+already handles the in-battle case.
+
+**Scope.** Anything that simulates twice on the same Pokemon objects
+shows this: the sandbox share links above, and any UI flow that re-runs
+after a settings change without rebuilding the Pokemon. Single-run
+consumers (rankings, matrix) are unaffected.
