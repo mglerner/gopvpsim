@@ -749,6 +749,45 @@ safe swap / closer) so floor selection can weight cells and the headline can
 say "in the shield states Sableye usually sees". (2) needs an expert-supplied
 or usage-derived prior; the sim does not have one.
 
+SPREAD-SETS ANALYSIS DONE (2026-09-15; report
+`~/coding/reports/gopvpsim-spread-sets-2026-09-15.html`, artifacts + 112
+per-blob fact files with explicit member lists under
+`userdata/analysis/2026-09-15_spread_sets/`, ~246 MB, gitignored, not to
+keep forever). Michael's framing: SETS of spreads are the primitive (users
+check their mons against a set on the plot; gobattlekit gets explicit IV
+lists); descriptions are labels. Findings on the deduplicated corpus (108
+dives / 448 arms / 7944 named sets, pvpoke mode, L50):
+- Two-/three-stat structure beyond every single-stat threshold (atk, def,
+  hp AND stat product): 88% of arms have at least one such top-50 cell, but
+  the MAGNITUDE is small: 3.8% of decision cells, 1.8% after a materiality
+  bar (best single-stat rule wins the cell <= 95%). With only the four
+  brief-specified generators (no S5 boxes): 32% of arms.
+- Plain Sableye: the 863-spread 0v1 cluster wins Annihilape AND
+  Aegislash-Shield for every member; "atk >= 123.4 and HP >= 118" does NOT
+  (55%); the exact description is atk-floor + a Def-vs-HP staircase; the
+  genre's linear form "atk >= 123.4 and Def + 1.15*HP >= 255.88" fits at
+  J=0.98. Shadow Sableye's strongest cluster IS the floor set (2220).
+- Description shapes: 11% single threshold, 36% two-stat box, 15%
+  atk-floor + staircase, 36% list-only (at 95% fidelity 830 of those
+  rescued). The linear Def + k*HP family fits exactly 82 sets, 4% of the
+  hard sets at 99%, 14% at 95%: the list stays the primitive.
+- Frontier slope (corpus): median 0.54 Def per HP (q 0.36-0.80); the "1 HP
+  for 2 Def" ratio was Michael's paraphrase, not a RyanSwag quote; the
+  SHAPE is the genre's, the ratio is species-specific.
+- Score-only structure ("do better or worse"), ten dives: 12 of 486
+  (set, cell) pairs have non-overlapping p5-p95 score bands with no result
+  flip; strict separation never occurs.
+- gobattlekit: no schema change; `ivs = [[a,d,s],...]` already exists;
+  floors express lower bounds only, so 59% of sets need the explicit list;
+  the list is lossless only under the L50 cap; MAX_TARGETS=4 and file size
+  are the real constraints.
+OPEN: (1) the per-arm set-keeping cut (18 per arm) still uses the old
+interest score; adopt the material-cells ranking in spread_sets.py and
+re-run the corpus (~2.5 h, nice'd); (2) extend the score column to the
+corpus; (3) product: plot the named sets as color groups in "Which one to
+build?" with the collection overlay (the sets JSON is the input), and an
+export of explicit lists to gobattlekit behind the four-target cap.
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
