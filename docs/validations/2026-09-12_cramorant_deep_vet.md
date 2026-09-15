@@ -229,3 +229,22 @@ mean up everywhere. Remaining 75 slices: GL 2v2 (16 more at cap 50), UL
 2v2 pages m0/m2/m3/m4 (32), GL 1v0 (10), UL 1v0 m1/m2/m3/m4 (16) plus the
 UL index 1v0 nobait twins; run `cramorant_recertify.py --scenarios 2v2,1v0
 --stride 1` when the machine is free (~4-6 h serial under load).
+
+## Stride-1 re-certification, ALL 90 changed-row slices (2026-09-15, machine free, 16-way)
+
+`userdata/cramorant_lab/v6_stride1_full/` (per-slice JSON) + log
+`userdata/logs/2026-09/v6_stride1_20260915.log`; 20 minutes wall clock.
+Both Cramorant pages as re-baked (GL 2026-09-12, UL 2026-09-13).
+
+**90 / 90 PASS, 0 FAIL** on both metrics -> v6 is certified under the
+go/no-go rule. Worst margins: min net 0 (GL HP+Surf 1v0 pvpoke/bait,
+unchanged from shipped), min mean +1.121 (GL Dive+Fly 1v0). Total net win-
+cells over the 90 slices: shipped 937,116 -> v6 931,522 (-0.6%), with the
+four failing cells fixed and every top-SP lens >= 0 at the stride-13 read.
+Where the chip guard gives value back (bait modes, where the rush is the
+opponent's bait target and the last-shield decline was paying): GL HP+Surf
+2v2 bait -3.8k / -3.6k net, mean 6.2 -> 3.4; UL Peck/Surf 2v2 all eight
+slices -1.1k..-1.9k net, mean -0.4..-0.7; UL HP+Surf 2v2 bait -1.2k..-2.0k,
+mean flat. Disclosed, accepted: the bar is per-slice non-negativity on both
+metrics, which every slice meets, and the alternative was shipping a row
+that loses 300 in 3835/4096 spreads against one opponent.
