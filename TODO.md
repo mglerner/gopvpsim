@@ -32,6 +32,47 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+### DONE 2026-09-15 (Fable session): merges + migrations; RE-DIVE NOT RUN
+
+Michael: "Do the first four, don't do the redive. I want to be sure about
+our cluster stuff first." State after this session:
+
+- main = 9b5e86d: Aegislash fix (0afbf6b), predicates brought forward
+  (1374a70), sheet v6 (8a8afcd, GO on 90/90), scenario-clusters + "Which
+  one to build?" (9b5e86d). Engine hash `36037e51a2ee`. Fast tier green
+  after each engine merge.
+- Sweep cache: snapshot `~/.cache/gopvpsim/sweep_pre_aegislash_20260915`
+  (hardlinks; slayer likewise). Migrations applied: engine
+  `form_change_either_side_20260912` (e4d380 -> 1436a1: 235,768 blessed,
+  25,320 deleted), gamemaster 51dfa745457a -> 9de08819ae0f and
+  66b3cba2840d -> 9de08819ae0f (delta: mimikyu / houndoom_mega /
+  FELL_STINGER_PLUS; 0 further deletions, Mimikyu columns were already
+  gone), engine `pogodives_sheet_v6_20260912` (1436a1 -> 36037e: all
+  blessed, Cramorant pogodives columns already gone). `--list-stamps`:
+  235,768 columns at 36037e51a2ee / 9de08819ae0f; 153,376 legacy columns
+  at 515a0a95171b / 1398b001cf86 untouched.
+- WHY the gamemaster moved: the rebake was launched with
+  run_website_dives.py directly, NOT via overnight_redive.sh, so nothing
+  kept the 24h data-cache TTL fresh; the live gamemaster refreshed to the
+  09-14 vintage on 09-15 11:33 (Cramorant session runs). The engine and
+  gamemaster migrations deadlock (each skips columns whose OTHER stamp is
+  not current); resolved by temporarily writing each old gamemaster blob
+  (from ../pvpoke git history) into `~/Documents/gopvpsim_cache/
+  gamemaster.json`, running the engine migration per vintage, then
+  restoring the live file and running the gamemaster migrations.
+  Lens-grid item: a launch-time preflight should refuse a bare
+  run_website_dives.py run without the TTL keeper, or the runner should
+  own the keeper.
+- TOOL GAP: `migrate_cache.py --from-gamemaster ... --slayer` silently
+  ignores `--slayer` (migrate_gamemaster runs on the sweep dir only). The
+  slayer cache's gamemaster stamps are therefore still the old vintages,
+  so mirror-slayer rounds re-sim on the next re-dive (a few minutes per
+  dive). Fix before a bake where that matters.
+- NEXT: the warm re-dive (`direnv exec . scripts/overnight_redive.sh`
+  or run_website_dives.py WITH the TTL keeper), verification per the
+  hand-off below, publish on Michael's go. Blocked on Michael's cluster
+  review (two-axis rungs / cluster-mined co-gates, plan Phase D).
+
 ### HAND-OFF (2026-09-15, branch `cramorant-reinvestigate`): merge, migrate, re-dive, verify
 
 Michael's close-out plan (2026-09-15): the 2026-09-12/14 rebake will NOT
