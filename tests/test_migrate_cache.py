@@ -522,3 +522,64 @@ def test_pogodives_sheet_v6_predicate_is_tier_scoped():
     assert not pred({'species': 'Azumarill'}, {'species': 'Cramorant'})
     assert pred({'species': 'Cramorant'}, None)
 
+
+# ---- slayer gamemaster migration (migrate_slayer_gamemaster) ----
+# Pre-fix (2026-09-15): ``--from-gamemaster ... --slayer`` silently ran the
+# SWEEP migration and the slayer cache's gamemaster stamps stayed at the old
+# vintage, so every mirror-slayer round re-simmed on the next bake. The
+# function under test did not exist; this file's slayer tests covered only
+# migrate_slayer_engine.
+
+def _slayer_gm_setup(tmp_path, monkeypatch):
+    """Old/new gamemaster pair differing in exactly ICE_BEAM's power; stamps
+    set to the pair's real narrowed hashes so the guards pass."""
+    old_gm = _delta_gm()
+    new_gm = _delta_gm(ICE_BEAM=95)
+    old_h = migrate_cache._narrow_hash(old_gm)
+    new_h = migrate_cache._narrow_hash(new_gm)
+    assert old_h != new_h
+    old_file = tmp_path / 'old_gm.json'
+    old_file.write_text(json.dumps(old_gm))
+    import gopvpsim.data as gdata
+    monkeypatch.setattr(gdata, 'load_gamemaster', lambda: new_gm)
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', new_h)
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_cur')
+    return old_h, new_h, old_file
+
+
+def test_slayer_gamemaster_migration_blesses_and_deletes(tmp_path, monkeypatch):
+    old_h, new_h, old_file = _slayer_gm_setup(tmp_path, monkeypatch)
+    sd = tmp_path / 'slayer'
+    aff = _put_slayer(sd, 'Azumarill', 'engine_cur', old_h, ['ICE_BEAM'])
+    bless = _put_slayer(sd, 'Medicham', 'engine_cur', old_h, ['PSYCHIC_FANGS'])
+    migrate_cache.migrate_slayer_gamemaster(sd, old_h, str(old_file), apply=True)
+    # Medicham reads nothing that changed -> re-stamped to the new gamemaster.
+    assert slayer_cache.read_stamp(bless) == ('engine_cur', new_h,
+                                              slayer_cache.read_stamp(bless)[2])
+    assert bless.with_suffix('.pkl').exists()
+    # Azumarill's mirror uses ICE_BEAM, which changed -> deleted for re-sim.
+    assert not aff.exists() and not aff.with_suffix('.pkl').exists()
+
+
+def test_slayer_gamemaster_migration_skips_other_engine(tmp_path, monkeypatch):
+    old_h, new_h, old_file = _slayer_gm_setup(tmp_path, monkeypatch)
+    sd = tmp_path / 'slayer'
+    j = _put_slayer(sd, 'Medicham', 'engine_old', old_h, ['PSYCHIC_FANGS'])
+    migrate_cache.migrate_slayer_gamemaster(sd, old_h, str(old_file), apply=True)
+    assert slayer_cache.read_stamp(j)[:2] == ('engine_old', old_h)  # untouched
+
+
+def test_slayer_flag_routes_gamemaster_mode(tmp_path, monkeypatch, capsys):
+    """The CLI must send --from-gamemaster --slayer to the SLAYER migration
+    (pre-fix it ran the sweep migration and printed the sweep header)."""
+    old_h, new_h, old_file = _slayer_gm_setup(tmp_path, monkeypatch)
+    sd = tmp_path / 'slayer'
+    _put_slayer(sd, 'Medicham', 'engine_cur', old_h, ['PSYCHIC_FANGS'])
+    monkeypatch.setattr(sys, 'argv', ['migrate_cache.py', '--from-gamemaster', old_h,
+                                      '--old-gamemaster-file', str(old_file),
+                                      '--slayer', '--slayer-dir', str(sd),
+                                      '--cache-dir', str(tmp_path / 'sweep_unused')])
+    migrate_cache.main()
+    out = capsys.readouterr().out
+    assert 'SLAYER GAMEMASTER' in out
+    assert 'blessed (unaffected, served warm): 1' in out

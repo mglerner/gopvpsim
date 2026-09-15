@@ -611,13 +611,19 @@ def migrate_slayer_engine(slayer_dir, from_engine, predicate_name, apply):
     print(f"  {mode}")
 
 
-def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
+def _gamemaster_delta_or_exit(from_gamemaster, old_gm_file, label):
+    """Shared front half of the two gamemaster migrations: the guards, the
+    delta, and the header print. Returns (affected, to_gamemaster, cur_engine)
+    or None when there is nothing to migrate. One copy on purpose: the slayer
+    variant was missing entirely until 2026-09-15 (``--slayer`` was silently
+    ignored in gamemaster mode), and a second copy of the guards is how the
+    two would drift apart again."""
     to_gamemaster = sweep_cache.gamemaster_hash()
     cur_engine = sweep_cache.engine_hash()
     if from_gamemaster == to_gamemaster:
         print(f"--from-gamemaster {from_gamemaster} equals the current "
               "gamemaster; nothing to migrate.")
-        return
+        return None
     old_gm = json.loads(Path(old_gm_file).read_text())
     from gopvpsim.data import load_gamemaster
     new_gm = load_gamemaster()
@@ -635,7 +641,7 @@ def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
         sys.exit(2)
 
     affected, delta = build_gamemaster_delta(old_gm, new_gm)
-    print(f"GAMEMASTER  from={from_gamemaster}  to={to_gamemaster}")
+    print(f"{label}  from={from_gamemaster}  to={to_gamemaster}")
     print(f"  delta: {len(delta['touched_species'])} species changed/removed, "
           f"{len(delta['touched_moves'])} moves changed/removed, "
           f"{len(delta['added_species'])} species added, "
@@ -644,6 +650,59 @@ def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
         print(f"  changed/removed species: {delta['touched_species'][:40]}")
     if delta['touched_moves']:
         print(f"  changed/removed moves:   {delta['touched_moves'][:40]}")
+    return affected, to_gamemaster, cur_engine
+
+
+def migrate_slayer_gamemaster(slayer_dir, from_gamemaster, old_gm_file, apply):
+    """Gamemaster-migrate the v5 SLAYER cache (mirror of migrate_gamemaster).
+
+    Slayer entries are mirrors, so the delta's ``affected(focal, col)`` is
+    evaluated as ``affected(scenario, scenario)``; the scenario dict carries
+    the same species / shadow / fast / charged fields the sweep sidecars do.
+    A sidecar with no readable scenario cannot be proven unaffected and is
+    deleted (re-sim), matching the sweep path's unresolvable rule."""
+    res = _gamemaster_delta_or_exit(from_gamemaster, old_gm_file,
+                                    'SLAYER GAMEMASTER')
+    if res is None:
+        return
+    affected, to_gamemaster, cur_engine = res
+    slayer_dir = Path(slayer_dir)
+    blessed = deleted = skipped_engine = skipped_other = 0
+    if slayer_dir.exists():
+        for jp in sorted(slayer_dir.glob('*.json')):
+            e_stamp, gm_stamp, scen = slayer_cache.read_stamp(jp)
+            if e_stamp != cur_engine:
+                skipped_engine += 1
+                continue
+            if gm_stamp != from_gamemaster:
+                skipped_other += 1
+                continue
+            pkl = jp.with_suffix('.pkl')
+            if scen is None or affected(scen, scen):
+                deleted += 1
+                if apply:
+                    for p in (pkl, jp):
+                        try:
+                            p.unlink()
+                        except OSError:
+                            pass
+            else:
+                blessed += 1
+                if apply:
+                    _bless_slayer(jp, e_stamp, to_gamemaster)
+    mode = 'APPLIED' if apply else 'DRY-RUN (use --apply to write)'
+    print(f"  blessed (unaffected, served warm): {blessed}")
+    print(f"  deleted (affected, will re-sim):   {deleted}")
+    print(f"  skipped (other engine vintage):    {skipped_engine}")
+    print(f"  skipped (other gamemaster vintage):{skipped_other}")
+    print(f"  {mode}")
+
+
+def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
+    res = _gamemaster_delta_or_exit(from_gamemaster, old_gm_file, 'GAMEMASTER')
+    if res is None:
+        return
+    affected, to_gamemaster, cur_engine = res
 
     blessed = deleted = skipped_engine = skipped_other = unresolved = 0
     for _fd, meta, jp, e_stamp, gm_stamp, col in _iter_columns(cache_dir):
@@ -695,8 +754,9 @@ def main():
     ap.add_argument('--apply', action='store_true',
                     help='actually write changes (default: dry-run)')
     ap.add_argument('--slayer', action='store_true',
-                    help='engine-mode: migrate the SLAYER cache (v5 sidecars) '
-                         'instead of the sweep cache, using the same predicate')
+                    help='migrate the SLAYER cache (v5 sidecars) instead of '
+                         'the sweep cache; works in engine mode (same '
+                         'predicate) and gamemaster mode (same delta)')
     ap.add_argument('--cache-dir', default=None,
                     help='override the sweep cache dir (for tests)')
     ap.add_argument('--slayer-dir', default=None,
@@ -710,8 +770,13 @@ def main():
     if a.from_gamemaster:
         if not a.old_gamemaster_file:
             ap.error('--from-gamemaster requires --old-gamemaster-file')
-        migrate_gamemaster(cache_dir, a.from_gamemaster,
-                           a.old_gamemaster_file, a.apply)
+        if a.slayer:
+            slayer_dir = a.slayer_dir or slayer_cache.CACHE_DIR
+            migrate_slayer_gamemaster(slayer_dir, a.from_gamemaster,
+                                      a.old_gamemaster_file, a.apply)
+        else:
+            migrate_gamemaster(cache_dir, a.from_gamemaster,
+                               a.old_gamemaster_file, a.apply)
         return
     if not a.from_engine:
         ap.error('one of --list-stamps / --from-engine / --from-gamemaster '
