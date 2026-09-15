@@ -56,7 +56,9 @@ re-run `python -c "import sweep_cache as s; print(s.engine_hash())"` from
    of the two changed rows is ALL-PASS -- every one of the 90 slices in
    `userdata/cramorant_lab/v6_stride1_full/` (log
    `userdata/logs/2026-09/v6_stride1_20260915.log`, summary at its end)
-   must read net >= 0 AND mean >= 0. Any FAIL = do not merge v6; leave it on
+   must read net >= 0 AND mean >= 0. RESULT 2026-09-15 11:53: **90/90 PASS,
+   0 FAIL -> v6 is GO** (total net 937,116 -> 931,522, -0.6%, the four
+   failing cells fixed; costs disclosed in the deep-vet doc). Any FAIL = do not merge v6; leave it on
    the branch and merge only item 1 (then the renderer branches still merge,
    they do not depend on v6).
 3. **Render-side branches** (no engine hash impact): the article renderer +
