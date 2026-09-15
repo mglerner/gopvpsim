@@ -1324,6 +1324,26 @@ def _cm_buff_delta(m: dict) -> int:
 # so a named string is a clearer stand-in than an opaque object and
 # survives being copied into a move dict.
 AEGISLASH_SHIELD_BUFF_TARGET = '_aegislash_shield_energy_farm'
+# Priority-shuffle clause 4 stamps these three keys onto a Pokemon's
+# charged-move dicts IN PLACE (a faithful PvPoke port, within one battle).
+# The dicts persist across battles on a reused BattlePokemon, so the
+# pristine values are snapshotted under _SHUFFLE_STAMP_SNAPSHOT the first
+# time the stamp lands and put back by reset_for_battle.
+_SHUFFLE_STAMP_KEYS = ('buffs', 'buffTarget', 'selfDebuffing')
+_SHUFFLE_STAMP_SNAPSHOT = '_pristine_shuffle_stamp'
+
+
+def _restore_shuffle_stamp(cm: dict) -> None:
+    """Undo priority-shuffle clause 4's in-place stamp on one charged-move
+    dict, restoring the keys to their construction-time state (absent keys
+    are removed again). No-op on a dict that was never stamped."""
+    snap = cm.get(_SHUFFLE_STAMP_SNAPSHOT)
+    if snap is None:
+        return
+    for k in _SHUFFLE_STAMP_KEYS:
+        cm.pop(k, None)
+    for k, v in snap:
+        cm[k] = v
 
 
 def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict,
@@ -1440,6 +1460,16 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict,
         # DEFENDER. Hence a sentinel that is none of the three.
         if active_form_sid == 'aegislash_shield':
             for _m in cms:
+                # Snapshot the pristine values ONCE, before the first stamp,
+                # so reset_for_battle can undo it (_restore_shuffle_stamp).
+                # Blade shares these dict objects with Shield, and without
+                # the undo every later battle on a reused pair started Blade
+                # with self-debuffing Shadow Ball / Gyro Ball -- 24% of the
+                # cells of a baked Cramorant-vs-Blade column were wrong
+                # (2026-09-12; tests/test_battle.py aegislash-blade-azumarill).
+                if _SHUFFLE_STAMP_SNAPSHOT not in _m:
+                    _m[_SHUFFLE_STAMP_SNAPSHOT] = tuple(
+                        (k, _m[k]) for k in _SHUFFLE_STAMP_KEYS if k in _m)
                 _m['buffs'] = [0, 0]
                 _m['buffTarget'] = AEGISLASH_SHIELD_BUFF_TARGET
                 _m['selfDebuffing'] = True
@@ -2790,17 +2820,39 @@ class BattlePokemon:
                         "the opponent for cache invalidation")
                 from .formchange import apply_form_change
                 apply_form_change(self, opponent, 0)   # swap back to base form
+            else:
+                # Ended the fight already back in the base form (e.g. Blade
+                # -> Shield -> Blade). No swap, so apply_form_change's
+                # invalidation did not run here -- but the frozen
+                # move-selection cache (_dp_init_cache) and the per-stage
+                # DP tables were RECOMPUTED mid-fight at the form changes
+                # (PvPoke's changeForm -> resetMoves), at those stat stages
+                # and under clause 4's stamp, and would otherwise govern
+                # the next battle from its first turn. A fresh pair starts
+                # with none of that. Invalidate exactly what a form change
+                # invalidates (formchange.apply_form_change). Found
+                # 2026-09-12: 1v2-then-1v1 vs Azumarill replayed 382 for
+                # a fresh 528 (tests/test_battle.py aegislash-blade-azumarill).
+                self._dmg_cache_opp = None
+                self._dp_cache = None
+                self._dp_init_cache = None
+                if opponent is not None:
+                    opponent._dmg_cache_opp = None
+                    opponent._dp_cache = None
             self._form_disguise_active = (self._form_change.effect == 'protect')
             # The alt form's move dicts may also carry the per-battle
             # damage memo cleared below -- clear both forms' lists.
             for form in self._form_change.forms:
                 for cm in form.charged_moves:
                     cm.pop('_cached_damage', None)
+                    _restore_shuffle_stamp(cm)
         # Per-battle damage memo on the move dicts (set by
         # _optimize_move_timing, read by the bandaid[866] gate) -- must not
-        # leak into the next battle.
+        # leak into the next battle. Likewise priority-shuffle clause 4's
+        # Aegislash-Shield stamp (see _restore_shuffle_stamp).
         for cm in self.charged_moves:
             cm.pop('_cached_damage', None)
+            _restore_shuffle_stamp(cm)
         self.hp = self.max_hp
         self.energy = min(ENERGY_CAP, max(0, self.initial_energy))
         self.shields = shields

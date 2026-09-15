@@ -170,6 +170,23 @@ function main() {
     return r;
   };
   battle.simulate();
+  // pvpoke.com runs a sandbox link's battle TWICE on the same Pokemon
+  // objects, and displays the SECOND run: Interface.js loadGetData() calls
+  // runSandboxSim() synchronously (setActions + simulate + displayTimeline),
+  // and the '.battle-btn' click it triggered just before that fires
+  // startBattle()'s setTimeout afterwards, which simulates again (the
+  // actions are still set) and re-renders. The two runs can differ because
+  // Pokemon.reset() (Pokemon.js:1924) does not clear `hasActed`: whichever
+  // Pokemon acted on run 1's final turn starts run 2 flagged as having
+  // acted, skips its turn-1 action, and its whole fast-move cycle shifts
+  // by one turn -- so its scripted actions land on the wrong parity and
+  // never match (Battle.js:724, 745). Found 2026-09-12: a link replaying 690 in one
+  // run shows 547 on the live page. Emulate the page, not the engine.
+  const firstRun = (() => { const q = battle.getPokemon();
+    return { hp: [q[0].hp, q[1].hp], shields: [q[0].shields, q[1].shields], turns: battle.getTurns() }; })();
+  // --single-run skips the page's second run: engine-level semantics only.
+  const singleRun = process.argv.includes('--single-run');
+  if (get.sandbox && !singleRun) { useLog.length = 0; battle.simulate(); }
   const pk = battle.getPokemon();
   // Pokemon.js:2124 getBattleRating (via Battle.js:665) -- the number the
   // battle page shows and the one BattleResult.pvpoke_score mirrors. Scale
@@ -185,7 +202,7 @@ function main() {
     shields: [pk[0].shields, pk[1].shields], level: [pk[0].level, pk[1].level],
     ivs: [pk[0].ivs, pk[1].ivs], cp: [pk[0].cp, pk[1].cp],
     statBuffs: [pk[0].startStatBuffs, pk[1].startStatBuffs],
-    finalStatBuffs: [pk[0].statBuffs, pk[1].statBuffs], useLog,
+    finalStatBuffs: [pk[0].statBuffs, pk[1].statBuffs], useLog, firstRun,
   }));
 }
 try { main() } catch (e) { process.stderr.write('ERR: ' + e.message + '\n' + e.stack + '\n'); process.exit(1) }

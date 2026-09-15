@@ -47,6 +47,16 @@ from gopvpsim.data import load_gamemaster  # noqa: E402
 from gopvpsim.pokemon import Pokemon  # noqa: E402
 from deep_dive_lib.sweep import compute_iv_metadata  # noqa: E402
 from deep_dive_lib.opponents import parse_opponent_spec  # noqa: E402
+from gopvpsim.battle import pogodives_dp, pvpoke_dp, simulate  # noqa: E402
+from cramorant_policy_lab import make_bp  # noqa: E402
+from pvpoke_sandbox import (  # noqa: E402
+    PokeSpec,
+    _CHARGED_RE,
+    plain_battle_url,
+    sandbox_url,
+    timeline_to_actions,
+    verify_url,
+)
 
 SCEN_LABELS = ['0-0', '0-1', '0-2', '1-0', '1-1', '1-2', '2-0', '2-1', '2-2']
 
@@ -159,6 +169,197 @@ def _lift_plotly():
     return m.group(1)
 
 
+# "See it for yourself" showcases: (league, opponent as named on the dive
+# page, start scenario, optional human-authored blurb). Everything else --
+# spreads, movesets, scores, both pvpoke.com links and the charged-move
+# sequences -- is COMPUTED at render time from the dive page's own
+# opponent definition and score tensor, then gated:
+#   * premise: the tensor cell must be a PvPoke loss (< 500) and a
+#     PoGoDives win (> 500), or the render fails naming the cell (pick
+#     another; the 2026-08-27 Jellicent 2-1 showcase died this way when
+#     the Twilight Trails rebalance made PvPoke's own plan win it);
+#   * consistency: a direct re-sim of the cell must reproduce the tensor
+#     integer-exactly, so the article can never disagree with the dive;
+#   * replay: both links are decoded from the URL string and run through
+#     PvPoke's real Battle.js the way pvpoke.com runs them
+#     (pvpoke_sandbox.verify_url); score and ending HP must match our
+#     engine, or the render fails. This is
+#     what the hardcoded 2026-08-27 links lacked -- PvPoke's turn-clock
+#     change (its 442a4afe8, on pvpoke.com's master from 2026-09-08) broke their
+#     replays until this was caught on 2026-09-12.
+# The blurb is the only prose here and it is optional: leave it '' unless
+# a human has read the CURRENT fight and vouches for every number in it.
+# Talonflame's paragraph was re-checked line by line against the
+# 2026-09-12 timelines (Dive shielded twice, Fly 67 eaten vs shielded,
+# Brave Bird 109 vs shielded, closing Dive 139) and kept, minus one
+# clause: "a loaded Gulp Missile it never gets to fire" was false --
+# the missile fires on the fatal Brave Bird in both engines (Talonflame
+# ends at 68 HP, not 94), so the sequence table right below would have
+# contradicted it.
+SHOWCASES = [
+    # All four PROPOSED 2026-09-12, awaiting Michael's editorial pick. They
+    # are the loss-to-win cells at PvPoke's default spread that survive the
+    # page-faithful replay gate (pvpoke.com runs a sandbox link twice and
+    # its un-reset `hasActed` flag drops odd-parity actions in the second
+    # run -- see pvpoke_sandbox SANDBOX SEMANTICS); the 2026-08-27 set's
+    # Azumarill 0-0 and Blastoise 2-2 replay as 547 and 515 on the live
+    # site and are out until PvPoke fixes that. Candidate scan:
+    # userdata/analysis/2026-09-12_cramorant_showcase_audit/
+    # scan_candidates_faithful.py.
+    ('great', 'Toxapex', '0-0', ''),
+    ('great', 'Feraligatr', '1-1', ''),
+    ('ultra', 'Feraligatr (Shadow)', '2-2', ''),
+    ('ultra', 'Talonflame', '1-2',
+     "The biggest swing in the set, and the difference is a single shield "
+     "decision. Both plans open the same way - Dive, Talonflame shields, "
+     "Dive again, Talonflame shields again. Then PvPoke shields Talonflame's "
+     "Fly, and Brave Bird kills it for 109. PoGoDives "
+     "<em>declines</em> that shield, eats 67, and the missile fires "
+     "immediately - so the shield is still there for Brave Bird, and the "
+     "follow-up Dive lands for 139 into the defense drop."),
+]
+
+_FORM_RE = re.compile(r'\s*\((Gulping|Gorging)\)')
+
+
+def _charged_sequence(timeline):
+    """The charged-move events of a timeline, in order, without turn
+    numbers (our clock and PvPoke's differ by one turn per charged move
+    already thrown, so quoting turns would mislead a reader replaying the
+    link). E.g. 'Cramorant Dive (shielded)', 'Azumarill Ice Beam 46',
+    'Gulp Missile 29'."""
+    out = []
+    for line in timeline:
+        m = _CHARGED_RE.match(line)
+        if not m:
+            continue
+        _turn, actor, move, dmg = m.groups()
+        actor = _FORM_RE.sub('', actor)
+        if move.startswith('Gulp Missile'):
+            out.append(f'Gulp Missile {dmg}')
+        elif dmg == 'SHIELDED':
+            out.append(f'{actor} {move} (shielded)')
+        else:
+            out.append(f'{actor} {move} {dmg}')
+    return out
+
+
+def _ends(r, names):
+    a, b = r.hp_remaining
+    sa, sb = r.shields_remaining
+    def side(name, hp, sh):
+        s = f'{name} {hp} HP' if hp > 0 else f'{name} faints'
+        return s + (f', {sh} shield{"s" if sh != 1 else ""} left' if sh else '')
+    return f'{side(names[0], a, sa)}; {side(names[1], b, sb)}'
+
+
+def _sim(cram, opp, shields, pogodives):
+    cram.reset_for_battle(shields[0], opp)
+    opp.reset_for_battle(shields[1], cram)
+    # Same wiring as the dive sweep (deep_dive_lib/sweep.py): the
+    # PoGoDives tier is the charged policy's marker alone; the default
+    # shield policy reads the flag.
+    return simulate(cram, opp,
+                    charged_policy_0=pogodives_dp if pogodives else pvpoke_dp,
+                    charged_policy_1=pvpoke_dp, log=True)
+
+
+def _showcase(n, league, opp_name, scen, blurb, data, pv, pg):
+    n_opp = len(data['opponents'])
+    cp = data['cpCap']
+    oi = data['opponents'].index(opp_name)
+    si = SCEN_LABELS.index(scen)
+    ref = data['pvpokeRefIvIdx']
+    cell = ref * 9 * n_opp + si * n_opp + oi
+    cell_pv, cell_pg = pv[cell], pg[cell]
+    tag = f'showcase {n} ({league} vs {opp_name} {scen})'
+    if not cell_pv < 500 < cell_pg:
+        raise SystemExit(
+            f'{tag}: premise gone -- dive tensor says PvPoke {cell_pv}, '
+            f'PoGoDives {cell_pg}; pick another cell')
+    ms = data['movesets'][0]
+    cram_ivs = (data['ivA'][ref], data['ivD'][ref], data['ivS'][ref])
+    cram_lv = data['ivLv'][ref]
+    link = data['oppLinks'][oi]
+    opp_moves = link['moves'].split('-')
+    opp_mode = link['byMode']['pvpoke']
+    opp_ivs = tuple(opp_mode['ivs'])
+    clean, _variant, shadow = parse_opponent_spec(opp_name)
+    shields = tuple(int(x) for x in scen.split('-'))
+
+    cram = make_bp('Cramorant', league, False, ms['fast'], ms['charged'],
+                   ivs=cram_ivs)
+    opp = make_bp(clean, league, shadow, opp_moves[0], opp_moves[1:],
+                  ivs=opp_ivs)
+    lv = (Pokemon.at_best_level('Cramorant', *cram_ivs, league=league).level,
+          Pokemon.at_best_level(clean, *opp_ivs, league=league,
+                                shadow=shadow).level)
+    if lv != (cram_lv, opp_mode['lvl']):
+        raise SystemExit(f'{tag}: level mismatch {lv} vs page '
+                         f'{(cram_lv, opp_mode["lvl"])}')
+    r_pv = _sim(cram, opp, shields, pogodives=False)
+    r_pg = _sim(cram, opp, shields, pogodives=True)
+    got = (r_pv.pvpoke_score(0), r_pg.pvpoke_score(0))
+    if got != (cell_pv, cell_pg):
+        raise SystemExit(f'{tag}: re-sim {got} disagrees with the dive '
+                         f'tensor {(cell_pv, cell_pg)}')
+
+    spec0 = PokeSpec('cramorant', ms['fast'], list(ms['charged']),
+                     ivs=cram_ivs, level=cram_lv)
+    spec1 = PokeSpec(link['id'], opp_moves[0], opp_moves[1:],
+                     ivs=opp_ivs, level=opp_mode['lvl'])
+    plain = plain_battle_url(cp, spec0, spec1, shields)
+    acts, _auto = timeline_to_actions(r_pg, cram, opp)
+    sandbox = sandbox_url(cp, spec0, spec1, shields, acts)
+    for url, r, what in ((plain, r_pv, "PvPoke's plan"),
+                         (sandbox, r_pg, 'our line')):
+        # verify_url emulates the PAGE (two runs for a sandbox link, see
+        # pvpoke_sandbox SANDBOX SEMANTICS), so this is what a visitor
+        # sees. Score and ending HP must match exactly. Remaining shields
+        # are deliberately NOT gated: the page gives both sides 2 shields
+        # when a sandbox link loads (Interface.js toggleSandboxMode), so
+        # its end-shield count never means anything for a 0-1/1-2 start.
+        rep = verify_url(url)
+        ours = (r.pvpoke_score(0), r.hp_remaining)
+        theirs = (round(rep['score'][0]), rep['hp'])
+        if ours != theirs:
+            raise SystemExit(f'{tag}: {what} link replays {theirs} on '
+                             f'pvpoke.com but our engine says {ours}: {url}')
+        # ...and the page's FIRST run must agree too, so the link stays
+        # right the day PvPoke fixes the hasActed leak and the page starts
+        # showing run 1 (a link that only works because of the bug is not
+        # a link we publish).
+        if rep['firstRun']['hp'] != r.hp_remaining:
+            raise SystemExit(f'{tag}: {what} link replays our fight only '
+                             f'on pvpoke.com\'s second run (first run ends '
+                             f'{rep["firstRun"]["hp"]}, ours '
+                             f'{r.hp_remaining}); pick a cell whose two '
+                             f'runs agree: {url}')
+
+    names = ('Cramorant', opp_name)
+    league_name = {'great': 'Great League', 'ultra': 'Ultra League'}[league]
+    disp = data['opponentsDisplay'][oi] if 'opponentsDisplay' in data else opp_name
+    seq = lambda r: ' &middot; '.join(_charged_sequence(r.timeline))  # noqa: E731
+    blurb_html = f'<p>{blurb}</p>\n' if blurb else ''
+    return f"""
+<h3>{n}. {league_name} vs {disp}, {scen} ({cell_pv} -> {cell_pg})</h3>
+{blurb_html}<table class="ledger showcase">
+<tr><th></th><th>Charged moves, in order</th><th>How it ends</th></tr>
+<tr><td>PvPoke's plan</td><td>{seq(r_pv)}</td><td>{_ends(r_pv, names)}</td></tr>
+<tr><td>PoGoDives line</td><td>{seq(r_pg)}</td><td>{_ends(r_pg, names)}</td></tr>
+</table>
+<p><a href="{plain}">PvPoke's plan (loses, {cell_pv})</a>
+&middot; <a href="{sandbox}">our line (wins, {cell_pg})</a></p>
+"""
+
+
+def _showcases_html(pages):
+    """pages: {league: (data, pv_tensor, pg_tensor)}."""
+    return ''.join(
+        _showcase(n, league, opp, scen, blurb, *pages[league])
+        for n, (league, opp, scen, blurb) in enumerate(SHOWCASES, 1))
+
+
 def build():
     data_gl, sc_gl, _ = _page_tensors('great')
     data_ul, sc_ul, _ = _page_tensors('ultra')
@@ -170,6 +371,9 @@ def build():
     pv_ul, pg_ul, nb_ul = (_unpack(sc_ul['0_pvpoke']),
                            _unpack(sc_ul['0_pvpoke:pogodives']),
                            _unpack(sc_ul['0_pvpoke:nobait']))
+
+    showcases_html = _showcases_html(
+        {'great': (data_gl, pv_gl, pg_gl), 'ultra': (data_ul, pv_ul, pg_ul)})
 
     vs_pv_gl = _scenario_stats(pv_gl, pg_gl, n_gl)
     vs_pv_ul = _scenario_stats(pv_ul, pg_ul, n_ul)
@@ -306,6 +510,7 @@ def build():
   padding: 4px 10px; }}
 .ledger th {{ background: var(--surface-2); }}
 .ledger td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+.showcase td:nth-child(2) {{ font-size: 0.9em; }}
 .grid3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }}
 .panel {{ height: 250px; }}
 .wide {{ height: 340px; }}
@@ -467,55 +672,14 @@ scenario-specific rule rows for one very unusual bird.</p>
 AI - which makes it the perfect neutral referee. For each battle below,
 the first link is the plain matchup (PvPoke's own plan plays it, and
 loses); the second is a sandbox link that forces <em>our</em> line,
-turn for turn. Every link pins the exact IVs and was machine-verified:
-we decoded each URL the way pvpoke.com's own interface does and ran it
-through PvPoke's engine, confirming it reproduces our simulator's
-score, ending HP, shields, and stat stages exactly.</p>
-
-<h3>1. Great League vs Azumarill, no shields (494 -> 674)</h3>
-<p>PvPoke's Cramorant banks to 45 and throws Fly, twice, and loses the
-race by two HP. The PoGoDives line spends its first 40 energy on Dive
-instead - Azumarill resists it, so it only chips 22 - but that Dive
-loads Gulp Missile. Azumarill's Ice Beam then fires the missile for
-free, and the defense drop it leaves behind turns the closing Fly from
-57 damage into 71. Same energy, same number of throws, and Cramorant
-finishes with 44 HP instead of fainting.</p>
-<p><a href="https://pvpoke.com/battle/1500/cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/00/0-1-2/0-2-3/">PvPoke's plan (loses, 494)</a>
-&middot; <a href="https://pvpoke.com/battle/sandbox/1500/cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/00/0-1-2/0-2-3/15.100000-19.110000-28.101000/">our line (wins, 674)</a></p>
-
-<h3>2. Great League vs Jellicent, 2-1 (467 -> 666)</h3>
-<p>PvPoke feeds its first Fly straight into Jellicent's shield, then
-loses the long game to Shadow Ball. PoGoDives opens with Dive instead:
-Jellicent has no reason to spend its one shield on a 24-damage throw,
-so Cramorant gets the gulping form for free. Jellicent's Surf then
-triggers the missile, and from there Cramorant is throwing cheap Dives
-that arrive with a defense drop attached while its own two shields
-cover the answers. It wins with a shield still in hand.</p>
-<p><a href="https://pvpoke.com/battle/1500/cramorant-26-5-15-13-4-4-1-1/jellicent-24-4-15-14-4-4-1-1/21/0-1-2/1-4-3/">PvPoke's plan (loses, 467)</a>
-&middot; <a href="https://pvpoke.com/battle/sandbox/1500/cramorant-26-5-15-13-4-4-1-1/jellicent-24-4-15-14-4-4-1-1/21/0-1-2/1-4-3/15.100000-22.110000-25.100100-29.111100-32.100000/">our line (wins, 666)</a></p>
-
-<h3>3. Ultra League vs Blastoise, 2-2 (427 -> 541)</h3>
-<p>The shield-heavy version. PvPoke pumps both of Cramorant's Flys into
-Blastoise's shields, runs out of resources, and gets closed out by
-Skull Bash. PoGoDives never offers Blastoise a big hit to shield: it
-dives, deliberately takes the Hydro Cannon in gulping form to fire the
-missile, and then spends the rest of the fight making Blastoise burn
-both shields on 22-damage Dives. The last Dive lands for the KO with
-13 HP to spare.</p>
-<p><a href="https://pvpoke.com/battle/2500/cramorant-50-15-15-15-4-4-1-1/blastoise-45.5-5-15-15-4-4-1-1/22/0-1-2/1-2-6/">PvPoke's plan (loses, 427)</a>
-&middot; <a href="https://pvpoke.com/battle/sandbox/2500/cramorant-50-15-15-15-4-4-1-1/blastoise-45.5-5-15-15-4-4-1-1/22/0-1-2/1-2-6/15.100000-22.110000-25.100100-32.110100-35.100100-39.111100-42.100000/">our line (wins, 541)</a></p>
-
-<h3>4. Ultra League vs Talonflame, 1-2 (297 -> 573)</h3>
-<p>The biggest swing in the set, and the difference is a single shield
-decision. Both plans open the same way - Dive, Talonflame shields,
-Dive again, Talonflame shields again. Then PvPoke shields Talonflame's
-Fly, which leaves Cramorant holding a loaded Gulp Missile it never
-gets to fire, and Brave Bird kills it for 109. PoGoDives
-<em>declines</em> that shield, eats 67, and the missile fires
-immediately - so the shield is still there for Brave Bird, and the
-follow-up Dive lands for 139 into the defense drop.</p>
-<p><a href="https://pvpoke.com/battle/2500/cramorant-50-15-15-15-4-4-1-1/talonflame-50-15-15-15-4-4-1-1/12/0-1-2/1-4-1/">PvPoke's plan (loses, 297)</a>
-&middot; <a href="https://pvpoke.com/battle/sandbox/2500/cramorant-50-15-15-15-4-4-1-1/talonflame-50-15-15-15-4-4-1-1/12/0-1-2/1-4-1/15.100100-24.100100-25.110000-31.111100-32.100000/">our line (wins, 573)</a></p>
+turn for turn. Both sides use PvPoke's default spread and moveset for
+the league, exactly as the dive pages do, and every link pins those
+IVs. The links are machine-verified each time this page is built: we
+decode each URL the way pvpoke.com's own interface does and run it
+through PvPoke's engine the way the page does, confirming that the
+plain link reproduces our simulator's PvPoke-plan score and that the
+sandbox link reproduces our line's score and ending HP exactly.</p>
+{showcases_html}
 <h2>Caveats</h2>
 <p>The conditions above carry a few tuned constants (the 40-energy
 bound, the tank thresholds, the fast-move-chip bound). They were fitted
