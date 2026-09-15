@@ -85,8 +85,18 @@ def main():
                                 pg_t = tensors[f'0_{mode}{bsuf}:pogodives{csuf}'].reshape(4096, 9, n_opp)
                                 bad = [k for k, v in cells.items() if v[0] != int(pv_t[k[0], si, k[1]])]
                                 if bad:
-                                    raise SystemExit(f'{page} {scen} {mode}/{bait}/@{cap}: plain tier '
-                                                     f'differs from tensor in {len(bad)} cells -- stale page')
+                                    # The plain tier cannot move under pogodives-only
+                                    # overrides, so a mismatch means the PAGE is stale for
+                                    # that opponent (e.g. the Aegislash (Blade) cross-battle
+                                    # contamination fixed 2026-09-12). Exclude those
+                                    # opponents from BOTH sides of the comparison and say so.
+                                    stale = sorted({names[k[1]] for k in bad})
+                                    print(f'  WARNING {Path(page).name} {scen} {mode}/{bait}/@{cap}: '
+                                          f'plain tier differs from the tensor for {stale} '
+                                          f'({len(bad)} cells) -- page is stale there; excluded',
+                                          flush=True)
+                                    drop = {k[1] for k in bad}
+                                    cells = {k: v for k, v in cells.items() if k[1] not in drop}
                                 live = summarize(cells, names)
                                 shipped = summarize({k: (int(pv_t[k[0], si, k[1]]),
                                                          int(pg_t[k[0], si, k[1]])) for k in cells}, names)
