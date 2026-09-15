@@ -32,6 +32,120 @@ lines of mostly-completed chronological batches. -->
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
+### HAND-OFF (2026-09-15, branch `cramorant-reinvestigate`): merge, migrate, re-dive, verify
+
+Michael's close-out plan (2026-09-15): the 2026-09-12/14 rebake will NOT
+publish as-is; the Aegislash fix merges BEFORE publish. The Fable session
+does the merges in one pass -- Aegislash fix, then v6 if certified, then its
+two render branches, then the migrations, then one warm re-dive, then
+verification. Michael publishes. Nothing below has been merged; the branch
+is pushed as a ref into this repo (`git branch --list cramorant-reinvestigate`).
+
+**Branch contents, in merge order** (main was `f8724f7` when it forked; main
+is now `dc0bee5` with the SAME engine hash `e4d380ec3e5e`, so the expected
+post-merge hashes below hold unless a conflict touches an engine file --
+re-run `python -c "import sweep_cache as s; print(s.engine_hash())"` from
+`scripts/` after EACH engine merge and compare):
+
+1. **Aegislash reuse-leak fix** -- commit `2e8d36b` (battle.py + the
+   `aegislash-blade-azumarill` reuse-test param; test-count sentinel). Engine
+   hash `e4d380ec3e5e` -> `1436a17ffbb2`.
+2. **Sheet v6** -- commits `8a639e2` (+ docs `fbbc213`; the migrate
+   predicates commit that follows). Engine hash `1436a17ffbb2` ->
+   `36037e51a2ee`. GO/NO-GO: merge v6 ONLY if the stride-1 re-certification
+   of the two changed rows is ALL-PASS -- every one of the 90 slices in
+   `userdata/cramorant_lab/v6_stride1_full/` (log
+   `userdata/logs/2026-09/v6_stride1_20260915.log`, summary at its end)
+   must read net >= 0 AND mean >= 0. RESULT 2026-09-15 11:53: **90/90 PASS,
+   0 FAIL -> v6 is GO** (total net 937,116 -> 931,522, -0.6%, the four
+   failing cells fixed; costs disclosed in the deep-vet doc). Any FAIL = do not merge v6; leave it on
+   the branch and merge only item 1 (then the renderer branches still merge,
+   they do not depend on v6).
+3. **Render-side branches** (no engine hash impact): the article renderer +
+   page-faithful sandbox verifier + encoder rule (`258e11b`, `6f79ab9`), the
+   lab loader fix (`dcf33a1`), the instruments (`9dd51f5`, `c926558`), docs
+   (`491f819`, `0397089`).
+
+**Migrations, in order, from the MAIN tree with `direnv exec .` (dry-run
+first, read the counts, then `--apply`; run each for the sweep cache AND
+again with `--slayer` for the slayer cache):**
+
+    # after merging item 1 (engine now 1436a17ffbb2):
+    python scripts/migrate_cache.py --from-engine e4d380ec3e5e --predicate form_change_either_side_20260912
+    python scripts/migrate_cache.py --from-engine e4d380ec3e5e --predicate form_change_either_side_20260912 --apply
+    python scripts/migrate_cache.py --from-engine e4d380ec3e5e --predicate form_change_either_side_20260912 --slayer
+    python scripts/migrate_cache.py --from-engine e4d380ec3e5e --predicate form_change_either_side_20260912 --slayer --apply
+    # after merging item 2 (engine now 36037e51a2ee) -- ONLY if v6 is certified:
+    python scripts/migrate_cache.py --from-engine 1436a17ffbb2 --predicate pogodives_sheet_v6_20260912
+    python scripts/migrate_cache.py --from-engine 1436a17ffbb2 --predicate pogodives_sheet_v6_20260912 --apply
+    python scripts/migrate_cache.py --from-engine 1436a17ffbb2 --predicate pogodives_sheet_v6_20260912 --slayer
+    python scripts/migrate_cache.py --from-engine 1436a17ffbb2 --predicate pogodives_sheet_v6_20260912 --slayer --apply
+
+Each predicate is pinned to ONE `--from-engine` hash and covers the entire
+delta of that bump; if anything else lands on the same bump the predicate
+is unsound and the alternative is a cold re-dive. If v6 is NOT merged, skip
+the second block entirely (the engine stays at `1436a17ffbb2`).
+
+**What each migration re-sims** (`form_change_either_side_20260912` =
+either side's species starts with Aegislash / Cramorant / Mimikyu /
+Morpeko -- the provable superset; measured, only Aegislash (Blade) columns
+actually moved): every column of the `aegislash-blade-*` dives and of the
+Cramorant / Mimikyu / Morpeko dives, plus ONE column per pool member of
+those species in every other dive (75 of 140 dirs carry a Blade column).
+`pogodives_sheet_v6_20260912` = pogodives-tier columns only, i.e. half the
+columns of `cramorant-great-league` and `cramorant-ultra-league` (all five
+moveset pages each); no other dive runs that tier. Then ONE warm re-dive
+(`direnv exec . python scripts/run_website_dives.py --reserve-cpus 0`)
+re-sims exactly those and serves everything else warm.
+
+**Verification after the re-dive:** `verify_overnight.py` + the ship gates,
+then `python scripts/cramorant_certify.py --league both --selftest 5`
+(must print 0 bar failures, 0 exemption violations, selftest all exact) and
+`python scripts/cramorant_mini_sweep.py ... --check-tensor` on the two v6
+cells in `tests/test_pogodives_v6.py` (the Blade contamination is gone, so
+--check-tensor is a full integer-exact gate again). Then re-render the
+strategy article (`render_pogodives_strategy_article.py`; the showcase gate
+re-picks and page-verifies) and run `tests/test_pogodives_article_showcases.py`.
+
+**Michael's three open decisions** (leave as-is until answered):
+
+- **Guzzlord 2v2: documented cost or target?** Shipped: -1559 win-cells,
+  +72.6 mean on GL Dive+Fly 2v2 nobait -- the rush pads rating onto lost
+  fights (258 -> 420) and pays with 504-519 razor wins. RECOMMENDATION:
+  documented cost. It passes the bar (both slice metrics positive), every
+  gate retune that removes it fails the UL Dive+Fly holdout by -320..-830
+  net, and it is one opponent. If "target": the only lever is the 2v2 gate
+  (M5 in the deep-vet doc), which means a GL-only conditional and a new
+  campaign; nothing in v6 changes.
+- **Gate-column refactor.** The referee re-derived that `gate on iff
+  opp_start_shields >= my_start_shields` reproduces all 9 rows.
+  RECOMMENDATION: yes, but as a behaviour-neutral hygiene commit AFTER v6
+  ships (own engine-hash bump with an always-true blessing predicate, like
+  `neutral_batch_20260810`), together with deleting the three dead
+  constants (`_POGODIVES_GATE_DPT_MAX`, `_POGODIVES_GATE_MIN_ENERGY`,
+  `_POGODIVES_TANK_CHEAP_FRAC`) and their `cmp_dpt`/`cmp_dpt_e`/
+  `cmp_ready_dpt`/`cheap` branches; needs `tests/test_pogodives.py`'s
+  synthetic rows and `cramorant_sensitivity.py` updated. If "no": nothing
+  changes; the sheet stays a 9-row table with per-row gate strings.
+- **Report 9 (PvPoke `hasActed` survives `Pokemon.reset()`).** Draft text:
+  `docs/pvpoke_bug_reports.md` Report 9; a standalone copy is in
+  `~/coding/reports/pvpoke-report9-hasacted-2026-09-15.html` (card on
+  pogo-reports.html). RECOMMENDATION: file it -- browser-verified,
+  one-line fix, and it plausibly explains Report 3's unresolved 429-vs-510
+  from July. If filed: note the issue number in `docs/pvpoke_bug_reports.md`
+  and, once PvPoke fixes it, the Lapras page-level pin (446) in
+  `tests/test_pvpoke_sandbox.py` and the article test's run1==run2 gate
+  start failing -- delete the pin and keep the gate. If not filed: nothing
+  changes; our verifier already emulates the page.
+
+Files written OUTSIDE the clone by the 2026-09-12..15 sessions (for the
+record): Claude memory notes under `~/.claude/projects/-Users-mglerner-
+coding-gopvpsim/memory/` (three files + index); the Report 9 page + card in
+`~/coding/reports` (its own git repo); a `git fetch` in `~/coding/pvpoke`
+(refs only, worktree untouched); scratch under the session scratchpad.
+Nothing in `~/coding/gopvpsim` was modified (the branch ref was pushed
+into its `.git` only).
+
 - **ENGINE BUG FOUND 2026-09-12 (fixed on `cramorant-reinvestigate`, NOT in
   main; the running rebake is reproducing it): Aegislash (Blade) columns are
   contaminated across battles.** Two cross-battle leaks on a reused
@@ -89,6 +203,41 @@ lines of mostly-completed chronological batches. -->
   changed rows at stride 1 once the rebake frees the cores, (4) THEN new
   showcases and the article prose pass. Full-res compute waits for the
   rebake; tensor reads and stride screens do not.
+
+  **STATUS 2026-09-12 late: sheet v6 IMPLEMENTED on the branch** (13-agent
+  campaign; record: `docs/validations/2026-09-12_cramorant_deep_vet.md`).
+  Two row changes -- (1,0) `lead_ready_ko` (terminal-KO guard), (2,2)
+  `lead_ready_chip` (last-shield "can they chip us" guard, division-free);
+  everything else kept, 2v1 stays exempt, Dondozo documented as a boundary
+  cost (19/4096 razor ties, 0 net flips), not an exception. Stride-13 screen
+  of the changed rows over all 160 slices: 0 bar failures, the 4 failing GL
+  cells go -3.36/-4.27 -> +3.05/+3.35 mean, every top-SP lens >= 0 (worst
+  2v2 +1.65, 1v0 +0.03); 2v2 total net +77,153 -> +77,243, 1v0 unchanged.
+  Stride-61 adjacency: all 560 slices of the 7 unchanged rows identical to
+  shipped. Costs to disclose: UL Peck/Surf 2v2 net +1057 -> +911 (mean
+  -0.7), UL HP/Surf 2v2 bait -154 net, GL Dive+Fly 2v2 mean -0.003; the KO
+  guard is NOT a perfect GL no-op when threaded (GL 1v0 Dive+Surf / HP+Surf
+  mean -0.008 / -0.006, net unchanged) -- wrapper-to-threaded drift, as the
+  playbook warns. Stride-1 on the 15 priority slices (both failing GL
+  cells, GL top-SP margins, all 8 UL HP+Surf 2v2 slices, UL 1v0 lenses):
+  15/15 pass, failing cells -3.3/-4.2 -> +3.09/+3.24 mean, cost = UL
+  HP+Surf 2v2 bait mode -1200..-2000 win-cells/slice (mean flat).
+  REMAINING: (a) stride-1 re-certification of the other 75 changed-row
+  slices (`cramorant_recertify.py --scenarios 2v2,1v0
+  --stride 1`, ~4-6 h serial under load; parallelise once the rebake frees
+  cores); (b) merge order after the rebake is published: Aegislash fix
+  (2e8d36b, predicate species-startswith-Aegislash), then the v6 rule
+  commit (Cramorant-only, predicate = the pogodives case registry), each
+  alone on its hash bump; (c) rebake the Cramorant pages and run
+  `cramorant_certify.py --league both` as the ship gate; (d) THEN new
+  showcases (the renderer re-picks from the survivors automatically) and
+  Michael's prose pass; (e) hygiene commit deleting the three dead
+  constants (needs test_pogodives synthetic rows + cramorant_sensitivity
+  updated). MICHAEL'S CALLS: Guzzlord 2v2 (-1559 flips / +72.6 mean:
+  documented cost or target?); whether to re-express the gate column as
+  `opp_start_shields >= my_start_shields` (reproduces all 9 rows, zero
+  score change); P-C (KO guard at 1v1, measured positive in GL) and P-D
+  (constant-free 1v2 `lead_drained`, costs most of the row) next cycle.
 - **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
   2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
   links showed the same 642 win. Audit
