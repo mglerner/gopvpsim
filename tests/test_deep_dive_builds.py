@@ -389,3 +389,177 @@ def test_payload_regions_are_keyed_by_the_spreads_they_hold():
             assert pay['regions'][b['region']]['mask'], (
                 "a selected build's region carries no membership mask")
             assert pay['regions'][b['region']]['size'] == b['size']
+
+
+# ---------------------------------------------------------------------------
+# 5. The preset's own scale (2026-09-16 review)
+#
+# Everything the page prints about a build under a narrow preset has TWO
+# possible denominators -- the scenarios the preset counts, and all nine --
+# and the ranking used the first. The round-1 implementation picked the
+# most-winning member on the second while plotting it on the first, and
+# printed the second in the table with the first in the sentence under it.
+# ---------------------------------------------------------------------------
+
+def _synthetic_sets(ctx):
+    return [{'name': 'L', 'generator': 'T', 'mask': ctx['atk'] < 128,
+             'provenance': {}, 'aliases': []},
+            {'name': 'H', 'generator': 'T', 'mask': ctx['atk'] >= 128,
+             'provenance': {}, 'aliases': []}]
+
+
+def synthetic_res():
+    """A ``compute_builds``-shaped result over the synthetic cube.
+
+    Blob-free, so the payload's field contract can be pinned in the fast
+    tier and by tests/test_js_wire_contract.py, which reads the same shape
+    the browser dereferences.
+    """
+    ctx = _synthetic_ctx()
+    sets = _synthetic_sets(ctx)
+    frame = D.cell_frame(ctx)
+    presets = {k: D.run_preset(ctx, sets, frame, k) for k in D.PRESET_KEYS}
+    sigs = {tuple((b['role'], b['_mask'].tobytes()) for b in p['builds'])
+            for p in presets.values()}
+    return dict(ctx=ctx, sets=sets, frame=frame, presets=presets,
+                presets_identical=(len(sigs) == 1),
+                n_decision_cells=len(frame['cells']),
+                n_material_cells=int(frame['mat'].sum()),
+                label='synthetic', arm=0)
+
+
+def test_the_payload_carries_the_preset_scale_fields():
+    """Named here against the BUILDER's output, not grepped out of the JS.
+
+    tests/test_js_wire_contract.py scans the engine for the same names; a
+    rename on either side then fails on one of the two.
+    """
+    pay = D.builds_payload(synthetic_res(), 0)
+    assert set(pay['presetKeys']) == set(D.PRESET_KEYS)
+    for key in pay['presetKeys']:
+        block = pay['presets'][key]
+        for field in ('nDecW', 'nDecWMat', 'tie', 'weights', 'scens',
+                      'builds', 'cols', 'lattice', 'objectives'):
+            assert field in block, (key, field)
+        assert block['nDecW'] <= pay['nDecision']
+        for b in block['builds']:
+            for field in ('nG', 'nGw', 'nGmat', 'mostWinning', 'region',
+                          'desc', 'rank1In'):
+                assert field in b, (key, field)
+            for field in ('iv', 'idx', 'wins', 'winsAll', 'den', 'spRank'):
+                assert field in b['mostWinning'], (key, field)
+            assert b['nGw'] <= b['nG']
+        if block['objectives']:
+            for field in ('winGap', 'winDen', 'cellGap', 'cellGapAll'):
+                assert field in block['objectives'], (key, field)
+    for col in pay['presets'][D.PRESET_ONE]['cols']:
+        assert col['nGw'] <= col['nG']
+
+
+def test_the_weighted_denominator_is_the_presets_own_cell_count():
+    res = synthetic_res()
+    labels = res['ctx']['scen_labels']
+    for key, block in res['presets'].items():
+        live = {labels[i] for i, w in enumerate(block['weights']) if w > 0}
+        want = sum(1 for c in res['frame']['cells'] if c['scenario'] in live)
+        assert block['n_decision_weighted'] == want, key
+    # the 1v1 preset counts strictly fewer cells than the flat one, so the
+    # two denominators are genuinely different numbers on this cube
+    assert (res['presets'][D.PRESET_ONE]['n_decision_weighted']
+            < res['presets'][D.PRESET_FLAT]['n_decision_weighted'])
+
+
+def test_a_ruleless_build_carries_an_iv_envelope_that_holds_its_members():
+    """The envelope is printed instead of a bare "list of N spreads"; it must
+    contain every member and own up to what else is inside it."""
+    res = synthetic_res()
+    seen = 0
+    for block in res['presets'].values():
+        for b in block['builds']:
+            if b['description'] is not None:
+                assert b['iv_envelope'] is None
+                continue
+            seen += 1
+            env = b['iv_envelope']
+            assert env and env['n_box'] >= b['size']
+            assert env['n_outside'] == env['n_box'] - b['size']
+            for ax, col in (('atk', 0), ('def', 1), ('hp', 2)):
+                v = res['ctx']['meta'][b['_mask'], col]
+                assert env[ax][0] == int(v.min())
+                assert env[ax][1] == int(v.max())
+    # positive control: this cube does produce at least one describable build
+    assert any(b['description'] is not None
+               for block in res['presets'].values() for b in block['builds'])
+
+
+def test_display_rule_spells_one_stat_one_way_and_never_truncates():
+    """Page spelling only -- the `rule` field itself stays byte-identical to
+    the reference implementation's, which the parity tests compare."""
+    assert (D.display_rule('atk >= 125 and Def + 1.9*HP >= 345.067')
+            == 'Atk >= 125.00 and Def + 1.9*HP >= 345.067')
+    assert (D.display_rule('def >= 101.4 and HP >= 125')
+            == 'Def >= 101.40 and HP >= 125')
+    # a threshold that needs three places keeps them: print_thr chose the
+    # shortest decimal that selects exactly the same spreads
+    assert D.display_rule('atk >= 148.125') == 'Atk >= 148.125'
+    # HP is an integer stat and the fact strip has always printed it as one
+    assert D.display_rule('hp >= 143') == 'HP >= 143'
+    # the step count is not a threshold
+    assert (D.display_rule('atk >= 150.24 and Def >= d(HP) [4 steps]')
+            == 'Atk >= 150.24 and Def >= d(HP) [4 steps]')
+
+
+def test_the_cluster_set_label_uses_the_clusters_sections_own_name():
+    """The Matchup clusters section names its clusters C0..C(K-1); an
+    off-by-one relabelling pointed the UpSet row "matchup cluster 5" at what
+    that section calls C4 (2026-09-16 review)."""
+    assert D.set_short_label('S1 1v0 cluster 4') == 'matchup cluster C4 (1v0)'
+    assert D.set_short_label('S1 1v0 cluster 0') == 'matchup cluster C0 (1v0)'
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_the_most_winning_member_is_the_highest_point_of_its_own_build():
+    """Picked on the PRESET-weighted win count -- the section plot's y axis.
+
+    Pre-fix the member was the all-nine argmax while the plot drew the
+    weighted count, so Shadow Sableye's 1v1 primary marked 8/7/5@50 at 38
+    weighted wins while 11/4/4@49.5 of the same build reached 39, and the
+    legend asserted something the plot contradicted.
+    """
+    res = _arm(SABLEYE_SHADOW, 0)
+    ctx = res['ctx']
+    for key, block in res['presets'].items():
+        w = D.preset_weights(key, ctx['scen_labels'])
+        wsum = D.weighted_wins(ctx, w)
+        den = int(w.sum()) * ctx['n_opp']
+        for b in block['builds']:
+            mw = b['most_winning_member']
+            assert mw['wins'] == int(wsum[b['_mask']].max()), (key, b['role'])
+            assert int(wsum[mw['idx']]) == mw['wins']
+            assert mw['denominator'] == den
+    one = res['presets'][D.PRESET_ONE]['builds'][0]['most_winning_member']
+    assert (one['iv'], one['wins'], one['denominator']) == ('11/4/4@49.5', 39, 76)
+    # the all-nine choice this replaced is still carried, and is a DIFFERENT
+    # spread here -- so the test would pass trivially if they coincided
+    assert one['wins_all'] != res['presets'][D.PRESET_FLAT]['builds'][0][
+        'most_winning_member']['wins']
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_a_shared_lead_is_reported_as_a_tie():
+    """Under a narrow preset the primary is usually a tie-break, not a
+    dominant region, and a page printing only the winner reads as though one
+    region dominated."""
+    res = _arm(SABLEYE_SHADOW, 0)
+    assert res['presets'][D.PRESET_ONE]['top_tie'] == {
+        'n': 9, 'weighted': 13, 'by': 'size', 'size': 292}
+    assert res['presets'][D.PRESET_EVEN]['top_tie']['weighted'] == 29
+    # recomputed independently from the lattice each preset ran
+    for key, block in res['presets'].items():
+        tie, top = block['top_tie'], block['inters'][0]
+        n = sum(1 for d in block['inters'] if d['wg'] == top['wg'])
+        assert (tie['n'] if tie else 1) == n, key
+        if tie:
+            assert tie['weighted'] == int(round(top['wg']))

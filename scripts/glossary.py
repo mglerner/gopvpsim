@@ -55,9 +55,10 @@ TERMS = {
         "A region of the IV grid you can aim at -- every spread that clears "
         "the same combination of thresholds, at least fifty of them.",
     'fork':
-        "A second region with no spread in common with the first, whose "
-        "members all win a different set of matchups, so the two are a real "
-        "choice rather than two spellings of one.",
+        "A second region with no spread in common with the first that wins "
+        "a noticeably different set of matchups outright -- the two overlap "
+        "on less than 80% of them -- so they are a real choice rather than "
+        "two spellings of one.",
     'decision matchup':
         "A (shield scenario, opponent) pair the IV choice decides: a top-50 "
         "opponent that some spreads on this grid beat and others lose to.",

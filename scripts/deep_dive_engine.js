@@ -348,6 +348,20 @@ function getActiveScenarioIndices() {
   return [parseInt(state.scenarioMode)];
 }
 
+// The scatter's y-axis TITLE (not currentYLabel, which also names the hover
+// line and a table column). Under Shields = "All (by build criteria)" the
+// values average a SUBSET of the shield scenarios and the plot said nothing
+// about which: the axis read "Avg Battle Score", identical to "All (equal
+// weight)", and the only signal was the muted line in the controls strip,
+// which is scrolled off by the time a reader is looking at the chart
+// (2026-09-16 review). The section's own plot has always labelled its axis.
+function yAxisTitle() {
+  if (state.scenarioMode !== 'wbavg') return currentYLabel;
+  var tag = (typeof wbPresetScenLabel === 'function')
+          ? wbPresetScenLabel() : null;
+  return tag ? (currentYLabel + ' (' + tag + ')') : currentYLabel;
+}
+
 // ---- Opponent filter (client-side subset) ----
 //
 // state.selectedOpps is a Uint8Array(nO) of 1/0 (1 = shown), or null before
@@ -3627,7 +3641,7 @@ function updateView() {
     // tuned for a white paper and disappear against a themed plot fill.
     xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad],
             gridcolor: chrome.grid, zerolinecolor: chrome.grid},
-    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad],
+    yaxis: {title:yAxisTitle(), range:[yMin-yPad, yMax+yPad],
             gridcolor: chrome.grid, zerolinecolor: chrome.grid},
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font:{color: chrome.font}, hovermode:'closest',
@@ -5254,12 +5268,18 @@ function _wbUpset(root, pay) {
   var cols = block.cols, rows = block.lattice;
   var colOfBuild = {};
   for (var b = 0; b < block.builds.length; b++) colOfBuild[block.builds[b].col] = b;
+  // Under a narrow preset the number ABOVE the bar is the weighted count --
+  // the one the ranking used and the one the table and the prose lead with.
+  // Drawing the all-nine count there made the ties invisible: nine regions
+  // tie at 13 of the 16 1v1 cells on Shadow Sableye arm 0 while their
+  // all-nine counts differ (2026-09-16 review).
+  var flatPreset = (block.scens.length === pay.bp.scenLabels.length);
   var x = [], y = [], colors = [], texts = [], ticks = [];
   for (var c = 0; c < cols.length; c++) {
     x.push(c); y.push(cols[c].size);
     var bi = colOfBuild[c];
     colors.push(bi == null ? chrome.grid : (bcol[bi] || chrome.ink));
-    texts.push(cols[c].nG + '');
+    texts.push((flatPreset ? cols[c].nG : cols[c].nGw) + '');
     ticks.push(cols[c].combo);
   }
   var bar = { type: 'bar', x: x, y: y, marker: { color: colors },
@@ -5270,10 +5290,14 @@ function _wbUpset(root, pay) {
                 return (colOfBuild[ci] != null
                         ? _wbBuildName(block, colOfBuild[ci]) + '<br>' : '') +
                        cc.combo + ': ' + cc.size + ' spreads<br>' +
-                       cc.nG + ' decision matchups guaranteed (' +
+                       (flatPreset ? '' :
+                        (cc.nGw + ' of the ' + block.nDecW +
+                         ' decision matchups in the shields this preset ' +
+                         'counts -- the number drawn above the bar, and ' +
+                         'the one the ranking uses<br>')) +
+                       cc.nG + ' decision matchups guaranteed over all ' +
+                       pay.bp.scenLabels.length + ' scenarios (' +
                        cc.nGmat + ' material)<br>' +
-                       cc.nGw + ' of them in the shields this preset ' +
-                       'counts -- the number the ranking uses<br>' +
                        (cc.memb ? 'sets ' + cc.memb.split('').join(' + ')
                                 : 'constructed box, not an intersection'); }) };
   var dx = [], dy = [], dc = [];
@@ -5297,13 +5321,13 @@ function _wbUpset(root, pay) {
              showgrid: true, gridcolor: chrome.grid, zeroline: false },
     yaxis2: { domain: [0, 0.46], tickvals: rows.map(function(_r, i) { return i; }),
               ticktext: rows.map(function(rr) {
-                return rr.key + ' ' + rr.short + ' (' + rr.size + ' / ' +
-                       rr.nG + ')'; }),
+                return rr.key + ' ' + rr.short + ' (' + rr.size +
+                       ' spreads / ' + rr.nG + ' guaranteed)'; }),
               tickfont: { size: 9 }, autorange: 'reversed',
               showgrid: false, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 10 },
-    margin: { t: 16, b: 30, l: 190, r: 8 }
+    margin: { t: 16, b: 30, l: 230, r: 8 }
   };
   Plotly.react(host, [bar, dots], layout,
                { responsive: true, displayModeBar: false });
@@ -5346,6 +5370,18 @@ function wbRenderMembers(box, all) {
   }
   box.innerHTML = out.join('');
 }
+
+// Reveal the guarantee rows this scenario group shipped hidden. The rows
+// are server-rendered (same _g_row_html as the visible ones), so this only
+// unhides them -- the page never promises rows it does not carry.
+function wbMoreRows(btn) {
+  var ul = btn.closest('ul');
+  if (!ul) return;
+  ul.querySelectorAll('li.wb-hid').forEach(function(li) { li.hidden = false; });
+  var own = btn.closest('li');
+  if (own) own.hidden = true;
+}
+window.wbMoreRows = wbMoreRows;
 
 function wbShowAllMembers(btn) {
   var box = btn.closest('.wb-mem');
@@ -5443,6 +5479,23 @@ function wbPresetScenIndices() {
   return out;
 }
 window.wbPresetScenIndices = wbPresetScenIndices;
+
+// The same scenarios as words, for the scatter's y-axis title. Spelled the
+// way the section's own plot spells them, so a reader flipping between the
+// two meets one phrasing.
+function wbPresetScenLabel() {
+  var root = _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  var key = wbActivePresetKey();
+  if (!pay || !pay.bp || !key || !pay.bp.presets[key]) return null;
+  var s = pay.bp.presets[key].scens || [];
+  if (!s.length) return null;
+  if (s.length === pay.bp.scenLabels.length) {
+    return 'all ' + s.length + ' shield scenarios';
+  }
+  return s.join(' / ') + ' shields';
+}
+window.wbPresetScenLabel = wbPresetScenLabel;
 
 // The Matchup clusters section's "all scenarios" option, re-pointed and
 // re-labelled for the active preset. The label text comes from the clusters
@@ -5634,14 +5687,22 @@ function wbRenderRoot(root) {
       var mwt = _wbMarkTrace(
         _wbBuildName(pblock, mb) + ': most-winning member', mwi,
         bcolors[mb] || colors.mark2, 'triangle-up', L, wins,
-        'wins the most matchups inside ' + _wbBuildName(pblock, mb), den);
+        'wins the most matchups inside ' + _wbBuildName(pblock, mb) +
+        ' in the shields this preset counts (' +
+        pblock.builds[mb].mostWinning.wins + ' of ' +
+        pblock.builds[mb].mostWinning.den + ')', den);
       if (mwt) traces.push(mwt);
     }
     var gbi2 = _wbIvIdx(_wbIvTriple(pay.bp.gridBest.iv));
     if (gbi2 >= 0) {
-      var gbt2 = _wbMarkTrace('Wins the most matchups on the whole grid',
+      // Named by its SCOPE, not just "the most": it is the all-nine winner,
+      // so under a narrower preset it is deliberately not the highest point
+      // on an axis that is counting fewer matchups.
+      var gbScope = 'all ' + DATA.nScenarios + ' shield scenarios';
+      var gbt2 = _wbMarkTrace('Wins the most matchups over ' + gbScope,
                               gbi2, colors.mark2, 'square-open', L, wins,
-                              'wins the most matchups on the whole grid; ' +
+                              'wins the most matchups over ' + gbScope +
+                              ' (' + pay.bp.gridBest.wins + '); ' +
                               _wbBuildSide(pay, pblock,
                                            _wbBuildOf(pay.bp, pblock, gbi2),
                                            scen),
@@ -5682,8 +5743,11 @@ function wbRenderRoot(root) {
     // between the two meets two different scales. This one never moves, and
     // says what it is out of.
     yaxis: { title: (weighted
-              ? ('Matchups won in ' + pblock.scens.join(' / ') +
-                 ' shields (of ' + den + ')')
+              ? (pblock.scens.length === DATA.nScenarios
+                 ? ('Matchups won, all ' + DATA.nScenarios +
+                    ' shield scenarios (of ' + den + ')')
+                 : ('Matchups won in ' + pblock.scens.join(' / ') +
+                    ' shields (of ' + den + ')'))
               : scen
               ? ('Matchups won in ' + scen.label + ' shields (of ' +
                  DATA.nOpponents + ' opponents)')
@@ -5769,6 +5833,8 @@ function wbRenderRoot(root) {
     if (view === 'builds') _wbUpset(root, pay);
     var up = root.querySelector('.wb-upset');
     if (up) up.hidden = (view !== 'builds');
+    var upcap = root.querySelector('.wb-upset-caption');
+    if (upcap) upcap.hidden = (view !== 'builds');
   }
   root.setAttribute('data-wb-rendered', '1');
 }

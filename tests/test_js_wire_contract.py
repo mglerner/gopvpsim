@@ -631,8 +631,13 @@ def test_the_three_preset_keys_have_one_definition():
     # The dropdown, the clusters call and the section all read that table.
     py = _PY.read_text()
     assert 'import deep_dive_builds' in py
-    assert 'for _k, _lbl, _scens, _tag in _build_presets():' in py
     assert "_build_presets()" in py
+    # the dropdown builder walks that table rather than re-typing it, and
+    # the labels it emits are the table's own
+    import deep_dive
+    opts = deep_dive._build_criteria_select(list(builds.PRESET_KEYS))
+    for key, label, _s, _t in builds.PRESETS:
+        assert f'<option value="{key}">{label}</option>' in opts, key
     render = (_SCRIPTS / 'deep_dive_lib' / 'render.py').read_text()
     assert '_builds.PRESETS' in render
     # ... and no file writes the three strings out again.
@@ -652,11 +657,21 @@ def test_the_knob_id_is_the_same_string_on_both_sides():
 
 
 def test_the_shields_dropdown_carries_both_all_entries():
-    """'avg' is renamed and never changes; 'wbavg' is the weighted one."""
+    """'avg' is renamed and never changes; 'wbavg' is the weighted one.
+
+    Pinned on the MARKUP the page gets, not on a source line: the emitted
+    option was split across two Python string literals, so the old
+    source-literal assertion pinned an indentation level instead of an
+    option (2026-09-16 review), and its first alternative could never match.
+    """
+    import deep_dive
+    assert (deep_dive._wbavg_option(['flat'])
+            == '    <option value="wbavg">All (by build criteria)</option>\n')
+    # no section, no weighted entry -- it would average a preset the page
+    # cannot switch to
+    assert deep_dive._wbavg_option([]) == ''
     py = _PY.read_text()
     assert "<option value=\"avg\">All (equal weight)</option>" in py
-    assert "<option value=\"wbavg\">All (build " in py or \
-           "'    <option value=\"wbavg\">All (by build '" in py
     js = _js()
     # the weighted entry resolves to the preset's scenarios, and 'avg' still
     # means every scenario
@@ -667,28 +682,121 @@ def test_the_shields_dropdown_carries_both_all_entries():
 
 
 def test_the_knob_note_names_exactly_the_three_surfaces_it_drives():
-    py = _PY.read_text()
-    assert 'Build criteria weights ' in py
-    assert 'Which one to build?, the ' in py
-    assert 'All (by build ' in py
-    assert 'Every other section counts all nine shield ' in py
+    import deep_dive
+    note = deep_dive._build_criteria_note(['flat'])
+    for surface in ('Which one to build?', 'all-scenarios clusters',
+                    'All (by build criteria)'):
+        assert surface in note, surface
+    # NOT "every other section counts all nine equally": Threats, Rank
+    # Volatility and Matchup clusters each have their own per-scenario
+    # views, so the only true claim is about re-weighting (2026-09-16).
+    assert 'Nothing else on this page is re-weighted by it.' in note
+    assert 'counts all nine shield scenarios equally' not in note
+    assert deep_dive._build_criteria_note([]) == ''
+
+
+def test_the_knob_lists_only_the_presets_this_page_built():
+    """A dive that baked no 1v1 must not offer the 1v1-only preset.
+
+    That preset weights nothing there, so compute_builds drops it from the
+    payload; an option for it left wbApplyPreset returning early (the
+    previous block and summary still on screen), the clusters view falling
+    back to all nine scenarios and the Shields entry averaging everything
+    while its label still read "All (by build criteria)".
+    """
+    import deep_dive
+    import deep_dive_builds as B
+    # the end of the chain that produces the live list
+    assert not B.preset_is_live(B.PRESET_ONE, ['0v0', '2v2'])
+    assert B.preset_is_live(B.PRESET_EVEN, ['0v0', '2v2'])
+    live = [k for k in B.PRESET_KEYS if B.preset_is_live(k, ['0v0', '2v2'])]
+    html = deep_dive._build_criteria_select(live)
+    assert '<option value="flat">' in html
+    assert '<option value="even">' in html
+    assert 'one_one' not in html
+    assert '1v1 only' not in html
+    # positive control: with every preset live all three are offered, so an
+    # always-empty select could not pass this
+    full = deep_dive._build_criteria_select(list(B.PRESET_KEYS))
+    assert full.count('<option ') == 3
+    # and no section at all means no knob
+    assert deep_dive._build_criteria_select([]) == ''
+
+
+def test_the_weighted_shields_entry_labels_its_own_axis():
+    """The scatter's y-axis title says WHICH scenarios it is averaging.
+
+    Under "All (by build criteria)" the values average a subset and the axis
+    used to read "Avg Battle Score", identical to "All (equal weight)"; the
+    only signal was the muted line in the controls strip, scrolled off by
+    the time a reader is looking at the chart (2026-09-16 review).
+    """
+    js = _js()
+    body = _js_fn(js, 'yAxisTitle')
+    assert "state.scenarioMode !== 'wbavg'" in body
+    assert 'return currentYLabel' in body
+    assert 'wbPresetScenLabel()' in body
+    # the plot reads the title through that function, not through the raw
+    # label (which also names the hover line and a table column)
+    assert 'yaxis: {title:yAxisTitle(),' in js
+    # and the label itself comes from the preset's own scenario list
+    lbl = _js_fn(js, 'wbPresetScenLabel')
+    assert 'presets[key].scens' in lbl.replace(' ', '')
+    assert 'shield scenarios' in lbl and 'shields' in lbl
+
+
+def test_the_more_control_and_its_hidden_rows_are_one_contract():
+    """"+N more" is a button over rows the server already shipped hidden."""
+    js = _js()
+    assert 'function wbMoreRows(' in js
+    assert 'window.wbMoreRows = wbMoreRows;' in js
+    body = _js_fn(js, 'wbMoreRows')
+    assert "li.wb-hid" in body
+    assert 'hidden = false' in body
+    py = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    # the producing side emits exactly those two things
+    assert 'wbMoreRows(this)' in py
+    assert 'class="wb-hid" hidden' in py
 
 
 def test_the_section_payload_carries_every_builds_field_the_js_reads():
-    """Field names, checked against the JS that dereferences them.
+    """Both halves, for real: the BUILDER's output and the JS that reads it.
 
-    Built from a real computation would need a blob; the field list is
-    asserted against the payload builder's own output shape instead, and the
-    JS half is scanned for the same names. A rename on one side fails here.
+    The round-1 version only grepped the JS twice and claimed in its
+    docstring to check the producer, so renaming e.g. ``nGw`` in
+    builds_payload passed while the plot silently broke (2026-09-16 review).
+    The producer half runs on the synthetic cube in tests/
+    test_deep_dive_builds.py, so this stays a fast, blob-free test.
     """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_deep_dive_builds import synthetic_res
+    pay = builds.builds_payload(synthetic_res(), 0)
+    top = ('presets', 'regions', 'default', 'rank1', 'gridBest',
+           'nDecision', 'cells', 'presetKeys', 'scenLabels')
+    for field in top:
+        assert field in pay, field
+    block = pay['presets'][pay['default']]
+    for field in ('lattice', 'cols', 'builds', 'weights', 'scens', 'nDecW',
+                  'tie', 'objectives'):
+        assert field in block, field
+    for field in ('nG', 'nGw', 'nGmat', 'memb', 'combo', 'size', 'role', 'r'):
+        assert field in block['cols'][0], field
+    for field in ('mostWinning', 'desc', 'region', 'nG', 'nGw', 'rank1In'):
+        assert field in block['builds'][0], field
+    for field in ('size', 'nG', 'nGmat', 'bits'):
+        assert field in pay['regions'][0], field
+
     js = _js()
     for field in ('bp.presets', 'bp.regions', 'bp.default', 'bp.rank1',
                   'bp.gridBest', 'bp.nDecision', 'bp.topN', 'bp.colors'):
         assert field in js, field
-    for field in ('.mostWinning', '.nGmat', '.nGw', '.memb',
+    for field in ('.mostWinning', '.nGmat', '.nGw', '.memb', '.nDecW',
                   '.lattice', '.cols', '.builds', '.weights', '.scens',
                   '.summary', '.desc', '.region', '.bits'):
         assert field in js, field
+    # the payload's own summary/lead sentences are merged in by the renderer
+    # (prose is authored and word-gated in Python), so they are absent here
+    assert 'summary' not in block
 
 
 def test_the_clusters_payload_carries_one_all_scenarios_key_per_preset():

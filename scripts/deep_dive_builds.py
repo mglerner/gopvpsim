@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import itertools
 import os
+import re
 import sys
 
 import numpy as np
@@ -229,6 +230,47 @@ def rule_str(rule, planes):
         word = {'atk': 'atk', 'def': 'def', 'hp': 'HP'}[ax]
         bits.append(f"{word} {op} {p:g}")
     return ' and '.join(bits)
+
+
+# One spelling per stat on the PAGE ("Atk", "Def", "HP") and at least two
+# decimals on every threshold, so the section's fact strip and its builds
+# table cannot print one rectangle two ways. Applied at DISPLAY time only:
+# the ``rule`` field itself stays byte-identical to the reference
+# implementation's, which is what tests/test_deep_dive_builds.py compares
+# against ``*_builds.json`` field for field.
+_STAT_CASE = {'atk': 'Atk', 'def': 'Def', 'hp': 'HP'}
+_STAT_WORD = re.compile(r'\b(atk|def|hp)\b', re.IGNORECASE)
+_STAT_THRESH = re.compile(r'\b(atk|def)(\s*(?:>=|<=)\s*)(\d+)(\.\d+)?\b',
+                          re.IGNORECASE)
+
+
+def _two_dp(text):
+    """Pad a bare number to two decimals, never TRUNCATING one.
+
+    ``print_thr`` returns the shortest decimal that selects exactly the same
+    spreads, so 345.067 is load-bearing to three places and must survive;
+    only 101.4 -> 101.40 and 125 -> 125.00 are padded.
+    """
+    whole, _, frac = str(text).partition('.')
+    if len(frac) >= 2:
+        return str(text)
+    return whole + '.' + (frac + '00')[:2]
+
+
+def display_rule(text):
+    """A rule string as the page prints it.
+
+    Two decimals on the CONTINUOUS stats only. HP is an integer stat and the
+    page's fact strip has always printed it as one ("Def >= 101.40, HP >=
+    125"); padding it to 125.00 would make the two surfaces disagree the
+    other way round.
+    """
+    if not text:
+        return text
+    out = _STAT_THRESH.sub(
+        lambda m: (_STAT_CASE[m.group(1).lower()] + m.group(2)
+                   + _two_dp(m.group(3) + (m.group(4) or ''))), text)
+    return _STAT_WORD.sub(lambda m: _STAT_CASE[m.group(0).lower()], out)
 
 
 def fit_box(target, planes, sc, axes, ops, n):
@@ -1063,14 +1105,27 @@ def cell_rows(L, region_mask, g, ctx):
     return out
 
 
-def region_block(L, ctx, inter, role, others, weights):
-    """Everything the page prints about one selected build."""
+def region_block(L, ctx, inter, role, others, weights, wsum=None):
+    """Everything the page prints about one selected build.
+
+    ``wsum`` is :func:`weighted_wins` for this preset, computed once by the
+    caller. The most-winning member is chosen ON THAT WEIGHTED COUNT, not on
+    the all-nine total: the section's plot draws the weighted count on its y
+    axis and marks this spread as its build's most-winning one, so a member
+    picked by a quantity the axis is not showing would sit visibly below
+    another member of its own build (the 2026-09-16 review measured exactly
+    that: 8/7/5@50 marked at y=38 with 11/4/4@49.5 of the same build at 39).
+    Under the default preset every weight is 1 and this IS the reference
+    implementation's all-nine argmax.
+    """
     n = ctx['n_iv']
     frame = L['frame']
     m, g = inter['mask'], inter['g']
     win2 = ctx['win2']
+    if wsum is None:
+        wsum = weighted_wins(ctx, weights)
     ids = np.nonzero(m)[0]
-    tot = win2[m].sum(axis=1)
+    tot = wsum[m]
     mw = int(ids[int(np.argmax(tot))])
     best_sp = ids[np.argsort(ctx['sp_rank'][ids])[:5]]
     r1 = int(np.argmin(ctx['sp_rank']))
@@ -1099,8 +1154,29 @@ def region_block(L, ctx, inter, role, others, weights):
             dblock['atk_floor'] = float(d95['atk_floor'])
         if d95.get('trade_terms') is not None:
             dblock['trade_terms'] = d95['trade_terms']
+    # No rule fits: give the reader the IV box the members live in, with the
+    # count of spreads inside that box that are NOT members -- an envelope
+    # sold as a rule would be the one dishonesty this section cannot afford.
+    env = None
+    if dblock is None:
+        meta = ctx['meta']
+        lo = meta[m, :3].min(axis=0)
+        hi = meta[m, :3].max(axis=0)
+        box = np.ones(n, bool)
+        for ax in range(3):
+            box &= (meta[:, ax] >= lo[ax]) & (meta[:, ax] <= hi[ax])
+        env = {'atk': [int(lo[0]), int(hi[0])],
+               'def': [int(lo[1]), int(hi[1])],
+               'hp': [int(lo[2]), int(hi[2])],
+               'n_box': int(box.sum()),
+               'n_outside': int((box & ~m).sum())}
     n_modes = 1 + len(ctx['other_modes'])
     wcell = cell_weights(frame['cells'], weights)
+    # Denominator for the most-winning member's count: the matchups the
+    # preset actually counts (weighted scenarios x opponents). Printed with
+    # the count everywhere, so "378 matchups" can never be read against the
+    # wrong scale.
+    wden = int(round(float(np.sum(weights)) * ctx['n_opp']))
     return {
         'role': role, 'combo': inter['combo'], 'sets': list(inter['sets']),
         'constructed': bool(inter.get('constructed')),
@@ -1120,14 +1196,19 @@ def region_block(L, ctx, inter, role, others, weights):
         'most_winning_member': {'iv': iv_str(ctx['meta'], mw),
                                 'idx': mw,
                                 'sp_rank': int(ctx['sp_rank'][mw]),
-                                'wins': int(tot.max())},
+                                'wins': int(tot.max()),
+                                'wins_all': int(win2[mw].sum()),
+                                'denominator': wden},
         'best_sp_members': [{'iv': iv_str(ctx['meta'], int(i)),
                              'idx': int(i),
                              'sp_rank': int(ctx['sp_rank'][i]),
-                             'wins': int(win2[i].sum())} for i in best_sp],
+                             'wins': int(wsum[int(i)]),
+                             'wins_all': int(win2[i].sum())} for i in best_sp],
         'rank1_in': bool(m[r1]),
+        'wins_denominator': wden,
         'wins_per_member': [int(tot.min()), int(np.median(tot)), int(tot.max())],
         'description': dblock,
+        'iv_envelope': env,
         'description_shape': ('list' if d95 is None else d95['family']),
         'honesty': {
             'n_guaranteed_all_modes': sum(1 for r in rows
@@ -1152,11 +1233,22 @@ def weighted_wins(ctx, weights):
     return per_scen @ np.asarray(weights, dtype=np.float64)
 
 
-def objectives_block(ctx, builds, weights):
-    """The two objectives, plus the grid's own most-winning spread."""
+def objectives_block(ctx, builds, weights, wsum=None):
+    """The two objectives, plus the grid's own most-winning spread.
+
+    ``win_gap`` is over the PRESET-weighted win count (the section plot's y
+    axis and the same number ``most_winning_member`` was picked on);
+    ``cell_gap`` is over the preset-weighted guaranteed-cell count (the
+    number the ranking used). ``cell_gap_all`` is the same gap over all nine
+    scenarios -- the number the builds table prints -- so the sentence can
+    quote both with their scopes and a reader subtracting the table's
+    columns lands on a number the sentence actually contains.
+    """
     if not builds:
         return None
     wins_all = ctx['win2'].sum(axis=1)
+    if wsum is None:
+        wsum = weighted_wins(ctx, weights)
     r1 = int(np.argmin(ctx['sp_rank']))
     gmw = int(np.argmax(wins_all))
     by_cells = max(builds, key=lambda b: (b['n_guaranteed_weighted'],
@@ -1173,11 +1265,19 @@ def objectives_block(ctx, builds, weights):
         'split': by_cells['combo'] != by_wins['combo'],
         'win_gap': (by_wins['most_winning_member']['wins']
                     - by_cells['most_winning_member']['wins']),
+        'win_denominator': int(round(float(np.sum(weights)) * ctx['n_opp'])),
+        'best_wins_value_weighted': by_wins['most_winning_member']['wins'],
+        'best_cells_wins_weighted': by_cells['most_winning_member']['wins'],
         'cell_gap': (by_cells['n_guaranteed_weighted']
                      - by_wins['n_guaranteed_weighted']),
+        'cell_gap_all': (by_cells['n_guaranteed']
+                         - by_wins['n_guaranteed']),
+        'best_cells_count_all': by_cells['n_guaranteed'],
+        'best_wins_build_cells_all': by_wins['n_guaranteed'],
         'rank1_iv': iv_str(ctx['meta'], r1),
         'rank1_idx': r1,
         'rank1_wins': int(wins_all[r1]),
+        'rank1_wins_weighted': int(wsum[r1]),
         'rank1_in_any_build': any(b['rank1_in'] for b in builds),
         'global_most_winning': {'iv': iv_str(ctx['meta'], gmw), 'idx': gmw,
                                 'sp_rank': int(ctx['sp_rank'][gmw]),
@@ -1187,24 +1287,62 @@ def objectives_block(ctx, builds, weights):
     }
 
 
+def top_tie(L):
+    """How the top-ranked region won, when it did not win outright.
+
+    A tie on the weighted guaranteed-cell count is the normal case under a
+    narrow preset (nine candidate regions tie at 13 of the 16 1v1 cells on
+    Shadow Sableye arm 0), and a page that prints only the winner reads as
+    though one region dominated. Returns None on an outright win.
+
+    Counted over the LATTICE's candidate regions, before select_builds
+    appends its constructed bulk box: the tie is about what the ranking
+    chose between.
+    """
+    if not L['inters']:
+        return None
+    top = L['inters'][0]
+    tied = [d for d in L['inters'] if d['wg'] == top['wg']]
+    if len(tied) < 2:
+        return None
+    mat_max = max(d['wg_mat'] for d in tied)
+    n_at_mat = sum(1 for d in tied if d['wg_mat'] == mat_max)
+    return {'n': len(tied), 'weighted': int(round(float(top['wg']))),
+            'by': ('material' if (n_at_mat == 1
+                                  and top['wg_mat'] == mat_max) else 'size'),
+            'size': int(top['size'])}
+
+
 def run_preset(ctx, sets, frame, preset):
     """Select and describe the builds for one preset."""
     weights = preset_weights(preset, ctx['scen_labels'])
+    wsum = weighted_wins(ctx, weights)
     L = arm_lattice(ctx, sets, frame, weights)
+    # BEFORE select_builds, which appends the constructed bulk box to
+    # L['inters']: the tie is about the lattice's own candidate regions.
+    tie = top_tie(L)
     kept, r1_status, fork_info = select_builds(ctx, L)
     gmw = int(np.argmax(ctx['win2'].sum(axis=1)))
     builds = []
     for role, b in kept:
         others = [o for _r, o in kept if o is not b]
-        blk = region_block(L, ctx, b, role, others, weights)
+        blk = region_block(L, ctx, b, role, others, weights, wsum=wsum)
         blk['_holds_gmw'] = bool(b['mask'][gmw])
         blk['_mask'] = b['mask']
         builds.append(blk)
+    wcell = cell_weights(frame['cells'], weights)
+    counted = wcell > 0
     singles = [d for d in L['inters'] if len(d['combo']) == 1]
     best_single = max(singles, key=lambda d: (d['wg'], d['size'])) if singles else None
     return {
         'preset': preset,
         'weights': [float(x) for x in weights],
+        # The denominator the ranking's own count is out of: decision cells
+        # in the scenarios this preset weights. The all-nine total is on the
+        # result dict as ``n_decision_cells``.
+        'n_decision_weighted': int(counted.sum()),
+        'n_decision_weighted_material': int((counted & frame['mat']).sum()),
+        'top_tie': tie,
         'builds': builds,
         'lattice_sets': [{'key': p['key'], 'name': p['name'],
                           'generator': p['generator'], 'size': p['size'],
@@ -1222,7 +1360,7 @@ def run_preset(ctx, sets, frame, preset):
         'inters': L['inters'],
         'rank1_status': r1_status,
         'fork_detail': fork_info,
-        'objectives': objectives_block(ctx, builds, weights),
+        'objectives': objectives_block(ctx, builds, weights, wsum=wsum),
         'has_fork': any(b['role'] == 'fork' for b in builds),
     }
 
@@ -1245,8 +1383,15 @@ def compute_builds(state, arm, mode='pvpoke', level='l50', facts=None,
         if not preset_is_live(key, ctx['scen_labels']):
             continue
         presets[key] = run_preset(ctx, sets, frame, key)
+    # Do all three presets land on the same regions? On a moveset where they
+    # do, a knob that visibly changes nothing reads as broken; the section's
+    # lead says so instead. Compared on the MEMBER MASKS, not the combo
+    # letters, which are per-preset labels.
+    sigs = {tuple((b['role'], b['_mask'].tobytes()) for b in p['builds'])
+            for p in presets.values()}
     return dict(ctx=ctx, sets=sets, frame=frame, presets=presets,
                 clusters_result=clusters_result,
+                presets_identical=(len(presets) > 1 and len(sigs) == 1),
                 n_decision_cells=len(frame['cells']),
                 n_material_cells=int(frame['mat'].sum()),
                 label=ctx['label'], arm=arm)
@@ -1278,11 +1423,22 @@ def pack_mask(flags):
 
 
 def _desc_text(build):
-    """The build's description, or "list of N" when no 95% rule fits it."""
+    """The build's description for the PLOT LEGEND (short form).
+
+    The legend wraps at 34 characters, so a staircase cannot carry its steps
+    or its defense band here -- but it must not carry "Def >= d(HP)" either,
+    which is notation nothing on the page defines. It says what the shape is
+    and leaves the numbers to the table. A build no rule fits says so rather
+    than repeating the size the trace name already prints.
+    """
     d = build['description']
     if d is None:
-        return f"list of {build['size']} spreads", None
-    return d['rule'], d
+        return 'no two- or three-stat rule fits it', None
+    if d.get('steps'):
+        head = display_rule(d['rule']).split(' and Def >= d(HP)')[0]
+        n = len(d['steps'])
+        return f"{head} + a defense staircase ({n} steps)", d
+    return display_rule(d['rule']), d
 
 
 def _region_key(inter):
@@ -1307,13 +1463,16 @@ def set_short_label(name):
     m = _re.match(r"S1 (\S+) cluster (\d+)$", name)
     if m:
         scen = 'all scenarios' if m.group(1) == clusters.ALL_SCEN_KEY else m.group(1)
-        return f"matchup cluster {int(m.group(2)) + 1} ({scen})"
+        # The Matchup clusters section names its clusters C0..C(K-1); an
+        # off-by-one relabelling here made the UpSet row "matchup cluster 5"
+        # point at what that section calls C4 (2026-09-16 review).
+        return f"matchup cluster C{int(m.group(2))} ({scen})"
     m = _re.match(r"S2 floor \((\w+) >= ([0-9.]+)\)$", name)
     if m:
-        return f"the line ({m.group(1)} >= {m.group(2)})"
+        return f"the line ({display_rule(m.group(1) + ' >= ' + m.group(2))})"
     m = _re.match(r"S2 rung \((\w+) >= ([0-9.]+)\)$", name)
     if m:
-        return f"rung ({m.group(1)} >= {m.group(2)})"
+        return f"rung ({display_rule(m.group(1) + ' >= ' + m.group(2))})"
     if name == 'S2 alternative rectangle':
         return 'the bulk rectangle'
     m = _re.match(r"S3 package \[(.*)\]$", name)
@@ -1321,7 +1480,8 @@ def set_short_label(name):
         return 'wins ' + m.group(1)
     m = _re.match(r"S4 frontier \(atk >= ([0-9.]+) -> (.*)\)$", name)
     if m:
-        return f"atk {m.group(1)} + defense staircase for {m.group(2)}"
+        return (f"Atk {_two_dp(m.group(1))} + defense staircase for "
+                f"{m.group(2)}")
     m = _re.match(r"S5 box -> (.*)$", name)
     if m:
         return f"two-stat box for {m.group(1)}"
@@ -1428,6 +1588,8 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
                 'mostWinning': {'iv': b['most_winning_member']['iv'],
                                 'idx': b['most_winning_member']['idx'],
                                 'wins': b['most_winning_member']['wins'],
+                                'winsAll': b['most_winning_member']['wins_all'],
+                                'den': b['most_winning_member']['denominator'],
                                 'spRank': b['most_winning_member']['sp_rank']},
                 'rank1In': b['rank1_in'],
             })
@@ -1436,6 +1598,12 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             (prose or {}).get(key, {}),
             label=PRESET_LABEL[key], tag=PRESET_TAG[key],
             weights=[int(x) for x in block['weights']],
+            # Decision cells IN THE SCENARIOS THIS PRESET COUNTS: the
+            # denominator of every ``nGw``, and the number the page's prose
+            # leads with under a narrow preset.
+            nDecW=block['n_decision_weighted'],
+            nDecWMat=block['n_decision_weighted_material'],
+            tie=block['top_tie'],
             scens=[ctx['scen_labels'][i]
                    for i, w in enumerate(block['weights']) if w > 0],
             builds=pb, cols=col_rows,
@@ -1447,7 +1615,9 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             rank1Status=block['rank1_status'], hasFork=block['has_fork'],
             objectives=({'split': bool(obj.get('split')),
                          'winGap': int(obj.get('win_gap', 0)),
+                         'winDen': int(obj.get('win_denominator', 0)),
                          'cellGap': int(obj.get('cell_gap', 0)),
+                         'cellGapAll': int(obj.get('cell_gap_all', 0)),
                          'bestCells': obj.get('best_cells_build'),
                          'bestWins': obj.get('best_wins_build')}
                         if obj else None))
