@@ -17,9 +17,13 @@ Three kinds of test live here:
 
 Blob-reading tests are marked ``local_artifacts`` and skip when the replay
 store is not on the machine.
+
+Every opponent meta rank quoted below is served from a FROZEN rankings
+fixture (see ``_frozen_rankings``), not from the live PvPoke rankings.
 """
 import copy
 import importlib.util
+import json
 import math
 import re
 import sys
@@ -49,6 +53,110 @@ def _load_brief():
 
 
 B = _load_brief()
+
+
+# ---------------------------------------------------------------------------
+# Frozen PvPoke rankings
+# ---------------------------------------------------------------------------
+# Opponent meta ranks are a LIVE read in production: ``build_opp_meta_ranks``
+# numbers the opponents off ``gopvpsim.data.get_rankings_for(league)``, whose
+# cache PvPoke refreshes whenever it re-scores the meta. That makes any rank
+# this module quotes drift on a data refresh with no code change -- and the
+# damage is not only cosmetic, because RANK_GATE = 50 decides which cells may
+# carry a floor at all. The 2026-09-15 refresh renumbered Annihilape 30 -> 31
+# and moved Charjabug 60 -> 41; the newly eligible Charjabug cells deleted
+# Melmetal's floor outright, and 17 tests here failed on the data alone.
+#
+# So the module is pinned to the rankings vintage its oracle numbers were
+# computed against (pvpoke commit 9ad871c3e, 2026-09-08 -- the cache these
+# blobs were dived under). Freezing rather than deriving each rank at test
+# time, because the tests below do not merely quote ranks: they pin the
+# rank-GATED selection those ranks drive, and a derived rank cannot restore
+# content a newer vintage removed.
+#
+# The freeze is module-wide and autouse on purpose: the expensive fact
+# fixtures are module-scoped and shared, so a per-test freeze would leave the
+# cached facts depending on which test built them first.
+#
+# It does not leave the live read untested -- tests/test_opp_meta_ranks.py
+# runs ``build_opp_meta_ranks`` against the real rankings (and skips when they
+# are unavailable), and the control test below re-reads them here.
+RANKINGS_FIXTURE = (Path(__file__).resolve().parent / 'fixtures'
+                    / 'pvpoke_rankings_20260908.json')
+_FROZEN_RANKINGS = {
+    league: [{'speciesId': sid} for sid in ids]
+    for league, ids
+    in json.loads(RANKINGS_FIXTURE.read_text())['speciesIds'].items()}
+
+
+def _frozen_get_rankings_for(league, cup=None):
+    """Stand-in for ``gopvpsim.data.get_rankings_for`` at the frozen vintage.
+
+    Loud, never silent: a league or cup the fixture does not carry raises
+    rather than falling back to the live cache, which would leave one test
+    reading today's ranks while the rest of the module reads 2026-09-08.
+    """
+    if cup is not None:
+        raise AssertionError(
+            f"no frozen rankings for cup {cup!r}: add its list to "
+            f"{RANKINGS_FIXTURE.name}")
+    if league not in _FROZEN_RANKINGS:
+        raise AssertionError(
+            f"no frozen rankings for league {league!r}: add its list to "
+            f"{RANKINGS_FIXTURE.name}")
+    return _FROZEN_RANKINGS[league]
+
+
+@pytest.fixture(scope='module', autouse=True)
+def _frozen_rankings():
+    """Serve the frozen vintage to ``build_opp_meta_ranks`` for this module.
+
+    Patched on ``deep_dive_lib.opponents`` -- the module whose global the
+    rank builder actually resolves at call time -- exactly as the hermetic
+    tests in tests/test_opp_meta_ranks.py do.
+    """
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import deep_dive_lib.opponents as opponents
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(opponents, 'get_rankings_for', _frozen_get_rankings_for)
+        yield opponents
+
+
+def test_the_frozen_rankings_are_the_ones_the_rank_builder_reads(
+        _frozen_rankings):
+    """Positive control for the freeze: without it every rank below is live.
+
+    Identity, not a value comparison: a control that only checked "Annihilape
+    is 30" would go vacuous the day PvPoke happens to rank it 30 again.
+    """
+    assert _frozen_rankings.get_rankings_for is _frozen_get_rankings_for
+    assert (_frozen_rankings.get_rankings_for('great')
+            is _FROZEN_RANKINGS['great'])
+    assert len(_FROZEN_RANKINGS['great']) >= 1000      # floor, not ==
+    assert len(_FROZEN_RANKINGS['ultra']) >= 700
+    assert B.build_opp_meta_ranks(['Annihilape'], 'great') == [30]
+    assert B.build_opp_meta_ranks(['Florges'], 'ultra') == [12]
+    with pytest.raises(AssertionError, match='no frozen rankings for cup'):
+        _frozen_rankings.get_rankings_for('great', cup='equinox')
+
+
+def test_the_frozen_species_still_exist_in_the_live_rankings():
+    """The freeze must not hide a species falling out of the meta entirely.
+
+    Reads the rankings CACHE FILE directly -- no fetch, no TTL, no network --
+    and skips when it is absent. Ranks are deliberately NOT pinned here
+    (their drift is the whole problem); this asserts only that the species
+    the module talks about are still ranked at all, which is the one live
+    fact a frozen fixture could hide.
+    """
+    from gopvpsim.data import rankings_cache_path
+    cache = rankings_cache_path('great')
+    if not cache.exists():
+        pytest.skip(f"no rankings cache at {cache}")
+    live = {r['speciesId'] for r in json.loads(cache.read_text())}
+    for sid in ('annihilape', 'melmetal', 'charjabug', 'snorlax'):
+        assert sid in live, f"{sid} is gone from the live rankings"
+    assert len(live) >= 1000, 'positive control: the cache is a real ranking'
 
 
 def _replay_dirs():
@@ -443,6 +551,12 @@ def test_sableye_shadow_triage_and_clean_cut_counts(sableye_shadow_facts):
 
 @pytest.mark.local_artifacts
 def test_sableye_shadow_floor_is_the_annihilape_cmp_line(sableye_shadow_facts):
+    """Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     _state, facts, _path = sableye_shadow_facts
     fl = facts['floor']
     assert fl['T'] == pytest.approx(148.1039982)
@@ -692,6 +806,12 @@ def test_two_renders_are_byte_identical(tmp_path):
 
 @pytest.mark.local_artifacts
 def test_deoxys_defense_has_no_floor_and_says_why():
+    """Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(DEOXYS)
     state = B.load_blob(str(path))
     facts = B.compute_brief(state, 0, str(path))
@@ -841,6 +961,12 @@ def test_rank1_membership_of_the_alternative_is_set_without_a_floor():
     The pre-fix no-floor branch never assigned ``in_alternative``, so
     ``r1.get(...)`` returned None and field 4 printed the negative sentence
     unconditionally on all 14 no-floor arms.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(DEOXYS)
     state = B.load_blob(str(path))
@@ -1092,7 +1218,14 @@ def test_bulk_fork_is_stated_as_a_trade_when_it_is_not_exclusive(
 
 @pytest.mark.local_artifacts
 def test_melmetal_catch_line_does_not_claim_a_wild_catch():
-    """Melmetal has no wild spawn; the pre-fix page said "Wild catches"."""
+    """Melmetal has no wild spawn; the pre-fix page said "Wild catches".
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
     arm = next(i for i in range(len(state['moveset_data']))
@@ -1124,6 +1257,12 @@ def test_no_floor_alternative_is_rank_gated_and_reframed_when_wide():
     brief, so only a top-50 opponent in a non-degenerate scenario may select
     it; and a rectangle covering more than 40% of the grid is re-framed
     rather than printed as a target.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(DEOXYS)
     state = B.load_blob(str(path))
@@ -1146,6 +1285,12 @@ def test_no_floor_alternative_is_rank_gated_and_reframed_when_wide():
 
 @pytest.mark.local_artifacts
 def test_melmetal_breakpoint_floor_does_not_say_the_mechanism_is_unattributed():
+    """Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
     arm = next(i for i in range(len(state['moveset_data']))
@@ -1184,7 +1329,14 @@ def test_example_rows_keep_their_contested_cell_count_in_the_json(tmp_path):
 
 @pytest.mark.local_artifacts
 def test_page_lead_block_names_the_arm_that_carries_the_line(tmp_path):
-    """Melmetal's page opened on a no-line arm with no cross-arm sentence."""
+    """Melmetal's page opened on a no-line arm with no cross-arm sentence.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(MELMETAL)
     html_path, _json_path, all_facts = B.run_blob(str(path), str(tmp_path))
     page = Path(html_path).read_text()
@@ -1339,6 +1491,12 @@ def test_melmetal_partition_count_can_never_exceed_the_direction_count():
     impossible for two tests of one threshold. The 3 counted arms whose OWN
     cut exists (117.97 / 123.97 / 122.37), not arms the printed line
     partitions.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
@@ -1363,7 +1521,14 @@ def test_melmetal_partition_count_can_never_exceed_the_direction_count():
 
 @pytest.mark.local_artifacts
 def test_separability_is_printed_with_the_values_it_counted():
-    """E4: a bare count reads as corroboration; the values say what it is."""
+    """E4: a bare count reads as corroboration; the values say what it is.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
     arm = next(i for i in range(len(state['moveset_data']))
@@ -1378,7 +1543,14 @@ def test_separability_is_printed_with_the_values_it_counted():
 
 @pytest.mark.local_artifacts
 def test_gate_recompute_rejects_a_partition_count_above_the_direction_count():
-    """Positive control for the ordering the round-2 page violated."""
+    """Positive control for the ordering the round-2 page violated.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     import copy
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
@@ -1443,6 +1615,12 @@ def test_deoxys_bulk_rectangle_is_unreachable_and_says_so():
     Deoxys forms come from raids, research and trades, all of which floor
     every IV at 10. The rectangle Def >= 232.05 & HP >= 94 has 276 members
     and shares none of them with the 216 spreads that floor allows.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(DEOXYS)
     state = B.load_blob(str(path))
@@ -1462,7 +1640,14 @@ def test_deoxys_bulk_rectangle_is_unreachable_and_says_so():
 
 @pytest.mark.local_artifacts
 def test_melmetal_floor_catch_counts_over_the_reachable_grid():
-    """The floor line takes the same restriction, in the other direction."""
+    """The floor line takes the same restriction, in the other direction.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
     arm = next(i for i in range(len(state['moveset_data']))
@@ -1824,7 +2009,14 @@ def test_stage6_merges_only_rungs_whose_clearer_sets_nearly_agree():
 
 @pytest.mark.local_artifacts
 def test_merged_cells_are_stated_as_bought_and_not_as_partitioned():
-    """The merged-in cell turns over BELOW the line, so it is a weaker claim."""
+    """The merged-in cell turns over BELOW the line, so it is a weaker claim.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(SABLEYE_PLAIN)
     state = B.load_blob(str(path))
     facts = B.compute_brief(state, 0, str(path))
@@ -2209,6 +2401,12 @@ def test_azumarill_headline_demotes_a_line_that_costs_more_than_it_buys():
     No spread clearing 97.43 wins as many matchups as the stat-product rank-1
     build, and none of them reaches 95% stat product. Pre-fix the headline
     opened "Most Azumarill ... should have at least 97.43 attack".
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(AZUMARILL)
     state = B.load_blob(str(path))
@@ -2277,6 +2475,12 @@ def test_medicham_names_the_better_ranked_rule_just_below_the_line():
     It is 0.87 attack below the printed line, so every spread clearing the
     printed one clears it too, and its opponent (rank 13) is the one a reader
     opens a Medicham page for.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
     """
     path = require_blob(MEDICHAM)
     state = B.load_blob(str(path))
@@ -2362,6 +2566,12 @@ def test_the_strip_badge_says_which_way_a_gate_runs():
 
 @pytest.mark.local_artifacts
 def test_a_necessary_gate_says_at_or_above_on_a_ge_threshold():
+    """Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     azu = require_blob(AZUMARILL)
     f_a = B.compute_brief(B.load_blob(str(azu)), 0, str(azu))
     text = ' '.join(B.build_headline(f_a))
@@ -2371,7 +2581,14 @@ def test_a_necessary_gate_says_at_or_above_on_a_ge_threshold():
 
 @pytest.mark.local_artifacts
 def test_a_shared_line_is_not_re_explained_on_every_moveset(tmp_path):
-    """Four near-identical mechanism paragraphs on one page read as padding."""
+    """Four near-identical mechanism paragraphs on one page read as padding.
+
+    Rank-frozen: what this case asserts is rank-gated (RANK_GATE = 50), so
+    both the ranks and the selection they drive are read from the
+    2026-09-08 rankings fixture, not from the live PvPoke rankings. See
+    ``_frozen_rankings`` for why the vintage is pinned rather than the
+    expected rank derived at test time.
+    """
     path = require_blob(SABLEYE_SHADOW)
     state = B.load_blob(str(path))
     facts = [B.compute_brief(state, a, str(path))

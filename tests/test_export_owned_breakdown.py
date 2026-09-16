@@ -5,16 +5,34 @@ mobile-bound alternative to the full opponent-string list: per-IV bits over the
 dive's even-shield (opponent x scenario) cells plus a one-time `names` header.
 This test decodes the bitmask via that header and asserts the reconstructed
 per-IV drops exactly equal the full-list drops, on a real rendered dive.
+
+The dive is a machine-local artifact, so both tests are ``local_artifacts``
+and skip when it is absent (the repo convention for blob/artifact-backed
+tests). Like the replay-blob tests, they look in this clone first and then in
+a sibling ``gopvpsim`` checkout -- a working clone shares the machine's
+rendered dives rather than duplicating them.
 """
 import base64
 import importlib.util
 import json
 import os
 
+import pytest
+
 HERE = os.path.dirname(__file__)
 ROOT = os.path.dirname(HERE)
-DIVE = os.path.join(ROOT, 'userdata', 'website', 'altaria-great-league',
-                    'index.html')
+DIVE_REL = os.path.join('userdata', 'website', 'altaria-great-league',
+                        'index.html')
+DIVE_DIRS = [ROOT, os.path.join(os.path.dirname(ROOT), 'gopvpsim')]
+
+
+def require_dive():
+    for d in DIVE_DIRS:
+        p = os.path.join(d, DIVE_REL)
+        if os.path.exists(p):
+            return p
+    pytest.skip(f"no rendered dive at {DIVE_REL} on this machine")
+
 
 _spec = importlib.util.spec_from_file_location(
     'export_owned_breakdown_bundle',
@@ -36,10 +54,14 @@ def _decode_masks(entry):
     return out
 
 
+@pytest.mark.local_artifacts
 def test_bitmask_roundtrips_to_full_list():
-    assert os.path.exists(DIVE), f"missing dive fixture: {DIVE}"
-    _, _, full = _mod.breakdown_from_dive(DIVE)
-    _, _, bm = _mod.bitmask_from_dive(DIVE)
+    dive = require_dive()
+    _, _, full = _mod.breakdown_from_dive(dive)
+    _, _, bm = _mod.bitmask_from_dive(dive)
+
+    # Oracle parity is only parity if there is something to compare.
+    assert full['drops'], "positive control: this dive gives something up"
 
     # same set of IVs that give up something
     assert set(bm['masks']) == set(full['drops'])
@@ -50,9 +72,11 @@ def test_bitmask_roundtrips_to_full_list():
     assert recon == full['drops']
 
 
+@pytest.mark.local_artifacts
 def test_bitmask_is_far_smaller_than_full_list():
-    _, _, full = _mod.breakdown_from_dive(DIVE)
-    _, _, bm = _mod.bitmask_from_dive(DIVE)
+    dive = require_dive()
+    _, _, full = _mod.breakdown_from_dive(dive)
+    _, _, bm = _mod.bitmask_from_dive(dive)
     full_size = len(json.dumps({'Great League': {'Altaria': full}},
                                separators=(',', ':')))
     bm_size = len(json.dumps({'Great League': {'Altaria': bm}},
