@@ -5,6 +5,7 @@ floor, single-stat flip directions, tree rule extraction, degenerate inputs.
 """
 import ast
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -1189,3 +1190,87 @@ def test_section_stat_dp_matches_what_the_page_actually_bakes():
         m = re.search(r"%s\s*=\s*\[\s*round\([^,]+,\s*(\d+)\s*\)" % stat, src)
         assert m, f"{stat} is no longer a rounded comprehension; re-pin this"
         assert int(m.group(1)) == dp, (stat, m.group(1), dp)
+
+
+# ---------------------------------------------------------------------------
+# Per-preset combined partitions (2026-09-16, the Build criteria knob)
+# ---------------------------------------------------------------------------
+
+_PRESETS = [('flat', 'all shields, equal', None),
+            ('even', 'even shields', ('0v0', '1v1', '2v2')),
+            ('one_one', '1v1 only', ('1v1',))]
+
+
+def _render_with_presets():
+    flat, nIvs, nO = staircase_scores(n_opp=len(OPP_NAMES))
+    atk = np.linspace(100, 110, nIvs)
+    data_obj = {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+                "ivHp": np.full(nIvs, 135.0).tolist()}
+    return mc.render_section(
+        flat, nIvs, 9, nO, SCENARIOS9, OPP_NAMES, data_obj,
+        "rank-1", "Shadow Claw/Foul Play+Power Gem", [], presets=_PRESETS)
+
+
+def test_a_preset_partition_gets_its_own_key_and_display_name():
+    assert mc.all_scen_key() == mc.ALL_SCEN_KEY
+    assert mc.all_scen_key('flat') == mc.ALL_SCEN_KEY
+    assert mc.all_scen_key('even') == 'all__even'
+    assert mc.is_all_scen_key('all__even') and mc.is_all_scen_key('all')
+    assert not mc.is_all_scen_key('1v1')
+    _render_with_presets()          # fills the preset-tag table
+    assert mc._scen_display('all__even') == 'all scenarios (even shields)'
+
+
+def test_a_single_scenario_preset_resolves_to_that_scenarios_partition():
+    """The 1v1-only preset has nothing to combine, so its "all scenarios"
+    view IS the 1v1 partition -- never the nine-scenario one under a label
+    claiming otherwise."""
+    html = _render_with_presets()
+    pay = json.loads(re.search(
+        r'<script type="application/json" class="dd-mc-data">(.*?)</script>',
+        html, re.S).group(1))
+    assert pay['allByPreset']['flat'] == mc.ALL_SCEN_KEY
+    assert pay['allByPreset']['even'] == 'all__even'
+    assert pay['allByPreset']['one_one'] == '1v1'
+    assert pay['allLabelByPreset']['one_one'] == '1v1 shields'
+    for key, mapped in pay['allByPreset'].items():
+        assert mapped in pay['scens'], (key, mapped)
+
+
+def test_a_preset_block_prints_its_own_clusters_and_says_what_it_omits():
+    """The short form is a size decision, so the omission must be stated.
+
+    Printing the default view's per-bit win-rate grid under a different
+    partition's clusters would be the dishonest way to save the bytes; this
+    pins that the block carries its own cluster table and its own rules, and
+    a sentence saying where the omitted tables are.
+    """
+    html = _render_with_presets()
+
+    def _block(scen):
+        i = html.index(f'<div class="dd-mc-scen-block" data-scen="{scen}" ')
+        nxt = html.find('<div class="dd-mc-scen-block"', i + 10)
+        end = nxt if nxt > 0 else html.index('How this works', i)
+        return html[i:end]
+
+    block = _block('all__even')
+    assert 'Cluster' in block            # its own cluster table
+    assert 'Depth-3 decision tree' in block      # its own stat rules
+    assert "Build criteria preset's own combined partition" in block
+    assert 'are not repeated here' in block
+    # the two heavy tables are NOT in it
+    assert 'Matchup flip thresholds' not in block
+    assert 'Green tint = the cluster mostly wins' not in block
+    # positive control: the DEFAULT combined block still carries both
+    full = _block('all')
+    assert 'Matchup flip thresholds' in full
+    assert 'Green tint = the cluster mostly wins' in full
+
+
+def test_preset_partitions_do_not_become_dropdown_options():
+    html = _render_with_presets()
+    opts = re.findall(r'<option value="([^"]+)"', html)
+    assert mc.ALL_SCEN_KEY in opts
+    assert 'all__even' not in opts
+    # but it does get a block, so the option can select it
+    assert 'data-scen="all__even"' in html

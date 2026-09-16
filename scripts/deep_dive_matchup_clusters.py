@@ -1663,6 +1663,16 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # per-scenario server-side blocks
     for lbl, entry in computed.items():
         vis = "block" if lbl == default_scen else "none"
+        # A per-preset combined block prints its OWN clusters and its OWN
+        # stat rules -- the two things that describe the partition on screen
+        # -- and stops there. Its per-bit win-rate grid and flip table would
+        # be ~36 KB of a page that already carries the default combined
+        # view's, twice (the best-buddy pass re-parents the section into an
+        # inert <template>), for a second reading of the same bits under a
+        # different grouping. The note below says what is not printed and
+        # where the full tables are; nothing here is shown for a partition
+        # it does not belong to.
+        short_form = lbl != ALL_SCEN_KEY and is_all_scen_key(lbl)
         parts.append(f'<div class="dd-mc-scen-block" data-scen="{lbl}" '
                      f'style="display:{vis}">')
         parts.append(_scen_headline(lbl, entry, nO))
@@ -1671,9 +1681,21 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         if "res" in entry:
             names = _entry_opp_names(entry, disp)
             parts.append(_cluster_table(entry, names))
-            parts.append(_winrate_grid(entry, names))
-            parts.append(_rules_block(entry))
-            parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
+            if short_form:
+                parts.append(_rules_block(entry))
+                parts.append(
+                    '<p style="font-size:12px;color:var(--text-muted)">'
+                    'This is the Build criteria preset\'s own combined '
+                    'partition: the clusters and the stat rules above are '
+                    'its own. The per-matchup win-rate grid and the flip '
+                    f'table are printed for the {_esc(ALL_SCEN_DISPLAY)} '
+                    'view, over every non-degenerate scenario\'s bits -- a '
+                    'different set of columns from this one, which is why '
+                    'they are not repeated here.</p>')
+            else:
+                parts.append(_winrate_grid(entry, names))
+                parts.append(_rules_block(entry))
+                parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
         parts.append('</div>')
 
     knobs = cluster_params()   # every number quoted below comes from them
