@@ -29,7 +29,6 @@ block are the brief's own HTML.
 """
 from __future__ import annotations
 
-import base64
 import html as _html
 import json
 import os
@@ -42,6 +41,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import deep_dive_analysis as analysis  # noqa: E402
 import deep_dive_brief as brief  # noqa: E402
+import deep_dive_builds as builds  # noqa: E402
+import deep_dive_logging  # noqa: E402
 import glossary  # noqa: E402
 
 SECTION_ID = 'dd-which-build'
@@ -52,12 +53,24 @@ SECTION_TITLE = 'Which one to build?'
 # page no extra bytes.
 CLEARER_TOP_N = 25
 
+# One colour per selected build, in selection order (primary, fork, bulk).
+# Light-theme values, carried in the payload for the same reason
+# WB_FALLBACK exists in the engine: a trace with no colour is a legend key
+# pointing at invisible points. The CSS custom properties below are what
+# normally drives them, so the panel still re-themes with the picker.
+BUILD_COLORS = ('#7a4fc0', '#c0682a', '#16706a')
+
 # Every view the section plot can show, with the selector label. The caption
 # is per-page (it is a sentence of the brief's own headline), so it travels in
 # the payload rather than here.
 VIEWS_FLOOR = (('line', 'the line'), ('rungs', 'the rungs'),
                ('trade', 'the trade'), ('clusters', 'clusters'))
 VIEWS_NO_FLOOR = (('clusters', 'clusters'), ('rank1', 'rank-1'))
+# v4: the builds view leads on any page that HAS builds, and the four (or
+# two) views above stay exactly as they were behind it. The line view is
+# still the single-stat floor; the builds are the section's new primary
+# object, not a replacement for the line.
+VIEW_BUILDS = ('builds', 'the builds')
 
 # Terms marked on FIRST use in the section, longest-first so "stat-product
 # rank-1" is claimed before "stat product" can match inside it. Each entry is
@@ -65,6 +78,13 @@ VIEWS_NO_FLOOR = (('clusters', 'clusters'), ('rank1', 'rank-1'))
 # wrapped, so a plural stays plural.
 _TERM_PATTERNS = (
     ('stat-product rank-1', r'stat-product rank-1'),
+    ('decision matchup', r'decision matchups?'),
+    ('build criteria', r'Build criteria'),
+    ('outside rate', r'outside rates?'),
+    ('guaranteed', r'guarantees?(?:d)?'),
+    ('material', r'material'),
+    ('build', r'builds?'),
+    ('fork', r'forks?'),
     ('charge-move priority', r'charge-move[- ]priority'),
     ('contested matchups', r'contested matchups?'),
     ('one-sided gate', r'one-sided gates?'),
@@ -197,6 +217,28 @@ class TermMarker:
         """The marked terms, in the order a reader meets them."""
         return sorted(self.used, key=lambda t: self.used[t])
 
+    @staticmethod
+    def _first_offset(original, pattern):
+        """Where a term first occurs in the UNMARKED fragment, or None.
+
+        Measured on the original text, never on the partially-marked one.
+        The loop below claims terms in _TERM_PATTERNS order rather than in
+        reading order, so a term claimed LATER can sit EARLIER in the text --
+        and an offset read off the working copy would then carry the length
+        of every tooltip inserted before it. On the v4 section that put
+        "guaranteed" after "decision matchup" in the Terms list although a
+        reader meets it first (the two are one sentence apart in the builds
+        lead).
+        """
+        off = 0
+        for piece in _TAG_SPLIT.split(original):
+            if not piece.startswith('<') and piece.strip():
+                m = re.search(pattern, piece, re.IGNORECASE)
+                if m:
+                    return off + m.start()
+            off += len(piece)
+        return None
+
     def mark(self, fragment):
         # One term per outer pass, re-splitting the fragment each time. The
         # markup a substitution inserts carries the DEFINITION in a title=
@@ -205,6 +247,7 @@ class TermMarker:
         # contains another registered term today -- test_no_definition_
         # contains_another_term keeps it that way -- but a marker that only
         # works while that holds is a trap for whoever adds the seventh term.)
+        original = fragment
         for term, pattern in _TERM_PATTERNS:
             if term in self.used:
                 continue
@@ -218,13 +261,10 @@ class TermMarker:
                 pieces[k] = (piece[:m.start()]
                              + glossary.abbr_html(term, text=m.group(0))
                              + piece[m.end():])
-                # Offset in the WHOLE fragment, not in this piece: two
-                # terms in one paragraph land in different pieces, and a
-                # per-piece offset would order them by which pass claimed
-                # them. Earlier marks shift only the text AFTER their own
-                # insertion point, so the offsets stay comparable.
+                # Offset in the WHOLE fragment as it arrived, not in this
+                # piece and not in the working copy: see _first_offset.
                 self.used[term] = (self._frag,
-                                   sum(len(x) for x in pieces[:k]) + m.start())
+                                   self._first_offset(original, pattern))
                 fragment = ''.join(pieces)
                 break
         self._frag += 1
@@ -463,12 +503,12 @@ def mask_b64(flags):
 
     512 bytes per 4096-spread mask, ~684 base64 characters. That is the
     classification, not a second copy of the stats.
+
+    The packing itself lives in ``deep_dive_builds.pack_mask`` -- the builds
+    payload packs masks too, and the browser has exactly one unpacker
+    (``_wbMask`` / ``_wbBit``), so there is one implementation per side.
     """
-    buf = bytearray((len(flags) + 7) // 8)
-    for i, flag in enumerate(flags):
-        if flag:
-            buf[i >> 3] |= 1 << (i & 7)
-    return base64.b64encode(bytes(buf)).decode('ascii')
+    return builds.pack_mask(flags)
 
 
 def line_key(axis, T):
@@ -775,8 +815,23 @@ def fixed_note(facts, page_movesets=1):
     return out
 
 
+BUILDS_CAPTION = (
+    "Every spread on this grid, by stat product rank against the matchups it "
+    "wins in the shield scenarios the Build criteria preset counts. One "
+    "colour per build; the diamond is stat-product rank-1, each triangle a "
+    "build's most-winning member, and the open square the spread that wins "
+    "the most matchups anywhere on the grid.")
+
+
 def _caption_for(view, facts, fields, all_facts=None):
-    """One sentence of the brief's prose per view, chosen by what it shows."""
+    """One sentence of the brief's prose per view, chosen by what it shows.
+
+    The builds view is the one view the brief has no sentence about -- it
+    draws this module's own object -- so its caption is authored here and
+    gated with the rest of this module's prose in :func:`prepare`.
+    """
+    if view == 'builds':
+        return BUILDS_CAPTION
     head = facts['_headline']
     first = [relabel(x, all_facts) for x in sentences(head[0])]
     rest = ([relabel(x, all_facts) for x in sentences(head[1])]
@@ -1084,6 +1139,11 @@ def scenario_caption(view, scen, entry, facts, base=''):
     if view == 'trade':
         return (f"{base} Counted over every shield scenario; the y-axis here "
                 f"is {scen} wins only.")
+    if view == 'builds':
+        return (f"The same builds, drawn against their {scen} shields win "
+                f"count only. Which builds these ARE is still the Build "
+                f"criteria preset's answer; this control moves the y axis, "
+                f"not the selection.")
     if view == 'clusters':
         return (f"The Matchup clusters section's own groups for {scen} "
                 f"shields, drawn here on the same axes.")
@@ -1157,7 +1217,7 @@ def scenario_payload(facts, pay):
 
 
 def build_payload(facts, fields, moveset_idx, mode='pvpoke',
-                  all_facts=None):
+                  all_facts=None, arm_builds=None):
     """The section plot's inline JSON.
 
     Thresholds, marked spreads, and one packed membership mask per printed
@@ -1173,6 +1233,9 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke',
     r1 = facts['rank1']
     gb = facts['grid_best']
     views = VIEWS_FLOOR if fl is not None else VIEWS_NO_FLOOR
+    has_builds = bool(arm_builds and arm_builds['presets'])
+    if has_builds:
+        views = (VIEW_BUILDS,) + tuple(views)
     pay = {
         'mi': int(moveset_idx),
         'mode': mode,
@@ -1265,6 +1328,16 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke',
                            + [0])
     if pay['nScenRamp']:
         pay['scenColors'] = rung_ramp(pay['nScenRamp'], 'light')
+    # ---- v4: the builds half ---------------------------------------------
+    # One nested object rather than a second <script> block: the section is
+    # re-parented wholesale into an inert <template> by the best-buddy L51
+    # pass, and one payload per section is what survives that unchanged.
+    if has_builds:
+        pay['bp'] = builds.builds_payload(
+            arm_builds, moveset_idx, mode=mode,
+            prose=builds_prose(facts, arm_builds, all_facts))
+        pay['bp']['colors'] = list(BUILD_COLORS)
+        pay['bp']['topN'] = CLEARER_TOP_N
     return pay
 
 
@@ -1398,7 +1471,351 @@ CSS = """
 @media (max-width: 34rem) {
   #dd-which-build .wb-terms { grid-template-columns: 1fr; }
   #dd-which-build .wb-terms dd { margin: 0 0 6px; } }
+/* ---- v4: builds ---- */
+#dd-which-build { --wb-b0: #7a4fc0; --wb-b1: #c0682a; --wb-b2: #16706a; }
+[data-theme="gruvbox-dark"] #dd-which-build,
+[data-theme="pokemon-dark"] #dd-which-build {
+  --wb-b0: #b18cf0; --wb-b1: #f0a860; --wb-b2: #55d9c9; }
+#dd-which-build .wb-builds { margin: 12px 0 16px; }
+#dd-which-build .wb-builds-lead { font-size: 0.9rem; margin: 0 0 8px; }
+#dd-which-build .wb-builds-table { width: 100%; }
+#dd-which-build .wb-builds-table td { white-space: normal; }
+#dd-which-build .wb-fid { color: var(--text-muted); font-size: 0.76rem; }
+#dd-which-build .wb-swatch { display: inline-block; width: 10px;
+  height: 10px; border-radius: 2px; margin-right: 6px;
+  background: var(--wb-b0); }
+#dd-which-build .wb-swatch[data-build="1"] { background: var(--wb-b1); }
+#dd-which-build .wb-swatch[data-build="2"] { background: var(--wb-b2); }
+#dd-which-build .wb-obj { font-size: 0.86rem; margin: 8px 0 0; }
+#dd-which-build .wb-weighting { font-size: 0.78rem; color: var(--text-muted);
+  margin: 8px 0 0; }
+#dd-which-build .wb-build { margin: 8px 0 0; }
+#dd-which-build .wb-build > summary { cursor: pointer; font-size: 0.84rem;
+  color: var(--text-muted); }
+#dd-which-build .wb-g-list { font-size: 0.82rem; margin: 6px 0;
+  padding-left: 18px; }
+#dd-which-build .wb-g-list ul { padding-left: 16px; margin: 2px 0 6px; }
+#dd-which-build .wb-more, #dd-which-build .wb-free { color: var(--text-muted); }
+#dd-which-build .wb-mem-head { font-size: .74rem; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--text-muted); margin: 10px 0 4px;
+  font-weight: 600; }
+#dd-which-build .wb-mem { font-size: 0.8rem; max-height: 260px;
+  overflow-y: auto; background: var(--surface-2);
+  border: 1px solid var(--border-2); border-radius: 6px; padding: 6px 10px; }
+#dd-which-build .wb-plotrow { display: flex; flex-wrap: wrap; gap: 10px; }
+#dd-which-build .wb-upset { flex: 1 1 320px; min-width: 300px; height: 400px; }
+#dd-which-build .wb-plotrow .wb-panel { flex: 2 1 420px; min-width: 320px; }
 """
+
+
+# ---------------------------------------------------------------------------
+# BUILDS (v4). The section's primary object: 2-3 regions of the IV grid per
+# moveset, selected under the reader's Build-criteria preset.
+# ---------------------------------------------------------------------------
+# Vocabulary added by this block (docs style rule, per document):
+#
+# - Build: a region of the IV grid a player can aim at -- an intersection of
+#   the named sets, at least 50 spreads.
+# - Fork: a build with no spread in common with the primary that also
+#   guarantees a different set of matchups.
+# - Decision cell / decision matchup: a (shield scenario, opponent) pair the
+#   IV choice decides -- top-50 opponent, and the whole grid's win rate on it
+#   strictly inside 2%-98%.
+# - Guaranteed: every spread in the build wins it.
+# - Outside rate: how often the spreads OUTSIDE the build win that same cell.
+# - Material: a cell no single-stat threshold rule of 100+ spreads wins at
+#   more than 95%.
+# - Preset: one of the three Build-criteria weightings.
+
+# Reader-facing name per selected role, in selection order.
+ROLE_NAME = {'primary': 'Build 1 (primary)',
+             'fork': 'Build 2 (fork)',
+             'rank1': 'Build 3 (bulk)'}
+ROLE_SHORT = {'primary': 'primary', 'fork': 'fork', 'rank1': 'bulk'}
+# Guarantee rows printed per shield scenario before the "+N more" control.
+GUARANTEE_CAP = 5
+# A cell the rest of the grid wins at more than this is near-free: the build
+# is not what got it. Counted in a trailing sentence rather than listed.
+NEAR_FREE = 0.90
+
+
+def _pct(x):
+    return f"{round(float(x) * 100):.0f}%"
+
+
+def _fidelity_clause(b):
+    """How well the printed description reproduces the member list."""
+    d = b['description']
+    if d is None:
+        return 'no two- or three-stat rule fits it; the list is the build'
+    j = float(d['jaccard'])
+    if j >= 0.999:
+        return 'exactly these spreads'
+    return (f"{_pct(j)} of the same spreads "
+            f"({brief._n(d['n_extra'])} extra, "
+            f"{brief._n(d['n_missing'])} missed)")
+
+
+def build_desc(b, steps=True):
+    """The build's rule, or the honest "list of N" when none fits.
+
+    ``steps`` prints a staircase's actual steps. A staircase description is
+    unusable without them -- that is the 2026-09-16 review's own finding --
+    so the TABLE always prints them; the one-line summary does not, because
+    eight "HP 115 -> def 103.16" pairs in the collapsed summary bury the
+    sentence a reader opened the page for.
+    """
+    d = b['description']
+    if d is None:
+        return f"list of {brief._n(b['size'])} spreads"
+    rule = d['rule']
+    if d.get('steps'):
+        if not steps:
+            return rule
+        pairs = '; '.join(f"HP {h:g} -> def {dd:g}" for h, dd, _n in d['steps'])
+        return f"{rule}: {pairs}"
+    return rule
+
+
+def _scen_weighted(bl, scen_labels):
+    """The scenarios this preset counts, as a printable clause."""
+    live = [scen_labels[i] for i, w in enumerate(bl['weights']) if w > 0]
+    if len(live) == len(scen_labels):
+        return 'all ' + brief._n(len(live)) + ' shield scenarios'
+    return ' / '.join(live) + ' shields'
+
+
+def builds_summary(facts, arm_builds, preset, all_facts=None):
+    """The collapsed summary line for one preset.
+
+    "Which one to build? [even shields] 61 spreads at atk >= 150.24 with a
+    defense staircase guarantee 55 of the 87 decision matchups; a disjoint
+    114-spread rectangle guarantees 41 instead, and holds your rank-1."
+
+    A page with no builds keeps the v3 sentence: the two no-line summaries
+    already say what a reader who reads only the summary can do.
+    """
+    bl = arm_builds['presets'].get(preset)
+    if not bl or not bl['builds'] or facts['floor'] is None:
+        # A page with no line keeps the v3 negative summary -- Michael's
+        # 2026-09-16 call. Its two sentences say what a reader who reads only
+        # the summary can do ("your rank-1 already wins more than anything
+        # else"), which a builds sentence would displace rather than improve.
+        # The builds themselves are still rendered and still plotted below.
+        return summary_sentence(facts, all_facts)
+    tag = builds.PRESET_TAG[preset]
+    p = bl['builds'][0]
+    n_dec = arm_builds['n_decision_cells']
+    out = (f"[{tag}] {brief._n(p['size'])} spreads -- "
+           f"{build_desc(p, steps=False)} -- guarantee "
+           f"{brief._n(p['n_guaranteed'])} of the "
+           f"{brief._n(n_dec)} decision matchups")
+    rest = bl['builds'][1:]
+    if rest:
+        f = rest[0]
+        clause = (f"; a disjoint {brief._n(f['size'])}-spread build "
+                  f"({build_desc(f, steps=False)}) guarantees "
+                  f"{brief._n(f['n_guaranteed'])} instead")
+        if f['rank1_in']:
+            clause += ' and holds your stat-product rank-1'
+        out += clause
+    elif p['rank1_in']:
+        out += ', and it holds your stat-product rank-1'
+    return out + '.'
+
+
+def builds_lead(facts, arm_builds, preset, all_facts=None):
+    """The sentence under the section's own lead: which preset, what it does."""
+    bl = arm_builds['presets'].get(preset)
+    if not bl:
+        return ''
+    scens = _scen_weighted(bl, arm_builds['ctx']['scen_labels'])
+    n = len(bl['builds'])
+    return (f"Build criteria: {builds.PRESET_LABEL[preset]} -- the builds "
+            f"below are selected and ranked by what they guarantee in "
+            f"{scens}. {brief._n(n).capitalize()} "
+            f"{brief._noun(n, 'build')} for this moveset, out of "
+            f"{brief._n(arm_builds['n_decision_cells'])} decision matchups "
+            f"({brief._n(arm_builds['n_material_cells'])} of them material).")
+
+
+def objectives_line(arm_builds, preset):
+    """The two objectives, printed only when they disagree."""
+    bl = arm_builds['presets'].get(preset)
+    if not bl or not bl['builds']:
+        return ''
+    obj = bl['objectives'] or {}
+    if not obj.get('split'):
+        return ''
+    by_cells = next(b for b in bl['builds']
+                    if b['combo'] == obj['best_cells_build'])
+    by_wins = next(b for b in bl['builds']
+                   if b['combo'] == obj['best_wins_build'])
+    win_gap = int(obj['win_gap'])
+    cell_gap = int(obj['cell_gap'])
+    return (f"The two objectives disagree here: "
+            f"{ROLE_SHORT[by_wins['role']]}'s most-winning spread "
+            f"{by_wins['most_winning_member']['iv']} wins "
+            f"{brief._n(win_gap)} more "
+            f"{brief._noun(win_gap, 'matchup')} overall, while "
+            f"{ROLE_SHORT[by_cells['role']]} guarantees "
+            f"{brief._n(cell_gap)} more decision "
+            f"{brief._noun(cell_gap, 'matchup')}.")
+
+
+WEIGHTING_NOTE = (
+    "The shield weighting above is the page's Build criteria preset. The "
+    "tables list cells per shield scenario whatever the preset is; the "
+    "preset changes which of them the ranking counts.")
+
+
+def builds_prose(facts, arm_builds, all_facts=None):
+    """Every preset's authored sentences, for the payload.
+
+    Authored HERE, not in the browser: these are the section's reader-facing
+    prose, and the whole module's rule is that prose passes the brief's word
+    gates before it reaches a page. :func:`prepare` gates exactly this dict.
+    """
+    out = {}
+    for key in arm_builds['presets']:
+        out[key] = {
+            'summary': builds_summary(facts, arm_builds, key, all_facts),
+            'lead': builds_lead(facts, arm_builds, key, all_facts),
+            'objectives_line': objectives_line(arm_builds, key),
+        }
+    return out
+
+
+def _guarantee_rows_html(arm_builds, b):
+    """One build's guaranteed cells, grouped by shield scenario.
+
+    Sorted by OUTSIDE RATE ascending inside each group -- the guarantee the
+    rest of the grid is least likely to hand a reader anyway reads first --
+    capped, with the near-free tail counted rather than listed.
+    """
+    n_modes = b['honesty']['n_modes']
+    parts = []
+    by_scen = b['guaranteed_by_scenario']
+    for scen in arm_builds['ctx']['scen_labels']:
+        rows = by_scen.get(scen)
+        if not rows:
+            continue
+        listed = [r for r in rows if r['outside_wr'] <= NEAR_FREE]
+        free = len(rows) - len(listed)
+        items = []
+        for r in listed[:GUARANTEE_CAP]:
+            flags = []
+            if r['material']:
+                flags.append('material')
+            # Only the SHORTFALL is printed: "holds in 3 of 3 opponent-IV
+            # modes" on every one of a few hundred rows is the page's single
+            # biggest run of bytes and its least informative words. The
+            # count of rows that hold everywhere is in the table above.
+            if r['modes_ok'] < n_modes:
+                flags.append(f"holds in {r['modes_ok']} of {n_modes} "
+                             f"opponent-IV modes")
+            tail = ('; ' + '; '.join(flags)) if flags else ''
+            items.append(
+                f'<li>{_esc(r["cell"])} (rank {r["rank"]}) -- outside '
+                f'{_esc(_pct(r["outside_wr"]))}{_esc(tail)}</li>')
+        more = len(listed) - len(items)
+        if more > 0:
+            items.append(f'<li class="wb-more">+{more} more in {_esc(scen)}'
+                         f'</li>')
+        tail = ''
+        if free:
+            tail = (f'<li class="wb-free">{brief._n(free).capitalize()} more '
+                    f'{brief._noun(free, "cell")} here are near-free: the '
+                    f'spreads outside this build win them over '
+                    f'{_esc(_pct(NEAR_FREE))} of the time too.</li>')
+        parts.append(f'<li class="wb-sgroup"><b>{_esc(scen)}</b> '
+                     f'({len(rows)})<ul>' + ''.join(items) + tail + '</ul></li>')
+    if not parts:
+        return '<p>No decision matchup is guaranteed by every member.</p>'
+    return '<ul class="wb-g-list">' + ''.join(parts) + '</ul>'
+
+
+def _gives_up_text(b):
+    if not b['gives_up']:
+        return 'nothing the other builds guarantee'
+    names = [f"{r['cell']} (rank {r['rank']})" for r in b['gives_up'][:4]]
+    tail = ('' if len(b['gives_up']) <= 4
+            else f", +{len(b['gives_up']) - 4} more")
+    return ', '.join(names) + tail
+
+
+def builds_table_html(arm_builds, preset):
+    """The builds table for one preset, plus its per-build expanders."""
+    bl = arm_builds['presets'].get(preset)
+    if not bl or not bl['builds']:
+        return ''
+    n_dec = arm_builds['n_decision_cells']
+    head = ('<tr><th>Build</th><th>What it is</th><th>Spreads</th>'
+            '<th>Guarantees</th><th>Most-winning member</th>'
+            '<th>Stat-product rank-1</th><th>Gives up</th></tr>')
+    rows = []
+    for i, b in enumerate(bl['builds']):
+        mw = b['most_winning_member']
+        rows.append(
+            f'<tr data-build="{i}">'
+            f'<td><span class="wb-swatch" data-build="{i}"></span>'
+            f'{_esc(ROLE_NAME.get(b["role"], b["role"]))}</td>'
+            f'<td>{_esc(build_desc(b))}<br>'
+            f'<span class="wb-fid">{_esc(_fidelity_clause(b))}</span></td>'
+            f'<td>{brief._n(b["size"])}</td>'
+            f'<td>{b["n_guaranteed"]} of {n_dec}'
+            f' ({b["n_guaranteed_material"]} material,'
+            f' {b["n_scenarios_covered"]} shield '
+            f'{brief._noun(b["n_scenarios_covered"], "scenario")}'
+            + (f', {b["honesty"]["n_guaranteed_all_modes"]} holding in all '
+               f'{b["honesty"]["n_modes"]} opponent-IV modes'
+               if b['honesty']['n_modes'] > 1 else '')
+            + ')</td>'
+            f'<td>{_esc(mw["iv"])} -- {mw["wins"]} matchups</td>'
+            f'<td>{"in" if b["rank1_in"] else "out"}</td>'
+            f'<td>{_esc(_gives_up_text(b))}</td>'
+            f'</tr>')
+    out = ['<table class="wb-builds-table">', head] + rows + ['</table>']
+    obj = objectives_line(arm_builds, preset)
+    if obj:
+        out.append(f'<p class="wb-obj">{_esc(obj)}</p>')
+    for i, b in enumerate(bl['builds']):
+        out.append(
+            f'<details class="wb-build" data-build="{i}">'
+            f'<summary>{_esc(ROLE_NAME.get(b["role"], b["role"]))}: what it '
+            f'guarantees ({b["n_guaranteed"]}) and its members '
+            f'({brief._n(b["size"])})</summary>'
+            + _guarantee_rows_html(arm_builds, b)
+            + f'<p class="wb-mem-head">Members ({brief._n(b["size"])}), '
+              f'bulkiest first</p>'
+            + f'<div class="wb-mem" data-preset="{_esc(preset)}" '
+              f'data-build="{i}"></div>'
+            + '<p><button type="button" class="wb-btn" '
+              'onclick="if(window.wbCompareBuilds)wbCompareBuilds(this)">'
+              'Compare these</button>'
+              '<span class="wb-spreads"></span></p>'
+            + '</details>')
+    return ''.join(out)
+
+
+def builds_block_html(facts, arm_builds, all_facts):
+    """Every preset's builds block; the inactive ones start hidden."""
+    if not arm_builds or not arm_builds['presets']:
+        return ''
+    parts = ['<div class="wb-builds">']
+    default = (builds.PRESET_FLAT if builds.PRESET_FLAT in arm_builds['presets']
+               else next(iter(arm_builds['presets'])))
+    for key in arm_builds['presets']:
+        hide = '' if key == default else ' hidden'
+        parts.append(f'<div class="wb-preset" data-preset="{_esc(key)}"{hide}>')
+        parts.append('<p class="wb-builds-lead">'
+                     + _esc(builds_lead(facts, arm_builds, key, all_facts))
+                     + '</p>')
+        parts.append(builds_table_html(arm_builds, key))
+        parts.append('</div>')
+    parts.append(f'<p class="wb-weighting">{_esc(WEIGHTING_NOTE)}</p>')
+    parts.append('</div>')
+    return ''.join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -1431,8 +1848,11 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
     """
     facts = all_facts[arm]
     marker = TermMarker()
+    arm_builds = facts.get('_builds')
     pay = build_payload(facts, facts['_fields'], moveset_idx, mode=mode,
-                        all_facts=all_facts)
+                        all_facts=all_facts, arm_builds=arm_builds)
+    has_builds = 'bp' in pay
+    default_preset = pay['bp']['default'] if has_builds else None
 
     lead = ' '.join(lead_sentences(all_facts, arm))
     # A literal space after the title, not the 6px CSS margin alone: copy /
@@ -1443,11 +1863,14 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
              f'<details class="wb-root" id="{SECTION_ID}">',
              f'<summary class="wb-summary"><b>{_esc(SECTION_TITLE)}</b> '
              f'<span class="wb-head">'
-             f'{_esc(summary_sentence(facts, all_facts))}</span>'
+             f'{_esc(builds_summary(facts, arm_builds, default_preset, all_facts) if has_builds else summary_sentence(facts, all_facts))}</span>'
              f'</summary>',
              '<div class="wb-body">',
              marker.mark(f'<p class="wb-lead">{_esc(lead)}</p>'),
              marker.mark(brief.strip_html(facts['_strip']))]
+    if has_builds:
+        parts.append(marker.mark(
+            builds_block_html(facts, arm_builds, all_facts)))
 
     # ---- headline, with the opening sentence extended + the line expander --
     head = [relabel(x, all_facts) for x in facts['_headline']]
@@ -1504,8 +1927,10 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
         f'<select class="wb-scen" onchange="if(window.wbSelectView)'
         f'wbSelectView(this)">{scen_opts}</select></label>'
         '</div>'
-        '<div class="wb-panel"></div>'
-        f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
+        + ('<div class="wb-plotrow"><div class="wb-upset"></div>'
+           '<div class="wb-panel"></div></div>'
+           if has_builds else '<div class="wb-panel"></div>')
+        + f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
         f'<p class="wb-fixed">{_esc(fixed_note(facts, page_movesets))}</p>'
         '</div>')
 
@@ -1579,6 +2004,18 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
         facts['_fields'] = fields
         facts['_evidence'] = evidence
         facts['_masks'] = compute_masks(state, arm, facts, mode, level)
+        # v4: the builds. Computed per arm from the same blob the brief read
+        # (1-2 s on a 4096 x 9 x 76 grid), and NOT fatal on its own: a page
+        # whose builds fail to compute still ships the v3 section, with its
+        # line, its rungs and its trade, rather than losing the whole block.
+        try:
+            facts['_builds'] = builds.compute_builds(
+                state, arm, mode=mode, level=level, facts=facts)
+        except Exception as exc:                       # noqa: BLE001
+            facts['_builds'] = None
+            deep_dive_logging.get_logger().warning(
+                f"  Which one to build?: builds for moveset {arm} omitted "
+                f"({type(exc).__name__}: {exc})")
         all_facts.append(facts)
     # Every reader-facing string this module AUTHORS -- the lead, the note
     # under the panel, the clusters caption that stands in when the brief
@@ -1595,8 +2032,19 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # instance of that fixed phrase. Gating a restatement of an already-
     # gated sentence would fail on the duplicate, not on a defect.
     ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode}
-    own = [CLUSTERS_FALLBACK_CAPTION]
+    own = [CLUSTERS_FALLBACK_CAPTION, BUILDS_CAPTION, WEIGHTING_NOTE]
     for arm, facts in enumerate(all_facts):
+        ab = facts.get('_builds')
+        if ab:
+            # Every preset's sentences, for every preset -- gated whether or
+            # not the reader ever selects that preset, for the same reason
+            # the clusters fallback is: a gate that fires only on the branch
+            # a page happens to take is a gate that ships the bad string.
+            for key, block in builds_prose(facts, ab, all_facts).items():
+                own.extend(v for v in block.values() if v)
+            for key in ab['presets']:
+                own.append(builds_summary(facts, ab, key, all_facts))
+                own.append(builds_lead(facts, ab, key, all_facts))
         own.extend(lead_sentences(all_facts, arm))
         own.append(fixed_note(facts, page_movesets=2))
         if facts['floor'] is None:
@@ -1609,7 +2057,7 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
         # own sentence plus a tag, so only the tag is new; it is cheaper to
         # gate the whole set than to special-case it.
         for scen, entry in (facts.get('scenario_lines') or {}).items():
-            for view in ('line', 'rungs', 'clusters', 'rank1'):
+            for view in ('builds', 'line', 'rungs', 'clusters', 'rank1'):
                 own.append(scenario_caption(view, scen, entry, facts))
     brief.gate_words(own, ctx)
     brief.gate_caveat(own, ctx)

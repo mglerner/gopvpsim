@@ -125,6 +125,25 @@ DEGEN_MIN_PATTERNS = 8
 # collide with an '{a}v{b}' label.
 ALL_SCEN_KEY = "all"
 ALL_SCEN_DISPLAY = "all scenarios"
+# One combined entry per Build-criteria preset (2026-09-16): the knob's
+# "all scenarios" partition is concatenated over the scenarios that preset
+# WEIGHTS, not over every non-degenerate one. The default preset keeps the
+# bare ALL_SCEN_KEY -- its partition is unchanged, byte for byte -- and the
+# others get a suffixed key in the same keyspace. '__' cannot appear in an
+# '{a}v{b}' label, so nothing can collide.
+ALL_SCEN_PRESET_SEP = "__"
+
+
+def all_scen_key(preset=None):
+    """The `scens` key holding the combined partition for one preset."""
+    if not preset or preset == 'flat':
+        return ALL_SCEN_KEY
+    return f"{ALL_SCEN_KEY}{ALL_SCEN_PRESET_SEP}{preset}"
+
+
+def is_all_scen_key(label):
+    return label == ALL_SCEN_KEY or label.startswith(
+        ALL_SCEN_KEY + ALL_SCEN_PRESET_SEP)
 
 # Decimal places the PAGE's stat arrays carry: deep_dive.py builds
 # DATA.ivAtk / ivDef as ``round(m[5], 2)``, and this section's tree is fitted
@@ -930,7 +949,7 @@ def _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats, is_named):
 
 def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                              atk, def_, hp, is_named,
-                             scen_pairs=None):
+                             scen_pairs=None, presets=None):
     """Run the full pipeline for EVERY shield scenario the dive baked, in
     grid order, plus a combined "all scenarios" entry.
 
@@ -1016,6 +1035,57 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
     # order the 113-bit reading is K=3 / 0.395 / atk < 148.68 / 0.961, which
     # is the same geometry under a different linkage tie-break and is why
     # that order is not left to chance.)
+    combined_entry = _combined(wins_by_scen, atk, def_, hp, sp_rank, stats,
+                               is_named, min_cluster_ivs, len(pairs))
+    if combined_entry is not None:
+        out[ALL_SCEN_KEY] = combined_entry
+    # ---- one more combined entry per Build-criteria preset ----
+    # ``presets`` is [(key, tag, scenario labels or None)] from the caller's
+    # own preset table (scripts/deep_dive_builds.PRESETS); the default preset
+    # is skipped because ALL_SCEN_KEY above already IS its partition. A
+    # preset weighting a single scenario has no combination to make -- the
+    # caller resolves it to that scenario's own entry, see
+    # :func:`resolve_all_scen_keys`.
+    for key, tag, want in (presets or []):
+        _PRESET_TAGS[key] = tag
+        if all_scen_key(key) == ALL_SCEN_KEY:
+            continue
+        subset = [(lbl, W) for lbl, W in wins_by_scen if lbl in (want or ())]
+        if len(subset) < 2:
+            continue
+        entry = _combined(subset, atk, def_, hp, sp_rank, stats, is_named,
+                          min_cluster_ivs, len(subset))
+        if entry is not None:
+            out[all_scen_key(key)] = entry
+    return out
+
+
+def resolve_all_scen_keys(computed, presets):
+    """preset key -> the `scens` key its "all scenarios" view should draw.
+
+    A preset that weights two or more scenarios has its own combined entry.
+    One that weights exactly one (the 1v1-only preset) has no combination to
+    make, so its "all scenarios" view IS that scenario's own partition, and
+    the dropdown says so rather than drawing the nine-scenario partition
+    under a label claiming one.
+    """
+    out = {}
+    for key, _tag, want in presets:
+        k = all_scen_key(key)
+        if k in computed and 'res' in computed[k]:
+            out[key] = k
+            continue
+        live = [lbl for lbl in (want or []) if lbl in computed]
+        if len(live) == 1 and 'res' in computed[live[0]]:
+            out[key] = live[0]
+            continue
+        out[key] = ALL_SCEN_KEY if ALL_SCEN_KEY in computed else None
+    return out
+
+
+def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
+              min_cluster_ivs, n_total):
+    """The concatenated-fingerprint entry over a set of scenarios."""
     cf = concat_fingerprint(wins_by_scen)
     if cf["W"] is not None:
         W_all = cf["W"]
@@ -1031,18 +1101,17 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                 "excluded": list(cf["excluded"]),
                 "n_bits": n_bits,
                 "bit_scen": list(cf["bit_scen"]), "bit_opp": list(bit_opp),
-                "n_total": len(pairs)}
+                "n_total": n_total}
         if entry is None:
-            out[ALL_SCEN_KEY] = {
+            return {
                 "reason": fragmented_reason(
                     n_bits, n_patterns_all, min_cluster_ivs,
                     what="concatenated marginal-matchup bits"),
                 "degenerate": False, "combined": meta,
                 "n_sharp": n_bits, "n_patterns": n_patterns_all}
-        else:
-            entry["combined"] = meta
-            out[ALL_SCEN_KEY] = entry
-    return out
+        entry["combined"] = meta
+        return entry
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1121,13 +1190,25 @@ def _swatch(c):
             f'margin-right:4px"></span>')
 
 
+# preset key -> the words the display label carries ("even shields"). Filled
+# by :func:`compute_matchup_clusters` from the caller's own preset table, so
+# this module never re-spells a preset name.
+_PRESET_TAGS = {}
+
+
 def _scen_display(label):
     """Dropdown / headline text for a scenario key.
 
     One definition for both surfaces, so the selector and the block it
     selects cannot spell the same scenario two ways.
     """
-    return ALL_SCEN_DISPLAY if label == ALL_SCEN_KEY else f'{label} shields'
+    if label == ALL_SCEN_KEY:
+        return ALL_SCEN_DISPLAY
+    if is_all_scen_key(label):
+        tag = _PRESET_TAGS.get(label.split(ALL_SCEN_PRESET_SEP, 1)[1],
+                               label.split(ALL_SCEN_PRESET_SEP, 1)[1])
+        return f'{ALL_SCEN_DISPLAY} ({tag})'
+    return f'{label} shields'
 
 
 def _scen_short_note(entry):
@@ -1390,7 +1471,7 @@ def _flip_table_html(entry, opp_names, has_anchors):
 
 def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                    data_obj, opp_label, moveset_label, resolved_anchors,
-                   bait_label='bait-selective'):
+                   bait_label='bait-selective', presets=None):
     """Render the Matchup clusters section (HTML string).
 
     Replaces the retired experimental banding/gap-cluster block as the first
@@ -1422,7 +1503,8 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
 
     computed = compute_matchup_clusters(
         scores_flat, nIvs, nS, nO, scenarios,
-        data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named)
+        data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named,
+        presets=presets)
     if not computed:
         return ('<div class="dd-section" id="dd-matchup-clusters">'
                 '<!-- matchup-clusters:v1 -->'
@@ -1432,6 +1514,14 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                 '</p></div>\n')
 
     scen_labels = list(computed.keys())
+    # The per-preset combined entries are NOT their own dropdown options: the
+    # "all scenarios" option re-labels itself with the page's Build criteria
+    # preset and selects the matching partition. They still get their own
+    # server-side block, because the tables under the panels have to be the
+    # tables for the partition on screen.
+    option_labels = [lbl for lbl in scen_labels
+                     if lbl == ALL_SCEN_KEY or not is_all_scen_key(lbl)]
+    all_by_preset = resolve_all_scen_keys(computed, presets or [])
     # Default view: the combined entry when it clustered (it is the
     # section's own question -- which fights do you win across every shield
     # state -- asked once), then 1v1 (the status quo default, and the
@@ -1451,7 +1541,15 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # in `degenerate` so the mini-grid can title them honestly without the
     # overlay ever finding a labelless entry.
     payload = {"palette": CLUSTER_PALETTE, "default": default_scen,
-               "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {}}
+               "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {},
+               # preset key -> the `scens` key its "all scenarios" view
+               # draws, plus the label the option carries while it is
+               # selected. Both from Python: the JS re-labels the option, it
+               # does not compose the words.
+               "allByPreset": all_by_preset,
+               "allLabelByPreset": {k: _scen_display(v)
+                                    for k, v in all_by_preset.items()
+                                    if v is not None}}
     for lbl, entry in computed.items():
         disp_lbl = _scen_display(lbl)
         if "res" not in entry:
@@ -1519,7 +1617,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
         f'{_esc(_scen_display(lbl))}'
         f'{_esc(_scen_option_note(computed[lbl]))}</option>'
-        for lbl in scen_labels)
+        for lbl in option_labels)
     parts.append(
         '<label style="font-size:13px">Shield scenario: '
         '<select class="dd-mc-scen" onchange="if(window.mcSelectScenario)'
