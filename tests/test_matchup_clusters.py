@@ -1217,8 +1217,18 @@ def test_a_preset_partition_gets_its_own_key_and_display_name():
     assert mc.all_scen_key('even') == 'all__even'
     assert mc.is_all_scen_key('all__even') and mc.is_all_scen_key('all')
     assert not mc.is_all_scen_key('1v1')
-    _render_with_presets()          # fills the preset-tag table
-    assert mc._scen_display('all__even') == 'all scenarios (even shields)'
+    # Label text is a pure function of its arguments: BEFORE the 2026-09-16
+    # review it read a module-global table that only a prior
+    # compute_matchup_clusters call filled, so this same call returned the
+    # raw key 'even' when it ran first. No render has happened in this test.
+    tags = mc.preset_tags(_PRESETS)
+    assert tags == {'flat': 'all shields, equal', 'even': 'even shields',
+                    'one_one': '1v1 only'}
+    assert mc._scen_display('all__even', tags) == 'all scenarios (even shields)'
+    # and it stays that way after a render, in either call order
+    _render_with_presets()
+    assert mc._scen_display('all__even', tags) == 'all scenarios (even shields)'
+    assert mc._scen_display('all__even') == 'all scenarios (even)'
 
 
 def test_a_single_scenario_preset_resolves_to_that_scenarios_partition():
@@ -1232,7 +1242,13 @@ def test_a_single_scenario_preset_resolves_to_that_scenarios_partition():
     assert pay['allByPreset']['flat'] == mc.ALL_SCEN_KEY
     assert pay['allByPreset']['even'] == 'all__even'
     assert pay['allByPreset']['one_one'] == '1v1'
-    assert pay['allLabelByPreset']['one_one'] == '1v1 shields'
+    # NOT the bare '1v1 shields': that put two entries in the dropdown
+    # reading as the same scenario (2026-09-16 review). The option says
+    # instead that "all scenarios" resolves to 1v1 under this preset.
+    assert (pay['allLabelByPreset']['one_one']
+            == 'all scenarios = 1v1 shields here')
+    assert pay['allLabelByPreset']['flat'] == 'all scenarios'
+    assert pay['allLabelByPreset']['even'] == 'all scenarios (even shields)'
     for key, mapped in pay['allByPreset'].items():
         assert mapped in pay['scens'], (key, mapped)
 

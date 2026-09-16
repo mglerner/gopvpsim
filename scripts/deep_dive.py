@@ -1364,7 +1364,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               opp_movesets=None, mechanics='legacy',
                               best_buddy=None, slayer_iter_result_l51=None,
                               cup=None, cup_label=None,
-                              which_build_html=None):
+                              which_build_html=None,
+                              which_build_presets=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2297,6 +2298,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += which_build_html
 
     # Controls
+    # The Build-criteria presets this page's section actually produced, in
+    # the preset table's own order. Empty when there is no section, or when
+    # the section rendered but compute_builds failed: the knob and the
+    # weighted Shields entry both hang off this, never off "a section exists".
+    _live_presets = [k for k, _l, _s, _t in _build_presets()
+                     if k in set(which_build_presets or ())]
     html += '<div class="controls" id="dd-scatter">\n'
     if split_info is not None:
         # URL-navigating dropdown: onchange jumps to a sibling HTML file
@@ -2330,24 +2337,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # entry below cannot be read as the same thing: the weighted one
         # follows the page's Build criteria preset, this one never moves.
         html += '    <option value="avg">All (equal weight)</option>\n'
-        if which_build_html:
-            html += ('    <option value="wbavg">All (by build '
-                     'criteria)</option>\n')
+        html += _wbavg_option(_live_presets)
         for si, scen in enumerate(shield_scenarios):
             sel = ' selected' if n_scenarios == 1 else ''
             html += (f'    <option value="{si}"{sel}>'
                      f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
-        # "Build criteria": which shield scenarios the build ranking counts.
-        # Three fixed presets, no free weights (Michael's 2026-09-16 call).
-        # Emitted only on a page that HAS the section the knob drives.
-        if which_build_html:
-            html += ('  <label>Build criteria: '
-                     '<select id="build-criteria-sel" '
-                     'onchange="wbSetPreset(this.value)">\n')
-            for _k, _lbl, _scens, _tag in _build_presets():
-                html += f'    <option value="{_k}">{_bc_esc(_lbl)}</option>\n'
-            html += '  </select></label>\n'
+        html += _build_criteria_select(_live_presets)
 
     if len(opp_iv_modes) > 1:
         _base_modes = list(dict.fromkeys(
@@ -2418,17 +2414,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # back up to the control strip to pin a specific IV.)
     # (Top-IVs table controls live next to the table itself - see the
     # control strip rendered just before <div id="summary"> below.)
-    if which_build_html:
-        # What the knob does, in one line, right where the knob is. It drives
-        # exactly three things; every other section on this page counts all
-        # nine shield scenarios equally, and a reader who cannot see that
-        # boundary will read the whole page as re-weighted.
-        html += ('  <span style="font-size:11px;color:var(--text-muted);'
-                 'margin-left:8px;flex-basis:100%">Build criteria weights '
-                 'shield scenarios in: Which one to build?, the '
-                 'all-scenarios clusters, and Shields = All (by build '
-                 'criteria). Every other section counts all nine shield '
-                 'scenarios equally.</span>\n')
+    html += _build_criteria_note(_live_presets)
     if thresholds:
         html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
@@ -3468,10 +3454,60 @@ def _bc_esc(s):
     return escape(str(s), quote=True)
 
 
+# The three Build-criteria surfaces in the controls strip, as functions of
+# the presets THIS PAGE'S section actually built. Split out of
+# generate_interactive_html so the emitted markup is testable without a full
+# dive render: the 2026-09-16 review found the knob offering presets the
+# payload had dropped, which left the section, the clusters view and the
+# Shields entry in three different states with nothing on the page saying so.
+
+def _wbavg_option(live_presets):
+    """The Shields dropdown's weighted entry. 'avg' above it never moves."""
+    if not live_presets:
+        return ''
+    return '    <option value="wbavg">All (by build criteria)</option>\n'
+
+
+def _build_criteria_select(live_presets):
+    """The knob, listing only the presets this page can actually switch to."""
+    if not live_presets:
+        return ''
+    out = ('  <label>Build criteria: <select id="build-criteria-sel" '
+           'onchange="wbSetPreset(this.value)">\n')
+    for key, label, _scens, _tag in _build_presets():
+        if key not in live_presets:
+            continue
+        out += f'    <option value="{key}">{_bc_esc(label)}</option>\n'
+    return out + '  </select></label>\n'
+
+
+def _build_criteria_note(live_presets):
+    """What the knob drives, in one line, right where the knob is.
+
+    The closing sentence used to read "every other section counts all nine
+    shield scenarios equally", which is not true of Threats / Rank Volatility
+    / Matchup clusters -- each has its own per-scenario views. What IS true
+    is that nothing else re-weights by this knob.
+    """
+    if not live_presets:
+        return ''
+    return ('  <span style="font-size:11px;color:var(--text-muted);'
+            'margin-left:8px;flex-basis:100%">Build criteria weights '
+            'shield scenarios in: Which one to build?, the all-scenarios '
+            'clusters, and Shields = All (by build criteria). Nothing else '
+            'on this page is re-weighted by it.</span>\n')
+
+
 def _which_build_sections(state):
     """Pre-render the "Which one to build?" section for every moveset.
 
-    Returns ``{arm index: html}``. The brief is computed from the replay
+    Returns ``({arm index: html}, {arm index: [live preset key]})``. The
+    preset keys are what the controls strip's Build-criteria dropdown
+    offers: a preset that weights no scenario this dive baked never reaches
+    the payload, so an option for it would leave three surfaces in a state
+    nothing on the page explains.
+
+    The brief is computed from the replay
     BLOB (scripts/deep_dive_brief.py reads the whole score cube out of it),
     so this is the only layer that can build it: ``generate_interactive_html``
     sees one file's slice of the moveset data and never the blob.
@@ -3492,7 +3528,7 @@ def _which_build_sections(state):
     if not blob_path:
         logger.info("  Which one to build?: skipped (no replay blob path on "
                     "this render; the brief is computed from the blob)")
-        return {}
+        return {}, {}
     # How many movesets each FILE will embed. Split mode gives every file
     # exactly one; a single-file dive embeds them all behind a Moveset
     # dropdown this section does not follow, and the note under the panel
@@ -3503,13 +3539,17 @@ def _which_build_sections(state):
     try:
         import deep_dive_which_build as which_build
         all_facts = which_build.prepare(state, blob_path)
-        return {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
+        html = {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
                                               page_movesets=per_file)
                 for arm in range(len(all_facts))}
+        presets = {arm: list((all_facts[arm].get('_builds') or {})
+                             .get('presets', {}))
+                   for arm in range(len(all_facts))}
+        return html, presets
     except Exception as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
-        return {}
+        return {}, {}
 
 
 def render_dive_html(state):
@@ -3526,7 +3566,7 @@ def render_dive_html(state):
             state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
-    which_build = _which_build_sections(state)
+    which_build, which_build_presets = _which_build_sections(state)
     if state['split_movesets'] and len(moveset_data) > 1:
         # Per-moveset split: emit N files, one per moveset. The
         # filesystem plan is computed up-front so every file
@@ -3578,6 +3618,7 @@ def render_dive_html(state):
                 cup=state.get('cup'),
                 cup_label=state.get('cup_label'),
                 which_build_html=which_build.get(mi),
+                which_build_presets=which_build_presets.get(mi),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -3612,6 +3653,7 @@ def render_dive_html(state):
             cup=state.get('cup'),
             cup_label=state.get('cup_label'),
             which_build_html=which_build.get(0),
+            which_build_presets=which_build_presets.get(0),
         )
 
 

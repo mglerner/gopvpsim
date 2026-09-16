@@ -1226,7 +1226,10 @@ def test_section_is_emitted_above_the_scatter_controls():
 def test_section_is_omitted_without_a_blob_path():
     """No blob, no brief -- and the no-op is logged, never silent."""
     import deep_dive
-    assert deep_dive._which_build_sections({}) == {}
+    # Two maps now: the rendered sections and the presets each arm's
+    # section actually built (the controls strip's Build-criteria dropdown
+    # lists the second, so a dive that produced no builds offers no knob).
+    assert deep_dive._which_build_sections({}) == ({}, {})
 
 
 # ---------------------------------------------------------------------------
@@ -1723,7 +1726,7 @@ def test_the_control_moves_the_panel_and_nothing_else():
             + _fn_body(raw, stripped, '_wbScen'))
     touched = set(re.findall(r"querySelector(?:All)?\(\s*'([^']+)'", body))
     assert touched == {'.wb-panel', '.wb-caption', 'select.wb-view',
-                       'select.wb-scen', '.wb-upset',
+                       'select.wb-scen', '.wb-upset', '.wb-upset-caption',
                        '.wb-preset:not([hidden]) .wb-mem'}, touched
     # Positive control: the scan sees the selectors that ARE there, so an
     # empty match set cannot pass this silently.
@@ -2477,8 +2480,14 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     # one table per preset, each with the seven columns the reader reads
     assert html.count('<table class="wb-builds-table">') == 3
     for col in ('Build', 'What it is', 'Spreads', 'Guarantees',
-                'Most-winning member', 'Stat-product rank-1', 'Gives up'):
+                'Most-winning member', 'Stat-product rank-1',
+                'Gives up (guaranteed by another build, not this one)'):
         assert f'<th>{col}</th>' in html, col
+    # Under a preset that counts fewer than all nine scenarios the two
+    # count-bearing headers say which scale their numbers are on; the
+    # default preset's table keeps the short headers above.
+    assert '<th>Guarantees (in the counted shields / overall)</th>' in html
+    assert '<th>Most-winning member (in 1v1 shields)</th>' in html
     # the per-build expanders and their members box
     assert html.count('<details class="wb-build"') >= 6
     assert html.count('class="wb-mem"') >= 6
@@ -2514,8 +2523,13 @@ def test_guarantee_lists_are_sorted_by_outside_rate_and_capped(shadow_sableye):
         outs = [r['outside_wr'] for r in rows]
         assert outs == sorted(outs), (scen, outs)
     html = W.section_html(all_facts, 0)
-    assert 'more in ' in html            # the "+N more" control
-    assert 'are near-free' in html
+    # The "+N more" control is a BUTTON over rows that already shipped
+    # hidden, not a dead label: every one of them has its rows.
+    shown = [int(x) for x in re.findall(r'wbMoreRows\(this\)">Show (\d+) more',
+                                        html)]
+    assert shown, 'no "+N more" control was rendered at all'
+    assert sum(shown) == html.count('<li class="wb-hid" hidden>')
+    assert 'near-free' in html
     # a near-free cell is counted, never listed
     listed = re.findall(r'-- outside (\d+)%', html)
     assert listed, 'no guarantee row was printed at all'
@@ -2532,8 +2546,19 @@ def test_the_objectives_line_is_printed_only_when_they_disagree(shadow_sableye):
         split = (block['objectives'] or {}).get('split')
         assert bool(line) == bool(split), (key, split, line)
         if line:
-            assert 'more matchups overall' in line
-            assert 'more decision matchup' in line
+            obj = block['objectives']
+            assert line.startswith('The two objectives disagree here:')
+            # the wins half carries its own denominator, and the cells half
+            # the count the RANKING used -- a reader who subtracts the
+            # table's columns has to land inside this sentence
+            mw = next(b for b in block['builds']
+                      if b['combo'] == obj['best_wins_build']
+                      )['most_winning_member']
+            assert f"of {mw['denominator']}" in line
+            assert 'decision matchup' in line
+            flat = all(w > 0 for w in block['weights'])
+            if not flat:
+                assert 'over all' in line, line
 
 
 @pytest.mark.local_artifacts
@@ -2565,3 +2590,157 @@ def test_the_glossary_defines_every_v4_term():
     for term in ('build', 'fork', 'guaranteed', 'outside rate',
                  'decision matchup', 'material', 'build criteria'):
         assert glossary.definition(term), term
+
+
+# ---------------------------------------------------------------------------
+# 10. v4 round 2: the preset's own scale in the prose (2026-09-16 review)
+# ---------------------------------------------------------------------------
+
+def test_the_term_marker_does_not_mark_inside_a_marked_term():
+    """Nested <abbr> tooltips: the INNER title is what a hover shows.
+
+    "Build criteria" was claimed first, then the shorter "build" re-matched
+    the word inside the span already inserted for it, so hovering "Build" in
+    "Build criteria:" showed the build definition. Splitting on tags is not
+    enough -- the substitution puts the claimed text in its own text piece.
+    """
+    out = W.TermMarker().mark('<p>Build criteria decide the build</p>')
+    assert out.count('<abbr') == 2
+    assert '<abbr class="wb-term" title="' in out
+    # no abbr opens before the previous one closes
+    depth, worst = 0, 0
+    for tok in re.findall(r'</?abbr', out):
+        depth += 1 if tok == '<abbr' else -1
+        worst = max(worst, depth)
+    assert worst == 1, out
+    # the long term kept its own definition
+    first = re.search(r'<abbr class="wb-term" title="([^"]*)">Build criteria',
+                      out)
+    assert first and first.group(1) == glossary.definition('build criteria')
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_narrow_preset_leads_with_the_count_its_ranking_used(shadow_sableye):
+    """The summary, the table and the objectives sentence all quote the
+    preset's own denominator first, then all nine in brackets.
+
+    Pre-fix the summary and the table printed "49 of the 87" (all nine)
+    while the ranking that chose those 292 spreads counted 13 of 16, and the
+    sentence between them quoted the weighted gap -- so a reader subtracting
+    the table's columns got a number the sentence did not contain.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    one = ab['presets'][builds_mod.PRESET_ONE]
+    assert one['n_decision_weighted'] == 16
+    assert ab['n_decision_cells'] == 87
+    line = W.builds_summary(all_facts[0], ab, builds_mod.PRESET_ONE, all_facts)
+    assert '13 of the 16 decision matchups in 1v1 shields' in line, line
+    assert '(49 of all 87)' in line, line
+    table = W.builds_table_html(ab, builds_mod.PRESET_ONE)
+    assert '13 of 16 in 1v1 shields; 49 of 87 overall' in table
+    # the default preset has ONE scale and prints one number
+    flat_line = W.builds_summary(all_facts[0], ab, builds_mod.PRESET_FLAT,
+                                 all_facts)
+    assert '55 of the 87 decision matchups' in flat_line
+    assert 'of all 87' not in flat_line
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_lead_says_when_the_primary_only_won_a_tie(shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    even = W.builds_lead(all_facts[0], ab, builds_mod.PRESET_EVEN, all_facts)
+    assert 'tie at 29 guaranteed matchups in 0v0 / 1v1 / 2v2 shields' in even
+    assert 'Build 1 is the largest of them (92 spreads)' in even
+    # and the count the ranking uses is named where the preset is named
+    assert '43 of those sit in 0v0 / 1v1 / 2v2 shields' in even
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_summary_always_says_where_rank1_sits(shadow_sableye):
+    """Under the even preset the rank-1 holder is the THIRD build, which the
+    round-1 summary dropped entirely (it named builds 1 and 2 only)."""
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    for key, block in ab['presets'].items():
+        line = W.builds_summary(all_facts[0], ab, key, all_facts)
+        assert 'stat-product rank-1' in line, key
+        holder = next((i for i, b in enumerate(block['builds'])
+                       if b['rank1_in']), None)
+        if holder is None:
+            assert 'is in none of them' in line, key
+    even = W.builds_summary(all_facts[0], ab, builds_mod.PRESET_EVEN,
+                            all_facts)
+    assert 'sits in a third, 114-spread build' in even, even
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_staircase_summary_prints_a_range_not_undefined_notation(
+        shadow_sableye):
+    """"Def >= d(HP)" is notation nothing on the page defines, and the
+    collapsed line is what most readers act on."""
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    stairs = [b for block in ab['presets'].values() for b in block['builds']
+              if (b['description'] or {}).get('steps')]
+    assert stairs, 'no staircase build on this blob to check'
+    for b in stairs:
+        short = W.build_desc(b, steps=False)
+        assert 'd(HP)' not in short, short
+        assert 'depending on HP' in short and 'steps, in the table' in short
+        # the printed band CONTAINS every step of the staircase
+        lo, hi = re.search(r'Def >= ([\d.]+)-([\d.]+) ', short).groups()
+        defs = [d for _h, d, _n in b['description']['steps']]
+        assert float(lo) <= min(defs) and float(hi) >= max(defs)
+        # the table still prints the steps themselves
+        assert '->' in W.build_desc(b, steps=True)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_outside_rate_is_named_on_the_page_and_reaches_the_terms_list(
+        shadow_sableye):
+    """The rows say "outside 40%" and the glossary had an "outside rate"
+    entry the page could never reach, because it never spelled the term."""
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    assert 'Sorted by outside rate:' in html
+    assert re.search(r'<abbr class="wb-term" title="[^"]*">outside rate</abbr>',
+                     html), 'the term was printed but never marked'
+    terms = html[html.index('Terms used here'):]
+    assert '<dt>outside rate</dt>' in terms
+    # positive control: an unrelated v4 term is in the same list, so an
+    # empty Terms block cannot pass this
+    assert '<dt>decision matchup</dt>' in terms
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_negative_page_bridges_its_summary_to_its_builds():
+    """The v3 "zero matchups wide" sentence is about TOTAL wins and stays
+    (Michael's call). Standing alone beside a builds table guaranteeing 29
+    of 51 decision matchups it read as a contradiction."""
+    path = require_blob(MELMETAL)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))
+    arm = next(i for i, f in enumerate(all_facts) if f['floor'] is None)
+    ab = all_facts[arm]['_builds']
+    assert ab and ab['presets'], 'this arm no longer builds anything'
+    for key in ab['presets']:
+        line = W.builds_summary(all_facts[arm], ab, key, all_facts)
+        assert line.startswith(f'[{builds_mod.PRESET_TAG[key]}]'), line
+        assert 'Which matchups you win still moves:' in line, key
+        lead = W.builds_lead(all_facts[arm], ab, key, all_facts)
+        assert 'no single-stat line' in lead
+        assert 'is guaranteed to win -- and that one does move' in lead
+    # every preset lands on the same regions here, and the lead says so
+    assert ab['presets_identical'] is True
+    assert ('The Build criteria preset does not change which builds this '
+            'moveset gets.' in W.builds_lead(all_facts[arm], ab,
+                                             builds_mod.PRESET_FLAT,
+                                             all_facts))

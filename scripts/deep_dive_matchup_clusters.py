@@ -1047,7 +1047,6 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
     # caller resolves it to that scenario's own entry, see
     # :func:`resolve_all_scen_keys`.
     for key, tag, want in (presets or []):
-        _PRESET_TAGS[key] = tag
         if all_scen_key(key) == ALL_SCEN_KEY:
             continue
         subset = [(lbl, W) for lbl, W in wins_by_scen if lbl in (want or ())]
@@ -1190,13 +1189,18 @@ def _swatch(c):
             f'margin-right:4px"></span>')
 
 
-# preset key -> the words the display label carries ("even shields"). Filled
-# by :func:`compute_matchup_clusters` from the caller's own preset table, so
-# this module never re-spells a preset name.
-_PRESET_TAGS = {}
+def preset_tags(presets):
+    """preset key -> the words its display label carries ("even shields").
+
+    Passed down explicitly rather than stashed on the module: label text
+    that depended on process-global state seeded by an earlier call made
+    :func:`_scen_display` return a different string depending on call order
+    (2026-09-16 review; the test had to prime the table before asserting).
+    """
+    return {k: tag for k, tag, _want in (presets or [])}
 
 
-def _scen_display(label):
+def _scen_display(label, tags=None):
     """Dropdown / headline text for a scenario key.
 
     One definition for both surfaces, so the selector and the block it
@@ -1205,10 +1209,28 @@ def _scen_display(label):
     if label == ALL_SCEN_KEY:
         return ALL_SCEN_DISPLAY
     if is_all_scen_key(label):
-        tag = _PRESET_TAGS.get(label.split(ALL_SCEN_PRESET_SEP, 1)[1],
-                               label.split(ALL_SCEN_PRESET_SEP, 1)[1])
-        return f'{ALL_SCEN_DISPLAY} ({tag})'
+        key = label.split(ALL_SCEN_PRESET_SEP, 1)[1]
+        return f'{ALL_SCEN_DISPLAY} ({(tags or {}).get(key, key)})'
     return f'{label} shields'
+
+
+def _all_labels(all_by_preset, tags):
+    """The "all scenarios" option's label while each preset is selected.
+
+    A preset that weights ONE scenario resolves to that scenario's own
+    partition, and labelling the option "1v1 shields" put two entries in the
+    dropdown reading as the same scenario (2026-09-16 review). The option
+    says instead that "all scenarios" IS that scenario under this preset.
+    """
+    out = {}
+    for k, v in all_by_preset.items():
+        if v is None:
+            continue
+        if is_all_scen_key(v):
+            out[k] = _scen_display(v, tags)
+        else:
+            out[k] = f'{ALL_SCEN_DISPLAY} = {_scen_display(v, tags)} here'
+    return out
 
 
 def _scen_short_note(entry):
@@ -1263,8 +1285,8 @@ def _entry_opp_names(entry, disp):
             for o, lbl in zip(comb["bit_opp"], comb["bit_scen"])]
 
 
-def _scen_headline(label, entry, nO):
-    disp = _scen_display(label)
+def _scen_headline(label, entry, nO, tags=None):
+    disp = _scen_display(label, tags)
     if "reason" in entry:
         # Every reason string is a finding-first sentence carrying its own
         # counts (see degenerate_reason / fragmented_reason), so nothing is
@@ -1308,7 +1330,7 @@ def _scen_headline(label, entry, nO):
             f'K={res["k"]} clusters ({sil_txt}){root_txt}.</p>')
 
 
-def _sharpest_signpost(computed):
+def _sharpest_signpost(computed, tags=None):
     """Point the reader at the sharpest SINGLE scenarios, from the combined block.
 
     The combined view is the section's default and is routinely the LEAST
@@ -1336,7 +1358,7 @@ def _sharpest_signpost(computed):
     for sil, lbl, e in ranked[:2]:
         split = e.get("root_split")
         n = len(e["res"]["sharp"])
-        bits.append(f'{_esc(_scen_display(lbl))} (K={e["res"]["k"]}, '
+        bits.append(f'{_esc(_scen_display(lbl, tags))} (K={e["res"]["k"]}, '
                     f'silhouette {sil:.2f} over {n} sharp '
                     f'{"marginal" if n == 1 else "marginals"}'
                     + (f', split {_esc(split)}' if split else '') + ')')
@@ -1513,6 +1535,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                 'available: this dive baked no shield scenarios to cluster.'
                 '</p></div>\n')
 
+    _tags = preset_tags(presets)
     scen_labels = list(computed.keys())
     # The per-preset combined entries are NOT their own dropdown options: the
     # "all scenarios" option re-labels itself with the page's Build criteria
@@ -1547,11 +1570,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                # selected. Both from Python: the JS re-labels the option, it
                # does not compose the words.
                "allByPreset": all_by_preset,
-               "allLabelByPreset": {k: _scen_display(v)
-                                    for k, v in all_by_preset.items()
-                                    if v is not None}}
+               "allLabelByPreset": _all_labels(all_by_preset, _tags)}
     for lbl, entry in computed.items():
-        disp_lbl = _scen_display(lbl)
+        disp_lbl = _scen_display(lbl, _tags)
         if "res" not in entry:
             payload["degenerate"][lbl] = {
                 "display": disp_lbl, "reason": entry["reason"],
@@ -1615,7 +1636,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # scenario selector (server-side blocks + client panels both follow it)
     opts = "".join(
         f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
-        f'{_esc(_scen_display(lbl))}'
+        f'{_esc(_scen_display(lbl, _tags))}'
         f'{_esc(_scen_option_note(computed[lbl]))}</option>'
         for lbl in option_labels)
     parts.append(
@@ -1675,9 +1696,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         short_form = lbl != ALL_SCEN_KEY and is_all_scen_key(lbl)
         parts.append(f'<div class="dd-mc-scen-block" data-scen="{lbl}" '
                      f'style="display:{vis}">')
-        parts.append(_scen_headline(lbl, entry, nO))
+        parts.append(_scen_headline(lbl, entry, nO, _tags))
         if lbl == ALL_SCEN_KEY:
-            parts.append(_sharpest_signpost(computed))
+            parts.append(_sharpest_signpost(computed, _tags))
         if "res" in entry:
             names = _entry_opp_names(entry, disp)
             parts.append(_cluster_table(entry, names))
