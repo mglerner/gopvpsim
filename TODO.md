@@ -841,6 +841,21 @@ stays at the default preset. Placeholder "lead-and-closer" prior: skipped.
 Gate before the rebake: Michael reviews the preview renders (Sableye pair
 + Melmetal) and says go.
 
+RANKINGS-VINTAGE SENSITIVITY (found 2026-09-16 fixing test drift on wotb-v4,
+commit 9adc094): opponent PvPoke ranks are a LIVE read at render time
+(build_opp_meta_ranks -> get_rankings_for). The 2026-09-15 refresh moved
+Annihilape 30 -> 31 and Charjabug 60 -> 41; with RANK_GATE = 50 the newly
+eligible Charjabug cells deleted Melmetal's floor. So a rankings refresh can
+change a page's verdict with no change in sim data. Tests now freeze a
+rankings fixture (tests/fixtures/pvpoke_rankings_20260908.json, great+ultra
+only; cups raise loudly). For the next rebake: run through the chain wrapper
+/ TTL keeper so all 135 pages see ONE rankings vintage (the direct
+run_website_dives.py launch on 2026-09-12 did not). Proper fix, before the
+bake after this one: stamp opponent facts (ranks, default builds) into the
+blob at dive time (expert_verdict_plan Phase 0 "blob stamping", deferred), so
+replay re-renders cannot drift. Other test modules that read live rankings
+were not audited.
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
