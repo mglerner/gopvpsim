@@ -1533,7 +1533,10 @@ ROLE_NAME = {'primary': 'Build 1 (primary)',
              'rank1': 'Build 3 (bulk)'}
 ROLE_SHORT = {'primary': 'primary', 'fork': 'fork', 'rank1': 'bulk'}
 # Guarantee rows printed per shield scenario before the "+N more" control.
-GUARANTEE_CAP = 5
+# Four, not more: three presets x up to three builds x up to nine shield
+# scenarios means every extra row is emitted ~80 times on one file, and the
+# counts a reader is actually comparing are in the table above the lists.
+GUARANTEE_CAP = 4
 # A cell the rest of the grid wins at more than this is near-free: the build
 # is not what got it. Counted in a trailing sentence rather than listed.
 NEAR_FREE = 0.90
