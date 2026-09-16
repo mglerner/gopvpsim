@@ -32,7 +32,7 @@ TERMS = {
         "attack stat goes first.",
     'stat-product rank-1':
         "The IV spread with the largest attack x defense x HP at this "
-        "league's CP cap -- the bulk-first build most IV tools list first.",
+        "league's CP cap -- the bulk-first spread most IV tools list first.",
     # BOTH directions, deliberately: a gate is one-sided either way round
     # (necessary OR sufficient), and a definition naming only the necessary
     # one would be wrong on every page whose gate is the sufficient kind.
@@ -50,6 +50,30 @@ TERMS = {
     'stat product':
         "Attack x defense x HP at the league's CP cap, the usual one-number "
         "summary of an IV spread.",
+    # ---- the v4 "Which one to build?" builds vocabulary ----
+    'build':
+        "A region of the IV grid you can aim at -- every spread that clears "
+        "the same combination of thresholds, at least fifty of them.",
+    'fork':
+        "A second region with no spread in common with the first, whose "
+        "members all win a different set of matchups, so the two are a real "
+        "choice rather than two spellings of one.",
+    'decision matchup':
+        "A (shield scenario, opponent) pair the IV choice decides: a top-50 "
+        "opponent that some spreads on this grid beat and others lose to.",
+    'guaranteed':
+        "Won by every single spread in the region, not by most of them.",
+    'outside rate':
+        "How often the spreads left OUT of a region win the same matchup "
+        "its own members all win -- one the rest of the grid takes anyway "
+        "is not what you bought.",
+    'material':
+        "A matchup no single-stat threshold of a hundred or more spreads "
+        "wins more than 95% of the time, so it takes two stats at once to "
+        "claim it.",
+    'build criteria':
+        "Which shield scenarios the ranking counts: all nine equally, the "
+        "three even ones, or 1v1 alone.",
 }
 
 # term -> "<guide-slug>#<heading-anchor>", relative to the guides directory.

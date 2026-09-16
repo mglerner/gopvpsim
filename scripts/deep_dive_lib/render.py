@@ -1359,10 +1359,17 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # score-gap cluster block, 2026-07; see deep_dive_matchup_clusters.py) --
     _mc_bait = ('no-bait' if parse_mode(opp_iv_mode)[1] == 'nobait'
                 else 'bait-selective')
+    # The Build-criteria presets, so the section can carry one combined
+    # "all scenarios" partition per preset (2026-09-16). The table itself
+    # lives with the builds module -- one definition of the three presets on
+    # the page -- and is passed in rather than imported there, which would
+    # make the clusters module depend on the module that depends on IT.
+    import deep_dive_builds as _builds
+    _mc_presets = [(k, tag, scens) for k, _lbl, scens, tag in _builds.PRESETS]
     analysis_parts.append(matchup_clusters.render_section(
         scores_flat, nIvs, nS, nO, scenarios, opponents, data_obj,
         opp_label, moveset_label, resolved_anchors_top,
-        bait_label=_mc_bait))
+        bait_label=_mc_bait, presets=_mc_presets))
 
     analysis_parts.append(rendering.render_analysis_volatility_html(
         data_obj, nIvs, nS, scenarios, scene_ranks, avg_ranks, ranked,

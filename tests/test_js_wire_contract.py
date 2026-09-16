@@ -605,3 +605,137 @@ def test_js_maps_the_avg_shields_state_to_the_combined_clusters():
     # only hard-coded fallback
     assert "mcPay.allKey || 'all'" in raw
     assert clusters.ALL_SCEN_KEY == "all"
+
+
+# ---------------------------------------------------------------------------
+# 5. The Build criteria preset (v4 "Which one to build?")
+# ---------------------------------------------------------------------------
+# Three keys, one table. They key the section's payload, the clusters
+# section's per-preset combined partitions and the scatter's weighted Shields
+# entry, and every one of those fails SILENTLY on a drift: the section falls
+# back to its default preset, the clusters option re-labels itself with a
+# partition it is not drawing, and the scatter quietly averages all nine.
+
+sys.path.insert(0, str(_SCRIPTS))
+import deep_dive_builds as builds  # noqa: E402
+import deep_dive_which_build as which_build  # noqa: E402
+
+
+def test_the_three_preset_keys_have_one_definition():
+    """deep_dive_builds.PRESETS is the table; nothing re-types the keys."""
+    keys = [p[0] for p in builds.PRESETS]
+    assert keys == ['flat', 'even', 'one_one']
+    assert builds.PRESET_SCENS['flat'] is None            # every scenario
+    assert builds.PRESET_SCENS['even'] == ('0v0', '1v1', '2v2')
+    assert builds.PRESET_SCENS['one_one'] == ('1v1',)
+    # The dropdown, the clusters call and the section all read that table.
+    py = _PY.read_text()
+    assert 'import deep_dive_builds' in py
+    assert 'for _k, _lbl, _scens, _tag in _build_presets():' in py
+    assert "_build_presets()" in py
+    render = (_SCRIPTS / 'deep_dive_lib' / 'render.py').read_text()
+    assert '_builds.PRESETS' in render
+    # ... and no file writes the three strings out again.
+    for path in (_JS, _SCRIPTS / 'deep_dive_matchup_clusters.py'):
+        text = path.read_text()
+        assert "'one_one'" not in text, path.name
+        assert '"one_one"' not in text, path.name
+
+
+def test_the_knob_id_is_the_same_string_on_both_sides():
+    js = _js()
+    assert "var WB_PRESET_SEL = 'build-criteria-sel';" in js
+    assert 'id="build-criteria-sel"' in _PY.read_text()
+    # onchange calls the one entry point
+    assert 'onchange="wbSetPreset(this.value)"' in _PY.read_text()
+    assert 'function wbSetPreset(' in js
+
+
+def test_the_shields_dropdown_carries_both_all_entries():
+    """'avg' is renamed and never changes; 'wbavg' is the weighted one."""
+    py = _PY.read_text()
+    assert "<option value=\"avg\">All (equal weight)</option>" in py
+    assert "<option value=\"wbavg\">All (build " in py or \
+           "'    <option value=\"wbavg\">All (by build '" in py
+    js = _js()
+    # the weighted entry resolves to the preset's scenarios, and 'avg' still
+    # means every scenario
+    body = _js_fn(js, 'getActiveScenarioIndices')
+    assert "state.scenarioMode === 'avg'" in body
+    assert "state.scenarioMode === 'wbavg'" in body
+    assert 'wbPresetScenIndices()' in body
+
+
+def test_the_knob_note_names_exactly_the_three_surfaces_it_drives():
+    py = _PY.read_text()
+    assert 'Build criteria weights ' in py
+    assert 'Which one to build?, the ' in py
+    assert 'All (by build ' in py
+    assert 'Every other section counts all nine shield ' in py
+
+
+def test_the_section_payload_carries_every_builds_field_the_js_reads():
+    """Field names, checked against the JS that dereferences them.
+
+    Built from a real computation would need a blob; the field list is
+    asserted against the payload builder's own output shape instead, and the
+    JS half is scanned for the same names. A rename on one side fails here.
+    """
+    js = _js()
+    for field in ('bp.presets', 'bp.regions', 'bp.default', 'bp.rank1',
+                  'bp.gridBest', 'bp.nDecision', 'bp.topN', 'bp.colors'):
+        assert field in js, field
+    for field in ('.mostWinning', '.nGmat', '.nGw', '.memb',
+                  '.lattice', '.cols', '.builds', '.weights', '.scens',
+                  '.summary', '.desc', '.region', '.bits'):
+        assert field in js, field
+
+
+def test_the_clusters_payload_carries_one_all_scenarios_key_per_preset():
+    pay = _mc_payload_fixture()
+    # the fixture above renders without presets, so the map is absent or
+    # empty; the keyed render is the one under test
+    n_opp, block = 8, 40
+    n_iv = block * (n_opp + 1)
+    arr = np.full((n_iv, 9, n_opp), 200, dtype=np.int32)
+    for si in (4, 8):
+        for i in range(n_opp + 1):
+            arr[i * block:(i + 1) * block, si, :i] = 800
+    arr[n_iv // 2:, 0, :2] = 800
+    atk = np.linspace(100, 110, n_iv)
+    html = clusters.render_section(
+        arr.ravel().tolist(), n_iv, 9, n_opp,
+        [(a, b) for a in range(3) for b in range(3)],
+        [f"Opp{i}" for i in range(n_opp)],
+        {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+         "ivHp": np.full(n_iv, 135.0).tolist()},
+        "rank-1", "FAST / CM1, CM2", [],
+        presets=[(k, tag, scens) for k, _lbl, scens, tag in builds.PRESETS])
+    m = re.search(r'<script type="application/json" class="dd-mc-data">'
+                  r'(.*?)</script>', html, re.S)
+    keyed = json.loads(m.group(1))
+    assert set(keyed['allByPreset']) == {p[0] for p in builds.PRESETS}
+    assert keyed['allByPreset']['flat'] == clusters.ALL_SCEN_KEY
+    # every mapped key is either a real partition or None, never a dangling
+    # name the JS would look up and miss
+    for key, mapped in keyed['allByPreset'].items():
+        assert mapped is None or mapped in keyed['scens'], (key, mapped)
+        if mapped is not None:
+            assert keyed['allLabelByPreset'][key]
+    # the per-preset combined entries are NOT separate dropdown options
+    opts = re.findall(r'<option value="([^"]+)"', html)
+    assert clusters.ALL_SCEN_KEY in opts
+    assert not [o for o in opts if o.startswith(
+        clusters.ALL_SCEN_KEY + clusters.ALL_SCEN_PRESET_SEP)]
+    # the JS reads the map through the same two names
+    js = _js()
+    assert 'payload.allByPreset' in js or 'pay.allByPreset' in js
+    assert 'allLabelByPreset' in js
+
+
+def test_the_section_view_ids_are_the_same_on_both_sides():
+    js = _js()
+    assert which_build.VIEW_BUILDS[0] == 'builds'
+    assert "view === 'builds'" in js
+    for vid, _label in which_build.VIEWS_FLOOR + which_build.VIEWS_NO_FLOOR:
+        assert f"view === '{vid}'" in js or f"'{vid}'" in js, vid

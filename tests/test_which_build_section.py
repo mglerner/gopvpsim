@@ -70,6 +70,7 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
 import deep_dive_brief as B  # noqa: E402
+import deep_dive_builds as builds_mod  # noqa: E402
 
 
 def _replay_dirs():
@@ -342,6 +343,22 @@ def test_no_definition_contains_another_registered_term():
             if re.search(pattern, definition, re.IGNORECASE):
                 offenders.append((term, other))
     assert offenders == [], offenders
+
+
+def test_term_marker_orders_by_reading_order_not_by_claim_order():
+    """The Terms list is in the order a reader MEETS the terms.
+
+    Pre-fix the offset was read off the partially-marked working copy, so a
+    term claimed later by _TERM_PATTERNS but sitting earlier in the sentence
+    carried the length of every tooltip inserted before it and sorted after
+    the term it precedes. The builds lead has exactly that shape.
+    """
+    m = W.TermMarker()
+    m.mark('<p>Build criteria: what these builds guarantee, over 87 '
+           'decision matchups</p>')
+    order = m.ordered()
+    assert order.index('guaranteed') < order.index('decision matchup')
+    assert order.index('build criteria') < order.index('guaranteed')
 
 
 def test_term_marker_does_not_mark_inside_an_inserted_tooltip():
@@ -1037,6 +1054,163 @@ def test_section_grouping_logic_runs(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# 4c. v4: the builds half, executed
+# ---------------------------------------------------------------------------
+
+_BUILDS_HARNESS = r"""// Node harness: the builds view's grouping + the weighted win count.
+const fs = require('fs');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+const start = src.indexOf('function _wbRoot()');
+const end = src.indexOf('// ---- Re-theme the canvases');
+if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
+const block = src.slice(start, end);
+
+const N = 6;
+const DATA = {
+  nIvs: N, nScenarios: 2, nOpponents: 2, scenarioLabels: ['0v0', '1v1'],
+  ivA: [0,1,2,3,4,5], ivD: [15,14,13,12,11,10], ivS: [15,14,13,12,11,10],
+  ivAtk: [140,145,148.2,149,150.5,151], ivDef: [110,105,101.5,100,99,98],
+  ivHp: [130,128,126,124,122,120], ivLv: [50,50,50,50,50,50],
+  spRanks: [1,2,3,4,5,6], ivL51: null,
+};
+// Flat (iv, scenario, opponent): iv0 wins one 0v0 cell, iv1 wins both 0v0,
+// iv2 adds a 1v1, and iv3..5 win everything.
+const SCORES = { '0|pvpoke': new Uint16Array([
+  600,400,400,400,  600,600,400,400,  600,600,600,400,
+  600,600,600,600,  600,600,600,600,  600,600,600,600]) };
+const SCORE_KEY_SEP = '|';
+function isWin(v) { return v > 500; }
+function scenLabel(si) { return DATA.scenarioLabels[si]; }
+function wrapLegendName(n) { return n; }
+function plotChrome() { return {ink:'#000', paper:'', plot:'', font:'', grid:'',
+  legendBg:'', legendBorder:'', hoverBg:'', hoverBorder:''}; }
+function _mcPayloadPage() { return null; }
+function _mcLabelsApply() { return false; }
+const state = { ownedByIv: null };
+const _bbL50 = null;
+const window = {};
+const document = { getElementById: () => null, addEventListener: () => {},
+                   querySelector: () => null, querySelectorAll: () => [] };
+const location = { hash: '' };
+const history = { replaceState: () => {} };
+const Plotly = { react: () => {}, restyle: () => {}, Plots: { resize: () => {} } };
+const getComputedStyle = () => ({ getPropertyValue: () => '' });
+
+let out;
+eval(block + '\nout = {wbWinsWeighted, wbWeightedDen, _wbBuildOf, _wbBuildSide,' +
+     ' _wbGuaranteedInScen, _wbBuildGroups, _wbBuildName, wbPresetBlock,' +
+     ' wbLevelArrays, wbWins};');
+
+// Two builds: spreads 0..1 (mask 'Aw==' = 0b00000011) and spreads 4..5
+// ('MA==' = 0b00110000). Region guarantee bits are over the decision-cell
+// axis below: region 0 guarantees cells 0 and 2, region 1 cell 1.
+const bp = {
+  mi: 0, mode: 'pvpoke', default: 'flat', presetKeys: ['flat', 'one_one'],
+  nDecision: 3, nMaterial: 1, nOpp: 2, topN: 25, colors: ['#a','#b','#c'],
+  scenLabels: ['0v0', '1v1'],
+  cells: [[0, 5, 1], [1, 9, 0], [0, 12, 0]],
+  regions: [{size: 2, nG: 2, nGmat: 1, bits: 'BQ==', mask: 'Aw=='},
+            {size: 2, nG: 1, nGmat: 0, bits: 'Ag==', mask: 'MA=='}],
+  rank1: {iv: '0/15/15@50', idx: 0, wins: 1},
+  gridBest: {iv: '5/10/10@50', idx: 5, wins: 4},
+  presets: {
+    flat: {label: 'All shields, equal', tag: 'all shields, equal',
+           weights: [1, 1], scens: ['0v0', '1v1'], summary: 'S-flat',
+           builds: [{role: 'primary', combo: 'A', col: 0, region: 0, size: 2,
+                     desc: 'd0', nG: 2, nGw: 2, nGmat: 1,
+                     mostWinning: {iv: '1/14/14@50', idx: 1, wins: 2}},
+                    {role: 'fork', combo: 'B', col: 1, region: 1, size: 2,
+                     desc: 'd1', nG: 1, nGw: 1, nGmat: 0,
+                     mostWinning: {iv: '4/11/11@50', idx: 4, wins: 4}}],
+           cols: [], lattice: []},
+    one_one: {label: '1v1 only', tag: '1v1 only', weights: [0, 1],
+              scens: ['1v1'], summary: 'S-one',
+              builds: [{role: 'primary', combo: 'B', col: 0, region: 1,
+                        size: 2, desc: 'd1', nG: 1, nGw: 1, nGmat: 0,
+                        mostWinning: {iv: '4/11/11@50', idx: 4, wins: 2}}],
+              cols: [], lattice: []}
+  }
+};
+const pay = {mi: 0, mode: 'pvpoke', hasFloor: false, views: [], bp: bp,
+             rank1: {iv: [0,15,15], level: 50}, gridBest: {iv: [5,10,10], level: 50},
+             examples: [], rungs: []};
+const L = out.wbLevelArrays();
+const fail = [];
+function eq(name, got, want) {
+  if (JSON.stringify(got) !== JSON.stringify(want))
+    fail.push(name + ': got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want));
+}
+
+// 1. the weighted win count. All-ones must equal the unweighted count, and
+// the 1v1-only vector must equal that scenario's own slice.
+eq('flat weights == every scenario',
+   Array.from(out.wbWinsWeighted(0, 'pvpoke', [1, 1])),
+   Array.from(out.wbWins(0, 'pvpoke', null)));
+eq('1v1 weights == the 1v1 slice',
+   Array.from(out.wbWinsWeighted(0, 'pvpoke', [0, 1])),
+   Array.from(out.wbWins(0, 'pvpoke', 1)));
+eq('weighted denominator', out.wbWeightedDen([0, 1]), 2);
+eq('flat denominator', out.wbWeightedDen([1, 1]), 4);
+
+// 2. membership, from the packed masks
+const flat = bp.presets.flat;
+eq('membership', [0,1,2,3,4,5].map(i => out._wbBuildOf(bp, flat, i)),
+   [0, 0, -1, -1, 1, 1]);
+
+// 3. the guarantee bits, read per shield scenario
+eq('region 0 guarantees in 0v0', out._wbGuaranteedInScen(bp, 0, 0), 2);
+eq('region 0 guarantees in 1v1', out._wbGuaranteedInScen(bp, 0, 1), 0);
+eq('region 1 guarantees in 1v1', out._wbGuaranteedInScen(bp, 1, 1), 1);
+
+// 4. the hover text: counts, and the scenario-scoped form when one is picked
+const side = out._wbBuildSide(pay, flat, 0, null);
+if (side.indexOf('guarantees 2 of 3 decision matchups') < 0)
+  fail.push('build hover lost its counts: ' + side);
+const sideScen = out._wbBuildSide(pay, flat, 0, {idx: 0, label: '0v0'});
+if (sideScen.indexOf('2 decision matchups in 0v0 shields') < 0)
+  fail.push('scenario hover is not scenario-scoped: ' + sideScen);
+if (out._wbBuildSide(pay, flat, -1, null).indexOf('none of the builds') < 0)
+  fail.push('a spread in no build is not said to be in none');
+
+// 5. the grouping: one trace per build plus the grey remainder, every spread
+// drawn exactly once.
+const wins = out.wbWinsWeighted(0, 'pvpoke', [1, 1]);
+const g = out._wbBuildGroups(pay, L, wins, {below: '#z', line: '#y'}, 4,
+                             {querySelector: () => null}, null);
+const counts = {};
+g.traces.forEach(t => { counts[t.name.replace(/ \(\d+\)$/, '')] = t.x.length; });
+eq('every spread drawn once',
+   g.traces.reduce((a, t) => a + t.x.length, 0), N);
+if (!Object.keys(counts).some(k => k.indexOf('Build 1 (primary)') === 0))
+  fail.push('no primary trace: ' + JSON.stringify(Object.keys(counts)));
+if (counts['In no build'] !== 2)
+  fail.push('the remainder trace is wrong: ' + JSON.stringify(counts));
+
+// 6. wbPresetBlock falls back to the payload default with no knob on the page
+eq('default preset block', out.wbPresetBlock(pay).summary, 'S-flat');
+
+if (fail.length) { console.error(fail.join('\n')); process.exit(1); }
+console.log('OK');
+"""
+
+
+@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+def test_builds_view_logic_runs(tmp_path):
+    """Run the builds view's own code for real, on a 6-spread synthetic grid.
+
+    Source pins cannot catch a spread landing in the wrong build, a weighted
+    win count that ignores its weights, or a guarantee-bit read that is off
+    by a cell -- all three of which a reader would see as a wrong picture
+    with no error anywhere.
+    """
+    runner = tmp_path / 'wb_builds_check.js'
+    runner.write_text(_BUILDS_HARNESS)
+    proc = subprocess.run(['node', str(runner), str(ENGINE_JS)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert proc.stdout.strip() == 'OK'
+
+# ---------------------------------------------------------------------------
 # 4b. Placement in the renderer
 # ---------------------------------------------------------------------------
 
@@ -1079,10 +1253,15 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     assert len(html) < 150_000, len(html)
     payload = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
-    # One 512-byte mask per printed rung plus one for the bulk pair; the cap
-    # is generous enough for a long rung ladder and far below the point where
-    # a per-IV STAT array would have been cheaper.
-    assert len(json.dumps(payload)) < 32_000, len(json.dumps(payload))
+    # One 512-byte mask per printed rung plus one for the bulk pair, and
+    # (v4) the builds half: one mask per selected region, the guarantee bits
+    # of every candidate region, and the per-preset facts and sentences for
+    # all three presets. Still far below the point where a per-IV STAT array
+    # would have been cheaper. Measured 34 KB on this blob when v4 shipped.
+    assert len(json.dumps(payload)) < 48_000, len(json.dumps(payload))
+    # The builds half is the part that would grow if a member LIST ever
+    # replaced a packed mask.
+    assert len(json.dumps(payload['bp'])) < 24_000, len(json.dumps(payload['bp']))
 
 
 @pytest.mark.local_artifacts
@@ -1095,7 +1274,17 @@ def test_real_section_is_collapsed_and_carries_the_headline(shadow_sableye):
     summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
                         html, re.S).group(1)
     assert 'Which one to build?' in summary
-    assert 'should have at least 148.10 attack' in summary
+    # v4: the summary names the PRIMARY BUILD under the default preset, and
+    # self-labels the preset it was selected under. The line is still the
+    # headline's own opening sentence, asserted below.
+    assert '[all shields, equal]' in summary
+    assert '61 spreads' in summary and '55 of the 87 decision matchups' in summary
+    assert 'disjoint 114-spread build' in summary
+    # The line itself is still the headline's opening sentence -- with the
+    # printed value wrapped in the clearers button, which is why this looks
+    # for the two halves rather than the whole phrase.
+    assert 'should have at least ' in html
+    assert '>148.10</button> attack' in html
     # A literal space between the title and the sentence: copy/paste, a
     # screen reader and this test all read the runs with nothing between
     # them otherwise ("build?Most Sableye").
@@ -1294,7 +1483,11 @@ def test_a_real_no_line_moveset_renders_the_negative_section():
     payload = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
     assert payload['hasFloor'] is False
-    assert [v['id'] for v in payload['views']] == ['clusters', 'rank1']
+    # v4: the builds view leads even here -- a page with no single-stat line
+    # still has regions of the grid worth aiming at -- and the two
+    # line-derived views are still absent. The SUMMARY stays the negative
+    # one, asserted above.
+    assert [v['id'] for v in payload['views']] == ['builds', 'clusters', 'rank1']
     assert payload['rungs'] == [] and payload['alt'] is None
     # No line means no printed value, so no clearer expander either.
     assert 'wbToggleClearers' not in html
@@ -1363,7 +1556,10 @@ def test_every_arm_renders_its_own_section(shadow_sableye):
         summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
                             html, re.S).group(1)
         assert 'Same line as' not in summary
-        assert 'should have at least 148.10 attack' in summary
+        # v4: every split file answers with its own builds, under the
+        # default preset, rather than pointing at another file's moveset.
+        assert '[all shields, equal]' in summary
+        assert 'decision matchups' in summary
 
 
 @pytest.mark.local_artifacts
@@ -1440,8 +1636,12 @@ def test_a_shared_line_moveset_states_the_line_and_counts_it_once(
     html = W.section_html(all_facts, 1)
     summary = re.search(r'<summary class="wb-summary">(.*?)</summary>',
                         html, re.S).group(1)
-    assert 'Most Sableye (Shadow) should have at least 148.10 attack' in summary
-    assert 'the same line as its other 3 movesets' in summary
+    # v4: the summary is this moveset's own builds sentence; the shared-line
+    # clause it used to carry is in the headline, which this test's first
+    # half already reads.
+    assert '[all shields, equal]' in summary
+    assert 'decision matchups' in summary
+    assert 'Same line as' not in summary
 
 
 # ---------------------------------------------------------------------------
@@ -1507,15 +1707,24 @@ def test_the_control_moves_the_panel_and_nothing_else():
     The collapsed summary line and the headline paragraphs are the
     ALL-scenario verdict; a control that rewrote them would make the one
     sentence a reader reads depend on a dropdown they may never touch.
+
+    v4 adds two panels the Shield-scenario control legitimately re-renders
+    -- the UpSet matrix beside the plot and the visible preset block's
+    member lists -- and nothing else. The scan now catches
+    ``querySelectorAll`` too: the v4 render path reaches its new nodes that
+    way, and a scan blind to it would have let the summary line be rewritten
+    from ``querySelectorAll('.wb-head')`` without a word.
     """
     raw = ENGINE_JS.read_text()
     stripped = _engine()
     body = (_fn_body(raw, stripped, 'wbRenderRoot')
             + _fn_body(raw, stripped, 'wbSelectView')
+            + _fn_body(raw, stripped, 'wbFillMembers')
             + _fn_body(raw, stripped, '_wbScen'))
-    touched = set(re.findall(r"querySelector\(\s*'([^']+)'", body))
+    touched = set(re.findall(r"querySelector(?:All)?\(\s*'([^']+)'", body))
     assert touched == {'.wb-panel', '.wb-caption', 'select.wb-view',
-                       'select.wb-scen'}, touched
+                       'select.wb-scen', '.wb-upset',
+                       '.wb-preset:not([hidden]) .wb-mem'}, touched
     # Positive control: the scan sees the selectors that ARE there, so an
     # empty match set cannot pass this silently.
     assert '.wb-panel' in touched
@@ -1815,12 +2024,13 @@ def test_the_negative_page_carries_the_control_and_its_captions():
     all_facts = W.prepare(state, str(path))
     neg = all_facts[0]
     assert neg['floor'] is None
-    pay = W.build_payload(neg, neg['_fields'], 0, all_facts=all_facts)
-    assert [v['id'] for v in pay['views']] == ['clusters', 'rank1']
+    pay = W.build_payload(neg, neg['_fields'], 0, all_facts=all_facts,
+                          arm_builds=neg.get('_builds'))
+    assert [v['id'] for v in pay['views']] == ['builds', 'clusters', 'rank1']
     assert len(pay['scen']) == len(state['shield_scenarios'])
     for lbl, entry in pay['scen'].items():
         assert entry['lines'] == []
-        assert set(entry['captions']) == {'clusters', 'rank1'}
+        assert set(entry['captions']) == {'builds', 'clusters', 'rank1'}
         assert lbl in entry['captions']['rank1']
     html = W.section_html(all_facts, 0)
     assert 'Shield scenario: ' in html
@@ -1829,7 +2039,8 @@ def test_the_negative_page_carries_the_control_and_its_captions():
     # The arm that DOES carry a line: 1v1 has one, most scenarios do not.
     pos = all_facts[2]
     assert pos['floor'] is not None
-    pay2 = W.build_payload(pos, pos['_fields'], 0, all_facts=all_facts)
+    pay2 = W.build_payload(pos, pos['_fields'], 0, all_facts=all_facts,
+                           arm_builds=pos.get('_builds'))
     withline = [k for k, v in pay2['scen'].items() if v['lines']]
     assert '1v1' in withline
     assert len(withline) < len(pay2['scen']), 'expected empty scenarios here'
@@ -1883,8 +2094,10 @@ def test_the_section_is_byte_deterministic_with_the_control(shadow_sableye):
     pay = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', a, re.S).group(1))
     # Small: ten lines, nine pooled masks and a caption per view per
-    # scenario -- not a per-IV array per scenario.
-    assert len(json.dumps(pay)) < 32_000, len(json.dumps(pay))
+    # scenario -- not a per-IV array per scenario. Plus the v4 builds half;
+    # the per-scenario block itself is unchanged and is capped separately
+    # below, so this cap moving cannot hide growth in it.
+    assert len(json.dumps(pay)) < 48_000, len(json.dumps(pay))
     assert len(json.dumps(pay['scen'])) < 12_000, len(json.dumps(pay['scen']))
 
 
@@ -2240,3 +2453,115 @@ def test_the_degenerate_sentence_has_one_source():
     src = (SCRIPTS_DIR / 'deep_dive_which_build.py').read_text()
     assert 'brief.clusters.degenerate_finding(' in src
     assert 'contested win patterns' not in src
+
+
+# ---------------------------------------------------------------------------
+# 9. v4: the builds block, the presets, and the section's own prose
+# ---------------------------------------------------------------------------
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
+    """Every preset's table is server-rendered; the inactive ones are hidden.
+
+    Rendering all three rather than formatting them in the browser is what
+    keeps the prose inside the word gates: the knob chooses a block, it does
+    not compose a sentence.
+    """
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    blocks = re.findall(r'<div class="wb-preset" data-preset="(\w+)"( hidden)?>',
+                        html)
+    assert [b[0] for b in blocks] == ['flat', 'even', 'one_one']
+    assert [bool(b[1]) for b in blocks] == [False, True, True]
+    # one table per preset, each with the seven columns the reader reads
+    assert html.count('<table class="wb-builds-table">') == 3
+    for col in ('Build', 'What it is', 'Spreads', 'Guarantees',
+                'Most-winning member', 'Stat-product rank-1', 'Gives up'):
+        assert f'<th>{col}</th>' in html, col
+    # the per-build expanders and their members box
+    assert html.count('<details class="wb-build"') >= 6
+    assert html.count('class="wb-mem"') >= 6
+    assert 'wbCompareBuilds(this)' in html
+    # the note that says what the preset does and does not weight
+    import html as _hh
+    assert W.WEIGHTING_NOTE in _hh.unescape(html)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_summary_self_labels_its_preset(shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    for key in ab['presets']:
+        line = W.builds_summary(all_facts[0], ab, key, all_facts)
+        assert line.startswith(f'[{builds_mod.PRESET_TAG[key]}]'), line
+        assert 'decision matchups' in line
+        # the staircase's steps belong in the table, not in the one line a
+        # reader reads before opening anything
+        assert '->' not in line
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_guarantee_lists_are_sorted_by_outside_rate_and_capped(shadow_sableye):
+    """Rarest guarantee first, cap with a "+N more", near-free cells counted."""
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    block = ab['presets'][builds_mod.PRESET_FLAT]
+    b = block['builds'][0]
+    for scen, rows in b['guaranteed_by_scenario'].items():
+        outs = [r['outside_wr'] for r in rows]
+        assert outs == sorted(outs), (scen, outs)
+    html = W.section_html(all_facts, 0)
+    assert 'more in ' in html            # the "+N more" control
+    assert 'are near-free' in html
+    # a near-free cell is counted, never listed
+    listed = re.findall(r'-- outside (\d+)%', html)
+    assert listed, 'no guarantee row was printed at all'
+    assert all(int(x) <= 90 for x in listed), max(listed)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_objectives_line_is_printed_only_when_they_disagree(shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    for key, block in ab['presets'].items():
+        line = W.objectives_line(ab, key)
+        split = (block['objectives'] or {}).get('split')
+        assert bool(line) == bool(split), (key, split, line)
+        if line:
+            assert 'more matchups overall' in line
+            assert 'more decision matchup' in line
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_builds_payload_travels_with_the_section(shadow_sableye):
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    pay = json.loads(
+        re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
+    bp = pay['bp']
+    assert bp['presetKeys'] == ['flat', 'even', 'one_one']
+    assert bp['default'] == 'flat'
+    assert bp['nDecision'] == 87
+    # every selected build points at a region that carries a membership mask
+    for key in bp['presetKeys']:
+        block = bp['presets'][key]
+        assert block['summary'] and block['lead']
+        assert len(block['weights']) == len(bp['scenLabels'])
+        assert set(block['weights']) <= {0, 1}
+        for b in block['builds']:
+            reg = bp['regions'][b['region']]
+            assert reg['mask'] and reg['size'] == b['size']
+            assert bp['regions'][b['region']]['bits']
+    # the builds view leads the Show selector
+    assert [v['id'] for v in pay['views']][0] == 'builds'
+
+
+def test_the_glossary_defines_every_v4_term():
+    for term in ('build', 'fork', 'guaranteed', 'outside rate',
+                 'decision matchup', 'material', 'build criteria'):
+        assert glossary.definition(term), term

@@ -81,11 +81,12 @@ def test_every_canvas_sources_chrome_from_plotchrome():
     Counted rather than located: a canvas added later must opt in too, or
     this fails. It has already caught one -- the "Which one to build?"
     section's panel (2026-09-13) was the fourth, and this test is where the
-    count moved from three to four.
+    count moved from three to four. The fifth is that section's UpSet panel
+    (2026-09-16).
     """
     n_layouts = len(re.findall(r'paper_bgcolor', JS))
     n_shimmed = len(re.findall(r'paper_bgcolor:\s*\w+\.paper', JS))
-    assert n_layouts == 4, f"expected 4 Plotly layouts, found {n_layouts}"
+    assert n_layouts == 5, f"expected 5 Plotly layouts, found {n_layouts}"
     assert n_shimmed == n_layouts
 
 

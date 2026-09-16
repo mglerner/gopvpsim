@@ -334,6 +334,17 @@ function getActiveScenarioIndices() {
   if (state.scenarioMode === 'avg') {
     var arr = []; for (var i=0; i<nS; i++) arr.push(i); return arr;
   }
+  // "All (by build criteria)": the scenarios the page's Build criteria
+  // preset weights. Every shipped preset weights 0 or 1, so a weighted
+  // count IS a count over a subset of scenarios and the rest of this file
+  // -- computeYValues, the Top-IVs table, the histograms -- needs no notion
+  // of a weight at all. A page with no preset knob never reaches here.
+  if (state.scenarioMode === 'wbavg') {
+    var sub = (typeof wbPresetScenIndices === 'function')
+            ? wbPresetScenIndices() : null;
+    if (sub && sub.length) return sub;
+    var all = []; for (var j=0; j<nS; j++) all.push(j); return all;
+  }
   return [parseInt(state.scenarioMode)];
 }
 
@@ -2393,7 +2404,17 @@ function buildTraces() {
       // default (1v1) and colored by a single scenario without saying so.
       var sis0 = getActiveScenarioIndices();
       var allKey0 = mcPay.allKey || 'all';
-      if (state.scenarioMode === 'avg' && mcPay.scens[allKey0]) {
+      // Under the weighted entry the combined partition to colour by is the
+      // one for THIS preset, not the nine-scenario one.
+      if (state.scenarioMode === 'wbavg') {
+        var pk0 = (typeof wbActivePresetKey === 'function')
+                ? wbActivePresetKey() : null;
+        var mapped0 = (pk0 && mcPay.allByPreset) ? mcPay.allByPreset[pk0] : null;
+        if (mapped0 && mcPay.scens[mapped0]) mcScen = mapped0;
+      }
+      if (mcScen) {
+        // already resolved above
+      } else if (state.scenarioMode === 'avg' && mcPay.scens[allKey0]) {
         mcScen = allKey0;
       } else if (sis0.length === 1) {
         var lbl0 = scenLabel(sis0[0]);
@@ -4214,6 +4235,11 @@ function cmpWireHandlers() {
 window.applyHighlight = applyHighlight;
 window.clearHighlight = clearHighlight;
 applyHistogramHash();
+// The Build criteria preset a shared link carried, applied BEFORE the first
+// render: the scatter's weighted Shields entry and the clusters "all
+// scenarios" option both read the knob, so a hash applied afterwards would
+// draw the default once and then jump.
+wbApplyPresetHash();
 // Seed the opponent-filter panel (all checked) before the first render so
 // state.selectedOpps exists; harmless no-op when the panel isn't in the page.
 initOppFilter();
@@ -4291,11 +4317,23 @@ function _mcTrace(name, marker, x, y, text) {
           hoverinfo: 'text', name: name, marker: marker};
 }
 
+// The scenario key one Matchup clusters section is actually showing.
+// Identity for every '{a}v{b}' option; for the "all scenarios" option it is
+// the partition of the page's Build criteria preset -- the option re-labels
+// itself, so its value stays the stable key and the mapping lives here.
+function _mcEffectiveScen(payload, value) {
+  var allKey = payload.allKey || 'all';
+  if (value !== allKey || !payload.allByPreset) return value;
+  var pk = (typeof wbActivePresetKey === 'function') ? wbActivePresetKey() : null;
+  var mapped = pk ? payload.allByPreset[pk] : null;
+  return (mapped && payload.scens[mapped]) ? mapped : value;
+}
+
 function _mcRenderRoot(root) {
   var payload = _mcPayload(root);
   if (!payload) return;
   var sel = root.querySelector('select.dd-mc-scen');
-  var scen = sel ? sel.value : payload['default'];
+  var scen = _mcEffectiveScen(payload, sel ? sel.value : payload['default']);
   var sc = payload.scens[scen];
   var panels = root.querySelectorAll('.dd-mc-panel');
   var panelBox = root.querySelector('.dd-mc-panels');
@@ -4415,8 +4453,10 @@ function mcRefreshAll() {
 function mcSelectScenario(sel) {
   var root = sel.closest('.dd-mc-root');
   if (!root) return;
+  var payload = _mcPayload(root);
+  var shown = payload ? _mcEffectiveScen(payload, sel.value) : sel.value;
   root.querySelectorAll('.dd-mc-scen-block').forEach(function(b) {
-    b.style.display = (b.getAttribute('data-scen') === sel.value) ? 'block' : 'none';
+    b.style.display = (b.getAttribute('data-scen') === shown) ? 'block' : 'none';
   });
   _mcRenderRoot(root);
 }
@@ -4681,6 +4721,13 @@ function _wbTrace(name, color, symbol, size, opacity) {
            marker: { size: size, color: color, symbol: symbol || 'circle',
                      opacity: opacity == null ? 0.75 : opacity },
            hoverlabel: { bordercolor: color } };
+}
+
+// "7/2/14@49.5" -> [7, 2, 14]. The builds payload writes spreads the way the
+// analysis modules do (with the level), and _wbIvIdx wants the triple.
+function _wbIvTriple(s) {
+  var p = String(s).split('@')[0].split('/');
+  return [parseInt(p[0], 10), parseInt(p[1], 10), parseInt(p[2], 10)];
 }
 
 function _wbIvStr(i) {
@@ -4963,7 +5010,7 @@ function _wbMcApplies(pay, mcPay) {
 
 // Your pasted collection, on this panel, in every view -- same gold star the
 // cluster panels use, hover naming the mon and its side of the line.
-function _wbOwnedTrace(pay, L, wins, line, den, noLine) {
+function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn) {
   if (!state.ownedByIv) return null;
   // The same tiny y-nudge the cluster panels and the main scatter apply, for
   // the same measured reason: a star sitting at the EXACT coordinates of a
@@ -4985,7 +5032,9 @@ function _wbOwnedTrace(pay, L, wins, line, den, noLine) {
       return ((r.mon && r.mon.name) || 'mon') + ' CP' +
              ((r.stats && r.stats.cp) || '?');
     }).join(', ');
-    var side = line ? _wbSideAt(L, line, i) : (noLine || 'no line on this page');
+    var side = sideFn ? sideFn(i)
+             : line ? _wbSideAt(L, line, i)
+             : (noLine || 'no line on this page');
     ox.push(L.spRanks[i]); oy.push(wins[i] + ynudge);
     ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side, den));
   }
@@ -5033,6 +5082,453 @@ function _wbWireLegend(panel, ops) {
   tryAttach();
 }
 
+// ---------------------------------------------------------------------------
+// "Which one to build?" v4: BUILDS
+// ---------------------------------------------------------------------------
+// The section's primary object is now 2-3 BUILDS -- regions of the IV grid --
+// selected under the page's Build criteria preset. Python renders every
+// preset's tables and sentences server-side (one hidden .wb-preset block
+// each) and ships the numbers this file needs in pay.bp; nothing here
+// formats a threshold or writes a sentence about the data.
+//
+// The knob drives exactly three things, and the note under the control strip
+// says so: this section, the Matchup clusters "all scenarios" partition, and
+// the scatter's Shields = "All (by build criteria)" entry. Everything else on
+// the page counts all nine shield scenarios equally.
+
+var WB_PRESET_SEL = 'build-criteria-sel';
+var WB_HASH_KEY = 'bc';
+
+// The active preset key. The page-level <select> is the single source of
+// truth (the section, the clusters section and the scatter all read it), and
+// the payload's own default is the fallback for a page that emitted no knob.
+function wbPreset(pay) {
+  var sel = document.getElementById(WB_PRESET_SEL);
+  var v = sel ? sel.value : null;
+  if (pay && pay.bp) {
+    if (v && pay.bp.presets[v]) return v;
+    return pay.bp.default;
+  }
+  return v;
+}
+window.wbPreset = wbPreset;
+
+function wbPresetBlock(pay) {
+  var k = wbPreset(pay);
+  return (pay && pay.bp && k) ? pay.bp.presets[k] : null;
+}
+
+// Matchups won per IV, weighted by a per-scenario weight vector. Same win
+// predicate and the same flat (iv, scenario, opponent) decoding as wbWins and
+// as the main plot's winsPvpoke mode; only the weights are new. Every shipped
+// preset weights 0 or 1, so the result is an integer count.
+var _wbWWinsCache = {};
+function wbWinsWeighted(mi, mode, weights) {
+  var key = mi + SCORE_KEY_SEP + mode + SCORE_KEY_SEP + weights.join('');
+  if (_wbWWinsCache[key]) return _wbWWinsCache[key];
+  var g = SCORES[mi + SCORE_KEY_SEP + mode];
+  if (!g) return null;
+  var nO = DATA.nOpponents, nS = DATA.nScenarios, n = DATA.nIvs;
+  var out = new Float64Array(n);
+  for (var iv = 0; iv < n; iv++) {
+    var c = 0, base0 = iv * nS * nO;
+    for (var sj = 0; sj < nS; sj++) {
+      var w = weights[sj] || 0;
+      if (!w) continue;
+      var base = base0 + sj * nO;
+      for (var oi = 0; oi < nO; oi++) { if (isWin(g[base + oi])) c += w; }
+    }
+    out[iv] = c;
+  }
+  _wbWWinsCache[key] = out;
+  return out;
+}
+window.wbWinsWeighted = wbWinsWeighted;
+
+// How many matchups the weighted y-axis is out of.
+function wbWeightedDen(weights) {
+  var s = 0;
+  for (var i = 0; i < weights.length; i++) s += (weights[i] || 0);
+  return s * DATA.nOpponents;
+}
+
+// One colour per build, from the section's CSS custom properties with the
+// payload's light-theme values as the deliberate fallback (same pattern as
+// WB_FALLBACK above).
+function _wbBuildColors(root, bp) {
+  var cs = getComputedStyle(root), out = [];
+  var fb = (bp && bp.colors) || [];
+  for (var k = 0; k < 3; k++) {
+    var got = cs.getPropertyValue('--wb-b' + k).trim();
+    out.push(got || fb[k] || '#7a4fc0');
+  }
+  return out;
+}
+
+// Which build (index into block.builds) holds spread i, or -1.
+function _wbBuildOf(bp, block, i) {
+  for (var b = 0; b < block.builds.length; b++) {
+    var m = bp.regions[block.builds[b].region].mask;
+    if (m && _wbBit(_wbMask(m), i)) return b;
+  }
+  return -1;
+}
+
+function _wbBuildName(block, b) {
+  var roles = { primary: 'Build 1 (primary)', fork: 'Build 2 (fork)',
+                rank1: 'Build 3 (bulk)' };
+  return roles[block.builds[b].role] || ('Build ' + (b + 1));
+}
+
+// The builds view: every spread, coloured by the build it belongs to.
+function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
+  var bp = pay.bp, block = wbPresetBlock(pay);
+  var bcol = _wbBuildColors(root, bp);
+  var none = _wbTrace('In no build', colors.below, 'circle', 3, 0.45);
+  var ts = block.builds.map(function(b, k) {
+    return _wbTrace(_wbBuildName(block, k) + ': ' + b.desc,
+                    bcol[k] || colors.line, 'circle', 4, 0.85);
+  });
+  for (var i = 0; i < DATA.nIvs; i++) {
+    var b = _wbBuildOf(bp, block, i);
+    var t = (b < 0) ? none : ts[b];
+    t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+    t.text.push(_wbHover(i, L, wins,
+                         _wbBuildSide(pay, block, b, scen), den));
+  }
+  none.name += ' (' + none.x.length + ')';
+  for (var k2 = 0; k2 < ts.length; k2++) {
+    ts[k2].name = wrapLegendName(ts[k2].name + ' (' + ts[k2].x.length + ')', 34);
+  }
+  var out = [none];
+  for (var k3 = 0; k3 < ts.length; k3++) if (ts[k3].x.length) out.push(ts[k3]);
+  return { traces: out, missing: false };
+}
+
+// How many of one region's guaranteed cells sit in one shield scenario.
+// Reads the region's guarantee bits against the payload's decision-cell
+// axis, whose first field is the scenario index -- the same packing the
+// membership masks use, unpacked by the same two helpers.
+function _wbGuaranteedInScen(bp, regionIdx, si) {
+  var reg = bp.regions[regionIdx];
+  if (!reg || !reg.bits) return null;
+  var bits = _wbMask(reg.bits), n = 0;
+  for (var c = 0; c < bp.cells.length; c++) {
+    if (bp.cells[c][0] === si && _wbBit(bits, c)) n++;
+  }
+  return n;
+}
+
+// What membership buys, for a hover. Counts only: the cells themselves are
+// listed in the server-rendered table two inches above, and a hover card is
+// not where a reader reads 55 matchup names. With one shield scenario
+// selected it answers for THAT scenario, which is the question the control
+// just asked.
+function _wbBuildSide(pay, block, b, scen) {
+  if (b < 0) return 'in none of the builds below';
+  var bd = block.builds[b];
+  if (scen) {
+    var n = _wbGuaranteedInScen(pay.bp, bd.region, scen.idx);
+    if (n != null) {
+      return _wbBuildName(block, b) + ': guarantees ' + n +
+             ' decision matchups in ' + scen.label + ' shields (' + bd.nG +
+             ' over every scenario)';
+    }
+  }
+  return _wbBuildName(block, b) + ': guarantees ' + bd.nG + ' of ' +
+         pay.bp.nDecision + ' decision matchups (' + bd.nGmat + ' material)';
+}
+
+// The UpSet panel: which named sets each candidate region is made of.
+// Rows = the lattice's named sets (size and guaranteed cells in the label),
+// columns = the selected builds plus the next few candidate regions. Bar =
+// region size, the number above it = the decision matchups it guarantees,
+// selected columns in their build's colour.
+function _wbUpset(root, pay) {
+  var host = root.querySelector('.wb-upset');
+  if (!host || !pay.bp) return;
+  var bp = pay.bp, block = wbPresetBlock(pay);
+  if (!block) { host.innerHTML = ''; return; }
+  var chrome = plotChrome();
+  var bcol = _wbBuildColors(root, bp);
+  var cols = block.cols, rows = block.lattice;
+  var colOfBuild = {};
+  for (var b = 0; b < block.builds.length; b++) colOfBuild[block.builds[b].col] = b;
+  var x = [], y = [], colors = [], texts = [], ticks = [];
+  for (var c = 0; c < cols.length; c++) {
+    x.push(c); y.push(cols[c].size);
+    var bi = colOfBuild[c];
+    colors.push(bi == null ? chrome.grid : (bcol[bi] || chrome.ink));
+    texts.push(cols[c].nG + '');
+    ticks.push(cols[c].combo);
+  }
+  var bar = { type: 'bar', x: x, y: y, marker: { color: colors },
+              text: texts, textposition: 'outside', cliponaxis: false,
+              textfont: { size: 10, color: chrome.font },
+              hoverinfo: 'text', name: 'spreads',
+              hovertext: cols.map(function(cc, ci) {
+                return (colOfBuild[ci] != null
+                        ? _wbBuildName(block, colOfBuild[ci]) + '<br>' : '') +
+                       cc.combo + ': ' + cc.size + ' spreads<br>' +
+                       cc.nG + ' decision matchups guaranteed (' +
+                       cc.nGmat + ' material)<br>' +
+                       cc.nGw + ' of them in the shields this preset ' +
+                       'counts -- the number the ranking uses<br>' +
+                       (cc.memb ? 'sets ' + cc.memb.split('').join(' + ')
+                                : 'constructed box, not an intersection'); }) };
+  var dx = [], dy = [], dc = [];
+  for (var r = 0; r < rows.length; r++) {
+    for (var c2 = 0; c2 < cols.length; c2++) {
+      var on = cols[c2].memb.indexOf(rows[r].key) >= 0;
+      dx.push(c2); dy.push(r);
+      var bi2 = colOfBuild[c2];
+      dc.push(on ? (bi2 == null ? chrome.font : (bcol[bi2] || chrome.ink))
+                 : chrome.grid);
+    }
+  }
+  var dots = { type: 'scattergl', mode: 'markers', x: dx, y: dy,
+               xaxis: 'x', yaxis: 'y2', hoverinfo: 'skip',
+               marker: { size: 9, color: dc }, showlegend: false };
+  var layout = {
+    barmode: 'group', showlegend: false,
+    xaxis: { domain: [0, 1], anchor: 'y2', tickvals: x, ticktext: ticks,
+             tickfont: { size: 9 }, showgrid: false, zeroline: false },
+    yaxis: { domain: [0.52, 1], title: 'spreads in region',
+             showgrid: true, gridcolor: chrome.grid, zeroline: false },
+    yaxis2: { domain: [0, 0.46], tickvals: rows.map(function(_r, i) { return i; }),
+              ticktext: rows.map(function(rr) {
+                return rr.key + ' ' + rr.short + ' (' + rr.size + ' / ' +
+                       rr.nG + ')'; }),
+              tickfont: { size: 9 }, autorange: 'reversed',
+              showgrid: false, zeroline: false },
+    paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
+    font: { color: chrome.font, size: 10 },
+    margin: { t: 16, b: 30, l: 190, r: 8 }
+  };
+  Plotly.react(host, [bar, dots], layout,
+               { responsive: true, displayModeBar: false });
+}
+
+// The members list inside one build's expander: top N by stat product, then
+// a control that renders the rest. Built in the browser from the region's
+// membership mask and the page's own IV arrays, so a 318-spread build costs
+// the page 512 bytes rather than 318 strings.
+function _wbMemberRows(out, L, from, to, rows) {
+  for (var k = from; k < to && k < rows.length; k++) {
+    var i = rows[k];
+    out.push('<div>' + DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i] +
+              ' @L' + Number(L.ivLv[i]).toFixed(1) +
+              ' -- stat-product rank ' + L.spRanks[i] + '</div>');
+  }
+}
+
+function wbRenderMembers(box, all) {
+  var root = box.closest('.wb-root');
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay || !pay.bp) return;
+  var block = pay.bp.presets[box.getAttribute('data-preset')];
+  if (!block) return;
+  var bd = block.builds[parseInt(box.getAttribute('data-build'), 10)];
+  if (!bd) return;
+  var m = _wbMask(pay.bp.regions[bd.region].mask);
+  var L = wbLevelArrays();
+  var idx = [];
+  for (var i = 0; i < DATA.nIvs; i++) if (_wbBit(m, i)) idx.push(i);
+  idx.sort(function(a, b) { return L.spRanks[a] - L.spRanks[b]; });
+  var topN = pay.bp.topN || 25;
+  var show = all ? idx.length : Math.min(topN, idx.length);
+  var out = [];
+  _wbMemberRows(out, L, 0, show, idx);
+  if (!all && idx.length > show) {
+    out.push('<p><button type="button" class="wb-val" ' +
+             'onclick="if(window.wbShowAllMembers)wbShowAllMembers(this)">' +
+             'Show all ' + idx.length + '</button></p>');
+  }
+  box.innerHTML = out.join('');
+}
+
+function wbShowAllMembers(btn) {
+  var box = btn.closest('.wb-mem');
+  if (box) wbRenderMembers(box, true);
+}
+window.wbShowAllMembers = wbShowAllMembers;
+
+// "Compare these": stat-product rank-1 plus every build's most-winning
+// member, in build order. The same widget the section's other Compare button
+// fills, so a reader lands on one comparison table and not two.
+function wbCompareBuilds(btn) {
+  var root = btn.closest('.wb-root');
+  var pay = root ? _wbPayload(root) : null;
+  if (!pay || !pay.bp) return;
+  var block = wbPresetBlock(pay);
+  if (!block) return;
+  var list = [];
+  function push(iv) {
+    var p = iv.split('@')[0].split('/');
+    var t = [parseInt(p[0], 10), parseInt(p[1], 10), parseInt(p[2], 10)];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k][0] === t[0] && list[k][1] === t[1] && list[k][2] === t[2]) return;
+    }
+    list.push(t);
+  }
+  push(pay.bp.rank1.iv);
+  for (var b = 0; b < block.builds.length; b++) push(block.builds[b].mostWinning.iv);
+  if (window.cmpSetCandidates) window.cmpSetCandidates(list);
+  var span = btn.parentNode.querySelector('.wb-spreads');
+  if (span) {
+    span.textContent = list.map(function(t) {
+      return t[0] + '/' + t[1] + '/' + t[2]; }).join(', ');
+  }
+  var sec = document.getElementById('cmp-section');
+  if (sec) {
+    sec.open = true;
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.wbCompareBuilds = wbCompareBuilds;
+
+// Fill the visible preset block's member lists. Called from the panel
+// render, which is why it does NOT touch the summary line or the preset
+// blocks' visibility: the Shield-scenario control re-renders the panel, and
+// a control that rewrote the one sentence a reader reads would make the
+// verdict depend on a dropdown they may never touch
+// (tests/test_which_build_section.py pins that boundary).
+function wbFillMembers(root) {
+  root.querySelectorAll('.wb-preset:not([hidden]) .wb-mem').forEach(
+    function(box) { wbRenderMembers(box, false); });
+}
+
+// Show the active preset's server-rendered block, hide the others, and put
+// that preset's summary sentence in the collapsed <summary>. Every string
+// here was authored and word-gated in Python; this only chooses which one.
+// Called by the Build criteria knob and by the hash applied at load -- the
+// two places a PRESET change comes from.
+function wbApplyPreset(root) {
+  var pay = _wbPayload(root);
+  if (!pay || !pay.bp) return;
+  var key = wbPreset(pay), block = pay.bp.presets[key];
+  if (!block) return;
+  root.querySelectorAll('.wb-preset').forEach(function(el) {
+    el.hidden = (el.getAttribute('data-preset') !== key);
+  });
+  var head = root.querySelector('.wb-head');
+  if (head && block.summary) head.textContent = block.summary;
+  wbFillMembers(root);
+}
+
+// ---- the Build criteria knob -----------------------------------------------
+// The knob drives exactly three surfaces, and the muted line under the
+// control strip names them: this section, the Matchup clusters "all
+// scenarios" partition, and the scatter's Shields = "All (by build
+// criteria)" entry. Nothing else on the page re-weights.
+
+// The selected preset key, from the page-level <select>.
+function wbActivePresetKey() {
+  var sel = document.getElementById(WB_PRESET_SEL);
+  return sel ? sel.value : null;
+}
+window.wbActivePresetKey = wbActivePresetKey;
+
+// The scenario INDICES the active preset weights, for the scatter.
+function wbPresetScenIndices() {
+  var root = _wbRoot();
+  var pay = root ? _wbPayload(root) : null;
+  var key = wbActivePresetKey();
+  if (!pay || !pay.bp || !key || !pay.bp.presets[key]) return null;
+  var want = pay.bp.presets[key].scens || [];
+  var out = [];
+  for (var si = 0; si < DATA.nScenarios; si++) {
+    if (want.indexOf(scenLabel(si)) >= 0) out.push(si);
+  }
+  return out;
+}
+window.wbPresetScenIndices = wbPresetScenIndices;
+
+// The Matchup clusters section's "all scenarios" option, re-pointed and
+// re-labelled for the active preset. The label text comes from the clusters
+// payload (Python spelled it); this only selects which one.
+function wbSyncClusterAllOption() {
+  var pk = wbActivePresetKey();
+  document.querySelectorAll('.dd-mc-root').forEach(function(root) {
+    var pay = _mcPayload(root);
+    var sel = root.querySelector('select.dd-mc-scen');
+    if (!pay || !sel || !pay.allByPreset) return;
+    var allKey = pay.allKey || 'all';
+    var opt = null;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === allKey) opt = sel.options[i];
+    }
+    if (!opt) return;
+    var mapped = pay.allByPreset[pk] || allKey;
+    var lbl = (pay.allLabelByPreset && pay.allLabelByPreset[pk]) || null;
+    var sc = pay.scens[mapped];
+    opt.setAttribute('data-mapped', mapped);
+    if (lbl) {
+      opt.textContent = lbl + (sc ? (' (K=' + sc.k + ', silhouette ' +
+        Number(sc.sil).toFixed(2) + (sc.split ? ', split ' + sc.split : '') +
+        ')') : '');
+    }
+    if (sel.value === allKey) mcSelectScenario(sel);
+  });
+}
+
+// The whole switch: remember it in the URL hash, re-render the section, the
+// clusters "all scenarios" view and -- when the scatter is on the weighted
+// entry -- the scatter.
+function wbSetPreset(key) {
+  var sel = document.getElementById(WB_PRESET_SEL);
+  if (sel && key && sel.value !== key) sel.value = key;
+  _wbWriteHash(sel ? sel.value : key);
+  var root = _wbRoot();
+  if (root) {
+    // ALWAYS apply the preset: it swaps which server-rendered block is
+    // visible and which summary sentence the collapsed line carries, and
+    // wbRenderRoot deliberately does not touch either (the Shield-scenario
+    // control shares that path). Then redraw the panel if it is on screen,
+    // or drop the rendered flag so the next open redraws it.
+    wbApplyPreset(root);
+    if (root.open && root.offsetParent !== null) wbRenderRoot(root);
+    else root.removeAttribute('data-wb-rendered');
+  }
+  wbSyncClusterAllOption();
+  if (state.scenarioMode === 'wbavg' && typeof updateView === 'function') {
+    updateView();
+  }
+}
+window.wbSetPreset = wbSetPreset;
+
+// Persist the preset in the URL hash so a link carries it. Same hash the
+// histogram deep links use, so the two must not clobber each other: only
+// this key is rewritten.
+function _wbWriteHash(key) {
+  if (!key) return;
+  var parts = (location.hash || '').replace(/^#/, '').split('&')
+                .filter(function(p) { return p && p.indexOf(WB_HASH_KEY + '=') !== 0; });
+  parts.push(WB_HASH_KEY + '=' + encodeURIComponent(key));
+  try {
+    history.replaceState(null, '', location.pathname + location.search +
+                         '#' + parts.join('&'));
+  } catch (e) { location.hash = parts.join('&'); }
+}
+
+// Apply the hash's preset (if any) to every surface, at load.
+function wbApplyPresetHash() {
+  var sel = document.getElementById(WB_PRESET_SEL);
+  if (!sel) return;
+  var m = (location.hash || '').match(
+    new RegExp('[#&]' + WB_HASH_KEY + '=([^&]+)'));
+  var want = m ? decodeURIComponent(m[1]) : null;
+  if (want) {
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) { sel.value = want; break; }
+    }
+  }
+  var root = _wbRoot();
+  if (root) wbApplyPreset(root);
+  wbSyncClusterAllOption();
+}
+window.wbApplyPresetHash = wbApplyPresetHash;
+
 function wbRenderRoot(root) {
   if (!root) return;
   var pay = _wbPayload(root);
@@ -5040,11 +5536,22 @@ function wbRenderRoot(root) {
   if (!pay || !panel) return;
   var L = wbLevelArrays();
   var scen = _wbScen(root, pay);
-  var wins = wbWins(pay.mi, pay.mode, scen ? scen.idx : null);
+  var sel0 = root.querySelector('select.wb-view');
+  var view0 = sel0 ? sel0.value : (pay.views[0] && pay.views[0].id);
+  var pblock = wbPresetBlock(pay);
+  // The builds view's y axis is the PRESET-WEIGHTED win count -- the same
+  // number the builds were ranked on -- unless the section's own Shield
+  // scenario control has narrowed the panel to one scenario, which moves the
+  // axis and nothing else (the selection stays the preset's).
+  var weighted = (view0 === 'builds' && !scen && pblock);
+  var wins = weighted ? wbWinsWeighted(pay.mi, pay.mode, pblock.weights)
+                      : wbWins(pay.mi, pay.mode, scen ? scen.idx : null);
   // The y-axis denominator moves with the control and nothing else does:
   // over every scenario it is (scenarios x opponents), inside one it is the
-  // opponent pool.
-  var den = scen ? DATA.nOpponents : (DATA.nScenarios * DATA.nOpponents);
+  // opponent pool, and under the weighted axis it is (weighted scenarios x
+  // opponents).
+  var den = weighted ? wbWeightedDen(pblock.weights)
+          : scen ? DATA.nOpponents : (DATA.nScenarios * DATA.nOpponents);
   var cap = root.querySelector('.wb-caption');
   if (!wins) {
     panel.innerHTML = '';
@@ -5053,10 +5560,11 @@ function wbRenderRoot(root) {
     root.setAttribute('data-wb-rendered', '1');
     return;
   }
-  var sel = root.querySelector('select.wb-view');
-  var view = sel ? sel.value : (pay.views[0] && pay.views[0].id);
+  var view = view0;
   var colors = _wbColors(root, pay);
-  var g = _wbGroups(pay, view, L, wins, colors, scen, den);
+  var g = (view === 'builds' && pblock)
+        ? _wbBuildGroups(pay, L, wins, colors, den, root, scen)
+        : _wbGroups(pay, view, L, wins, colors, scen, den);
   var traces = g.traces.slice();
   // The trade is a whole-grid claim, so its marked spreads keep saying their
   // side of the PAGE's line even under a single scenario; the two threshold
@@ -5111,6 +5619,36 @@ function wbRenderRoot(root) {
       if (bt) traces.push(bt);
     }
   }
+  if (view === 'builds' && pblock) {
+    var bcolors = _wbBuildColors(root, pay.bp);
+    var br1 = _wbIvIdx(_wbIvTriple(pay.bp.rank1.iv));
+    var br1t = _wbMarkTrace('Stat-product rank-1', br1, colors.mark1,
+                            'diamond', L, wins,
+                            'the stat-product rank-1 spread; ' +
+                            _wbBuildSide(pay, pblock,
+                                         _wbBuildOf(pay.bp, pblock, br1), scen),
+                            den);
+    if (br1t) traces.push(br1t);
+    for (var mb = 0; mb < pblock.builds.length; mb++) {
+      var mwi = _wbIvIdx(_wbIvTriple(pblock.builds[mb].mostWinning.iv));
+      var mwt = _wbMarkTrace(
+        _wbBuildName(pblock, mb) + ': most-winning member', mwi,
+        bcolors[mb] || colors.mark2, 'triangle-up', L, wins,
+        'wins the most matchups inside ' + _wbBuildName(pblock, mb), den);
+      if (mwt) traces.push(mwt);
+    }
+    var gbi2 = _wbIvIdx(_wbIvTriple(pay.bp.gridBest.iv));
+    if (gbi2 >= 0) {
+      var gbt2 = _wbMarkTrace('Wins the most matchups on the whole grid',
+                              gbi2, colors.mark2, 'square-open', L, wins,
+                              'wins the most matchups on the whole grid; ' +
+                              _wbBuildSide(pay, pblock,
+                                           _wbBuildOf(pay.bp, pblock, gbi2),
+                                           scen),
+                              den);
+      if (gbt2) traces.push(gbt2);
+    }
+  }
   if (!pay.hasFloor && view === 'rank1') {
     var nr1 = _wbIvIdx(pay.rank1.iv);
     var nr1t = _wbMarkTrace('Stat-product rank-1', nr1, colors.mark1, 'diamond',
@@ -5124,7 +5662,15 @@ function wbRenderRoot(root) {
       if (gbt) traces.push(gbt);
     }
   }
-  var ownT = _wbOwnedTrace(pay, L, wins, line, den, noLine);
+  var ownSide = null;
+  if (view === 'builds' && pblock) {
+    // On the builds view a pasted mon's question is "is it in a build, and
+    // what does that get me" -- not which side of the line it is on.
+    ownSide = function(i) {
+      return _wbBuildSide(pay, pblock, _wbBuildOf(pay.bp, pblock, i), scen);
+    };
+  }
+  var ownT = _wbOwnedTrace(pay, L, wins, line, den, noLine, ownSide);
   if (ownT) traces.push(ownT);
 
   var chrome = plotChrome();
@@ -5135,7 +5681,10 @@ function wbRenderRoot(root) {
     // default" axis honours the Shields dropdown, so a reader flipping
     // between the two meets two different scales. This one never moves, and
     // says what it is out of.
-    yaxis: { title: (scen
+    yaxis: { title: (weighted
+              ? ('Matchups won in ' + pblock.scens.join(' / ') +
+                 ' shields (of ' + den + ')')
+              : scen
               ? ('Matchups won in ' + scen.label + ' shields (of ' +
                  DATA.nOpponents + ' opponents)')
               : ('Matchups won (of ' + (DATA.nScenarios * DATA.nOpponents) +
@@ -5214,6 +5763,12 @@ function wbRenderRoot(root) {
       }
     }
     cap.textContent = capText;
+  }
+  if (pay.bp) {
+    wbFillMembers(root);
+    if (view === 'builds') _wbUpset(root, pay);
+    var up = root.querySelector('.wb-upset');
+    if (up) up.hidden = (view !== 'builds');
   }
   root.setAttribute('data-wb-rendered', '1');
 }

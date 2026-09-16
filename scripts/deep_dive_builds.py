@@ -596,7 +596,14 @@ def gen_S1(ctx, computed=None):
             flat, ctx['n_iv'], ctx['n_sc'], ctx['n_opp'],
             [tuple(s) for s in ctx['state']['shield_scenarios']],
             ctx['atk'], ctx['dfn'], ctx['hp'], lambda b, s: False)
-    live = [(k, v) for k, v in computed.items() if 'res' in v]
+    # The per-preset combined entries (``all__even``, ...) are EXCLUDED: the
+    # generators are a property of the arm, not of the reader's preset, and
+    # letting one compete for the three per-scenario seats would make the
+    # named sets -- and so every preset's builds -- depend on which extra
+    # partitions the clusters section happened to bake.
+    live = [(k, v) for k, v in computed.items()
+            if 'res' in v and (k == clusters.ALL_SCEN_KEY
+                               or not clusters.is_all_scen_key(k))]
     live.sort(key=lambda kv: -kv[1]['res']['silhouette'])
     keep = [k for k, _v in live if k == clusters.ALL_SCEN_KEY]
     keep += [k for k, _v in live if k != clusters.ALL_SCEN_KEY][:CLUSTER_SCEN_KEEP]
@@ -1289,31 +1296,67 @@ def _region_key(inter):
     return inter['mask'].tobytes()
 
 
-def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6):
+def set_short_label(name):
+    """A reader-facing name for one lattice set.
+
+    The generator names are audit vocabulary ("S4 frontier (atk >= 148.1 ->
+    1v2 Corviknight)"); the UpSet panel's rows sit under reader prose and get
+    the page's own words. The full name stays in the hover.
+    """
+    import re as _re
+    m = _re.match(r"S1 (\S+) cluster (\d+)$", name)
+    if m:
+        scen = 'all scenarios' if m.group(1) == clusters.ALL_SCEN_KEY else m.group(1)
+        return f"matchup cluster {int(m.group(2)) + 1} ({scen})"
+    m = _re.match(r"S2 floor \((\w+) >= ([0-9.]+)\)$", name)
+    if m:
+        return f"the line ({m.group(1)} >= {m.group(2)})"
+    m = _re.match(r"S2 rung \((\w+) >= ([0-9.]+)\)$", name)
+    if m:
+        return f"rung ({m.group(1)} >= {m.group(2)})"
+    if name == 'S2 alternative rectangle':
+        return 'the bulk rectangle'
+    m = _re.match(r"S3 package \[(.*)\]$", name)
+    if m:
+        return 'wins ' + m.group(1)
+    m = _re.match(r"S4 frontier \(atk >= ([0-9.]+) -> (.*)\)$", name)
+    if m:
+        return f"atk {m.group(1)} + defense staircase for {m.group(2)}"
+    m = _re.match(r"S5 box -> (.*)$", name)
+    if m:
+        return f"two-stat box for {m.group(1)}"
+    return name
+
+
+def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
     """The inline JSON the section's client half reads.
 
-    Carries, once per arm:
+    Deliberately SMALL. Every table the section prints -- the builds table,
+    the per-scenario guarantee lists, the "gives up" lists, the members
+    expanders -- is rendered server-side once per preset by
+    ``deep_dive_which_build``, so the payload carries only what the BROWSER
+    needs: the plot's and the UpSet panel's numbers, the membership masks the
+    scatter and the collection overlay colour by, and the per-preset
+    sentences (authored and word-gated in Python, never formatted in JS).
 
-    - ``cells``: every decision cell, with scenario, rank, grid win rate and
-      the material flag. Build guarantee lists are INDICES into this array,
-      so a cell's name is on the page once.
-    - ``regions``: every region any preset draws -- the selected builds plus
-      the next few candidate regions -- identified by the spreads it holds,
-      each with its guarantee bits over ``cells`` (12 bytes on an 87-cell
-      arm) and, when some preset SELECTS it, a packed membership mask.
-    - ``presets``: per preset, its lattice rows, its UpSet columns (with the
-      per-column membership over those rows), its builds' facts, and the
-      objectives sentence's numbers.
+    - ``cells``: one compact ``[scenario index, opponent rank, material]``
+      row per decision cell -- the axis the guarantee bits are over.
+    - ``regions``: every region any preset draws, identified by the SPREADS
+      it holds (not by the per-preset lattice letter), with its guarantee
+      bits over ``cells`` and, when a preset selects it, a packed membership
+      mask.
+    - ``presets``: per preset, its lattice rows, its UpSet columns, its
+      builds' facts and its sentences.
 
-    Region entries are shared between presets that land on the same region,
-    which is why the masks -- the only large arrays here -- are stored once.
+    ``prose`` is ``{preset key: {...strings}}`` from the renderer, already
+    gated; it is merged in rather than authored here so that every
+    reader-facing sentence on the page has passed the brief's word gates.
     """
     ctx = res['ctx']
     frame = res['frame']
-    cells = [{'label': c['label'], 'scen': c['scenario'], 'rank': c['rank'],
-              'gridWr': round(float(c['wr']), 4), 'mat': bool(c['material']),
-              'bestSingle': c['best_single_rate']}
-             for c in frame['cells']]
+    si_of = {lbl: i for i, lbl in enumerate(ctx['scen_labels'])}
+    cells = [[si_of[c['scenario']], (c['rank'] or 0),
+              1 if c['material'] else 0] for c in frame['cells']]
     regions, region_idx = [], {}
 
     def add_region(inter, selected):
@@ -1339,8 +1382,8 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6):
         role_of = {b['combo']: b['role'] for b in block['builds']}
         cols = []
         for b in block['builds']:
-            inter = next(d for d in block['inters'] if d['combo'] == b['combo'])
-            cols.append((inter, True))
+            cols.append((next(d for d in block['inters']
+                              if d['combo'] == b['combo']), True))
         extra = 0
         for d in block['inters']:
             if extra >= n_col:
@@ -1373,58 +1416,41 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6):
                 'role': b['role'], 'combo': b['combo'],
                 'col': col_of[b['combo']],
                 'region': region_idx[_region_key(inter)],
-                'size': b['size'],
-                'desc': text,
-                'shape': b['description_shape'],
+                'size': b['size'], 'desc': text, 'shape': b['description_shape'],
                 'fidelity': (None if d is None else d['jaccard']),
-                'descExtra': (None if d is None else d['n_extra']),
-                'descMissing': (None if d is None else d['n_missing']),
-                'steps': (None if d is None else d.get('steps')),
-                'sets': list(b['sets']),
-                'nG': b['n_guaranteed'],
-                'nGw': b['n_guaranteed_weighted'],
+                'nG': b['n_guaranteed'], 'nGw': b['n_guaranteed_weighted'],
                 'nGmat': b['n_guaranteed_material'],
                 'nScen': b['n_scenarios_covered'],
-                'nSpecies': b['n_guaranteed_distinct_species'],
-                'guaranteed': [[r['ci'], r['outside_wr'],
-                                1 if r['material'] else 0, r['modes_ok']]
-                               for r in b['guaranteed']],
-                'givesUp': [r['ci'] for r in b['gives_up']],
                 'nGivesUp': b['n_gives_up'],
+                'nNearFree': b['honesty']['n_cells_outside_wr_over_90'],
+                'nAllModes': b['honesty']['n_guaranteed_all_modes'],
+                'nModes': b['honesty']['n_modes'],
                 'mostWinning': {'iv': b['most_winning_member']['iv'],
                                 'idx': b['most_winning_member']['idx'],
                                 'wins': b['most_winning_member']['wins'],
                                 'spRank': b['most_winning_member']['sp_rank']},
-                'bestSp': [{'iv': x['iv'], 'idx': x['idx'],
-                            'spRank': x['sp_rank'], 'wins': x['wins']}
-                           for x in b['best_sp_members']],
                 'rank1In': b['rank1_in'],
-                'nModes': b['honesty']['n_modes'],
-                'nAllModes': b['honesty']['n_guaranteed_all_modes'],
-                'nNearFree': b['honesty']['n_cells_outside_wr_over_90'],
-                'medianOut': b['honesty']['median_outside_wr'],
             })
         obj = block['objectives'] or {}
-        pay_presets[key] = {
-            'label': PRESET_LABEL[key],
-            'tag': PRESET_TAG[key],
-            'weights': block['weights'],
-            'scens': [ctx['scen_labels'][i]
-                      for i, w in enumerate(block['weights']) if w > 0],
-            'builds': pb,
-            'cols': col_rows,
-            'lattice': block['lattice_sets'],
-            'rank1Status': block['rank1_status'],
-            'hasFork': block['has_fork'],
-            'objectives': ({
-                'split': bool(obj.get('split')),
-                'winGap': int(obj.get('win_gap', 0)),
-                'cellGap': int(obj.get('cell_gap', 0)),
-                'bestCells': obj.get('best_cells_build'),
-                'bestWins': obj.get('best_wins_build'),
-                'bestWinsValue': obj.get('best_wins_value'),
-            } if obj else None),
-        }
+        pay_presets[key] = dict(
+            (prose or {}).get(key, {}),
+            label=PRESET_LABEL[key], tag=PRESET_TAG[key],
+            weights=[int(x) for x in block['weights']],
+            scens=[ctx['scen_labels'][i]
+                   for i, w in enumerate(block['weights']) if w > 0],
+            builds=pb, cols=col_rows,
+            lattice=[{'key': p['key'], 'short': set_short_label(p['name']),
+                      'name': p['name'], 'size': p['size'],
+                      'nG': p['n_guaranteed'], 'nGw': p['n_guaranteed_weighted'],
+                      'nGmat': p['n_guaranteed_material']}
+                     for p in block['lattice_sets']],
+            rank1Status=block['rank1_status'], hasFork=block['has_fork'],
+            objectives=({'split': bool(obj.get('split')),
+                         'winGap': int(obj.get('win_gap', 0)),
+                         'cellGap': int(obj.get('cell_gap', 0)),
+                         'bestCells': obj.get('best_cells_build'),
+                         'bestWins': obj.get('best_wins_build')}
+                        if obj else None))
     r1 = int(np.argmin(ctx['sp_rank']))
     wins_all = ctx['win2'].sum(axis=1)
     gmw = int(np.argmax(wins_all))
@@ -1434,12 +1460,9 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6):
         'default': (PRESET_FLAT if PRESET_FLAT in pay_presets
                     else next(iter(pay_presets), None)),
         'scenLabels': list(ctx['scen_labels']),
-        'nDecision': len(cells),
-        'nMaterial': int(frame['mat'].sum()),
+        'nDecision': len(cells), 'nMaterial': int(frame['mat'].sum()),
         'nOpp': int(ctx['n_opp']),
-        'cells': cells,
-        'regions': regions,
-        'presets': pay_presets,
+        'cells': cells, 'regions': regions, 'presets': pay_presets,
         'rank1': {'iv': iv_str(ctx['meta'], r1), 'idx': r1,
                   'wins': int(wins_all[r1])},
         'gridBest': {'iv': iv_str(ctx['meta'], gmw), 'idx': gmw,

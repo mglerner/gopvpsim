@@ -2326,12 +2326,28 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     if n_scenarios > 1:
         html += '  <label>Shields: <select id="scenario-sel" onchange="updateView()">\n'
-        html += '    <option value="avg">All (avg)</option>\n'
+        # 'avg' is the unchanged all-nine-equal entry, renamed so the second
+        # entry below cannot be read as the same thing: the weighted one
+        # follows the page's Build criteria preset, this one never moves.
+        html += '    <option value="avg">All (equal weight)</option>\n'
+        if which_build_html:
+            html += ('    <option value="wbavg">All (by build '
+                     'criteria)</option>\n')
         for si, scen in enumerate(shield_scenarios):
             sel = ' selected' if n_scenarios == 1 else ''
             html += (f'    <option value="{si}"{sel}>'
                      f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
+        # "Build criteria": which shield scenarios the build ranking counts.
+        # Three fixed presets, no free weights (Michael's 2026-09-16 call).
+        # Emitted only on a page that HAS the section the knob drives.
+        if which_build_html:
+            html += ('  <label>Build criteria: '
+                     '<select id="build-criteria-sel" '
+                     'onchange="wbSetPreset(this.value)">\n')
+            for _k, _lbl, _scens, _tag in _build_presets():
+                html += f'    <option value="{_k}">{_bc_esc(_lbl)}</option>\n'
+            html += '  </select></label>\n'
 
     if len(opp_iv_modes) > 1:
         _base_modes = list(dict.fromkeys(
@@ -2402,6 +2418,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # back up to the control strip to pin a specific IV.)
     # (Top-IVs table controls live next to the table itself - see the
     # control strip rendered just before <div id="summary"> below.)
+    if which_build_html:
+        # What the knob does, in one line, right where the knob is. It drives
+        # exactly three things; every other section on this page counts all
+        # nine shield scenarios equally, and a reader who cannot see that
+        # boundary will read the whole page as re-weighted.
+        html += ('  <span style="font-size:11px;color:var(--text-muted);'
+                 'margin-left:8px;flex-basis:100%">Build criteria weights '
+                 'shield scenarios in: Which one to build?, the '
+                 'all-scenarios clusters, and Shields = All (by build '
+                 'criteria). Every other section counts all nine shield '
+                 'scenarios equally.</span>\n')
     if thresholds:
         html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
@@ -3422,6 +3449,23 @@ def article_slug_from_thresholds(species, shadow=False, thresholds_dir=None):
         return ''
     _key = species + (' (Shadow)' if shadow else '')
     return _raw.get(_key, {}).get('article', {}).get('slug', '')
+
+
+def _build_presets():
+    """The three Build-criteria presets, from their one definition.
+
+    ``scripts/deep_dive_builds.PRESETS`` owns the table -- the section ranks
+    builds with it, the clusters section bakes one combined partition per
+    entry, and this dropdown lists it. A literal list here would be a fourth
+    copy of the same three strings.
+    """
+    import deep_dive_builds
+    return deep_dive_builds.PRESETS
+
+
+def _bc_esc(s):
+    from html import escape
+    return escape(str(s), quote=True)
 
 
 def _which_build_sections(state):
