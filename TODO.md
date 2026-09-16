@@ -788,6 +788,42 @@ corpus; (3) product: plot the named sets as color groups in "Which one to
 build?" with the collection overlay (the sets JSON is the input), and an
 export of explicit lists to gobattlekit behind the four-target cap.
 
+BUILDS LATTICE DONE (2026-09-16; report
+`~/coding/reports/gopvpsim-builds-lattice-2026-09-16.html`, artifacts under
+`userdata/analysis/2026-09-16_builds/`, 17 MB, re-runnable from the blobs in
+~5 min via builds_lattice.py; verify_builds.py re-derives 12 arms from the
+blobs with zero mismatches). "Builds, not lines": per (dive, moveset) the
+lattice of intersections (<= 4) of the top-8 named sets from the
+2026-09-15 spread-sets analysis; 2-3 builds per moveset = the region
+guaranteeing the most decision cells (primary), a FORK (disjoint region
+whose guaranteed cells differ, Jaccard < 0.8), and the rank-1 region
+(constructed as a (Def, HP) box when no lattice region holds rank-1).
+Corpus (108 dives / 448 arms / 993 builds): best region beats best single
+set by a median 6 guaranteed decision cells (88% of arms gain; 26% gain
+>= 10); 79% of arms name a fork; the fork is the textbook "bulk side
+holding rank-1" on only 20% of fork arms (26% both sides carry an attack
+floor); the two objectives (region guaranteeing the most cells vs the
+single most-winning spread) pick different builds on 41% of arms, by a
+median 4 matchups vs 4.5 cells; 54% of builds are rule-quotable (30%
+two-stat box, 23% attack floor + printed Def-vs-HP staircase, 18%
+three-stat box), 23% list-only. Honesty: 23% of guaranteed (build, cell)
+pairs are cells the rest of the grid wins > 90% anyway; the median build
+guarantees ZERO cells that are both material and survive all opponent
+IV/bait modes -- one of those two bars must loosen before a headline.
+A shield-scenario prior (an explicit flat-defaulted knob) re-weights
+objective A directly: even-shields changes the leading build on 16% of
+multi-build arms, 1v1-only on 24% (partly size tie-breaks among tiny
+counts). Sableye shadow: primary atk >= 150.24 + Def >= d(HP) (61
+spreads, 55 cells) vs fork def >= 101.4 & HP >= 125 (114, 41 cells,
+holds rank-1); the grid's most-winning spread 7/2/14 is in neither.
+OPEN: (1) the lattice searches only the 18 named sets per arm (a
+hand-built (Def, HP) box out-guarantees every lattice region on 45 arms:
+the generators are the binding constraint); (2) decide the material /
+all-modes bars for headlines; (3) objective B under the prior needs the
+per-scenario win cube; (4) product: this is the v4 input for "Which one
+to build?" (builds as color groups + UpSet panel + explicit lists +
+collection overlay + gobattlekit targets).
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
