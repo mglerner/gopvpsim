@@ -2012,21 +2012,99 @@ def test_a_single_scenario_marks_only_rank1():
             ) in render
 
 
+# An arm that carries a LINE is a moving target: the brief gates a floor on
+# the opponent's PvPoke meta rank, which is a live read, so a rankings refresh
+# alone can take every line off a blob. The 2026-09-15 refresh did exactly
+# that to Melmetal, which used to carry one on arm 2 -- the index this test
+# pinned. So the positive arm is found BY PROPERTY now. The hints are tried
+# first (one blob load in the common case) and the rest of the store is
+# scanned in sorted order behind them, so the search is deterministic without
+# being pinned to one blob that a later refresh can hollow out.
+_LINE_ARM_HINTS = ['20260909_161909_Deoxys_Defense_ultra.replay.pkl.gz',
+                   MELMETAL, SABLEYE_SHADOW]
+_LINE_ARM_SCAN_BUDGET = 6
+
+
+def _candidate_blobs():
+    """Blob names to search, hints first, then the store in sorted order."""
+    seen, out = set(), []
+    for name in _LINE_ARM_HINTS:
+        seen.add(name)
+        out.append(name)
+    for d in _replay_dirs():
+        if d.is_dir():
+            for name in sorted(q.name for q in d.glob('*.replay.pkl.gz')):
+                if name not in seen:
+                    seen.add(name)
+                    out.append(name)
+    return out
+
+
+def _arm_with_a_line_and_an_empty_scenario():
+    """First (blob name, facts, payload) whose arm carries all three shapes.
+
+    The second half of the test below needs an arm that (a) prints a line,
+    (b) still has a shield scenario with no line of its own, and (c) has a
+    DEGENERATE scenario that does carry an in-band cut -- the case where the
+    panel used to claim a threshold decides matchups in a shield state the
+    clusters view calls dead two clicks away.
+    """
+    tried = 0
+    for name in _candidate_blobs():
+        path = next((d / name for d in _replay_dirs() if (d / name).exists()),
+                    None)
+        if path is None:
+            continue
+        tried += 1
+        if tried > _LINE_ARM_SCAN_BUDGET:
+            break
+        state = B.load_blob(str(path))
+        all_facts = W.prepare(state, str(path))
+        for f in all_facts:
+            if f['floor'] is None:
+                continue
+            pay = W.build_payload(f, f['_fields'], 0, all_facts=all_facts,
+                                  arm_builds=f.get('_builds'))
+            scen = pay['scen']
+            if (any(v['lines'] for v in scen.values())
+                    and any(not v['lines'] for v in scen.values())
+                    and any(v['degenerate'] and v['lines']
+                            for v in scen.values())):
+                return name, f, pay
+    pytest.skip(f"no blob in the first {_LINE_ARM_SCAN_BUDGET} searched "
+                f"carries a line with an empty and a degenerate scenario")
+
+
+@pytest.fixture(scope='module')
+def line_carrying_arm():
+    return _arm_with_a_line_and_an_empty_scenario()
+
+
 @pytest.mark.local_artifacts
 @pytest.mark.slow
-def test_the_negative_page_carries_the_control_and_its_captions():
+def test_the_negative_page_carries_the_control_and_its_captions(
+        line_carrying_arm):
     """Melmetal Great League: the section's own control on a no-line page.
 
-    Arm 0 prints no line at all, so the two threshold views do not exist and
-    the control drives the y-axis, the clusters view and the caption. Arm 2
-    DOES print one, and most of its shield scenarios still have no line of
-    their own -- which is the case the captions have to say out loud.
+    A no-line arm prints no line at all, so the two threshold views do not
+    exist and the control drives the y-axis, the clusters view and the
+    caption. The opposite case -- an arm that DOES print one while most of
+    its shield scenarios still have no line of their own -- is the case the
+    captions have to say out loud, and it comes from
+    ``line_carrying_arm``.
+
+    Both arms are selected BY PROPERTY, not by index, and the second half's
+    caption VALUES are read back out of the payload: what is pinned is the
+    sentence each caption has to say, because which arm carries a line (and
+    at what value) moves whenever PvPoke re-ranks the meta. Pinning Melmetal
+    arm 2 made the 2026-09-15 rankings refresh look like a code failure.
     """
     path = require_blob(MELMETAL)
     state = B.load_blob(str(path))
     all_facts = W.prepare(state, str(path))
-    neg = all_facts[0]
-    assert neg['floor'] is None
+    neg = next((f for f in all_facts if f['floor'] is None), None)
+    assert neg is not None, 'this blob no longer carries a no-line moveset'
+    arm = neg['header']['arm']
     pay = W.build_payload(neg, neg['_fields'], 0, all_facts=all_facts,
                           arm_builds=neg.get('_builds'))
     assert [v['id'] for v in pay['views']] == ['builds', 'clusters', 'rank1']
@@ -2035,17 +2113,14 @@ def test_the_negative_page_carries_the_control_and_its_captions():
         assert entry['lines'] == []
         assert set(entry['captions']) == {'builds', 'clusters', 'rank1'}
         assert lbl in entry['captions']['rank1']
-    html = W.section_html(all_facts, 0)
+    html = W.section_html(all_facts, arm)
     assert 'Shield scenario: ' in html
     assert f'<option value="{W.ALL_SCEN}" selected>' in html
 
-    # The arm that DOES carry a line: 1v1 has one, most scenarios do not.
-    pos = all_facts[2]
-    assert pos['floor'] is not None
-    pay2 = W.build_payload(pos, pos['_fields'], 0, all_facts=all_facts,
-                           arm_builds=pos.get('_builds'))
+    # The arm that DOES carry a line: some scenarios have one, some do not.
+    blob, _pos, pay2 = line_carrying_arm
     withline = [k for k, v in pay2['scen'].items() if v['lines']]
-    assert '1v1' in withline
+    assert withline, blob
     assert len(withline) < len(pay2['scen']), 'expected empty scenarios here'
     empty = next(k for k, v in pay2['scen'].items() if not v['lines'])
     cap = pay2['scen'][empty]['captions']['rungs']
@@ -2057,14 +2132,21 @@ def test_the_negative_page_carries_the_control_and_its_captions():
     # G-scenario is a hard exclusion for the page's line and is applied to
     # nothing here, so without this the panel claimed a threshold decides
     # matchups in a shield state the clusters view calls dead two clicks away.
-    deg = pay2['scen']['2v0']
-    assert deg['degenerate'] and deg['lines'], deg
+    # The two sentences are what is pinned; the value and the opponent are
+    # this arm's own, so they are read back from the payload rather than
+    # spelled out (spelling them out is what tied the test to one blob).
+    deg_lbl = next(k for k, v in pay2['scen'].items()
+                   if v['degenerate'] and v['lines'])
+    deg = pay2['scen'][deg_lbl]
     dcap = deg['captions']['line']
-    assert dcap.startswith('Every spread at or above 122.54 attack wins '
-                           'Charjabug in 2v0 shields'), dcap
-    assert ('In 2v0 shields little turns on IVs at all: every spread wins '
-            '73-76 of 76 opponents here, so the IV choice moves at most 3 '
-            'matchups in this shield state.') in dcap, dcap
+    printed = deg['lines'][0]['printed']
+    assert float(printed) > 0, deg['lines'][0]     # a real value, not ''
+    assert printed in dcap, dcap                   # ... and it is quoted
+    assert f'{deg_lbl} shields' in dcap, dcap
+    assert (f'In {deg_lbl} shields little turns on IVs at all: every spread '
+            f'wins ') in dcap, dcap
+    assert 'so the IV choice moves at most ' in dcap, dcap
+    assert 'matchups in this shield state.' in dcap, dcap
 
     # The NEGATIVE arm's rank-1 caption names the scenario's own threshold
     # where it has one -- that page offers neither threshold view, so this is
