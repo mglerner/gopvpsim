@@ -824,6 +824,23 @@ per-scenario win cube; (4) product: this is the v4 input for "Which one
 to build?" (builds as color groups + UpSet panel + explicit lists +
 collection overlay + gobattlekit targets).
 
+"WHICH ONE TO BUILD?" v4 + BUILD CRITERIA KNOB (Michael, 2026-09-16; in
+progress on branch wotb-v4 in the clone): the section shows 2-3 BUILDS
+(primary / fork / rank-1 region from the intersection lattice), not one
+line. A "Build criteria" dropdown in the scatter controls strip with THREE
+presets and no free weights: "All shields, equal" (default), "Even shields
+(0v0, 1v1, 2v2)", "1v1 only (open GBL lead)". The knob drives exactly three
+surfaces and the page says so: the section (ranking, selection, summary,
+headline, plot, UpSet), the Matchup clusters "all scenarios" partition
+(one precomputed per preset), and a NEW Shields entry "All (by build
+criteria)" (weighted wins); the old 'avg' entry is renamed "All (equal
+weight)" and never changes. All other sections stay all-nine-equal, with a
+one-line caption saying so. Section text self-labels the preset
+("[even shields]"). Preset persists in the URL hash. gobattlekit export
+stays at the default preset. Placeholder "lead-and-closer" prior: skipped.
+Gate before the rebake: Michael reviews the preview renders (Sableye pair
++ Melmetal) and says go.
+
 Cramorant reinvestigation hand-off (for the session that picks it up):
 
 - Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
