@@ -2887,7 +2887,8 @@ def test_a_staircase_summary_prints_a_range_not_undefined_notation(
         assert 'depending on HP' in short and 'steps, in the table' in short
         # the printed band CONTAINS every step of the staircase
         lo, hi = re.search(r'Def >= ([\d.]+)-([\d.]+) ', short).groups()
-        defs = [d for _h, d, _n in b['description']['steps']]
+        # round 4: a step is (HP, exact floor, members, printed decimal)
+        defs = [d for _h, d, _n, _p in b['description']['steps']]
         assert float(lo) <= min(defs) and float(hi) >= max(defs)
         # the table still prints the steps themselves
         assert '->' in W.build_desc(b, steps=True)
@@ -3001,7 +3002,8 @@ def test_the_member_list_is_iv_spreads_and_nothing_else():
     # matchable -- that the list is JOINED into one string is.
     assert 'var html = out.join(' in render
     assert 'box.innerHTML = html;' in render
-    # the order and the cap are unchanged: bulkiest first, topN then all
+    # the order and the cap are unchanged: stat-product rank, topN then
+    # all (the header says so since round 4; the old one said 'bulkiest')
     assert 'L.spRanks[a] - L.spRanks[b]' in render
     assert 'pay.bp.topN' in render
 
@@ -3169,10 +3171,14 @@ def test_the_standouts_block_prints_what_is_the_spreads_own(shadow_sableye):
                             all_facts)
     text = W.gate_text(html)
     assert 'Of the 62 decision matchups it wins, Build 1 guarantees 49' in text
-    assert 'so the other 13 are this one spread\'s own' in text
     assert 'Of the 62 decision matchups it wins, Build 1 guarantees 52' in text
+    # round 4: the remainder is "no guarantee", not "this spread's own"
+    # (which claimed an exclusivity nothing had measured), and the block
+    # prints what the hunt costs. Asserted in full in
+    # test_the_standouts_block_claims_no_exclusivity.
+    assert 'come with no guarantee from it' in text
+    assert "spread's own" not in text
     # rarity, in the brief's own encounter model (this is a shadow)
-    assert 'It is 1 of the 4096 spreads on this grid.' in text
     assert 'Rocket-grunt encounters' in text
     assert 'the grunt IV floor is not verified here' in text
     # and the fixed sentence that says why a build cannot contain them
@@ -3200,11 +3206,14 @@ def test_the_card_specs_come_from_the_builds(shadow_sableye):
     specs = W.card_specs(all_facts[0], ab)
     assert [s['iv'] for s in specs] == [[8, 7, 5], [2, 11, 13],
                                         [9, 6, 13], [7, 2, 14]]
+    # round 4 titles: each names what the card SHOWS. Pre-fix: 'Highest
+    # battle score' (which printed no score) and 'Most wins (outside the
+    # builds)' (which printed no win count).
     assert [s['title'] for s in specs] == [
         'Build 1 -- Atk >= 150.24 + Def/HP steps',
         'Build 2 -- Def >= 101.40 and HP >= 125',
-        'Highest battle score',
-        'Most wins (outside the builds)']
+        'Highest average battle score',
+        'Most matchups won (outside the builds)']
     # the threshold on a card is the one the build is actually cut at:
     # formatting the raw atk_floor (150.245638) to two places rounds UP to
     # 150.25 and excludes real members
@@ -3221,7 +3230,13 @@ def test_the_card_specs_come_from_the_builds(shadow_sableye):
     # ... and they agree with the section by construction
     assert specs[0]['guarantee'].startswith(
         'guarantees 55 of 87 decision matchups (Build 1)')
-    assert specs[2]['guarantee'].startswith('wins 62 of 87 decision matchups')
+    # round 4: the standout cards lead with the number that MAKES them
+    # standouts. Pre-fix both read "wins 62 of 87 decision matchups" and
+    # nothing else, so neither card showed its own score or win count.
+    assert specs[2]['guarantee'].startswith('Avg Battle Score ')
+    assert '62 of 87 decision matchups' in specs[2]['guarantee']
+    assert specs[3]['guarantee'].startswith('wins 382 of 684 matchups, the '
+                                            'most of any spread on this grid')
     # no pole label survives on this path
     joined = ' '.join(s['title'] for s in specs)
     assert 'Matchup Hunter' not in joined and 'Max Bulk' not in joined
@@ -3261,3 +3276,468 @@ def test_each_build_carries_a_drawable_plane_or_says_it_cannot(
     # the scatter's own maximum travels with the payload, pre-formatted
     assert pay['bestScore']['iv'] == '9/6/13@47.5'
     assert pay['bestScore']['avgStr'] == '534.2'
+
+
+# ---------------------------------------------------------------------------
+# 7. Round 4 -- the 2026-09-16 ROUND-3 review (numbers, reader, contracts)
+# ---------------------------------------------------------------------------
+
+
+_FACTS_CACHE = {}
+
+
+def _facts_for(name):
+    """(state, all_facts) for one blob, loaded once per test session."""
+    if name not in _FACTS_CACHE:
+        path = require_blob(name)
+        state = B.load_blob(str(path))
+        _FACTS_CACHE[name] = (state, W.prepare(state, str(path)))
+    return _FACTS_CACHE[name]
+
+
+def test_the_builds_caption_explains_every_marker_the_view_draws():
+    """The builds plot marks BOTH standouts, so the caption names both.
+
+    Pre-fix it named the diamond, the triangles and the open square and
+    said nothing about the open cross (the highest Avg Battle Score), which
+    the same view has drawn since round 3 -- an unexplained marker in the
+    default view. The stats caption already named it.
+    """
+    assert 'open cross' in W.BUILDS_CAPTION
+    assert 'Avg Battle Score' in W.BUILDS_CAPTION
+    for marker in ('diamond', 'triangle', 'open square'):
+        assert marker in W.BUILDS_CAPTION, marker
+    # positive control: the stats caption's own wording is unchanged
+    assert 'the open cross the highest Avg Battle Score' in W.STATS_CAPTION
+
+
+def test_the_emphasis_key_defines_both_rates_it_weights():
+    """Item 5's key described the outside rate only, while the Standouts
+    block and the cards use the same three typefaces on the GRID rate with
+    no definition anywhere. Pre-fix it opened "Weight follows the outside
+    rate:".
+    """
+    assert 'outside N%' in W.EMPH_KEY and 'grid N%' in W.EMPH_KEY
+    assert not W.EMPH_KEY.startswith('Weight follows the outside rate')
+    for phrase in ('fewer than half', 'fewer than a quarter',
+                   'fewer than a tenth', 'nine in ten'):
+        assert phrase in W.EMPH_KEY, phrase
+
+
+def test_an_approximate_rule_is_flagged_on_a_synthetic_build():
+    """The fast positive control for the "about" flag: a rule that takes in
+    one non-member and misses one is printed as approximate on the
+    paragraph, the summary line and the card title.
+
+    Pre-fix only the builds table's fidelity clause said so, and the plain
+    Sableye page printed "at Atk >= 125.00 and Def + 1.9*HP >= 345.067" as
+    exact on three surfaces -- the un-flagged known-wrong case Michael's
+    standing rule forbids.
+    """
+    exact = {'rule': 'atk >= 125 and def >= 100', 'terms': [['atk', '>=', 125.0],
+             ['def', '>=', 100.0]], 'n_extra': 0, 'n_missing': 0,
+             'jaccard': 1.0, 'family': 'two_box'}
+    approx = dict(exact, n_extra=1, n_missing=1, jaccard=0.9937)
+    b_exact = {'description': exact, 'size': 318, 'role': 'primary',
+               'sets': ['S5 box -> 1v2 Snorlax']}
+    b_approx = dict(b_exact, description=approx)
+    assert not W.rule_is_approx(b_exact)
+    assert W.rule_is_approx(b_approx)
+    assert W.approx_clause(b_exact) == ''
+    assert W.approx_clause(b_approx) == (
+        'That rule takes in 1 spread that is not a member and misses 1; '
+        'the member list in the table is the build.')
+    assert W.build_rule_phrase(b_approx).startswith('about ')
+    assert 'about ' in W.build_summary_phrase(b_approx)
+    assert W.card_title_rule(b_approx).startswith('about ')
+    # ... and an exact rule carries no hedge
+    for phrase in (W.build_rule_phrase(b_exact),
+                   W.build_summary_phrase(b_exact),
+                   W.card_title_rule(b_exact)):
+        assert 'about' not in phrase, phrase
+
+
+def test_the_staircase_geometry_skips_zero_length_segments():
+    """Consecutive HP steps that share one defense floor emitted a shape
+    with x0 == x1 and y0 == y1 -- one on the flat Sableye staircase, three
+    on the 1v1 one. Invisible, but dead shapes in the layout.
+    """
+    src = _engine()
+    body = src[src.index('function _wbPlaneShapes('):
+               src.index('function _wbGuaranteedInScen(')]
+    assert 'if (x0 === x1 && y0 === y1) return;' in body
+    # positive control: the guard sits inside the segment emitter it guards
+    assert body.index('function line(') < body.index(
+        'if (x0 === x1 && y0 === y1) return;') < body.index('shapes.push({ type')
+
+
+def test_the_member_list_header_names_its_own_sort_order():
+    """The list is sorted by STAT PRODUCT rank (attack counts too), so the
+    first member is not the bulkiest. Pre-fix the header said "bulkiest
+    first" over a list the JS sorts by ``L.spRanks``.
+    """
+    src = _engine()
+    render = src[src.index('function wbRenderMembers('):
+                 src.index('function wbMoreRows(')]
+    assert 'L.spRanks[a] - L.spRanks[b]' in render
+    body = SCRIPTS_DIR.joinpath('deep_dive_which_build.py').read_text()
+    assert "'highest stat product first" in body or \
+           'highest stat product first' in body
+    assert 'bulkiest first' not in body
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_outside_rates_are_rounded_once_at_print_time(shadow_sableye):
+    """``cell_rows`` stored ``round(ow, 4)`` and ``_pct`` rounded that again.
+
+    A true 0.3749632677 was stored as 0.375 and printed 38% where the data
+    says 37% (errors went both ways), and the same stored value decided the
+    emphasis band and the near-free bucket, so a rate within 1e-4 of a band
+    edge could be weighted wrongly. Recomputed here from the cube.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    Wd = ab['frame']['Wd']
+    rows = []
+    for bl in ab['presets'].values():
+        for b in bl['builds']:
+            outside = ~b['_mask']
+            for r in b['guaranteed']:
+                raw = float(Wd[outside, r['ci']].mean())
+                assert abs(raw - r['outside_wr']) < 1e-12, r['cell']
+                assert W.emph_class(r['outside_wr']) == W.emph_class(raw)
+                rows.append(r['outside_wr'])
+    assert len(rows) > 200, len(rows)
+    # The pre-fix behaviour, recorded: at least one row on this blob prints
+    # a different percent through the 4-dp store than through the raw value.
+    differs = [v for v in rows
+               if f"{round(round(v, 4) * 100):.0f}%" != W._pct(v)]
+    assert differs, 'no row here distinguishes the two roundings'
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_printed_staircase_reproduces_its_own_build(shadow_sableye):
+    """A staircase's steps are printed as the decimals that SELECT them.
+
+    Pre-fix the raw float was formatted with %g, which rounds half-up and
+    lands ABOVE the true per-HP floor, so a reader applying the printed rule
+    literally dropped the boundary member of every step: 57 spreads out of
+    Build 1's 61.
+    """
+    import numpy as np
+    _state, all_facts, _path = shadow_sableye
+    checked = 0
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        ctx = ab['ctx']
+        atk, dfn, hp = (ctx['planes']['atk'], ctx['planes']['def'],
+                        ctx['planes']['hp'])
+        for bl in ab['presets'].values():
+            for b in bl['builds']:
+                d = b['description']
+                if not d or not d.get('steps'):
+                    continue
+                floor = float(builds_mod.stair_atk_head(d).split('>=')[1])
+                need = np.full(atk.shape, np.inf)
+                for h, exact, _n, printed in d['steps']:
+                    need[hp == h] = printed
+                    # never above the true floor, so the printed rule can
+                    # only ever be a superset of its own membership
+                    assert printed <= exact + 1e-12, (h, printed, exact)
+                got = int(((atk >= floor) & (dfn >= need)).sum())
+                assert got == b['size'], (b['role'], got, b['size'])
+                checked += 1
+    assert checked >= 2, checked
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_paragraphs_name_cells_the_preset_counts(shadow_sableye):
+    """Pre-fix the "most notably" three were taken from all nine scenarios.
+
+    Under the Even preset Build 1's paragraph opened "guarantees 29 of the
+    43 decision matchups in 0v0 / 1v1 / 2v2 shields" and then named 1v0
+    Tinkaton as the most notable of them -- a matchup the same sentence says
+    the preset does not count.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    labels = ab['ctx']['scen_labels']
+    seen_narrow = 0
+    for key, bl in ab['presets'].items():
+        counted = {labels[i] for i, w in enumerate(bl['weights']) if w > 0}
+        for i, b in enumerate(bl['builds']):
+            para = W.gate_text(
+                W.build_paragraph(all_facts[0], ab, bl, b, i, all_facts))
+            if 'most notably' not in para:
+                continue
+            named = para.split('most notably ', 1)[1]
+            rows, fell_back = W.counted_guaranteed(ab, bl, b)
+            if fell_back:
+                # the fallback says which scale it switched to
+                assert 'over all nine shield scenarios)' in para
+                continue
+            top = sorted(rows, key=lambda r: (r['outside_wr'], r['rank']))
+            for r in top[:W.TOP_CELLS]:
+                assert r['cell'] in named, (key, r['cell'])
+                assert r['cell'].split()[0] in counted, (key, r['cell'])
+            if len(counted) < len(labels):
+                seen_narrow += 1
+    assert seen_narrow >= 2, seen_narrow
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_only_the_headers_own_rectangle_is_the_bulk_box(blob):
+    """"The bulk box" is the box the header's Alternative row names, and
+    nothing else.
+
+    Pre-fix the definite article was attached to ANY Def-floor + HP-floor
+    rule, so one page called two different boxes the bulk box (Def >=
+    101.40 with HP >= 125 under two presets, Def >= 99.99 with HP >= 121
+    under the third), and on the plain page the section printed Def >=
+    120.00 for the very box its own header row calls Def >= 120.03.
+    """
+    _state, all_facts = _facts_for(blob)
+    seen_header_box = seen_other_box = 0
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        alt = facts.get('alternative') or {}
+        for key, bl in ab['presets'].items():
+            for i, b in enumerate(bl['builds']):
+                phrase = W.build_rule_phrase(b, facts)
+                summary = W.build_summary_phrase(b, facts)
+                if W.is_header_bulk_box(b, facts):
+                    seen_header_box += 1
+                    assert phrase.startswith('the bulk box, '), phrase
+                    assert summary.startswith('the bulk box '), summary
+                    # one box, one pair of numbers on the page
+                    numbers = B.alt_pair_short(alt).replace(', ', ' and ')
+                    assert numbers in phrase, (numbers, phrase)
+                    assert b['size'] == alt['n'], (b['size'], alt['n'])
+                else:
+                    assert 'bulk box' not in phrase, (key, phrase)
+                    assert 'bulk box' not in summary, (key, summary)
+                    if W.is_bulk_box(b):
+                        seen_other_box += 1
+                        assert phrase.startswith('a Def/HP box, '), phrase
+    # Not every page HAS the header's own rectangle as a build -- on
+    # Melmetal the bulk build is an intersection of that rectangle with a
+    # cell's winner set, which is a different (55-spread) region and so is
+    # "a Def/HP box". What every page must do is name at most the one.
+    assert seen_header_box + seen_other_box >= 1
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_header_box_build_quotes_the_headers_own_numbers(shadow_sableye):
+    """The positive control for the test above: a page that DOES build the
+    header's rectangle names it "the bulk box" and prints the header row's
+    numbers, not the describer's own decimals for the same spreads.
+    """
+    _state, all_facts, _path = shadow_sableye
+    found = 0
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        alt = facts['alternative']
+        for key, bl in ab['presets'].items():
+            for i, b in enumerate(bl['builds']):
+                if not W.is_header_bulk_box(b, facts):
+                    continue
+                found += 1
+                want = B.alt_pair_short(alt).replace(', ', ' and ')
+                assert W.build_rule_phrase(b, facts) == f'the bulk box, {want}'
+                assert W.build_summary_phrase(b, facts) == \
+                    f'the bulk box {want}'
+                assert W.card_title_rule(b, facts) == want
+    assert found >= 1, 'no build on this blob is the header rectangle'
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_every_approximate_rule_on_a_real_page_says_so(blob):
+    """The invariant on real data, whatever the rankings do: a rule that
+    does not reproduce its member list is hedged everywhere it is printed,
+    and an exact one is hedged nowhere. The synthetic test above is the
+    positive control that the hedge can appear at all.
+    """
+    _state, all_facts = _facts_for(blob)
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        for key, bl in ab['presets'].items():
+            for i, b in enumerate(bl['builds']):
+                para = W.gate_text(
+                    W.build_paragraph(facts, ab, bl, b, i, all_facts))
+                summary = W.build_summary_phrase(b, facts)
+                title = W.card_title_rule(b, facts)
+                if W.rule_is_approx(b):
+                    assert 'at about ' in para, (key, para[:120])
+                    assert 'the member list in the table is the build' in para
+                    assert 'about ' in summary, summary
+                    assert 'about ' in title, title
+                else:
+                    assert 'about' not in summary, summary
+                    assert 'about' not in title, title
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_standouts_block_claims_no_exclusivity(shadow_sableye):
+    """Pre-fix: "so the other 13 are this one spread's own".
+
+    Each of those 13 cells is won by hundreds of other spreads -- what they
+    lack is a REGION-WIDE guarantee -- and the block never printed the
+    number a reader needs to compare the two plans: what the hunt costs
+    (7/2/14 loses 6 matchups every Build 1 member wins).
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    bl = ab['presets'][builds_mod.PRESET_FLAT]
+    text = W.gate_text(W.standouts_html(all_facts[0], ab,
+                                        builds_mod.PRESET_FLAT, all_facts))
+    assert "spread's own" not in text
+    assert 'It is 1 of the 4096 spreads on this grid.' not in text
+    cells = ab['frame']['cells']
+    for t in bl['standouts']:
+        if t['in_build'] is not None:
+            continue
+        nb = bl['builds'][t['nearest_build']]
+        own, got = t['n_own_decision_wins'], t['n_from_nearest']
+        lost = t['n_lost_from_nearest']
+        # recomputed from the cube: what the build guarantees and this
+        # spread does not win
+        won = ab['ctx']['win2'][t['idx']]
+        assert lost == sum(1 for ci, c in enumerate(cells)
+                           if nb['_g'][ci] and not won[c['k']])
+        assert lost == nb['n_guaranteed'] - got
+        assert (f"guarantees {got} to every one of its {nb['size']} members"
+                in text)
+        assert f"the other {own - got} come with no guarantee from it" in text
+        assert (f"It loses {lost} of the {nb['n_guaranteed']} matchups "
+                f"{W.role_short(nb, t['nearest_build'])} guarantees." in text)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_the_fixed_standout_note_fits_the_page_it_is_on(blob):
+    """The "a single exceptional spread can out-win every build without
+    belonging to one" note shipped on pages where BOTH standouts are
+    members of a build -- arguing a case the page does not have.
+    """
+    _state, all_facts = _facts_for(blob)
+    seen_outside = seen_inside = 0
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        for key, bl in ab['presets'].items():
+            if not bl.get('standouts'):
+                continue
+            text = W.gate_text(W.standouts_html(facts, ab, key, all_facts))
+            if any(t['in_build'] is None for t in bl['standouts']):
+                seen_outside += 1
+                assert W.STANDOUT_NOTE in text
+                assert W.STANDOUT_NOTE_INSIDE not in text
+            else:
+                seen_inside += 1
+                assert W.STANDOUT_NOTE_INSIDE in text
+                assert W.STANDOUT_NOTE not in text
+    assert seen_outside + seen_inside >= 3
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_standout_cards_print_what_makes_them_standouts(shadow_sableye):
+    """Pre-fix both standout cards read "wins 62 of 87 decision matchups"
+    and nothing else, so "Highest battle score" showed no score and "Most
+    wins" showed no win count -- the two cards were indistinguishable to a
+    reader who had not opened the section.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    bl = ab['presets'][builds_mod.PRESET_FLAT]
+    specs = {s['title']: s for s in W.card_specs(all_facts[0], ab)}
+    by_kind = {t['kind']: t for t in bl['standouts']}
+    score, wins = by_kind['score'], by_kind['wins']
+    sc = specs[W.CARD_TITLE_SCORE]
+    assert f"Avg Battle Score {score['avg_score']:.1f}" in sc['guarantee']
+    assert (f"wins {score['wins_all']} of {score['denominator_all']} matchups"
+            in sc['guarantee'])
+    wc = specs[W.CARD_TITLE_WINS]
+    assert (f"wins {wins['wins_all']} of {wins['denominator_all']} matchups, "
+            f"the most of any spread on this grid" in wc['guarantee'])
+    # both still carry the decision-matchup count and the nearest build
+    for spec in (sc, wc):
+        assert f"of {ab['n_decision_cells']} decision matchups" in \
+            spec['guarantee']
+        assert 'it is in none of the builds' in spec['guarantee']
+        assert "spread's own" not in spec['guarantee']
+        assert 'it loses ' in spec['guarantee']
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_standout_inside_a_build_names_its_role_on_that_card():
+    """Melmetal: the most-winning spread, the highest battle score and
+    stat-product rank-1 are all 1/15/14, which is Build 1's most-winning
+    member. The dedup dropped the standout card silently, so the card set
+    lost a role the section had named; now the build card carries it.
+    """
+    _state, all_facts = _facts_for(MELMETAL)
+    seen = 0
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab or not ab.get('presets'):
+            continue
+        bl = ab['presets'].get(builds_mod.PRESET_FLAT)
+        if not bl or not bl['builds']:
+            continue
+        specs = W.card_specs(facts, ab)
+        ivs = [tuple(s['iv']) for s in specs]
+        assert len(ivs) == len(set(ivs)), ivs
+        for t in bl['standouts']:
+            iv = tuple(int(x) for x in t['iv'].split('@')[0].split('/'))
+            holder = next((s for s in specs if tuple(s['iv']) == iv), None)
+            if t['in_build'] is None or holder is None:
+                continue
+            if holder['title'].startswith('Build'):
+                seen += 1
+                assert W.CARD_ALSO[t['kind']] in holder['title'], \
+                    holder['title']
+    assert seen >= 1, 'no standout coincides with a build card here'
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_emphasis_key_sits_above_the_paragraphs(shadow_sableye):
+    """The paragraphs print "(outside 10%)" in the page's three typefaces,
+    so the key that defines them has to come first. Pre-fix it sat under the
+    builds table, three paragraphs below the first weighted cell.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    block = W.builds_block_html(all_facts[0], ab, all_facts)
+    key = W._esc(W.EMPH_KEY)
+    assert block.count(key) == len(ab['presets'])
+    for k in ab['presets']:
+        one = block[block.index(f'data-preset="{k}"'):]
+        one = one[:one.index('</table>')]
+        assert key in one, k
+        assert one.index(key) < one.index('wb-para'), k
+        assert one.index('wb-builds-lead') < one.index(key), k
+    # and the members list header names the sort order the JS actually uses
+    assert 'highest stat product first' in block
+    assert 'bulkiest first' not in block

@@ -495,6 +495,81 @@ def test_card_carries_the_build_guarantee_and_its_rarest_cells():
     assert '.ddcard-o3 {' in solo
 
 
+def test_card_carries_the_guarantee_key_in_its_own_foot():
+    """The card ships STANDALONE (--card-out), where there is no section to
+    read the emphasis key from -- and it prints two different rates
+    ("outside N%" on a build card, "grid N%" on a standout) in three
+    typefaces. Pre-fix the foot said only "Win rate = shield-scenario
+    matchups won (>500) ...", so an underlined italic cell on the exported
+    card meant nothing.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': [{'text': '1v2 Feraligatr (rank 30)', 'rate': 0.0999,
+                       'word': 'outside'}]}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    for html_out in (dc.render_card_html(m, standalone=False),
+                     dc.render_card_html(m, standalone=True)):
+        assert 'Rarest = the guaranteed matchups' in html_out
+        assert 'outside N% = the share of the spreads outside that build' \
+            in html_out
+        assert 'grid N% = the share of all the spreads on the grid' in html_out
+        assert 'bold = fewer than half' in html_out
+    # a card with no guarantee cells carries no key
+    ctx['card_extras'] = {0: {'guarantee': '', 'cells': []}}
+    plain = dc.render_card_html(
+        dc.build_card_model(data_obj, ctx, types=['steel']), standalone=False)
+    assert 'Rarest = the guaranteed matchups' not in plain
+
+
+def test_a_pinned_card_says_its_builds_come_from_another_level():
+    """The best-buddy (L51) card reuses the LEAGUE-CAP builds, because the
+    "Which one to build?" section itself is rendered once, at the cap.
+
+    Pre-fix the best-buddy pass got no builds at all, so toggling Best
+    Buddy replaced the four build cards with the RETIRED stat-extreme poles
+    ("Matchup Hunter", "Max Bulk") and dropped every guarantee line, with
+    nothing on the card saying why it differed from the section below it.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': []}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel'])
+    assert m.builds_pinned is False
+    assert dc.PINNED_NOTE not in dc.render_card_html(m, standalone=False)
+    ctx['builds_pinned'] = True
+    m2 = dc.build_card_model(data_obj, ctx, types=['steel'])
+    assert m2.builds_pinned is True
+    out = dc.render_card_html(m2, standalone=False)
+    assert 'computed at the league cap' in out
+    assert 'only the stats on this card follow the Best Buddy level' in out
+
+
+def test_both_level_passes_hand_the_card_the_same_builds():
+    """The producing half of the fix above, in deep_dive.py: the L51 pass
+    must get ``card_builds`` too. Pre-fix the argument was gated on
+    ``write_card_out``, which is true only for the level-default pass:
+
+        card_builds=(which_build_cards if write_card_out else None)
+    """
+    src = (Path(dc.__file__).resolve().parent / 'deep_dive.py').read_text()
+    assert 'card_builds=(which_build_cards if write_card_out else None)' \
+        not in src
+    assert 'card_builds=which_build_cards' in src
+    assert 'card_builds_pinned=builds_pinned' in src
+    assert 'builds_pinned=True' in src
+    # positive control: the scan is reading the module that renders both
+    # passes, so a moved helper cannot make the absence pin vacuous
+    assert 'def _render_level_body(' in src
+    assert 'write_card_out=True' in src and 'write_card_out=False' in src
+
+
 def test_card_without_builds_keeps_the_old_spread_block():
     """A dive with no builds (no replay blob, or compute_builds failed) gets
     the pole card unchanged -- no empty guarantee row, no stray label."""

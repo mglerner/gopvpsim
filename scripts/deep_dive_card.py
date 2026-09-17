@@ -133,6 +133,10 @@ class CardModel:
     # flip rendering (old ctxs / synthetic tests without flips_sp).
     flip_ref_sp1: str | None = None      # stat-product #1 spread
     flip_ref_pvpoke: str | None = None   # PvPoke default spread
+    # The builds behind the spreads were computed on another grid (the
+    # best-buddy card reuses the league-cap builds, because the section is
+    # rendered once, at the cap). Prints one line in the foot saying so.
+    builds_pinned: bool = False
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -275,6 +279,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         base_form_display=base_form_display,
         sibling_trade=card_ctx.get('sibling_trade'),
         has_author_notes=bool(has_author_notes),
+        builds_pinned=bool(card_ctx.get('builds_pinned')),
         cup_label=data_obj.get('cupLabel'),
         cup_snapshot=data_obj.get('rankSnapshot') if data_obj.get('cupLabel') else None,
     )
@@ -698,6 +703,24 @@ _EMPH_BANDS = ((0.10, 'ddcard-o3'), (0.25, 'ddcard-o2'), (0.50, 'ddcard-o1'))
 _EMPH_NEAR_FREE = 0.90
 
 
+# The card carries the section's three typefaces and two different rates,
+# and it SHIPS STANDALONE (--card-out), where there is no section to read
+# the key from. So the key rides in the foot whenever a Rarest line is
+# present (2026-09-16 round-3 review).
+GUARANTEE_KEY = (
+    ' Rarest = the guaranteed matchups the fewest other spreads win '
+    '(outside N% = the share of the spreads outside that build; grid N% = '
+    'the share of all the spreads on the grid); bold = fewer than half, '
+    'underlined = fewer than a quarter, italic = fewer than a tenth.')
+# Said out loud rather than left to be noticed: the best-buddy card shows
+# the league-cap builds' spreads with best-buddy stats.
+PINNED_NOTE = (
+    ' The builds behind these spreads -- and the guarantee counts -- are '
+    'computed at the league cap, which is the level the "Which one to '
+    'build?" section itself is pinned to; only the stats on this card '
+    'follow the Best Buddy level.')
+
+
 def _emph_class(rate):
     for bar, cls in _EMPH_BANDS:
         if rate <= bar:
@@ -779,6 +802,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     prov = (f'<span class="ddcard-prov" title="{html.escape(_prov_tip)}">'
             f'{html.escape(_prov_label)}</span>')
     wr = _wr_line(m.single_iv, m.robust)
+    _guar_key = (html.escape(GUARANTEE_KEY)
+                 if any(sp.cells for sp in m.spreads) else '')
+    _pinned = html.escape(PINNED_NOTE) if m.builds_pinned else ''
     sib_bar = _sibling_trade_html(m.sibling_trade, shadow=m.shadow,
                                   link_opps=not standalone)
     spreads = ''.join(_spread_html(s, link_opps=not standalone,
@@ -824,7 +850,7 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
   <div class="ddcard-foot">Win rate = shield-scenario matchups won (&gt;500),
-  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).</div>
+  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).{_guar_key}{_pinned}</div>
 </section>"""
 
     if not standalone:
