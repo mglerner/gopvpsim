@@ -1350,10 +1350,63 @@ def test_the_mini_grid_is_the_sections_opening_figure():
     assert 'win-count y-axis' in cap
 
 
+def test_the_opening_caption_defines_its_colours_before_it_uses_them():
+    """The caption that now INTRODUCES the section had two reader-flow gaps.
+
+    Pre-fix it said "coloured by that scenario's own matchup clusters"
+    before the section had said what a matchup cluster IS (the definition
+    paragraph follows the grid), and its "the main scatter on a win-count
+    y-axis shows them as bands" was a forward reference to a plot ~3 MB
+    below that also needs two dropdowns set -- while "Show: clusters"
+    inside "Which one to build?", directly ABOVE, already draws these
+    labels on a win-count axis and went unmentioned.
+
+    Pre-fix values: 'defined below' absent; 'Which one to build?' absent;
+    'Y-axis' absent.
+    """
+    html = _render([])
+    note = html.index('id="allscen-note"')
+    cap = html[note:html.index('id="allscen-grid"')]
+    # the term is glossed where it is first used
+    assert 'which marginal matchups they win' in cap
+    assert 'defined below' in cap
+    # the nearer surface is named first, and the far one says what to set
+    assert 'Which one to build?' in cap
+    assert 'Y-axis' in cap
+    # positive controls: the round-7 explanation survives
+    assert 'smear rather than band' in cap
+    assert 'win-count y-axis' in cap
+
+
 def test_a_one_scenario_dive_gets_no_mini_grid():
     assert mc._allscen_figure(1) == ''
     assert mc._allscen_figure(0) == ''
     assert 'allscen-grid' in mc._allscen_figure(9)
+    # ...and the collapsed line does not promise the figure it has not got
+    one = mc._section_open(1)
+    assert 'side by side' not in one and 'nine' not in one
+    assert 'which marginal matchups they win' in one
+
+
+def test_the_summary_line_counts_the_scenarios_this_dive_baked():
+    """The collapsed line's promise has to match the dive.
+
+    Pre-fix SECTION_SUMMARY_NOTE was a module CONSTANT reading "opens with
+    all nine shield scenarios side by side" whatever the bake was: correct
+    on the nine-scenario dives we render and a known-wrong statement on any
+    other (a three-scenario bake still said nine; a one-scenario bake said
+    it with no grid on the page at all, since _allscen_figure returns '').
+
+    Pre-fix values: `'nine' in mc.SECTION_SUMMARY_NOTE` -> True, and
+    `mc._section_open` took no arguments (TypeError on `_section_open(3)`).
+    """
+    assert 'all 9 shield scenarios side by side' in mc._section_open(9)
+    assert 'all 3 shield scenarios side by side' in mc._section_open(3)
+    for n in (9, 3, 1):
+        assert 'nine' not in mc._section_open(n)
+    # the rendered section (9 baked) says nine as a number, once
+    html = _render([])
+    assert html.count('all 9 shield scenarios side by side') == 1
 
 
 def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
@@ -1368,7 +1421,9 @@ def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
     assert '<div class="highlight-strip" ' in src
     # ...and the clusters section is now placed by this file, above the
     # scatter controls
-    assert src.count('<!-- MATCHUP_CLUSTERS_SLOT -->') == 3
+    # a floor, not an equality: one more mention of the marker (a
+    # comment, a second placement guard) is not a regression
+    assert src.count('<!-- MATCHUP_CLUSTERS_SLOT -->') >= 2
     assert (src.index("html += '<!-- MATCHUP_CLUSTERS_SLOT -->'")
             < src.index('\'<div class="controls" id="dd-scatter">\\n\''))
 

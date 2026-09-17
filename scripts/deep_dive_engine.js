@@ -268,6 +268,36 @@ function _initBestBuddy() {
   }
 }
 
+// Which <details> inside `host` the reader has OPEN, by id. The stored
+// host halves are the markup as first rendered -- every <details> closed --
+// so without carrying this across the swap, a Best Buddy tick collapses the
+// Matchup clusters section, whose own <details> moved INSIDE this host in
+// round 7, and throws away its nine minis and the reader's place on the page
+// (measured in headless Chrome, 2026-09-17: detOpen true -> false,
+// minis 9 -> 0).
+function _bbOpenIn(host) {
+  var ids = [];
+  if (!host.querySelectorAll) return ids;
+  host.querySelectorAll('details[id]').forEach(function(d) {
+    if (d.open) ids.push(d.id);
+  });
+  return ids;
+}
+
+// Re-open them after the swap, and dispatch the `toggle` the lazy-draw path
+// listens for: setting .open fires one asynchronously on its own, but the
+// figures should be back before the reader looks, and both draw paths are
+// idempotent (mcRenderPending skips a rendered root; refreshAllScenarios
+// redraws only an empty or stale grid).
+function _bbReopen(ids) {
+  for (var i = 0; i < ids.length; i++) {
+    var d = document.getElementById(ids[i]);
+    if (!d || d.open) continue;
+    d.open = true;
+    try { d.dispatchEvent(new Event('toggle', {bubbles: false})); } catch (e) {}
+  }
+}
+
 function setBestBuddyLevel(mode) {
   if (!DATA.ivL51 || !_bbL50) return;
   var src = (mode === '51') ? DATA.ivL51 : _bbL50;
@@ -278,7 +308,10 @@ function setBestBuddyLevel(mode) {
   state.levelMode = mode;
   for (var hid in _bbHostHTML) {
     var host = document.getElementById(hid);
-    if (host && _bbHostHTML[hid][mode] != null) host.innerHTML = _bbHostHTML[hid][mode];
+    if (!host || _bbHostHTML[hid][mode] == null) continue;
+    var wasOpen = _bbOpenIn(host);
+    host.innerHTML = _bbHostHTML[hid][mode];
+    _bbReopen(wasOpen);
   }
   // Re-hydrate title= from DATA.tooltips on whatever we just swapped in. The
   // <template> halves carry data-t="" but never title=: the DOMContentLoaded
@@ -565,8 +598,16 @@ function toggleAllScenarios() {
   if (!box || !grid) return;
   var note = document.getElementById('allscen-note');
   if (!box.checked) {
+    // PURGE before hiding, don't just hide: nine scattergl minis are nine
+    // WebGL contexts, and a hidden-but-live grid holds them for the life of
+    // the page (a browser caps ~16 and drops the oldest, which blanks plots
+    // elsewhere). _wbClearMinis is grid-agnostic -- it purges and empties
+    // whatever grid it is handed -- and refreshAllScenarios redraws from
+    // empty when the box comes back on (its !grid.children.length branch).
+    _wbClearMinis(grid);
     grid.style.display = 'none';
     if (note) note.style.display = 'none';
+    _allscenRendered = false; _allscenKey = null;
     return;
   }
   grid.style.display = 'grid';
@@ -5350,32 +5391,43 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   // scenario) and _wbGuaranteedInScen walks every decision cell to build
   // it. Nine minis x 4096 spreads is where that started to show.
   var sides = {};
-  function sideFor(b) {
-    var kk = (b < 0) ? 'x' : b;
-    if (sides[kk] == null) sides[kk] = _wbBuildSide(pay, block, b, scen);
+  function sideFor(b, ringed) {
+    var kk = ((b < 0) ? 'x' : b) + (ringed ? '|w' : '');
+    if (sides[kk] == null) {
+      sides[kk] = _wbSideWithWide(pay, block, b, scen, wideIdx, ringed);
+    }
     return sides[kk];
+  }
+  // The wide region's membership mask, read BEFORE the per-point pass: a
+  // build's OWN members can sit inside the region, and their hover is the
+  // only place that containment shows where the dots hide the rings.
+  var wmask = null;
+  if (wideIdx >= 0) {
+    var wreg = bp.regions[block.builds[wideIdx].region];
+    wmask = (wreg && wreg.mask) ? _wbMask(wreg.mask) : null;
   }
   for (var i = 0; i < DATA.nIvs; i++) {
     var b = _wbBuildOf(bp, block, i);
     // A spread the WIDE rule reaches and no build holds gets the muted
-    // centre dot; its ring comes from the pass below. Its hover still names
-    // the region that holds it (sideFor(wideIdx)), which is what it said
-    // when it had a trace of its own.
-    var inWide = (b === wideIdx);
-    var t = (b < 0 || inWide) ? none : ts[b];
+    // centre dot; its ring comes from the pass below. Its hover leads with
+    // "in none of the builds" and then names the region -- one point, two
+    // labels, in the order that cannot be misread.
+    var extra = (b === wideIdx);
+    var ringed = (b >= 0) && !!(wmask && _wbBit(wmask, i));
+    var t = (b < 0 || extra) ? none : ts[b];
     var mp = _wbXY(L, i, wins);
     t.x.push(mp[0]); t.y.push(mp[1]);
-    ivsOf[(b < 0 || inWide) ? 0 : b + 1].push(i);
-    t.text.push(_wbHover(i, L, wins, sideFor(b), den));
+    ivsOf[(b < 0 || extra) ? 0 : b + 1].push(i);
+    t.text.push(_wbHover(i, L, wins, sideFor(b, ringed), den));
   }
   // The ring trace gets EVERY member of the region, which is the whole
   // point of the change -- so its legend count IS the region's own size,
   // the number the table row and the summary line give for it, and the
-  // round-6 "(x of N not already in a build)" phrasings are gone.
+  // round-6 "(x of N not already in a build)" phrasings are gone. Its own
+  // hover names the region and nothing else: hovering a RING is the gesture
+  // that asks about the region.
   if (wideIdx >= 0) {
-    var wreg = bp.regions[block.builds[wideIdx].region];
-    var wmask = (wreg && wreg.mask) ? _wbMask(wreg.mask) : null;
-    var wt = ts[wideIdx], wside = sideFor(wideIdx);
+    var wt = ts[wideIdx], wside = sideFor(wideIdx, false);
     for (var wi = 0; wmask && wi < DATA.nIvs; wi++) {
       if (!_wbBit(wmask, wi)) continue;
       var wp = _wbXY(L, wi, wins);
@@ -5659,7 +5711,9 @@ function _wbGuaranteedInScen(bp, regionIdx, si) {
 // selected it answers for THAT scenario, which is the question the control
 // just asked.
 function _wbBuildSide(pay, block, b, scen) {
-  if (b < 0) return 'in none of the builds below';
+  // Not "the builds below": the builds table sits ABOVE the plot since the
+  // section moved to the top of the page (round 7).
+  if (b < 0) return 'in none of the builds';
   var bd = block.builds[b];
   if (scen) {
     var n = _wbGuaranteedInScen(pay.bp, bd.region, scen.idx);
@@ -5671,6 +5725,24 @@ function _wbBuildSide(pay, block, b, scen) {
   }
   return _wbBuildName(block, b) + ': guarantees ' + bd.nG + ' of ' +
          pay.bp.nDecision + ' decision matchups (' + bd.nGmat + ' material)';
+}
+
+// A spread can wear TWO labels at once now that the wide region rings every
+// one of its members: the build that holds it (or none) AND the region
+// around it. Order matters -- "in none of the builds" comes FIRST for a
+// spread the wide rule reaches that no build holds, so its hover can never
+// read as membership in a build, and a build member inside the region gets
+// the containment appended (where dots crowd, the ring under them is
+// invisible, so the hover is the only place it shows).
+function _wbSideWithWide(pay, block, b, scen, wideIdx, inWide) {
+  if (!inWide || wideIdx < 0) return _wbBuildSide(pay, block, b, scen);
+  var wname = _wbBuildName(block, wideIdx);
+  if (b === wideIdx) {
+    var w = _wbBuildSide(pay, block, wideIdx, scen)
+              .replace(wname + ': guarantees', wname + ', which guarantees');
+    return _wbBuildSide(pay, block, -1, scen) + '; inside ' + w;
+  }
+  return _wbBuildSide(pay, block, b, scen) + '; inside ' + wname;
 }
 
 // The UpSet panel: which named sets each candidate region is made of.
