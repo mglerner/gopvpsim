@@ -512,12 +512,23 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                moveset0_flavors_for_rename=None,
                                focal_shadow=False,
                                scores_base_arrays=None,
-                               base_form_info=None):
+                               base_form_info=None,
+                               card_builds=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
     results_html is always visible ("Deep Dive Results").
     analysis_html goes behind the toggle ("Deep Dive Analysis").
+
+    ``card_builds`` is the dive card's spread list taken from the "Which one
+    to build?" builds (``deep_dive_which_build.card_specs``): one entry per
+    named build plus the standouts, each with its title, its guarantee
+    sentence and its rarest guaranteed cells. When it is non-empty the CARD
+    headlines those spreads instead of the three stat-extreme POLES, which
+    were selected by a rule no other surface on the page uses (2026-09-16
+    review item 6). The poles themselves are untouched: they still drive
+    ``data_obj['recIvs']`` / ``recStyles``, which the scatter overlay and the
+    opponent-threat chips read.
 
     When ``anchor_passing_sink`` is a dict, it gets populated with
     ``{anchor_id: [passing_iv_idx, ...]}`` for every anchor-flip bullet
@@ -1496,10 +1507,48 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         logger.warning(f"  sibling-trade census failed ({type(e).__name__}: "
                        f"{e}); form trade bar omitted")
 
+    # ---- the card's spreads, from the builds (2026-09-16 item 6) ---------
+    # Each spec names an IV TRIPLE; the index is resolved here against this
+    # page's own arrays, so a card spread is always a spread this file
+    # actually embeds. Every spec gets the same rc dict shape the poles
+    # produced (_ensure_rc fabricates one for an IV outside the top-50
+    # strong pool) plus the same census coverage, so the card's
+    # breakpoint / bulkpoint / shadow-boost lines are computed exactly as
+    # they were before.
+    _card_recs, _card_extras = [], {}
+    if card_builds:
+        _triple_idx = {}
+        for _i in range(nIvs):
+            _triple_idx.setdefault(
+                (data_obj['ivA'][_i], data_obj['ivD'][_i],
+                 data_obj['ivS'][_i]), _i)
+        for _spec in card_builds:
+            _iv = _triple_idx.get(tuple(int(x) for x in _spec['iv']))
+            if _iv is None:
+                logger.warning(
+                    f"  dive card: build spread {_spec['iv']} is not on this "
+                    f"page's grid; that card is omitted")
+                continue
+            _rc = dict(_ensure_rc(_iv))
+            _rc['style'] = _spec['title']
+            if _anchor_mode:
+                _bp, _blk = _census_cover(_iv)
+                _rc['cover_breakpoints'] = _bp
+                _rc['cover_bulkpoints'] = _blk
+                _rc['n_breakpoint_opps'] = len(_bp)
+                _rc['n_bulkpoint_opps'] = len(_blk)
+                if _base_census_cover is not None:
+                    _base_bp, _ = _base_census_cover(_iv)
+                    _rc['n_breakpoint_newly'] = len(set(_bp) - set(_base_bp))
+            _card_recs.append(_rc)
+            _card_extras[_iv] = {'guarantee': _spec.get('guarantee', ''),
+                                 'cells': list(_spec.get('cells') or [])}
+
     data_obj['_cardCtx'] = {
         'two_number_ones': _two_ones,
         'sibling_trade': _sibling_trade,
-        'rec_candidates': chosen_recs,
+        'rec_candidates': _card_recs or chosen_recs,
+        'card_extras': _card_extras,
         'rec_idx': _rec_idx,
         'flips': flips,
         'flips_sp': flips_sp,

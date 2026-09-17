@@ -746,17 +746,31 @@ def test_the_weighted_shields_entry_labels_its_own_axis():
 
 
 def test_the_more_control_and_its_hidden_rows_are_one_contract():
-    """"+N more" is a button over rows the server already shipped hidden."""
+    """Each reveal is a button over rows the server already shipped hidden.
+
+    v5 (2026-09-16 review item 4) gives a scenario group TWO reveals -- the
+    capped tail (``wb-hid``) and the near-free tail (``wb-hidfree``) -- so
+    the button names the class it owns in ``data-reveal`` and the JS reads
+    it. Pre-fix the JS hard-coded ``li.wb-hid`` and one button revealed both
+    tails; this asserts the class now comes from the attribute AND that the
+    producer emits both classes with a matching ``data-reveal``.
+    """
     js = _js()
     assert 'function wbMoreRows(' in js
     assert 'window.wbMoreRows = wbMoreRows;' in js
     body = _js_fn(js, 'wbMoreRows')
-    assert "li.wb-hid" in body
+    assert "getAttribute('data-reveal')" in body
+    assert "'li.' + cls" in body
+    # the default is the class the pre-v5 control hard-coded, so an older
+    # button with no attribute still reveals its own rows
+    assert "|| 'wb-hid'" in body
     assert 'hidden = false' in body
     py = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
-    # the producing side emits exactly those two things
+    # the producing side emits exactly those things
     assert 'wbMoreRows(this)' in py
-    assert 'class="wb-hid" hidden' in py
+    assert "'wb-hidfree' if free else 'wb-hid'" in py
+    for cls in ('wb-hid', 'wb-hidfree'):
+        assert f'data-reveal="{cls}"' in py, cls
 
 
 def test_the_section_payload_carries_every_builds_field_the_js_reads():
