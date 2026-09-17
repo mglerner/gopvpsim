@@ -1138,20 +1138,37 @@ def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
 # visibility check keep working unchanged.
 SECTION_DETAILS_ID = "dd-matchup-clusters-section"
 SECTION_TITLE = "Matchup clusters"
-SECTION_SUMMARY_NOTE = (
-    "IVs grouped by which marginal matchups they win - opens with all nine "
-    "shield scenarios side by side"
-)
+SECTION_SUMMARY_BASE = "IVs grouped by which marginal matchups they win"
 
 
-def _section_open():
-    """The collapsed <details> + summary + the section div, in one string."""
+def _summary_note(grid_nS):
+    """The collapsed line's parenthetical, for a dive that baked `grid_nS`.
+
+    It promises the opening figure only when there IS one, and counts the
+    dive's own scenarios rather than a hard-coded nine: _allscen_figure
+    draws nothing for one baked scenario (or none), and a three-scenario
+    bake used to be told it opens with nine.
+    """
+    if grid_nS > 1:
+        return (f"{SECTION_SUMMARY_BASE} - opens with all {grid_nS} shield "
+                "scenarios side by side")
+    return SECTION_SUMMARY_BASE
+
+
+def _section_open(grid_nS):
+    """The collapsed <details> + summary + the section div, in one string.
+
+    `grid_nS` is how many scenarios the OPENING FIGURE shows -- the dive's
+    baked count where the grid is drawn, and 0 where it is not (the
+    no-clusters early return below), which is what keeps the summary line
+    from promising a figure the page does not carry.
+    """
     return (
         f'<details class="dd-collapsible dd-mc-collapse" '
         f'id="{SECTION_DETAILS_ID}">'
         f'<summary class="dd-h2" style="cursor:pointer">{SECTION_TITLE} '
         f'<span style="font-weight:400;font-size:0.8rem;'
-        f'color:var(--text-muted)">({SECTION_SUMMARY_NOTE})</span>'
+        f'color:var(--text-muted)">({_summary_note(grid_nS)})</span>'
         f'</summary>'
         f'<div class="dd-section dd-mc-root" id="dd-matchup-clusters">'
         f'<!-- matchup-clusters:v1 -->'
@@ -1188,11 +1205,14 @@ def _allscen_figure(nS):
         '<p id="allscen-note" style="font-size:11px;'
         'color:var(--text-muted);margin:4px 0 0 0">Each mini plots average '
         'score against stat-product rank, coloured by that scenario\'s own '
-        'matchup clusters (title: K, silhouette and the first stat split). '
-        'On this y-axis the clusters smear rather than band -- the main '
-        'scatter on a win-count y-axis shows them as bands, and the '
-        'stat-plane panels below show them as stat regions. Click a mini to '
-        'select that shield scenario.</p>\n'
+        'matchup clusters -- IV spreads grouped by which marginal matchups '
+        'they win, defined below (title: K, silhouette and the first stat '
+        'split). On this y-axis the clusters smear rather than band; to see '
+        'them as bands you need a win-count y-axis: <b>Show: clusters</b> '
+        'in &quot;Which one to build?&quot; just above, or the main scatter '
+        'below with <b>Y-axis</b> set to Wins and <b>Color</b> set to '
+        'Matchup cluster. The stat-plane panels below show them as stat '
+        'regions instead. Click a mini to select that shield scenario.</p>\n'
         '<div id="allscen-grid" style="display:grid;'
         'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;"></div>\n'
     )
@@ -1599,7 +1619,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named,
         presets=presets)
     if not computed:
-        return (_section_open()
+        return (_section_open(0)
                 + '<p style="font-size:13px;color:var(--text-muted)">Not '
                 'available: this dive baked no shield scenarios to cluster.'
                 '</p></div></details>\n')
@@ -1671,7 +1691,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             "display": disp_lbl,
         }
 
-    parts = [_section_open(), _allscen_figure(nS)]
+    parts = [_section_open(nS if nS > 1 else 0), _allscen_figure(nS)]
     parts.append(
         '<p style="font-size:13px">IVs grouped by <b>which marginal '
         'matchups they win</b> (their win/loss fingerprint over the '

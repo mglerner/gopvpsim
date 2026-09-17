@@ -3428,9 +3428,10 @@ def test_the_builds_caption_explains_every_marker_the_view_draws():
         assert marker in W.BUILDS_CAPTION, marker
     # positive control: the stats caption's own wording is unchanged
     assert 'the open cross the highest Avg Battle Score' in W.STATS_CAPTION
-    # round 5: the builds view draws one more trace -- the wide region under
-    # Build 1 -- so the caption names it too
-    assert 'wider region around Build 1' in W.BUILDS_CAPTION
+    # round 5: the builds view draws one more trace -- the wide region
+    # around Build 1 -- so the caption names it too. Round 7b: it is the
+    # containment ring, named by the wording its own test pins.
+    assert 'Build 1 wide' in W.BUILDS_CAPTION
     assert 'lighter tint' in W.BUILDS_CAPTION
     for cap in (W.BUILDS_CAPTION, W.STATS_CAPTION):
         assert 'stat-product rank-1 (SP1)' in cap
@@ -4559,8 +4560,15 @@ const Plotly = { react: () => {}, newPlot: () => {}, restyle: () => {},
 const getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 let out;
-eval(block + '\nout = {_wbBuildGroups, _wbBuildMarks, _wbMiniShrink, ' +
-     'wbPresetBlock, wbLevelArrays, wbWins, _wbBuildOf};');
+// The export list is TOLERANT so this one file runs on both sides of the
+// fix: _wbBuildMarks and _wbMiniShrink do not exist before it, and a bare
+// {_wbMiniShrink} in the eval is a ReferenceError rather than a reading.
+eval(block + '\nout = {_wbBuildGroups, wbPresetBlock, wbLevelArrays, ' +
+     'wbWins, _wbBuildOf,' +
+     ' _wbBuildMarks: (typeof _wbBuildMarks === "function")' +
+     '   ? _wbBuildMarks : null,' +
+     ' _wbMiniShrink: (typeof _wbMiniShrink === "function")' +
+     '   ? _wbMiniShrink : null};');
 
 // Build 1 = spreads 0..1 ('Aw=='), Build 1 wide = spreads 0..3 ('Dw==',
 // 0b00001111): it CONTAINS Build 1 and reaches two spreads no build holds.
@@ -4629,7 +4637,11 @@ if (t[0].text[0].indexOf('Build 1 wide') < 0)
   fail.push('the ring hover does not name the region: ' + t[0].text[0]);
 
 // (e) the minis: nine (here two) per-scenario trace sets with the same
-// shape, and every marker shrunk for a 200px panel
+// shape, and every marker shrunk for a 200px panel. Guarded, so an engine
+// without the mini helpers still reports (a)-(d) instead of throwing.
+if (!out._wbBuildMarks || !out._wbMiniShrink) {
+  fail.push('this engine has no mini helpers (pre-fix build)');
+} else {
 const marks = out._wbBuildMarks(pay, block0, L, out.wbWins(0, 'pvpoke', 0),
                                 {below:'#z', line:'#y', mark1:'#m', mark2:'#n'},
                                 2, {idx: 0, label: '0v0'},
@@ -4650,6 +4662,7 @@ mini.forEach((x, i) => {
 });
 if (!/^Build 1 wide/.test(mini[0].name))
   fail.push('the mini ring is not the first trace either');
+}
 
 if (fail.length) { console.error(fail.join('\n')); process.exit(1); }
 console.log('OK');
@@ -4661,7 +4674,10 @@ def test_the_wide_region_rings_every_member_and_draws_underneath(tmp_path):
     """Run the ring code on a synthetic grid whose wide region CONTAINS
     Build 1 -- the shape the round-6 trace could not draw.
 
-    Pre-fix values, measured against HEAD~ on this exact harness:
+    Pre-fix values, measured by running THIS file against 0afbee9's
+    engine (`git show 0afbee9:scripts/deep_dive_engine.js`); the eval
+    export list is tolerant of the two helpers that engine lacks, so
+    the same harness reproduces both sides:
 
         [{name: 'In no build (2)',                        n: 2, circle, 3},
          {name: 'Build 1 wide: wide-rule
@@ -4712,7 +4728,9 @@ def test_the_section_offers_its_own_all_scenarios_grid():
     # browser starts blanking plots elsewhere on the page
     assert 'function _wbClearMinis(grid) {' in js
     assert 'Plotly.purge(kids[i])' in js
-    assert js.count('_wbClearMinis(grid);') == 2
+    # a floor, not an equality: a third teardown site (the clusters
+    # grid's own off-path, a purge on unload) improves the code
+    assert js.count('_wbClearMinis(grid);') >= 2
     assert "grid.innerHTML = '';" in js
 
     py = (SCRIPTS_DIR / 'deep_dive_which_build.py').read_text()
@@ -4767,3 +4785,170 @@ def test_a_standout_the_collapsed_line_holds_is_named_not_counted():
     clause = W._wide_clause(ab, bl)
     assert clause.endswith(' and holds 9/6/13 (the highest avg battle score)')
     assert 'of the standouts' not in clause
+
+
+# ---------------------------------------------------------------------------
+# Round 7b (2026-09-17): the two reviews of the round-7 render -- the
+# captions still described the retired round-6 trace, the minis' caption
+# overclaimed, a Best Buddy tick threw the moved section away, and the
+# clusters grid never released its WebGL contexts.
+# ---------------------------------------------------------------------------
+
+
+def test_the_builds_caption_describes_the_ring_and_not_the_retired_trace():
+    """The captions that INTRODUCE the ring described round 6's trace.
+
+    Pre-fix values (round 7, commit c11431e):
+
+        'carrying only the spreads no build holds' in BUILDS_CAPTION -> True
+        'hollow ring'                              in BUILDS_CAPTION -> False
+        'hollow ring'                              in STATS_CAPTION  -> False
+
+    So the first explanation a reader got of the ring said the opposite of
+    what the plot drew: the legend's "(644)" (the region's own size) and the
+    caption's "only the spreads no build holds" cannot both be true. On the
+    stats plane the ring is also the one marker whose size does NOT encode
+    attack, which that caption never mentioned.
+    """
+    # absence pin for the retired phrasing...
+    assert 'only the spreads no build holds' not in W.BUILDS_CAPTION
+    # ...with the replacement as the positive control that gives it meaning
+    assert 'hollow ring' in W.BUILDS_CAPTION
+    assert 'around every spread it holds' in W.BUILDS_CAPTION
+    assert 'faint grey centre' in W.BUILDS_CAPTION
+    assert 'lighter tint' in W.BUILDS_CAPTION
+    # the stats view draws the ring too, at one fixed size
+    assert 'hollow ring' in W.STATS_CAPTION
+    assert 'does not follow attack' in W.STATS_CAPTION
+
+
+def test_the_mini_grid_caption_does_not_promise_bands_in_every_state():
+    """Item 2's caption overclaimed what one shield state shows.
+
+    Pre-fix ALLSCEN_CAPTION read "It is where each build's members band
+    above the rest, shield state by shield state" -- but a build is chosen
+    on the counted scenarios TAKEN TOGETHER, and in a single state its
+    members need not band above the rest at all (Shadow Sableye's 0v2 mini
+    has a ceiling of 5 wins of 76, and under the 1v1-only preset eight of
+    the nine minis are states the preset never counted).
+
+    Pre-fix values: 'band above the rest' in ALLSCEN_CAPTION -> True;
+    'taken together' -> False; 'did not count' -> False.
+    """
+    cap = W.ALLSCEN_CAPTION
+    assert 'band above the rest' not in cap
+    assert 'taken together' in cap
+    assert 'did not count' in cap
+    # positive controls: the caption still says what the axes are and that
+    # the colours follow the knob
+    assert 'shield state by shield state' in cap
+    assert 'Build criteria' in cap
+
+
+def test_a_ringed_spread_says_both_what_holds_it_and_what_does_not():
+    """One point, two labels -- in the order that cannot mislead.
+
+    Pre-fix a spread the wide rule reaches that NO build holds sat in the
+    muted "In no build (3921)" legend trace while its hover read
+    "Build 1 wide: guarantees 43 ..." with no mention of being in no build;
+    a Build 1 member's hover said nothing about sitting INSIDE Build 1 wide,
+    so where dots crowd and hide the rings the containment was invisible on
+    hover. The b < 0 fallback also still pointed "below" at a table that
+    moved above the plot in round 7.
+
+    Pre-fix source values: 'in none of the builds below' present (1);
+    '_wbSideWithWide' absent (0).
+    """
+    js = ENGINE_JS.read_text()
+    # the fallback no longer points at a table that is now above the plot
+    assert 'in none of the builds below' not in js
+    assert "if (b < 0) return 'in none of the builds';" in js
+    # the two-label builder, and the three cases it distinguishes
+    assert 'function _wbSideWithWide(' in js
+    assert "return _wbBuildSide(pay, block, -1, scen) + '; inside ' + w;" in js
+    assert ("return _wbBuildSide(pay, block, b, scen) + '; inside ' + wname;"
+            in js)
+    code = strip_js(js)
+    # ...called with the ringed flag from the per-point pass, and WITHOUT it
+    # for the ring's own hover (which names the region, as it should)
+    assert 'sideFor(b, ringed)' in code
+    assert 'sideFor(wideIdx, false)' in code
+
+
+def test_a_best_buddy_toggle_keeps_the_moved_section_open():
+    """The swap restored stored markup, which is markup with no `open`.
+
+    Round 7 moved the Matchup clusters section's own <details> INSIDE the
+    best-buddy host, so `host.innerHTML = stored` collapsed it. Measured in
+    headless Chrome on the round-7 preview (pre-fix): open the section
+    {detOpen: true, minis: 9}; tick #dd-bb-toggle {detOpen: FALSE, minis: 0};
+    untick {detOpen: FALSE, minis: 0}. A reader who opened the section and
+    toggled Best Buddy lost the figure and their scroll position -- and the
+    `!grid.children.length` branch added to refreshAllScenarios for exactly
+    that case was dead for the grid.
+
+    Pre-fix source value: '_bbOpenIn' absent (0 occurrences).
+    """
+    js = ENGINE_JS.read_text()
+    assert 'function _bbOpenIn(host) {' in js
+    # the open ids are captured BEFORE the swap and re-applied after it
+    assert 'var wasOpen = _bbOpenIn(host);' in js
+    assert "host.innerHTML = _bbHostHTML[hid][mode];" in js
+    assert (js.index('var wasOpen = _bbOpenIn(host);')
+            < js.index('host.innerHTML = _bbHostHTML[hid][mode];'))
+    # re-opening dispatches the toggle the lazy-draw path listens for, so
+    # the nine minis come back rather than waiting for a second click
+    assert "new Event('toggle'" in js
+    assert 'function _bbReopen(ids) {' in js
+
+
+def test_the_clusters_grid_purges_its_contexts_when_switched_off():
+    """Unchecking the clusters grid released nothing.
+
+    Pre-fix `toggleAllScenarios`' off-path was `grid.style.display = 'none'`
+    and a return: the nine scattergl divs stayed live, so nine WebGL
+    contexts were held for the life of the page. Measured on the round-7
+    preview: clusters grid afterUncheck {kids: 9, display: 'none'},
+    afterRecheck {kids: 9}; the which-build grid afterUncheck {kids: 0}.
+    This matters more after round 7 than before, because the clusters
+    checkbox now ships CHECKED -- opening the section alone creates nine.
+
+    Pre-fix source value: `_wbClearMinis(grid);` call count 2 (both in the
+    which-build grid).
+    """
+    js = ENGINE_JS.read_text()
+    # the purge helper is grid-agnostic and both grids now use it
+    assert js.count('_wbClearMinis(grid);') >= 3
+    off = js.split('function toggleAllScenarios()', 1)[1].split('\n}', 1)[0]
+    assert '_wbClearMinis(grid)' in off
+    assert off.index('_wbClearMinis(grid)') < off.index("display = 'none'")
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_rendered_section_carries_its_own_scenario_grid(shadow_sableye):
+    """Item 2's grid, pinned on a rendered section rather than its emitter.
+
+    The round-7 set pinned the checkbox/grid/caption with source scans of
+    deep_dive_engine.js and deep_dive_which_build.py only, and "allscen_html()
+    is called from the section builder, below the panel" is exactly the wiring
+    a refactor drops with every source pin still green.
+
+    (Not the ``small_dive_html`` fixture, which is where the page-level pins
+    in this suite normally live: that dive -- Bastiodon, two opponents --
+    builds no "Which one to build?" section at all, so the markup is not in
+    it. A real blob is the smallest page that carries one.)
+    """
+    _state, all_facts, _path = shadow_sableye
+    h = W.section_html(all_facts, 0)
+    panel = h.index('class="wb-panel"')
+    chk = h.index('class="wb-allscen-chk"')
+    grid = h.index('class="wb-allscen-grid"')
+    cap = h.index('class="wb-allscen-caption"')
+    # below the UpSet + panel pair and above the fixed note: the reader meets
+    # the one weighted answer before the nine per-scenario ones
+    assert panel < chk < grid < cap < h.index('class="wb-fixed"')
+    # all three ship hidden -- the JS owns when they show (builds view only)
+    assert '<label class="wb-allscen" hidden>' in h
+    assert '<div class="wb-allscen-grid" hidden>' in h
+    assert '<p class="wb-allscen-caption" hidden>' in h
