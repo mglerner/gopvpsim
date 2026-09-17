@@ -32,7 +32,8 @@ TERMS = {
         "attack stat goes first.",
     'stat-product rank-1':
         "The IV spread with the largest attack x defense x HP at this "
-        "league's CP cap -- the bulk-first spread most IV tools list first.",
+        "league's CP cap -- the bulk-first spread most IV tools list first. "
+        "Written SP1 where it is named repeatedly.",
     # BOTH directions, deliberately: a gate is one-sided either way round
     # (necessary OR sufficient), and a definition naming only the necessary
     # one would be wrong on every page whose gate is the sufficient kind.

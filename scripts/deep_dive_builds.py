@@ -89,6 +89,14 @@ NEAR_FORK = 25
 FORK_CELL_J = 0.80
 NEAR_GUARANTEE = 0.90
 BUILD_DEDUP = 0.90
+# --- the nested wide build (2026-09-17 round 5, item 4) ---
+# The lattice routinely holds a region that contains almost all of the
+# primary's members in several times the spreads -- suppressed by the dedup
+# and the fork rule, so the page never showed it although it is the obvious
+# "how much can I relax Build 1?" answer. At most ONE is surfaced, next to
+# the primary and never as a build of its own.
+WIDE_MIN_SHARE = 0.90   # of the primary's members it must contain
+WIDE_MIN_FACTOR = 2     # times the primary's size it must be
 
 # ---------------------------------------------------------------------------
 # The three Build-criteria presets (Michael's 2026-09-16 decision: three
@@ -1099,6 +1107,45 @@ def select_builds(ctx, L):
 # per-build facts
 # ---------------------------------------------------------------------------
 
+def wide_build(L, primary):
+    """The one region the page presents as "Build 1 wide", or None.
+
+    A candidate is a region of the SAME lattice that
+
+    * contains at least :data:`WIDE_MIN_SHARE` of the primary's members,
+    * is at least :data:`WIDE_MIN_FACTOR` times its size, and
+    * is not the primary itself (the size test already excludes it).
+
+    Among those, the one guaranteeing the most decision cells wins, ties
+    broken by size -- the preset-weighted count and the size, i.e. the
+    lattice's own ranking key minus its material tie-break, so the wide
+    region is chosen by the same quantity the builds were.
+
+    The constructed bulk box is excluded: it is not an intersection of named
+    sets, so "Build 1 without <set>" could never describe it and its rule is
+    already printed as its own build's.
+
+    Returns the ``inters`` dict, not a region block; the caller describes it.
+    """
+    pm = primary['mask']
+    n_p = int(pm.sum())
+    if not n_p:
+        return None
+    best = None
+    for d in L['inters']:
+        if d.get('constructed'):
+            continue
+        size = int(d['size'])
+        if size < WIDE_MIN_FACTOR * n_p:
+            continue
+        if int((pm & d['mask']).sum()) < WIDE_MIN_SHARE * n_p:
+            continue
+        key = (float(d['wg']), size)
+        if best is None or key > best[0]:
+            best = (key, d)
+    return None if best is None else best[1]
+
+
 def cell_rows(L, region_mask, g, ctx):
     """Evidence rows for the cells a region guarantees, by cell index."""
     frame = L['frame']
@@ -1366,6 +1413,21 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
     are won by a thousand other spreads; what they lack is a region-wide
     guarantee (2026-09-16 round-3 review, which found the page claiming
     exclusivity it had not measured).
+
+    2026-09-17 round 5 item 3 adds the two cell LISTS behind those counts,
+    because the counts alone never said WHICH matchups:
+
+    * ``beyond_cells`` -- the cells this spread wins that the nearest build
+      does not guarantee, each with ``share``: the fraction of that build's
+      own members that win the same cell. Ascending by share, so the cells
+      essentially no member wins read first and the ones most members win
+      (which are the least interesting) sort to the tail.
+    * ``lost_cells`` -- the cells the build guarantees to every member and
+      this spread does not win. Descending rarity (ascending grid rate), the
+      same order the guarantee lists use.
+
+    Both carry the cell's GRID win rate, which is the honest rate for a
+    single spread (a build's "outside rate" is a property of a region).
     """
     cells = frame['cells']
     won = ctx['win2'][idx]
@@ -1384,6 +1446,23 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
             best = max(scored)
             nearest, n_from = -best[1], best[0]
         n_lost = int((builds[nearest]['_g'] & ~own).sum())
+    beyond_cells, lost_cells = [], []
+    if nearest is not None:
+        nb = builds[nearest]
+        g, m = nb['_g'], nb['_mask']
+        sub = frame['Wd'][m]           # members x decision cells
+        for ci, c in enumerate(cells):
+            if own[ci] and not g[ci]:
+                beyond_cells.append({
+                    'cell': c['label'], 'rank': c['rank'] or 0,
+                    'grid_wr': float(c['wr']),
+                    'share': (float(sub[:, ci].mean()) if sub.shape[0]
+                              else 0.0)})
+            elif g[ci] and not own[ci]:
+                lost_cells.append({'cell': c['label'], 'rank': c['rank'] or 0,
+                                   'grid_wr': float(c['wr'])})
+        beyond_cells.sort(key=lambda r: (r['share'], r['grid_wr'], r['rank']))
+        lost_cells.sort(key=lambda r: (r['grid_wr'], r['rank']))
     meta = ctx['meta']
     return {
         'kind': kind, 'idx': int(idx), 'iv': iv_str(meta, idx),
@@ -1402,6 +1481,8 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
         'n_own_decision_wins': n_own,
         'n_from_nearest': n_from,
         'n_lost_from_nearest': n_lost,
+        'beyond_cells': beyond_cells,
+        'lost_cells': lost_cells,
     }
 
 
@@ -1441,6 +1522,32 @@ def run_preset(ctx, sets, frame, preset):
         blk['_mask'] = b['mask']
         blk['_g'] = b['g']
         builds.append(blk)
+    # The nested wide build: computed from the SAME lattice, kept OUT of
+    # ``builds`` on purpose. It is not a build a reader picks -- it is the
+    # context around Build 1 -- so the objectives, the card set, the standouts'
+    # nearest-build search and the UpSet columns all go on seeing two or three
+    # builds, and only the surfaces that opt in print it (2026-09-17 round 5,
+    # item 4). Never for the fork or the rank-1 build: "wide" is a statement
+    # about the PRIMARY's rule.
+    wide = None
+    prim = next((b for role, b in kept if role == 'primary'), None)
+    if prim is not None:
+        w = wide_build(L, prim)
+        if w is not None:
+            wide = region_block(L, ctx, w, 'wide', [], weights, wsum=wsum)
+            wide['_mask'] = w['mask']
+            wide['_g'] = w['g']
+            wide['_in_primary'] = int((w['mask'] & prim['mask']).sum())
+            wide['_primary_size'] = int(prim['mask'].sum())
+            # The named sets the primary has and this region does not, and
+            # vice versa: "Build 1 without the Atk >= 150.24 rung" is only
+            # sayable when the difference is exactly one dropped set.
+            wide['_dropped'] = [s for s in prim['sets'] if s not in w['sets']]
+            wide['_added'] = [s for s in w['sets'] if s not in prim['sets']]
+    standouts_out = standouts(ctx, frame, builds, weights, wsum)
+    for t in standouts_out:
+        t['in_wide'] = (None if wide is None
+                        else bool(wide['_mask'][t['idx']]))
     wcell = cell_weights(frame['cells'], weights)
     counted = wcell > 0
     singles = [d for d in L['inters'] if len(d['combo']) == 1]
@@ -1472,7 +1579,8 @@ def run_preset(ctx, sets, frame, preset):
         'rank1_status': r1_status,
         'fork_detail': fork_info,
         'objectives': objectives_block(ctx, builds, weights, wsum=wsum),
-        'standouts': standouts(ctx, frame, builds, weights, wsum),
+        'standouts': standouts_out,
+        'wide': wide,
         'has_fork': any(b['role'] == 'fork' for b in builds),
     }
 
@@ -1753,13 +1861,29 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
                 'memb': ('' if inter.get('constructed')
                          else ''.join(k for k in keys if k in inter['combo']))})
         pb = []
-        for b in block['builds']:
-            inter = next(d for d in block['inters'] if d['combo'] == b['combo'])
+        # The wide build travels LAST in this array and carries ``col: null``:
+        # _wbBuildOf colours a spread by the FIRST build holding it, so every
+        # real build claims its own members before the wide region does, and
+        # the UpSet panel gains no column for it (2026-09-17 round 5, item 4).
+        # The panel draws its trace first (below Build 1's) by role, not by
+        # position.
+        for b in ([x for x in block['builds']]
+                  + ([block['wide']] if block.get('wide') else [])):
+            inter = next((d for d in block['inters']
+                          if d['combo'] == b['combo']
+                          and d['size'] == b['size']), None)
+            if inter is None:                      # pragma: no cover
+                continue
             text, d = _desc_text(b)
             pb.append({
                 'role': b['role'], 'combo': b['combo'],
-                'col': col_of[b['combo']],
-                'region': region_idx[_region_key(inter)],
+                # The wide region never takes an UpSet column, even when the
+                # lattice happens to have listed the same region as one of
+                # the unselected candidates: the panel colours a column by
+                # the build that owns it, and it is not a build.
+                'col': (None if b['role'] == 'wide'
+                        else col_of.get(b['combo'])),
+                'region': add_region(inter, True),
                 'size': b['size'], 'desc': text, 'shape': b['description_shape'],
                 'fidelity': (None if d is None else d['jaccard']),
                 'nG': b['n_guaranteed'], 'nGw': b['n_guaranteed_weighted'],
@@ -1792,8 +1916,10 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             scens=[ctx['scen_labels'][i]
                    for i, w in enumerate(block['weights']) if w > 0],
             builds=pb, cols=col_rows,
+            wide=bool(block.get('wide')),
             standouts=[{'kind': t['kind'], 'iv': t['iv'],
                         'inBuild': t['in_build'],
+                        'inWide': t.get('in_wide'),
                         'nearest': t['nearest_build'],
                         'winsAll': t['wins_all'],
                         'winsW': t['wins_weighted'],

@@ -3335,11 +3335,19 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 
 def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
                                ref_iv, ref_atk, ref_def, opp_info_cache,
-                               focal_moves, focal_types, has_bait_axis=False):
+                               focal_moves, focal_types, has_bait_axis=False,
+                               build_of=None):
     """Render the top-3 IV recommendation cards as an HTML fragment.
 
     Returned HTML is injected into the Notable IVs & Recommendations
     section by ``render_results_section``.
+
+    The card headline is the spread plus where it sits in the "Which one to
+    build?" builds ("7/2/12 -- in Build 1", "-- in no build"), read off
+    ``build_of`` ({iv index: build name}). Until 2026-09-17 it was the
+    spread's STYLE ("Matchup Hunter: 7/2/12") from a stat-extreme taxonomy
+    that is now retired; the picks themselves are unchanged -- still the top
+    three by composite score.
     """
     if not rec_candidates:
         return ''
@@ -3356,8 +3364,12 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
         prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis,
                                    expandable=True, id_prefix='frec')
         parts.append('<div class="dd-rec-card">\n')
-        style_color = 'var(--accent)' if rc['style'] == 'Bait Robust' else 'var(--title)'
-        parts.append(f'<h4 style="color:{style_color}">{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
+        where = (build_of or {}).get(iv)
+        membership = (f' &mdash; in {_html.escape(where)}' if where
+                      else (' &mdash; in no build' if build_of else ''))
+        parts.append(f'<h4 style="color:var(--title)">'
+                     f'{iv_label(data_obj, iv)}{membership}'
+                     f'{tier_badge_html(data_obj, iv)}</h4>\n')
         parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
         parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
         parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
@@ -3470,10 +3482,23 @@ _OPP_THREATS_JS = (
     'else document.addEventListener("DOMContentLoaded",o);})();</script>\n')
 
 
+def _card_pinned_note():
+    """The dive card's own "these builds are the league cap's" sentence.
+
+    Imported lazily (deep_dive_card imports this module for ``opp_slug``, so a
+    module-level import would be circular) and quoted rather than re-worded:
+    the card and the threat rows show the same pinned spreads on the
+    best-buddy pass, and two spellings of one caveat is how they drift.
+    """
+    import deep_dive_card
+    return deep_dive_card.PINNED_NOTE
+
+
 def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                                     scenarios, opponents, nS, nO, data_obj,
                                     opp_label, has_bait_axis=False,
-                                    spread_ivs=None, win_threshold=WIN_RATING):
+                                    spread_ivs=None, win_threshold=WIN_RATING,
+                                    builds_pinned=False):
     """Opponent-centric "Threats where your build choice matters" section.
 
     For each opponent, computes whether each recommended spread (``spread_ivs``
@@ -3483,9 +3508,17 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     choice decides the result; the row shows a win/loss chip per build, a "build
     X" hint, and an expander with the exact stat cutoffs + a per-spread x
     9-shield grid. Opponents every build wins (or every build loses) hoist into
-    two one-line callouts. Subsumes the flat boundary dump. ``spread_ivs`` /
-    ``recStyles`` default to ``data_obj``. No new simulation. Returns '' when
-    there is nothing to show.
+    two one-line callouts. Subsumes the flat boundary dump. No new simulation.
+    Returns '' when there is nothing to show.
+
+    The spreads and their names are the DIVE CARD's -- the "Which one to
+    build?" builds plus the standouts (``data_obj['recIvs']`` /
+    ``['recNames']``, both fed by ``deep_dive_which_build.card_specs``), so a
+    chip here names the same spread the card headlines. Before 2026-09-17
+    they were the three stat-extreme poles and their style taxonomy
+    ("Matchup Hunter", "Max Bulk"), which named spreads no other surface on
+    the page showed. ``builds_pinned`` is the best-buddy (L51) pass, whose
+    builds are the league cap's: it adds the card's own pinned note.
     """
     if spread_ivs is None:
         spread_ivs = list(data_obj.get('recIvs') or [])
@@ -3502,10 +3535,10 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     for b in all_matchup_boundaries or []:
         by_opp.setdefault(b['opponent'], []).append(b)
 
-    spread_styles = data_obj.get('recStyles') or []
+    spread_names = data_obj.get('recNames') or []
 
     def _style(i):
-        s = spread_styles[i] if i < len(spread_styles) else ''
+        s = spread_names[i] if i < len(spread_names) else ''
         return s or _ivstr(spread_ivs[i])
 
     def _overall_win(siv, oi):
@@ -3567,7 +3600,10 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         f'{opp_label} opponents, so your build choice decides the result. The '
         'chips show which recommended build wins the matchup overall (a majority '
         f'of the {nS} shields); expand a row for the per-shield grid and the '
-        'exact stat cutoffs.</p>\n')
+        'exact stat cutoffs. The spreads are the ones the dive card names -- '
+        'one per build from "Which one to build?", plus the standouts.'
+        + (_html.escape(_card_pinned_note()) if builds_pinned else '')
+        + '</p>\n')
     parts.append(
         '<p class="dd-small" style="color:var(--text-muted)">'
         f'<b>Flips at</b>: {_html.escape(BOUNDARY_RULE_TIP)}</p>\n')
@@ -3656,6 +3692,9 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                 f'<span class="dd-opp-chip {cls}">{mark} '
                 f'{_html.escape(_style(i))} '
                 f'<span class="dd-small">{_ivstr(siv)}</span></span>')
+        # "won by Build 1 or Build 2", not "build Build 1 or Build 2": the
+        # spreads carry the card's own names now, and the builds among them
+        # already have "Build" in the name (2026-09-17 round 5, item 1a).
         winners = ' or '.join(_html.escape(_style(i))
                               for i in range(len(spread_ivs)) if outs[i])
         # id="opp-<slug>" preserves the deep-link contract the article's Matchup
@@ -3666,7 +3705,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
             '<summary style="cursor:pointer">'
             f'<span class="dd-opp-name">{_opp_b(name)}</span> '
             f'{"".join(chips)}'
-            f'<span class="dd-opp-build">&rarr; build {winners}</span>'
+            f'<span class="dd-opp-build">&rarr; won by {winners}</span>'
             '</summary>\n')
         parts.append('<div class="dd-opp-detail">\n')
         bnds = sorted(by_opp.get(name, []),
@@ -3706,12 +3745,18 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            ref_atk, ref_def, ref_iv, opp_iv_mode,
                            scores_flat, nS, nO, scenarios, opponents,
                            anchor_passing_sink, has_toml_tiers, ranked,
-                           hp_list, nIvs, has_bait_axis=False):
+                           hp_list, nIvs, has_bait_axis=False,
+                           build_of=None, builds_pinned=False):
     """Render the always-visible Deep Dive Results section.
 
     Returns an HTML string. Computation (anchor aggregation, tier
     derivation, matchup boundaries) is done by the caller; this function
     only assembles HTML from pre-computed data.
+
+    ``build_of`` is ``{iv index: build name}`` over every member of every
+    "Which one to build?" build, for the Top Picks cards' membership label;
+    ``builds_pinned`` is the best-buddy (L51) pass, whose builds are the
+    league cap's.
     """
     parts = []
 
@@ -3846,7 +3891,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     rec_html = _render_iv_recommendations(
         rec_candidates, flips, opp_label, data_obj, ref_iv, ref_atk,
         ref_def, opp_info_cache, focal_moves, focal_types,
-        has_bait_axis=has_bait_axis)
+        has_bait_axis=has_bait_axis, build_of=build_of)
 
     # -- Notable IVs & Recommendations --
     from deep_dive import build_iv_categories
@@ -3993,7 +4038,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # dump: each boundary record is now reached per-opponent via its row).
     opp_threats_html = render_opponent_threats_section(
         all_matchup_boundaries, scores_flat, scenarios, opponents,
-        nS, nO, data_obj, opp_label, has_bait_axis=has_bait_axis)
+        nS, nO, data_obj, opp_label, has_bait_axis=has_bait_axis,
+        builds_pinned=builds_pinned)
     if opp_threats_html:
         parts.append(opp_threats_html)
 

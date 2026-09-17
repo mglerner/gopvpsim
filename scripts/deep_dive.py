@@ -608,10 +608,7 @@ DEFAULT_CARD_ROBUST_K = 512
 
 # Moved to deep_dive_lib/render.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
-REC_DISTINCTNESS_MIN_SYMDIFF = render.REC_DISTINCTNESS_MIN_SYMDIFF
 REC_MAX_SPREADS = render.REC_MAX_SPREADS
-REC_STRONG_POOL_N = render.REC_STRONG_POOL_N
-REC_NOTABLE_MAX_CLEAR_FRAC = render.REC_NOTABLE_MAX_CLEAR_FRAC
 REC_TWO_ONES_MIN_WINRATE_GAP = render.REC_TWO_ONES_MIN_WINRATE_GAP
 
 # Moved to deep_dive_lib/robustness.py (Worlds 2026 robustness split,
@@ -1366,7 +1363,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               cup=None, cup_label=None,
                               which_build_html=None,
                               which_build_presets=None,
-                              which_build_cards=None):
+                              which_build_cards=None,
+                              which_build_membership=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -1394,9 +1392,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     which_build_cards: optional list of dive-card spreads taken from THIS
         moveset's builds (scripts/deep_dive_which_build.card_specs). When
         present the card headlines one spread per named build plus the two
-        standouts instead of the three stat-extreme POLES it used to pick,
-        so the card and the section name the same spreads for the same
-        reasons. None (or []) keeps the pole card.
+        standouts, and the same spreads drive the scatter's "Spec Card
+        Spreads" overlay and the opponent-threat chips. None (or []) falls
+        back to the composite-score top picks (the stat-extreme POLES this
+        used to fall back to were retired 2026-09-17).
+
+    which_build_membership: optional ``{'7/2/12': 'Build 1', ...}`` for THIS
+        moveset (scripts/deep_dive_which_build.card_build_membership), so the
+        "Top Picks" cards can say which build each pick sits in. None = the
+        cards say nothing about build membership.
     """
     opp_iv_modes = opp_iv_modes or ['pvpoke']
     shield_scenarios = shield_scenarios or [(1, 1)]
@@ -2763,7 +2767,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             # the best-buddy card, above an L50 builds section, with none of
             # the guarantee lines (2026-09-16 round-3 review).
             card_builds=which_build_cards,
-            card_builds_pinned=builds_pinned)
+            card_builds_pinned=builds_pinned,
+            card_build_membership=which_build_membership)
         if split_info is not None:
             _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
             assert _expected in r_html, (
@@ -3520,7 +3525,9 @@ def _which_build_sections(state):
     """Pre-render the "Which one to build?" section for every moveset.
 
     Returns ``({arm index: html}, {arm index: [live preset key]},
-    {arm index: [card spec]})``. The preset keys are what the controls
+    {arm index: [card spec]}, {arm index: {iv string: build name}})``. The
+    last is every build's membership, for the "Top Picks" cards' "in Build 1"
+    / "in no build" label. The preset keys are what the controls
     strip's Build-criteria dropdown offers: a preset that weights no
     scenario this dive baked never reaches the payload, so an option for it
     would leave three surfaces in a state nothing on the page explains. The
@@ -3549,7 +3556,7 @@ def _which_build_sections(state):
     if not blob_path:
         logger.info("  Which one to build?: skipped (no replay blob path on "
                     "this render; the brief is computed from the blob)")
-        return {}, {}, {}
+        return {}, {}, {}, {}
     # How many movesets each FILE will embed. Split mode gives every file
     # exactly one; a single-file dive embeds them all behind a Moveset
     # dropdown this section does not follow, and the note under the panel
@@ -3569,11 +3576,16 @@ def _which_build_sections(state):
         cards = {arm: which_build.card_specs(all_facts[arm],
                                              all_facts[arm].get('_builds'))
                  for arm in range(len(all_facts))}
-        return html, presets, cards
+        # Which build (if any) every spread on the grid belongs to, for the
+        # "Top Picks" cards' membership label.
+        membership = {arm: which_build.card_build_membership(
+                          all_facts[arm].get('_builds'))
+                      for arm in range(len(all_facts))}
+        return html, presets, cards, membership
     except Exception as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
-        return {}, {}, {}
+        return {}, {}, {}, {}
 
 
 def render_dive_html(state):
@@ -3590,8 +3602,8 @@ def render_dive_html(state):
             state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
-    which_build, which_build_presets, which_build_cards = (
-        _which_build_sections(state))
+    (which_build, which_build_presets, which_build_cards,
+     which_build_membership) = _which_build_sections(state)
     if state['split_movesets'] and len(moveset_data) > 1:
         # Per-moveset split: emit N files, one per moveset. The
         # filesystem plan is computed up-front so every file
@@ -3645,6 +3657,7 @@ def render_dive_html(state):
                 which_build_html=which_build.get(mi),
                 which_build_presets=which_build_presets.get(mi),
                 which_build_cards=which_build_cards.get(mi),
+                which_build_membership=which_build_membership.get(mi),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -3681,6 +3694,7 @@ def render_dive_html(state):
             which_build_html=which_build.get(0),
             which_build_presets=which_build_presets.get(0),
             which_build_cards=which_build_cards.get(0),
+            which_build_membership=which_build_membership.get(0),
         )
 
 

@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2735<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2746<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -1286,6 +1286,99 @@ moveset-0's). The cache is removed; a tripwire assertion in
 subheader names that file's moveset. Split dives published before the
 fix carry moveset-0 analysis on their non-landing pages and need a
 re-render to correct.
+
+## Dive-card spreads: the poles are retired (2026-09-17)
+
+Four surfaces used to name "the spreads this page is about", and they did
+not agree:
+
+| Surface                                   | Chose its spreads by                        |
+| ----------------------------------------- | ------------------------------------------- |
+| the dive card                             | the "Which one to build?" builds (2026-09-16) |
+| the scatter overlay "Spec Card Spreads"   | three stat-extreme POLES                     |
+| "Threats where your build choice matters" | the same three poles, plus their style names |
+| "Top Picks"                               | composite score, headlined with a pole style |
+
+The poles were a balanced lead (battle-score #1), an attack pole (max
+effective attack) and a bulk pole (max effective defense), labelled by a
+style classifier ("Attack Weight", "High Defense", "High HP", "Matchup
+Hunter", "Generalist", "Balanced", "Bait Robust", "Max Bulk"). On Shadow
+Sableye GL the overlay marked 9/6/13, 0/15/13 and 15/15/0 while the card
+showed 8/7/5, 2/11/13, 9/6/13 and 7/2/14 -- a live disagreement on one page,
+and the threat chips named two different spreads "Max Bulk".
+
+All of it is gone. `deep_dive_which_build.card_specs` is now the ONLY
+spread-selection rule on the page:
+
+- `data_obj['recIvs']` (the scatter overlay) = the card's spreads.
+- `data_obj['recNames']` (the threat chips) = the card titles' short forms
+  (`short` on each spec: "Build 1", "Build 2", "Highest battle score",
+  "Most matchups won"). This replaces `recStyles`, which is deleted.
+- The threat rows' hint reads "-> won by Build 1 or Build 2" (it used to be
+  "-> build <style>", which with the new names would have read "build Build
+  1").
+- "Top Picks" keeps its own selection (top three by composite score) and is
+  headlined "7/2/12 -- in Build 1" / "-- in no build", from
+  `deep_dive_which_build.card_build_membership` (every member of every
+  build, threaded through `generate_analysis_sections(card_build_membership=)`
+  as `build_of`).
+- The best-buddy (L51) pass reuses the league-cap spreads, as the card does,
+  and the threat rows quote the card's own `PINNED_NOTE`.
+
+**Fallback when a page has no builds** (a moveset with no decision cells, an
+old blob, or a dive with no replay blob): the card, the overlay and the chips
+all fall back to the composite-score top picks -- `rec_candidates`, filtered
+by the same `efficient_frontier` strict-dominance guard the extra card
+spreads always carried, capped at `REC_MAX_SPREADS`, and labelled "Top pick
+#N". Never a pole. `REC_STRONG_POOL_N`, `REC_NOTABLE_MAX_CLEAR_FRAC` and
+`REC_DISTINCTNESS_MIN_SYMDIFF` tuned the retired selection and are deleted
+with it.
+
+`tests/test_card_pole_tiebreak.py` now pins the RETIREMENT (its old content,
+the 810f53c attack tie-break tripwires, is quoted in the module docstring):
+a pole that came back would silently re-open the 2026-06-24 UL Mimikyu
+dominated-spread bug, whose tie-break lives nowhere now.
+
+### SP1, and the standouts' two matchup lists
+
+- The section defines "stat-product rank-1 (SP1)" once per surface -- the
+  builds lead and the collapsed summary line -- and writes SP1 everywhere
+  else (paragraphs, table column header, compare prefill). The glossary
+  tooltip matches either spelling, so the first one a reader meets carries
+  the definition. The panel legend entry is "Stat-product rank-1 (SP1)".
+- Each standout now prints the two matchup LISTS behind its counts, not just
+  the counts: the cells it wins that its nearest build does not guarantee
+  (each with the share of that build's members that win the same cell,
+  ascending; cells above `MEMBER_SHARE_TAIL` = 25% go to a counted tail), and
+  the cells that build guarantees to every member and this spread loses.
+  `deep_dive_builds.standout_block` computes them as `beyond_cells` /
+  `lost_cells`.
+- The fixed note under the block prints the page's OWN two thresholds -- the
+  brief's line and the primary build's attack rung -- and only when every
+  outside standout actually sits between them.
+
+### The nested wide build
+
+`deep_dive_builds.wide_build` surfaces at most one region of the same
+lattice that (a) holds at least `WIDE_MIN_SHARE` (90%) of the primary's
+members and (b) is at least `WIDE_MIN_FACTOR` (2x) its size, ranked on
+preset-weighted guaranteed cells with ties to the larger region. The
+constructed bulk box is excluded, and it is computed for the PRIMARY only.
+
+It is deliberately NOT in `bl['builds']`: it lives at `bl['wide']`, so the
+objectives line, the card set, the standouts' nearest-build search and the
+UpSet columns all go on seeing two or three builds. The surfaces that opt in
+are the table (one row directly under Build 1, carrying its payload index),
+the paragraphs (one directly under Build 1's), the collapsed summary (a
+clause, not a build slot), the standouts' membership, and the panel -- where
+it travels LAST in the payload's `builds` array with `col: null`, so
+`_wbBuildOf` lets every real build claim its members first, and draws in a
+tinted Build 1 colour underneath Build 1.
+
+**On Shadow Sableye GL arm 0 the rule picks D,F,G (157 spreads, 51
+guaranteed), not the D,G,H (552/44) or D,E,H (369/48) regions that hold the
+standouts**: those guarantee fewer cells, and the rule ranks cells first. So
+the wide region on that page holds neither standout, and the page says so.
 
 ## Article lifecycle
 
