@@ -328,10 +328,12 @@ def _flip_html(s, link_opps, ref_sp1=None, ref_pvpoke=None):
     same = ref_sp1 is not None and ref_sp1 == ref_pvpoke
     lines = []
     if ref_sp1 is not None:
-        label = (f'vs stat-product #1 = PvPoke default ({ref_sp1})' if same
-                 else f'vs stat-product #1 ({ref_sp1})')
+        # "SP1", the spelling the section defines and uses; the foot's key
+        # says what it is, for a card that ships standalone (round 6 review).
+        label = (f'vs SP1 = PvPoke default ({ref_sp1})' if same
+                 else f'vs SP1 ({ref_sp1})')
         if s.is_sp1:
-            body = 'this spread IS the stat-product #1'
+            body = 'this spread IS SP1'
         else:
             fd = s.flip_fd if same else s.flip_fd_sp
             body = (_flip_prose(fd, s.flip_has_bait, link_opps, 'fcardsp')
@@ -850,7 +852,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
   <div class="ddcard-foot">Win rate = shield-scenario matchups won (&gt;500),
-  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).{_guar_key}{_pinned}</div>
+  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).
+  SP #N = stat-product rank N; SP1 = rank 1, the spread most IV tools list
+  first.{_guar_key}{_pinned}</div>
 </section>"""
 
     if not standalone:

@@ -372,7 +372,10 @@ def test_flip_lines_label_both_references():
     assert m.flip_ref_sp1 == '1/13/11'
     assert m.flip_ref_pvpoke == '4/15/9'
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 (1/13/11): no matchup flips' in html_out
+    # round 6: the card writes SP1, the spelling the section defines
+    # (pre-fix: 'vs stat-product #1 (1/13/11): no matchup flips')
+    assert 'vs SP1 (1/13/11): no matchup flips' in html_out
+    assert 'SP1 = rank 1' in html_out       # the foot defines it
     assert 'vs PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
 
 
@@ -383,7 +386,7 @@ def test_flip_line_sp1_candidate_says_so():
     sp1_spread = [s for s in m.spreads if s.iv_str == '1/13/11'][0]
     assert sp1_spread.is_sp1
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'this spread IS the stat-product #1' in html_out
+    assert 'this spread IS SP1' in html_out   # pre-fix: 'the stat-product #1'
 
 
 def test_flip_lines_collapse_when_refs_identical():
@@ -392,7 +395,7 @@ def test_flip_lines_collapse_when_refs_identical():
     ctx['sp1_idx'] = 2                      # same spread as pvpokeRefIvIdx
     m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 = PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
+    assert 'vs SP1 = PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
     assert 'vs PvPoke default (' not in html_out  # no separate second line
 
 
@@ -408,6 +411,7 @@ def test_flip_line_legacy_ctx_has_no_reference_claim():
     html_out = dc.render_card_html(m, standalone=True)
     assert 'gains Azumarill 1v1' in html_out
     assert 'vs stat-product #1' not in html_out
+    assert 'vs SP1' not in html_out
     assert 'vs PvPoke default' not in html_out
 
 
@@ -442,7 +446,7 @@ def test_flip_line_pvpoke_default_candidate_gets_sp_line():
     pv = [s for s in m.spreads if s.iv_str == '4/15/9'][0]
     assert pv.is_pvpoke and not pv.is_sp1
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 (1/13/11): gains Lickitung 0v1' in html_out
+    assert 'vs SP1 (1/13/11): gains Lickitung 0v1' in html_out
     assert 'vs PvPoke default (4/15/9): this spread IS the PvPoke default' in html_out
 
 

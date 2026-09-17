@@ -3356,6 +3356,17 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
     parts.append(
         f'<p class="dd-small">Top candidates by average score, matchup flips, '
         f'and rank stability vs {opp_label} opponents.</p>\n')
+    if build_of:
+        # The two rankings answer different questions, and the page now says
+        # so out loud: all three picks reading "in no build" beside a section
+        # that recommends builds looked like a contradiction (2026-09-17
+        # round 6 review).
+        parts.append(
+            '<p class="dd-small" style="color:var(--text-muted)">Top Picks '
+            'rank single spreads by average score; the builds in "Which one '
+            'to build?" rank regions by what every member is guaranteed. '
+            'They need not coincide -- the Standouts block there is the '
+            'reconciliation.</p>\n')
     parts.append('<div class="dd-rec-grid">\n')
     for rc in rec_candidates[:3]:
         iv = rc['iv']
@@ -3541,6 +3552,21 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         s = spread_names[i] if i < len(spread_names) else ''
         return s or _ivstr(spread_ivs[i])
 
+    def _steal_subject(name):
+        """One spread as the SUBJECT of a sentence.
+
+        "Build 1 steals 1v0" is a sentence; "Most matchups won steals 1v0" is
+        a fragment, so a standout's noun-phrase name takes an article.
+        """
+        esc = _html.escape(name)
+        if esc.startswith('Build ') or '/' in esc:
+            return esc
+        return f'the {esc[:1].lower()}{esc[1:]} spread'
+
+    def _all_word(n):
+        return {2: 'both spreads', 3: 'all three spreads',
+                4: 'all four spreads'}.get(n, f'all {n} spreads')
+
     def _overall_win(siv, oi):
         # This build wins the matchup OVERALL == a majority of the 9 shields.
         return sum(1 for si in range(nS)
@@ -3655,9 +3681,19 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                 b = min(bnds, key=lambda b: b['threshold'])
                 _sl = 'Atk' if b.get('stat') == 'atk' else 'Def'
                 cut_str = f' ({_sl} &ge; {b["threshold"]:.2f})'
-            steal_bits = '; '.join(
-                f'{_html.escape(_style(i))} steals {", ".join(shs)}'
-                for i, shs in steals)
+            # One bullet, not the same sentence four times: when every
+            # recommended spread steals the same shields the bullet says so
+            # once, and a spread whose name is a noun phrase ("Most matchups
+            # won") gets the article that makes it a sentence (2026-09-17
+            # round 6 review).
+            shield_sets = {tuple(shs) for _i, shs in steals}
+            if len(steals) == len(spread_ivs) > 1 and len(shield_sets) == 1:
+                steal_bits = (f'{_all_word(len(steals))} steal '
+                              f'{", ".join(steals[0][1])}')
+            else:
+                steal_bits = '; '.join(
+                    f'{_steal_subject(_style(i))} steals {", ".join(shs)}'
+                    for i, shs in steals)
             parts.append(
                 f'<li{opp_anchor_id(name)}>{_opp_b(name)} - '
                 f'{steal_bits}{cut_str}</li>\n')

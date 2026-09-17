@@ -143,6 +143,46 @@ def test_the_best_buddy_threat_rows_say_their_builds_are_the_caps():
     assert deep_dive_card.PINNED_NOTE.strip() in pinned.replace('&quot;', '"')
 
 
+def _steal_data_obj(same=True):
+    """Four spreads; the two recommended ones lose every matchup overall but
+    steal individual shields (0v0 and 1v0; with ``same=False`` the second
+    steals only 0v0)."""
+    nIvs, nS, nO = 4, 9, 1
+    scores = [200] * (nIvs * nS * nO)
+    for iv in range(nIvs):
+        for si in ((0, 3) if (same or iv == 0) else (0,)):
+            scores[iv * nS * nO + si * nO] = 800
+    data_obj = {
+        'ivA': [0, 5, 10, 15], 'ivD': [15] * 4, 'ivS': [15] * 4,
+        'ivAtk': [100.0, 105.0, 110.0, 115.0],
+        'ivDef': [100.0] * 4, 'ivHp': [135] * 4,
+        'recIvs': [0, 3], 'recNames': ['Build 1', 'Most matchups won'],
+    }
+    return data_obj, scores, nS, nO
+
+
+def test_a_stealable_bullet_collapses_identical_shield_sets():
+    """Pre-fix the bullet said the same thing once per spread -- "Altaria -
+    Build 1 steals 1v0, 2v0, 2v1, 2v2; Build 2 steals 1v0, 2v0, 2v1, 2v2;
+    Highest battle score steals ...; Most matchups won steals ..." -- and a
+    standout's noun-phrase name read as a sentence fragment (2026-09-17 round
+    6 review).
+    """
+    data_obj, scores, nS, nO = _steal_data_obj()
+    html = rendering.render_opponent_threats_section(
+        [], scores, _SCENARIOS9, ['Altaria'], nS, nO, data_obj, 'rank-1')
+    assert 'Stealable' in html
+    assert 'both spreads steal 0v0, 1v0' in html
+    assert 'Most matchups won steals' not in html
+    # and when they differ, each is named -- the standout with its article
+    data_obj2, scores2, _nS, _nO = _steal_data_obj(same=False)
+    html2 = rendering.render_opponent_threats_section(
+        [], scores2, _SCENARIOS9, ['Altaria'], nS, nO, data_obj2, 'rank-1')
+    assert 'Build 1 steals 0v0, 1v0' in html2
+    assert 'the most matchups won spread steals 0v0' in html2
+    assert 'both spreads steal' not in html2
+
+
 def test_top_picks_are_labelled_by_build_membership_not_by_a_style():
     """Pre-fix: ``<h4 ...>Matchup Hunter: 7/2/12</h4>``. The picks are
     unchanged (top three by composite score); only the label moved to
@@ -163,6 +203,17 @@ def test_top_picks_are_labelled_by_build_membership_not_by_a_style():
     assert '>7/2/12 &mdash; in no build<' in html
     for style in _RETIRED_STYLES:
         assert style not in html
+    # the two rankings are different questions, and the page says so where a
+    # reader meets three picks labelled "in no build" (round 6 review)
+    assert 'Top Picks rank single spreads by average score' in html
+    assert 'the Standouts block there is the reconciliation' in html
+    # a pick no BUILD holds but the wide region does is named, not "in no
+    # build": the builds table names that same spread on the same page
+    wide = rendering._render_iv_recommendations(
+        recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {}, None, None,
+        build_of={0: 'Build 1 wide only', 1: 'Build 1'})
+    assert '>7/2/12 &mdash; in Build 1 wide only<' in wide
+    assert 'in no build' not in wide
     # with no builds on the page at all the cards say nothing about builds
     plain = rendering._render_iv_recommendations(
         recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {}, None, None)

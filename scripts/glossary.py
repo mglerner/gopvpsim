@@ -78,6 +78,12 @@ TERMS = {
         "three even ones, or 1v1 alone.",
 }
 
+# term -> the heading a definition list PRINTS for it, where that differs
+# from the registry key. The section writes "SP1" after defining it once, so
+# a reader scanning the terms at the foot for SP1 has to find it there
+# (2026-09-17 round 6 review).
+DISPLAY = {'stat-product rank-1': 'stat-product rank-1 (SP1)'}
+
 # term -> "<guide-slug>#<heading-anchor>", relative to the guides directory.
 # Absent = no guide covers the term today, and the hover definition stands
 # alone rather than linking somewhere that does not define it.
@@ -149,7 +155,7 @@ def terms_html(terms, cls='wb-terms', prefix=GUIDES_PREFIX):
         if key not in TERMS:
             raise KeyError(f"no glossary entry for {term!r}")
         href = guide_href(term, prefix=prefix)
-        name = _html.escape(term)
+        name = _html.escape(DISPLAY.get(key, term))
         if href is not None:
             name = (f'<a href="{_html.escape(href, quote=True)}">{name}</a>')
         rows.append(f'<dt>{name}</dt>'

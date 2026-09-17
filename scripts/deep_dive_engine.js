@@ -5292,7 +5292,20 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   }
   none.name += ' (' + none.x.length + ')';
   for (var k2 = 0; k2 < ts.length; k2++) {
-    ts[k2].name = wrapLegendName(ts[k2].name + ' (' + ts[k2].x.length + ')', 34);
+    // The wide region's trace carries only the spreads no BUILD holds (every
+    // build claims its own members first), so a bare count in its legend
+    // disagreed with the size the table row and the summary line give for
+    // the same named region. It says which count it is (round 6 review).
+    var cnt;
+    if (block.builds[k2].role === 'wide') {
+      cnt = ts[k2].x.length
+          ? (ts[k2].x.length + ' of ' + block.builds[k2].size
+             + ' not already in a build')
+          : 'all ' + block.builds[k2].size + ' already in a build';
+    } else {
+      cnt = '' + ts[k2].x.length;
+    }
+    ts[k2].name = wrapLegendName(ts[k2].name + ' (' + cnt + ')', 34);
   }
   if (_wbPlaneMode === 'stats') {
     // Attack is the stat neither axis carries, so it is the marker size.
@@ -5309,7 +5322,11 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   // the first build holding it and the wide entry travels last -- so this
   // trace carries only the spreads no build holds.)
   for (var kw = 0; kw < ts.length; kw++) {
-    if (block.builds[kw].role === 'wide' && ts[kw].x.length) out.push(ts[kw]);
+    // Emitted even with no points of its own: a named region the table and
+    // the paragraph both print, missing from the plot and from the legend
+    // with nothing saying why, is worse than an empty legend entry that
+    // says it (2026-09-17 round 6 review).
+    if (block.builds[kw].role === 'wide') out.push(ts[kw]);
   }
   for (var k3 = 0; k3 < ts.length; k3++) {
     if (block.builds[k3].role !== 'wide' && ts[k3].x.length) out.push(ts[k3]);
@@ -5905,8 +5922,11 @@ function wbRenderRoot(root) {
       // Named by its SCOPE, not just "the most": it is the all-nine winner,
       // so under a narrower preset it is deliberately not the highest point
       // on an axis that is counting fewer matchups.
+      // Round 6: the canonical short name leads, the scope follows it
+      // in brackets, so the legend, the section head, the card title and
+      // the threat chips all start with the same words.
       var gbScope = 'all ' + DATA.nScenarios + ' shield scenarios';
-      var gbt2 = _wbMarkTrace('Wins the most matchups over ' + gbScope,
+      var gbt2 = _wbMarkTrace('Most matchups won (' + gbScope + ')',
                               gbi2, colors.mark2, 'square-open', L, wins,
                               'wins the most matchups over ' + gbScope +
                               ' (' + pay.bp.gridBest.wins + '); ' +
@@ -5922,7 +5942,7 @@ function wbRenderRoot(root) {
     // other point (2026-09-16 review item 3).
     var bsi = pay.bp.bestScore ? _wbIvIdx(_wbIvTriple(pay.bp.bestScore.iv)) : -1;
     if (bsi >= 0 && bsi !== gbi2) {
-      var bst = _wbMarkTrace('Highest Avg Battle Score', bsi,
+      var bst = _wbMarkTrace('Highest avg battle score', bsi,
                              colors.mark1, 'x-open', L, wins,
                              'the highest Avg Battle Score on the scatter (' +
                              pay.bp.bestScore.avgStr + '); ' +
@@ -5940,7 +5960,7 @@ function wbRenderRoot(root) {
     if (nr1t) traces.push(nr1t);
     var gbi = _wbIvIdx(pay.gridBest.iv);
     if (gbi !== nr1) {
-      var gbt = _wbMarkTrace('Wins the most matchups', gbi, colors.mark2,
+      var gbt = _wbMarkTrace('Most matchups won', gbi, colors.mark2,
                              'triangle-up', L, wins, 'wins the most matchups',
                              den);
       if (gbt) traces.push(gbt);
