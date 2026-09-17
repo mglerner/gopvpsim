@@ -4694,9 +4694,13 @@ def strip_badge(fl):
     return PRIMITIVE_HEADLINE_BADGE[fl['kind']]
 
 
-STRIP_LABELS_FLOOR = ('Line', 'Decides', 'Rank-1', 'Alternative',
+# 'SP1', not 'Rank-1': the strip is the FIRST place the section names the
+# stat-product rank-1 spread, and the which-build renderer marks the first
+# occurrence with the glossary definition, so the short form is defined
+# where a reader meets it (2026-09-17 round 6 review).
+STRIP_LABELS_FLOOR = ('Line', 'Decides', 'SP1', 'Alternative',
                       'Not claimed')
-STRIP_LABELS_NONE = ('Line', 'Closest', 'Rank-1', 'Alternative',
+STRIP_LABELS_NONE = ('Line', 'Closest', 'SP1', 'Alternative',
                      'Decision width')
 
 

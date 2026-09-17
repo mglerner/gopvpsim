@@ -95,8 +95,14 @@ BUILD_DEDUP = 0.90
 # and the fork rule, so the page never showed it although it is the obvious
 # "how much can I relax Build 1?" answer. At most ONE is surfaced, next to
 # the primary and never as a build of its own.
-WIDE_MIN_SHARE = 0.90   # of the primary's members it must contain
 WIDE_MIN_FACTOR = 2     # times the primary's size it must be
+# Round 6 (the reviews of the round-5 render) replaced the original
+# "contains 90% of the primary's members" share test with FULL containment,
+# and made a printable rule a filter rather than a preference. Ranked on
+# guaranteed cells alone the rule picked, on Shadow Sableye, a region that
+# dropped two of Build 1's own members and that no two- or three-stat rule
+# fits: a row headed "Build 1 wide" that was neither wide around Build 1 nor
+# a target a reader could aim at.
 
 # ---------------------------------------------------------------------------
 # The three Build-criteria presets (Michael's 2026-09-16 decision: three
@@ -1107,19 +1113,37 @@ def select_builds(ctx, L):
 # per-build facts
 # ---------------------------------------------------------------------------
 
-def wide_build(L, primary):
+def region_rule(ctx, mask):
+    """The rule the page would PRINT for a region, or None when none fits.
+
+    One definition of "describable", used by :func:`region_block` (which
+    prints it) and by :func:`wide_build` (which requires it), so the wide
+    region can never be selected on a rule the table then declines to show.
+    """
+    return pick_descriptions(
+        describe(mask, ctx['planes'], ctx['sc'], ctx['n_iv']))['d95']
+
+
+def wide_build(L, primary, ctx=None):
     """The one region the page presents as "Build 1 wide", or None.
 
     A candidate is a region of the SAME lattice that
 
-    * contains at least :data:`WIDE_MIN_SHARE` of the primary's members,
-    * is at least :data:`WIDE_MIN_FACTOR` times its size, and
-    * is not the primary itself (the size test already excludes it).
+    * contains EVERY member of the primary -- "Build 1 wide" is a claim
+      about Build 1, and a region missing two of its spreads is at best next
+      to it (2026-09-17 round 6 review);
+    * is at least :data:`WIDE_MIN_FACTOR` times its size; and
+    * carries a rule at the fidelity the table prints (:func:`region_rule`),
+      because the row exists to give a reader a LOOSER TARGET and "a list of
+      157 spreads that no two- or three-stat rule fits" is not one.
 
     Among those, the one guaranteeing the most decision cells wins, ties
     broken by size -- the preset-weighted count and the size, i.e. the
     lattice's own ranking key minus its material tie-break, so the wide
     region is chosen by the same quantity the builds were.
+
+    ``ctx`` is the arm context; passing None skips the rule filter (the
+    synthetic-lattice tests, which carry no planes).
 
     The constructed bulk box is excluded: it is not an intersection of named
     sets, so "Build 1 without <set>" could never describe it and its rule is
@@ -1131,19 +1155,23 @@ def wide_build(L, primary):
     n_p = int(pm.sum())
     if not n_p:
         return None
-    best = None
+    cands = []
     for d in L['inters']:
         if d.get('constructed'):
             continue
         size = int(d['size'])
         if size < WIDE_MIN_FACTOR * n_p:
             continue
-        if int((pm & d['mask']).sum()) < WIDE_MIN_SHARE * n_p:
+        if int((pm & ~d['mask']).sum()):        # drops a member of Build 1
             continue
-        key = (float(d['wg']), size)
-        if best is None or key > best[0]:
-            best = (key, d)
-    return None if best is None else best[1]
+        cands.append(((float(d['wg']), size), d))
+    # Best first, and the rule fitted LAZILY: describe() is a full search
+    # over rule families and the first candidate carrying one is the answer.
+    cands.sort(key=lambda kv: kv[0], reverse=True)
+    for _key, d in cands:
+        if ctx is None or region_rule(ctx, d['mask']) is not None:
+            return d
+    return None
 
 
 def cell_rows(L, region_mask, g, ctx):
@@ -1210,8 +1238,7 @@ def region_block(L, ctx, inter, role, others, weights, wsum=None):
     gave_rows = [{'ci': ci, 'cell': c['label'], 'rank': c['rank'],
                   'scenario': c['scenario'], 'material': c['material']}
                  for ci, c in enumerate(frame['cells']) if gave[ci]]
-    descs = describe(m, ctx['planes'], ctx['sc'], n)
-    d95 = pick_descriptions(descs)['d95']
+    d95 = region_rule(ctx, m)
     dblock = None
     if d95 is not None:
         dblock = {'family': d95['family'], 'rule': d95['rule'],
@@ -1463,6 +1490,12 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
                                    'grid_wr': float(c['wr'])})
         beyond_cells.sort(key=lambda r: (r['share'], r['grid_wr'], r['rank']))
         lost_cells.sort(key=lambda r: (r['grid_wr'], r['rank']))
+    # How many OTHER spreads on this grid win every decision matchup this one
+    # wins. The standouts note argues that no REGION reproduces this spread's
+    # profile; this is the stronger measured fact behind it, and it is the
+    # one a careful reader would otherwise doubt (2026-09-17 round 6
+    # review). 0 = nothing else on the grid covers what it covers.
+    n_peers = (int(frame['Wd'][:, own].all(axis=1).sum()) - 1 if n_own else 0)
     meta = ctx['meta']
     return {
         'kind': kind, 'idx': int(idx), 'iv': iv_str(meta, idx),
@@ -1483,6 +1516,7 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
         'n_lost_from_nearest': n_lost,
         'beyond_cells': beyond_cells,
         'lost_cells': lost_cells,
+        'n_profile_peers': n_peers,
     }
 
 
@@ -1532,7 +1566,7 @@ def run_preset(ctx, sets, frame, preset):
     wide = None
     prim = next((b for role, b in kept if role == 'primary'), None)
     if prim is not None:
-        w = wide_build(L, prim)
+        w = wide_build(L, prim, ctx)
         if w is not None:
             wide = region_block(L, ctx, w, 'wide', [], weights, wsum=wsum)
             wide['_mask'] = w['mask']
@@ -1544,6 +1578,16 @@ def run_preset(ctx, sets, frame, preset):
             # sayable when the difference is exactly one dropped set.
             wide['_dropped'] = [s for s in prim['sets'] if s not in w['sets']]
             wide['_added'] = [s for s in w['sets'] if s not in prim['sets']]
+            # How many of its spreads no SELECTED build already holds -- the
+            # only ones its plot trace can draw, since every build claims its
+            # own members first. Zero is a real case (the table row and the
+            # paragraph still print), and the paragraph says so rather than
+            # leaving a named region with no points and no legend entry
+            # (2026-09-17 round 6 review).
+            sel = np.zeros_like(w['mask'])
+            for _r, b in kept:
+                sel |= b['mask']
+            wide['_own'] = int((w['mask'] & ~sel).sum())
     standouts_out = standouts(ctx, frame, builds, weights, wsum)
     for t in standouts_out:
         t['in_wide'] = (None if wide is None
@@ -1852,10 +1896,15 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             cols.append((next(d for d in block['inters']
                               if d['combo'] == b['combo']), True))
         extra = 0
+        # The wide region takes no UpSet column of its own (it is not a
+        # build), and it must not come back as an anonymous EXTRA candidate
+        # column either: the table directly above the panel names that same
+        # region "Build 1 wide" (2026-09-17 round 6 review).
+        wide_combo = (block.get('wide') or {}).get('combo')
         for d in block['inters']:
             if extra >= n_col:
                 break
-            if d['combo'] in sel_combos:
+            if d['combo'] in sel_combos or d['combo'] == wide_combo:
                 continue
             cols.append((d, False))
             extra += 1
