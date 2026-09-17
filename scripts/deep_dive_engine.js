@@ -640,6 +640,26 @@ function renderAllScenarios() {
     })(si);
   }
 }
+// Is `el` inside a <details> that is closed?
+//
+// Measured, not assumed (headless Chrome, 2026-09-17, on the round-7
+// preview): a closed <details> is NOT display:none in current Chrome. Its
+// contents keep layout boxes -- #allscen-grid reported offsetParent BODY and
+// clientWidth 661 with its section closed, and nine minis drawn inside it
+// came out 212px wide and correct. So the usual "is it on screen"
+// guards (offsetParent, clientWidth) all PASS inside a closed section, and
+// "don't draw until the reader opens it" has to ask the <details> itself.
+// Nine 4096-point panels is not work to do at page load for a figure nobody
+// has asked for yet.
+function _inClosedDetails(el) {
+  var d = el.closest ? el.closest('details') : null;
+  while (d) {
+    if (!d.open) return true;
+    d = d.parentElement ? d.parentElement.closest('details') : null;
+  }
+  return false;
+}
+
 function refreshAllScenarios() {
   // Rebuild minis only when their inputs changed (moveset or mode); a
   // scenario-dropdown change costs just the highlight sync.
@@ -647,11 +667,12 @@ function refreshAllScenarios() {
   var grid = document.getElementById('allscen-grid');
   if (!box || !box.checked || !grid) { _allscenRendered = false; _allscenKey = null; return; }
   // Round 7: the grid lives inside the Matchup clusters <details>, which is
-  // CLOSED on load while the checkbox ships checked -- so "checked" no
-  // longer implies "on screen", and Plotly would size nine minis to zero.
-  // Drop the flags and let the toggle-open pass draw them.
-  if (grid.offsetParent === null) {
-    _allscenRendered = false; _allscenKey = null; return;
+  // CLOSED on load while the checkbox ships checked. Defer until it opens --
+  // the toggle-open pass calls back in here.
+  if (_inClosedDetails(grid) || grid.offsetParent === null) {
+    _allscenRendered = false; _allscenKey = null;
+    grid.innerHTML = '';
+    return;
   }
   var key = state.movesetIdx + '|' + state.oppIvMode;
   // ...or when the grid element itself was replaced under us: the
