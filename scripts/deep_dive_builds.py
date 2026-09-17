@@ -1760,16 +1760,31 @@ def build_plane(build):
                 'atkNote': stair_atk_head(d)}
     if fam == 'atk_floor_trade' and d.get('trade_terms'):
         t = d['trade_terms']
+        # The printed cut, for the same reason as the box branch below.
+        head = re.search(r'Atk >= [0-9.]+', display_rule(d['rule']))
         return {'kind': 'line', 'k': float(t['k']), 'c': float(t['c']),
-                'atkNote': f"Atk >= {float(t['atk_floor']):.2f}"}
+                'atkNote': (head.group(0) if head
+                            else f"Atk >= {float(t['atk_floor']):.2f}")}
     terms = d.get('terms')
     if not terms:
         return {'kind': 'none'}
     box = {'def': [None, None], 'hp': [None, None]}
+    # The attack cuts as the RULE prints them, in rule order. Not
+    # ``f"{float(t):.2f}"``: two-place formatting rounds a 150.245638 cut UP
+    # to 150.25, a bar 0.01 above the cut the build is actually made at, so
+    # the stats-view legend read "Atk >= 150.24 [Atk >= 150.25, not on these
+    # axes]" -- two spellings of one number in one string, one of them
+    # excluding real members (2026-09-17 round 5, seen on the wide region of
+    # the 1v1 preset). ``stair_atk_head`` makes the same point for the
+    # staircase family.
+    printed_atk = re.findall(r'Atk (?:>=|<=) [0-9.]+',
+                             display_rule(d['rule']))
     atk_bits = []
     for ax, op, t in terms:
         if ax == 'atk':
-            atk_bits.append(f"Atk {op} {float(t):.2f}")
+            atk_bits.append(printed_atk[len(atk_bits)]
+                            if len(atk_bits) < len(printed_atk)
+                            else f"Atk {op} {float(t):.2f}")
             continue
         slot = 0 if op == '>=' else 1
         box[ax][slot] = float(t)
