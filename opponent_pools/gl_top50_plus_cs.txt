@@ -1,83 +1,79 @@
-# Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 74 unique species.
-# Generated 2026-09-10 by scripts/build_opponent_pool.py
+# Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 75 unique species.
+# Generated 2026-09-17 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
-Tinkaton
-Ninetales (Shadow)
-Corsola (Galarian)
-Corviknight
-Cramorant
-Quagsire (Shadow)
-Quagsire
-Altaria
 Melmetal
-Empoleon
-Mantine
-Ninetales
-Snorlax
-Empoleon (Shadow)
-Florges
-Corviknight (Shadow)
+Altaria
+Ninetales (Shadow)
+Cramorant
+Tinkaton
 Mimikyu
-Feraligatr
-Jellicent
+Corviknight
+Corsola (Galarian)
 Altaria (Shadow)
+Corviknight (Shadow)
+Florges
+Quagsire (Shadow)
+Ninetales
+Quagsire
 Araquanid
-Furret
-Azumarill
 Clodsire
-Fearow
-Vigoroth
-Deoxys (Defense)
-Marowak
-Annihilape
-Annihilape (Shadow)
-Feraligatr (Shadow)
-Malamar
 Sableye (Shadow)
-Electrode (Hisuian)
-Malamar (Shadow)
-Lapras
+Marowak
+Stunfisk
+Vigoroth
+Jellicent
+Empoleon
+Empoleon (Shadow)
+Fearow
+Mantine
+Snorlax
 Umbreon
-Dondozo
-Guzzlord
-Mandibuzz
-Snorlax (Shadow)
-Vigoroth (Shadow)
 Araquanid (Shadow)
-Kingdra
-Hippowdon
-Kingdra (Shadow)
+Feraligatr
+Annihilape
+Azumarill
+Deoxys (Defense)
+Electrode (Hisuian)
+Rillaboom
 Sableye
-Jumpluff
-Blastoise
-Hydreigon (Shadow)
-Carbink
-Hippowdon (Shadow)
-Medicham
-Forretress
-Moltres (Galarian)
-Spidops
-Dragonair (Shadow)
-Turtonator
+Vigoroth (Shadow)
+Annihilape (Shadow)
+Lapras
+Snorlax (Shadow)
 Charjabug
+Malamar
+Furret
+Guzzlord
+Malamar (Shadow)
+Carbink
+Charjabug (Shadow)
+Forretress (Shadow)
+Dondozo
+Hippowdon
+Mandibuzz
+Morpeko (Full Belly)
+Forretress
+Medicham
+Jumpluff
+Hydreigon (Shadow)
+Kingdra
+Blastoise
+Diggersby
+Feraligatr (Shadow)
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,ICY_WIND
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,PLAY_ROUGH
 Sableye (Mega)
 Malamar (Mega)
-Rillaboom
+Oinkologne (Female)
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)
-Morpeko (Full Belly)
-Stunfisk
+Hippowdon (Shadow)
+Spidops
 Toxapex
+Turtonator
 Cradily
 Wartortle
 Bombirdier
 Cradily (Shadow)
-
-# 2026-09-17 hand-appended curated inclusion (Michael): female Oinkologne is
-# good despite GL #113. The pool was NOT regenerated from today's rankings on
-# purpose; see build_opponent_pool.CURATED_INCLUSIONS for the entry.
-Oinkologne (Female)
