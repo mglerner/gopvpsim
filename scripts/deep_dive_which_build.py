@@ -2477,9 +2477,11 @@ def wide_paragraph(facts, arm_builds, bl, wide, all_facts=None):
             out.append('It holds both standouts below.' if len(outside) > 1
                        else 'It holds the standout below.')
         else:
+            # By IV, not "N of the standouts": the block below names them by
+            # IV and a reader who is here for one of them needs to see WHICH.
             out.append('It holds ' + brief._and_list(
                 [_esc(t['iv'].split('@')[0]) for t in held])
-                + ' of the standouts below, and not ' + brief._and_list(
+                + ' below, and not ' + brief._and_list(
                 [_esc(t['iv'].split('@')[0]) for t in outside
                  if not t.get('in_wide')]) + '.')
     # A region every one of whose spreads is already in a build draws no

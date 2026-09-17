@@ -103,6 +103,12 @@ WIDE_MIN_FACTOR = 2     # times the primary's size it must be
 # dropped two of Build 1's own members and that no two- or three-stat rule
 # fits: a row headed "Build 1 wide" that was neither wide around Build 1 nor
 # a target a reader could aim at.
+# Round 6b puts the region's PURPOSE ahead of its cell count in the ranking
+# key: the standouts a build cannot reach are why the region is surfaced at
+# all ("the standouts as ordinary members of Build 1 wide"), and the round-6
+# key, which kept ranking on cells alone, picked a Shadow Sableye region that
+# held neither standout over three supersets that held both. See
+# :func:`wide_build`.
 
 # ---------------------------------------------------------------------------
 # The three Build-criteria presets (Michael's 2026-09-16 decision: three
@@ -1124,7 +1130,7 @@ def region_rule(ctx, mask):
         describe(mask, ctx['planes'], ctx['sc'], ctx['n_iv']))['d95']
 
 
-def wide_build(L, primary, ctx=None):
+def wide_build(L, primary, ctx=None, standout_idx=()):
     """The one region the page presents as "Build 1 wide", or None.
 
     A candidate is a region of the SAME lattice that
@@ -1137,10 +1143,22 @@ def wide_build(L, primary, ctx=None):
       because the row exists to give a reader a LOOSER TARGET and "a list of
       157 spreads that no two- or three-stat rule fits" is not one.
 
-    Among those, the one guaranteeing the most decision cells wins, ties
-    broken by size -- the preset-weighted count and the size, i.e. the
-    lattice's own ranking key minus its material tie-break, so the wide
-    region is chosen by the same quantity the builds were.
+    Among those, the ranking key is
+
+    1. how many of ``standout_idx`` -- the preset's standouts that sit in no
+       build -- the region holds (2 > 1 > 0); then
+    2. the preset-weighted guaranteed-cell count; then
+    3. size, ties to the larger region.
+
+    Clauses 2 and 3 are the lattice's own ranking key minus its material
+    tie-break, so among regions equal on the standouts the wide region is
+    chosen by the same quantity the builds were. Clause 1 is what the region
+    is FOR (2026-09-17 round 6b): Michael's stated purpose for surfacing it
+    is "the standouts as ordinary members of Build 1 wide", and ranked on
+    cells alone it picked, on Shadow Sableye, a region holding NEITHER
+    standout over three supersets holding both -- a row whose paragraph had
+    to end "it is not a route to them". With no outside standouts the key
+    reduces to the round-6 one exactly.
 
     ``ctx`` is the arm context; passing None skips the rule filter (the
     synthetic-lattice tests, which carry no planes).
@@ -1164,7 +1182,8 @@ def wide_build(L, primary, ctx=None):
             continue
         if int((pm & ~d['mask']).sum()):        # drops a member of Build 1
             continue
-        cands.append(((float(d['wg']), size), d))
+        held = sum(1 for i in standout_idx if bool(d['mask'][i]))
+        cands.append(((held, float(d['wg']), size), d))
     # Best first, and the rule fitted LAZILY: describe() is a full search
     # over rule families and the first candidate carrying one is the answer.
     cands.sort(key=lambda kv: kv[0], reverse=True)
@@ -1556,6 +1575,12 @@ def run_preset(ctx, sets, frame, preset):
         blk['_mask'] = b['mask']
         blk['_g'] = b['g']
         builds.append(blk)
+    # The standouts are computed BEFORE the wide region, because the wide
+    # region's ranking key reads them: its first clause is how many of the
+    # standouts that sit in no build it holds (2026-09-17 round 6b). They
+    # depend only on ``builds``, which is already final here; ``in_wide`` is
+    # filled in below, once there is a wide region to ask about.
+    standouts_out = standouts(ctx, frame, builds, weights, wsum)
     # The nested wide build: computed from the SAME lattice, kept OUT of
     # ``builds`` on purpose. It is not a build a reader picks -- it is the
     # context around Build 1 -- so the objectives, the card set, the standouts'
@@ -1566,7 +1591,9 @@ def run_preset(ctx, sets, frame, preset):
     wide = None
     prim = next((b for role, b in kept if role == 'primary'), None)
     if prim is not None:
-        w = wide_build(L, prim, ctx)
+        outside_idx = [t['idx'] for t in standouts_out
+                       if t['in_build'] is None]
+        w = wide_build(L, prim, ctx, outside_idx)
         if w is not None:
             wide = region_block(L, ctx, w, 'wide', [], weights, wsum=wsum)
             wide['_mask'] = w['mask']
@@ -1588,7 +1615,6 @@ def run_preset(ctx, sets, frame, preset):
             for _r, b in kept:
                 sel |= b['mask']
             wide['_own'] = int((w['mask'] & ~sel).sum())
-    standouts_out = standouts(ctx, frame, builds, weights, wsum)
     for t in standouts_out:
         t['in_wide'] = (None if wide is None
                         else bool(wide['_mask'][t['idx']]))

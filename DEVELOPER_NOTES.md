@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2750<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2752<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -1411,21 +1411,37 @@ lattice that
 3. carries a rule at the fidelity the table prints
    (`region_rule` = `pick_descriptions(describe(...))['d95']`),
 
-ranked among those on preset-weighted guaranteed cells with ties to the
-larger region. The constructed bulk box is excluded, and it is computed for
-the PRIMARY only. The rule is fitted lazily, best candidate first, so
-`describe()` runs on one or two regions per preset rather than on all of
-them.
+ranked among those on
 
-Clauses 1 and 3 are the 2026-09-17 round-6 correction. The original rule
-was "holds >= 90% of the primary's members" with no rule requirement, and
-ranked on cells alone; on Shadow Sableye GL arm 0 that picked D,F,G -- 157
-spreads, 51 guaranteed cells, holding 59 of Build 1's 61, and fitted by no
-two- or three-stat rule. A row headed "Build 1 wide" that drops two of Build
-1's own spreads is not wide around Build 1, and one printed as "a list of
-157 spreads that no rule fits" is not a target anybody can aim at. Both
-reviews of the round-5 render landed on the same fix: make containment and
-describability FILTERS, then rank inside them.
+1. how many of the preset's OUTSIDE standouts (the ones with `in_build is
+   None`) the region holds, 2 > 1 > 0; then
+2. preset-weighted guaranteed cells; then
+3. size, ties to the larger region.
+
+The constructed bulk box is excluded, and it is computed for the PRIMARY
+only. The rule is fitted lazily, best candidate first, so `describe()` runs
+on one or two regions per preset rather than on all of them.
+
+The FILTER clauses 1 and 3 are the 2026-09-17 round-6 correction. The
+original rule was "holds >= 90% of the primary's members" with no rule
+requirement, and ranked on cells alone; on Shadow Sableye GL arm 0 that
+picked D,F,G -- 157 spreads, 51 guaranteed cells, holding 59 of Build 1's
+61, and fitted by no two- or three-stat rule. A row headed "Build 1 wide"
+that drops two of Build 1's own spreads is not wide around Build 1, and one
+printed as "a list of 157 spreads that no rule fits" is not a target anybody
+can aim at. Both reviews of the round-5 render landed on the same fix: make
+containment and describability FILTERS, then rank inside them.
+
+The standout clause of the RANKING key is round 6b (2026-09-17), and it is
+the region's stated purpose finally entering its selection: Michael's reason
+for surfacing the region at all is "the standouts as ordinary members of
+Build 1 wide". Round 6 kept ranking inside the filters on cells alone, and
+on Shadow Sableye GL arm 0 that picked E,F (292 spreads, 49 cells) over
+three describable supersets that hold both standouts -- so the page's own
+paragraph had to end "it holds neither standout below, so it is not a route
+to them", on the one row that exists to be a route to them. Where a preset
+has no outside standout the key is exactly the round-6 one (plain Sableye
+and Melmetal are unchanged under all three presets).
 
 It is deliberately NOT in `bl['builds']`: it lives at `bl['wide']`, so the
 objectives line, the card set, the standouts' nearest-build search and the
@@ -1437,16 +1453,33 @@ it travels LAST in the payload's `builds` array with `col: null`, so
 `_wbBuildOf` lets every real build claim its members first, and draws in a
 tinted Build 1 colour underneath Build 1.
 
-**On Shadow Sableye GL arm 0 the rule picks E,F** -- 292 spreads, 49
-guaranteed cells, `Atk >= 150.24` plus an eight-step Def/HP staircase, which
-is Build 1 without the 1v2 Corviknight (Shadow) staircase. It still holds
-NEITHER standout, and that is a property of the page rather than of the
-rule: both outside standouts sit BELOW Build 1's 150.24 attack rung, so the
-only regions holding them are the ones that drop that rung, and none of
-those is both a superset of Build 1 and describable at a better cell count
-than E,F's 49. The page says so in one clause ("it holds neither standout
-below, so it is not a route to them") instead of promoting the non-finding
-to the collapsed line.
+**On Shadow Sableye GL arm 0 the rule picks D,H** -- 644 spreads, 43
+guaranteed cells, `roughly Atk >= 148.70 and Def + 1.7*HP >= 301.928`, and
+it holds BOTH outside standouts (7/2/14 and 9/6/13). Both of them sit below
+Build 1's 150.24 attack rung, so only a region dropping that rung reaches
+them; D,H is the best-guaranteeing one that does and its rule fits. Every
+superset of Build 1 here that holds a standout, plus the round-6 pick, in
+the order the round-6b key ranks them:
+
+| combo | spreads | cells | standouts held |
+| ----- | ------- | ----- | -------------- |
+| D,H   | 644     | 43    | both           |
+| D     | 838     | 39    | both           |
+| H     | 1656    | 34    | both           |
+| D,E,H | 369     | 48    | 9/6/13 only    |
+| D,E   | 533     | 43    | 9/6/13 only    |
+| E,H   | 738     | 42    | 9/6/13 only    |
+| E     | 935     | 38    | 9/6/13 only    |
+| E,F   | 292     | 49    | neither        |
+
+(Rows below the winner are ranked but never described: the rule is fitted
+lazily, so on this page `describe()` ran on D,H alone and the
+describability of the rest is untested.) E,F was the round-6 pick (cells
+alone) and D,H is the round-6b one. The
+"holds neither standout below, so it is not a route to them" branch stays in
+the renderer for pages where it is still true; on this page the paragraph now
+ends "It holds both standouts below." and the collapsed line gains "and holds
+both standouts".
 
 What the wide surfaces print, after round 6:
 
@@ -1464,13 +1497,16 @@ What the wide surfaces print, after round 6:
 - It names the guarantees it gives up out there (rarest first, three plus a
   count).
 - When every spread it holds is already in a build its plot trace has no
-  points of its own -- Shadow Sableye under the Even preset, where the wide
-  region is E,H (249 spreads, `_own` = 0). The paragraph says so, and the JS
-  now emits the empty trace anyway with a legend entry that says it ("all
-  249 already in a build"), instead of letting Plotly drop a named region
-  off the legend silently. A non-empty wide trace's legend reads "N of SIZE
-  not already in a build", because the trace carries only the spreads no
-  build claims while the table row gives the region's full size.
+  points of its own. The paragraph says so, and the JS emits the empty trace
+  anyway with a legend entry that says it ("all N already in a build"),
+  instead of letting Plotly drop a named region off the legend silently. A
+  non-empty wide trace's legend reads "N of SIZE not already in a build",
+  because the trace carries only the spreads no build claims while the table
+  row gives the region's full size. Round 6's live example of `_own` = 0 was
+  Shadow Sableye under the Even preset (E,H, 249 spreads); round 6b's
+  standout clause moved that preset to E (838 spreads, `_own` = 589) and no
+  preset of the three preview pages now has `_own` = 0, so the branch is
+  covered by a unit test on a faked block rather than by a rendered page.
 - The table row prints `--` for its most-winning member: the plot draws it
   no triangle and "Compare these spreads" does not offer it, both because it
   is not a build to build, so a cell naming one pointed at a spread the
