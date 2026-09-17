@@ -2309,6 +2309,16 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if which_build_html:
         html += which_build_html
 
+    # "Matchup clusters" -- second on the page, directly under the build
+    # brief and collapsed like it (Michael's 2026-09-17 round-7 decision).
+    # It used to be the first block inside the Dive Analysis collapsible, ~3
+    # MB below the all-scenarios mini-grid its own clusters colour; the grid
+    # is now that section's opening figure. Filled after the render passes
+    # below, because the section is produced by generate_analysis_sections
+    # (it needs the score grid) and, when best-buddy is active, needs a
+    # host/template pair of its own.
+    html += '<!-- MATCHUP_CLUSTERS_SLOT -->'
+
     # Controls
     # The Build-criteria presets this page's section actually produced, in
     # the preset table's own order. Empty when there is no section, or when
@@ -2586,20 +2596,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'style="display:flex;justify-content:flex-end;align-items:center;'
         'gap:4px;margin:6px 20px 0 0;font-size:12px;color:var(--text)">\n'
     )
-    # All-scenarios small-multiples toggle (Michael 2026-08-25): a
-    # lazily-rendered 3x3 grid of simplified per-scenario scatters built
-    # from the ALREADY-EMBEDDED score arrays -- no page re-render, no
-    # state change; the panel matching the Shields dropdown gets a
-    # highlight, and clicking a panel selects it. Lives left-aligned in
-    # the strip under the plot (before Highlight IVs), with the grid
-    # container BELOW the strip so the checkbox doesn't jump when the
-    # grid opens.
-    if n_scenarios > 1:
-        html += ('  <label class="dd-allscen" style="display:flex;'
-                 'align-items:center;gap:4px;margin-right:auto">'
-                 '<input type="checkbox" id="allscen-toggle" '
-                 'onchange="toggleAllScenarios()"> '
-                 'Show all shield scenarios</label>\n')
+    # (The all-scenarios small-multiples toggle used to live here, left-
+    # aligned in this strip, with its 3x3 grid below it. Michael's
+    # 2026-09-17 round-7 decision moved the checkbox AND the grid into the
+    # Matchup clusters section as that section's opening figure: the minis
+    # are coloured by that section's own clusters and sat ~3 MB above the
+    # section that defines them. Emitted by
+    # deep_dive_matchup_clusters._allscen_figure; the ids and the JS are
+    # unchanged.)
     html += (
         '  <label style="display:flex;align-items:center;gap:4px">'
         'Highlight IVs: '
@@ -2617,24 +2621,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>\n'
         '</div>\n'
     )
-    if n_scenarios > 1:
-        # Caption first, then the grid. The minis plot the AVERAGED score on
-        # y (that is what this strip has always shown) while their colors
-        # come from the Matchup clusters section, whose bands are horizontal
-        # only on a win-count axis -- so the caption says where to look for
-        # the bands rather than letting the smear read as the clustering.
-        html += ('<p id="allscen-note" style="display:none;font-size:11px;'
-                 'color:var(--text-muted);margin:6px 0 0 0">Each mini plots '
-                 'average score against stat-product rank, colored by that '
-                 'scenario\'s own matchup clusters (title: K, silhouette '
-                 'and the first stat split). On this y-axis the clusters '
-                 'smear rather than band -- the Matchup clusters section '
-                 'below, and the main plot on a win-count y-axis, show them '
-                 'as bands. Click a mini to select that shield scenario.'
-                 '</p>\n')
-        html += ('<div id="allscen-grid" style="display:none;'
-                 'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
-                 '</div>\n')
     # Top-IVs table controls. Sit immediately above the table they
     # affect (the #summary div). The "Sort by" UX is column-header
     # clicks (see _summarySortClick in deep_dive_engine.js); only the
@@ -2752,6 +2738,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
                     f"{_time.time() - _n0:.1f}s")
         sink = {}
+        mc_sink = {}
         a_css, r_html, an_html = generate_analysis_sections(
             dobj, sarr, 0, opp_iv_modes[0], shield_scenarios, opponent_names,
             slayer_iter_result=slayer_iter_result, has_toml_tiers=has_toml_tiers,
@@ -2768,7 +2755,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             # the guarantee lines (2026-09-16 round-3 review).
             card_builds=which_build_cards,
             card_builds_pinned=builds_pinned,
-            card_build_membership=which_build_membership)
+            card_build_membership=which_build_membership,
+            # Round 7: the Matchup clusters section comes back HERE instead
+            # of inside an_html, so this function's caller can drop it into
+            # the slot above the scatter controls.
+            clusters_sink=mc_sink)
         if split_info is not None:
             _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
             assert _expected in r_html, (
@@ -2851,7 +2842,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 except OSError as _e:  # noqa: BLE001
                     logger.warning(f"  dive card: could not write "
                                    f"{card_out_path}: {_e}")
-        return r_html, an_html, card_section, a_css, sink
+        return (r_html, an_html, card_section, a_css, sink,
+                mc_sink.get('html', ''))
 
     # Snapshot a CLEAN L51 data_obj + score arrays BEFORE the level-default
     # pass mutates data_obj (tier renames, pasteTiers, _cardCtx). Done here so
@@ -2870,7 +2862,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                    for mode in opp_iv_modes if mode in md['scores_l51']}
 
     # ---- Level-default pass: drives the embedded DATA + scatter ----
-    results_html, analysis_html, _card50_html, analysis_css, _sink50 = \
+    (results_html, analysis_html, _card50_html, analysis_css, _sink50,
+     _clusters50) = \
         _render_level_body(
             data_obj, score_arrays, write_card_out=True, robust_max_level=None,
             base_scores=scores_base_arrays, base_info=base_form_info)
@@ -2891,7 +2884,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # #dd-bb-prose-host / #dd-bb-prose-tmpl, never at document level, so
         # each guard view still sees exactly one copy per slug.
         rendering.reset_opp_anchor_registry()
-        _results51, _analysis51, _card51_html, _, _ = _render_level_body(
+        (_results51, _analysis51, _card51_html, _, _,
+         _clusters51) = _render_level_body(
             _dobj51, _sarr51, write_card_out=False,
             robust_max_level=best_buddy.get('alt_cap'),
             base_scores=None, base_info=None, builds_pinned=True)
@@ -2911,6 +2905,23 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Drop the marker if no card was injected (card disabled) so no stray
     # comment ships.
     html = html.replace('<!-- DIVE_CARD_SLOT -->', '', 1)
+
+    # ---- Matchup clusters injection (round 7) ----
+    # Same host/<template> shape the prose and the card use, for the same
+    # reason: the L51 pass renders a second copy of the section, with its own
+    # element ids, and only one of the two is ever in the document. The pair
+    # is registered in deep_dive_engine.js (_bbInitHost), which is where
+    # tests/test_dive_dom_ids.py reads the host list from.
+    if _clusters50:
+        if _bb_active:
+            _mc_block = (
+                f'<div id="dd-bb-clusters-host" class="dd-bb-host">'
+                f'{_clusters50}</div>'
+                f'<template id="dd-bb-clusters-tmpl">{_clusters51}</template>')
+        else:
+            _mc_block = _clusters50
+        html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', _mc_block, 1)
+    html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', '', 1)
 
     # Results section is always visible; analysis is behind a toggle. When the
     # best-buddy toggle is active the L50 prose is live and the L51 prose rides

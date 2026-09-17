@@ -2075,8 +2075,27 @@ def _wide_clause(arm_builds, bl):
         out += (' and holds both standouts' if len(outside) > 1
                 else ' and holds the standout')
     elif held:
-        out += f" and holds {brief._n(len(held))} of the standouts"
+        # NAMED, not counted. "holds 1 of the standouts" told a reader who
+        # never opens the section that one of two spreads it has not met is
+        # in there, and which one is the whole question -- the two standouts
+        # are different offers. The IV plus the page's own canonical short
+        # name for that standout (CARD_SHORT, the same words the card title,
+        # the threat chips and the standouts block lead with), so this line
+        # and the block below cannot spell it two ways (2026-09-17 round 7
+        # item 4).
+        out += ' and holds ' + brief._and_list(
+            [standout_short_phrase(t) for t in held])
     return out
+
+
+def standout_short_phrase(t):
+    """'9/6/13 (the highest avg battle score)' -- one standout, named.
+
+    The parenthetical is ``CARD_SHORT`` lower-cased, which is the page's one
+    canonical short name per standout; nothing here composes new words.
+    """
+    kind = CARD_SHORT.get(t['kind'], t['kind'])
+    return f"{t['iv'].split('@')[0]} (the {kind[0].lower() + kind[1:]})"
 
 
 def _negative_bridge(arm_builds, bl, facts):
