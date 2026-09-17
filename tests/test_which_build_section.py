@@ -1323,7 +1323,14 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # when v5 shipped, against 145.6 KB for v4. The PAYLOAD ceiling did not
     # move: it is 43.0 KB here, and the per-scenario stats caption is a
     # short sentence rather than a ninth copy of the view's own.
-    assert len(html) < 175_000, len(html)
+    #
+    # Round 6b (2026-09-17) raised it again, 175 KB -> 180 KB. The wide
+    # region's new ranking key picks a LARGER region on this page (D,H, 644
+    # spreads, against round 6's E,F at 292), so its table row's member list
+    # is longer: measured 175.6 KB here against 174.4 KB at 62c4b6d, which
+    # was already inside 1 KB of the old ceiling. Nothing per-IV entered the
+    # section; the two numbers below cap the part that would show it.
+    assert len(html) < 180_000, len(html)
     payload = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
     # One 512-byte mask per printed rung plus one for the bulk pair, and
@@ -1331,12 +1338,18 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # of every candidate region, and the per-preset facts and sentences for
     # all three presets. Still far below the point where a per-IV STAT array
     # would have been cheaper. Measured 34 KB on this blob when v4 shipped.
-    assert len(json.dumps(payload)) < 48_000, len(json.dumps(payload))
+    #
+    # Round 6b raised it 48 KB -> 50 KB, measured 48.4 KB against 47.3 KB at
+    # 62c4b6d. The whole delta is accounted for: the wide region's new
+    # ranking key makes it a region no build already carries under the flat
+    # and Even presets, so ``bp.regions`` gains ONE 684-character mask
+    # (+782 B, 15 regions -> 16), and the collapsed lines gain the "and
+    # holds both standouts" clause (+314 B over three presets).
+    assert len(json.dumps(payload)) < 50_000, len(json.dumps(payload))
     # Round 5 (2026-09-17) raised the builds-half ceiling from 24 KB to 28
     # KB: the nested wide build adds one payload build per preset, and with
     # it one 684-character membership mask each (measured 25.5 KB here,
-    # against 23.4 KB before it). The 48 KB whole-payload ceiling and the
-    # 175 KB section ceiling did not move.
+    # against 23.4 KB before it). Round 6b did not move it: 26.3 KB.
     # The builds half is the part that would grow if a member LIST ever
     # replaced a packed mask.
     assert len(json.dumps(payload['bp'])) < 28_000, len(json.dumps(payload['bp']))
@@ -2288,7 +2301,10 @@ def test_the_section_is_byte_deterministic_with_the_control(shadow_sableye):
     # scenario -- not a per-IV array per scenario. Plus the v4 builds half;
     # the per-scenario block itself is unchanged and is capped separately
     # below, so this cap moving cannot hide growth in it.
-    assert len(json.dumps(pay)) < 48_000, len(json.dumps(pay))
+    # 48 KB -> 50 KB in round 6b, for the one extra region mask the wide
+    # region's new ranking key puts in ``bp.regions``; see the accounting on
+    # ``test_real_section_is_ascii_deterministic_and_small``.
+    assert len(json.dumps(pay)) < 50_000, len(json.dumps(pay))
     # v5 adds a fifth caption per scenario (the stats view). It is a SHORT
     # sentence, deliberately not a ninth copy of the view's own 900-
     # character caption -- that is what this cap exists to catch. Measured
@@ -3316,7 +3332,7 @@ def test_build_membership_covers_every_member_of_every_build(shadow_sableye):
     # page whose builds table names the same spread. Pre-fix: 61 + 114 only.
     inb = bl['builds'][0]['_mask'] | bl['builds'][1]['_mask']
     n_wide_only = int((bl['wide']['_mask'] & ~inb).sum())
-    assert n_wide_only == 231
+    assert n_wide_only == 583          # round 6 (E,F): 231
     assert len(memb) == 61 + 114 + n_wide_only
     assert set(memb.values()) == {'Build 1', 'Build 2', 'Build 1 wide only'}
     assert sum(1 for v in memb.values() if v == 'Build 1') == 61
@@ -3325,9 +3341,11 @@ def test_build_membership_covers_every_member_of_every_build(shadow_sableye):
     for i, b in enumerate(bl['builds']):
         assert memb[b['most_winning_member']['iv'].split('@')[0]] == \
             W.role_short(b, i)
-    # a spread in no build is simply absent -- 7/2/14 is the standout that
-    # fails Build 1's rung and the bulk box alike
-    assert '7/2/14' not in memb
+    # 7/2/14 is the standout that fails Build 1's rung and the bulk box
+    # alike, so no BUILD holds it -- and round 6b's ranking key is exactly
+    # why the wide region now does, which is the case this label exists for
+    # (round 6: '7/2/14' not in memb at all).
+    assert memb['7/2/14'] == 'Build 1 wide only'
     # and the map is over THIS grid's spreads
     import numpy as _np
     some = builds_mod.iv_str(meta, int(_np.nonzero(bl['builds'][0]['_mask'])[0][0]))
@@ -4161,22 +4179,84 @@ def test_a_wide_region_must_carry_a_rule_the_table_can_print(monkeypatch):
     assert builds_mod.wide_build(L, primary, ctx={}) is None
 
 
+def test_a_wide_region_is_ranked_on_the_standouts_it_holds_first():
+    """Round 6b: the FIRST clause of the ranking key is how many of the
+    preset's outside standouts the region holds, 2 > 1 > 0, and only then
+    the guaranteed cells and the size.
+
+    Round 6 ranked inside its filters on cells alone, which on Shadow
+    Sableye GL arm 0 picked E,F -- 292 spreads, 49 cells, holding NEITHER
+    standout -- over D,H (644 / 43 / both), D (838 / 39 / both) and H
+    (1656 / 34 / both). The page then had to end the row's own paragraph on
+    "it holds neither standout below, so it is not a route to them", on the
+    one region whose stated purpose is "the standouts as ordinary members of
+    Build 1 wide". ``cells_only`` below is the pre-fix pick here.
+
+    The filters do NOT move: a region holding both standouts that is too
+    small, or that drops a member of the primary, still loses to one that
+    holds neither.
+    """
+    import numpy as np
+    n = 40
+    s1, s2 = 35, 36                      # the two standouts, outside builds
+
+    def region(idx, wg, combo, constructed=False):
+        m = np.zeros(n, bool)
+        m[list(idx)] = True
+        return {'mask': m, 'size': int(m.sum()), 'wg': float(wg),
+                'n_g': int(wg), 'combo': combo, 'sets': [combo],
+                'constructed': constructed}
+
+    primary = region(range(10), 9, 'P')
+    cells_only = region(range(25), 9, 'C')               # 0 standouts
+    one = region(list(range(30)) + [s1], 7, 'O')         # 1 standout
+    both = region(list(range(22)) + [s1, s2], 5, 'B')    # 2, fewer cells
+    both_big = region(list(range(24)) + [s1, s2], 5, 'G')  # ties B, larger
+    both_worse = region(list(range(34)) + [s1, s2], 4, 'W')
+    L = {'inters': [primary, cells_only, one, both, both_big, both_worse]}
+    outs = [s1, s2]
+    assert builds_mod.wide_build(L, primary, None, outs) is both_big
+    # ... cells decide among regions holding the SAME number of standouts
+    L2 = {'inters': [primary, cells_only, one, both_worse]}
+    assert builds_mod.wide_build(L2, primary, None, outs) is both_worse
+    L3 = {'inters': [primary, cells_only, one]}
+    assert builds_mod.wide_build(L3, primary, None, outs) is one
+    # no outside standouts -> exactly the round-6 key, and the pre-fix pick
+    assert builds_mod.wide_build(L, primary, None, []) is cells_only
+    assert builds_mod.wide_build(L, primary) is cells_only
+    # the filters still bind: a 1.9x region and a non-superset holding both
+    # standouts both lose to a qualifying region holding neither
+    small = region(list(range(17)) + [s1, s2], 9, 'S')     # 19 -> 1.9x
+    misses = region(list(range(1, 34)) + [s1, s2], 9, 'M')
+    L4 = {'inters': [primary, small, misses, cells_only]}
+    assert builds_mod.wide_build(L4, primary, None, outs) is cells_only
+
+
 @pytest.mark.local_artifacts
 @pytest.mark.slow
 def test_the_wide_region_on_shadow_sableye(shadow_sableye):
-    """The pin, re-recorded for the round-6 rule.
+    """The pin, re-recorded for the round-6b ranking key.
 
-    Pre-fix the rule picked D,F,G -- 157 spreads, 51 guaranteed, holding 59
-    of Build 1's 61 and fitted by NO two- or three-stat rule, so the page
-    printed "a list of 157 spreads that no two- or three-stat rule fits"
-    under a heading claiming it was wide around Build 1. With containment
-    and describability as filters it picks E,F: Build 1 without the 1v2
-    Corviknight (Shadow) staircase.
+    It picks **D,H** -- 644 spreads, 43 guaranteed cells, fitted by
+    ``Atk >= 148.70 and Def + 1.7*HP >= 301.928`` at the table's own
+    fidelity -- and it holds BOTH outside standouts.
 
-    It still holds NEITHER standout, and that is a property of this page:
-    both outside standouts sit below Build 1's 150.24 attack rung, so only a
-    region dropping that rung could hold them. The page says so in one
-    clause instead of putting the non-finding in the collapsed line.
+    Two pre-fix values are recorded here:
+
+    * round 5 picked D,F,G (157 spreads, 51 guaranteed, holding 59 of Build
+      1's 61 and fitted by NO two- or three-stat rule), which containment +
+      describability as FILTERS removed; and
+    * round 6, ranking inside those filters on cells alone, picked **E,F**
+      (292 spreads, 49 cells, `_own` 231, 'd(HP) [8 steps]') -- which holds
+      NEITHER standout, so this same paragraph read "It holds neither
+      standout below, so it is not a route to them" and the collapsed line
+      ended "keeps 49 of Build 1's 55 guaranteed matchups." on the one row
+      that exists to be a route to them.
+
+    Both outside standouts sit below Build 1's 150.24 attack rung, so only a
+    region dropping the rung reaches them; D,H is the best-guaranteeing
+    describable superset that does (the others are D at 838/39 and H at
+    1656/34, with D,E,H at 369/48 holding 9/6/13 alone).
     """
     _state, all_facts, _path = shadow_sableye
     facts = all_facts[0]
@@ -4184,19 +4264,23 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     bl = ab['presets'][builds_mod.PRESET_FLAT]
     wide = bl['wide']
     assert wide is not None
-    assert wide['combo'] == 'EF'
-    assert (wide['size'], wide['n_guaranteed']) == (292, 49)
+    assert wide['combo'] == 'DH'
+    assert (wide['size'], wide['n_guaranteed']) == (644, 43)
     assert (wide['_in_primary'], wide['_primary_size']) == (61, 61)
-    assert wide['_own'] == 231
+    assert wide['_own'] == 583
     assert wide['role'] == 'wide'
     # it contains the primary outright, and carries a rule the table prints
     prim = bl['builds'][0]
     assert not (prim['_mask'] & ~wide['_mask']).any()
     assert wide['description'] is not None
-    assert 'd(HP) [8 steps]' in wide['description']['rule']
+    assert wide['description']['rule'] == \
+        'atk >= 148.7 and Def + 1.7*HP >= 301.928'
     # every cell it guarantees is one of Build 1's: the counts are retentions
     assert not (wide['_g'] & ~prim['_g']).any()
-    assert [t['in_wide'] for t in bl['standouts']] == [False, False]
+    # BOTH standouts are ordinary members of it, which is what the region is
+    # for and what the round-6b key ranks on (round 6: [False, False])
+    assert [t['in_wide'] for t in bl['standouts']] == [True, True]
+    assert all(t['in_build'] is None for t in bl['standouts'])
     # it is NOT one of the builds: the objectives, the card set and the
     # standouts' nearest-build search all still see two
     assert len(bl['builds']) == 2
@@ -4213,18 +4297,20 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     assert paras[1].startswith('<b>Build 1 wide</b>')
     assert paras[2].startswith('<b>Build 2</b>')
     text = W.gate_text(paras[1])
-    # what it is FOR, then its RULE, then the set difference as a gloss
+    # what it is FOR, then its RULE (no "Build 1 without <set>" gloss here:
+    # D,H drops two of the primary's sets and adds one)
     assert text.startswith('Build 1 wide is the looser target around Build 1, '
                            'for a reader who cannot hit Build 1 exactly: '
-                           'Atk >= 150.24 with Def >= 97.15 to 103.17 '
-                           'depending on HP (115-122) -- Build 1 without the '
-                           '1v2 Corviknight (Shadow) staircase.')
-    assert ("It holds every one of Build 1's 61 spreads in 292 of its own, "
-            "and keeps 49 of Build 1's 55 guaranteed matchups (1 of them "
+                           'roughly Atk >= 148.70 and '
+                           'Def + 1.7*HP >= 301.928.')
+    assert ("It holds every one of Build 1's 61 spreads in 644 of its own, "
+            "and keeps 43 of Build 1's 55 guaranteed matchups (none of them "
             "material)" in text)
-    assert 'the 6 it gives up out here are 1v2 Feraligatr (grid 11%)' in text
-    assert ('It holds neither standout below, so it is not a route to them.'
-            in text)
+    assert 'the 12 it gives up out here are 1v2 Feraligatr (grid 11%)' in text
+    # the holding branch, a sentence (round 6: 'It holds neither standout
+    # below, so it is not a route to them.')
+    assert 'It holds both standouts below.' in text
+    assert 'neither standout' not in text
     table = W.builds_table_html(ab, builds_mod.PRESET_FLAT)
     rows = re.findall(r'<tr data-build="(\d+)">', table)
     assert rows == ['0', '2', '1'], rows      # wide row directly under Build 1
@@ -4235,34 +4321,50 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     wide_row = re.search(r'<tr data-build="2">.*?</tr>', table, re.S).group(0)
     assert '<td>--</td>' in wide_row
     assert 'matchups</td>' not in wide_row
-    # the collapsed line gains a RETENTION clause, not a build and not a
-    # "holds neither standout" non-finding (pre-fix: "; Build 1 wide (157
-    # spreads) holds neither standout.")
+    # the collapsed line keeps the RETENTION clause and, now that the region
+    # reaches them, ends on the standouts (round 6: it ended on "...55
+    # guaranteed matchups." and said nothing about them, because "holds
+    # neither standout" is a non-finding)
     line = W.builds_summary(facts, ab, builds_mod.PRESET_FLAT, all_facts)
-    assert line.endswith("; Build 1 wide (292 spreads) keeps 49 of Build 1's "
-                         '55 guaranteed matchups.')
-    assert 'standout' not in line
+    assert line.endswith("; Build 1 wide (644 spreads) keeps 43 of Build 1's "
+                         '55 guaranteed matchups and holds both standouts.')
     assert line.count('guarantees') == 2
     # and the standouts say where they sit relative to it
     so = W.gate_text(W.standouts_html(facts, ab, builds_mod.PRESET_FLAT,
                                       all_facts))
-    assert so.count('Build 1 wide does not hold it either') == 2
-    # Under the Even preset the wide region holds no spread a build does not,
-    # so its trace has no points of its own -- the paragraph says so rather
-    # than naming a 249-spread region the plot and legend do not show.
+    assert so.count('It is in none of the builds, though Build 1 wide '
+                    'holds it.') == 2
+    assert 'Build 1 wide does not hold it either' not in so
+    # Under the Even preset it is E -- also holding both standouts, on the
+    # preset's own scale, and the clause carries both counts like its
+    # neighbours. Round 6 picked E,H there (249 spreads), the one page on
+    # which the wide region held no spread a build did not; no preset of
+    # this page now has ``_own`` = 0, so that branch is pinned on a faked
+    # block below rather than on a rendered preset.
     even = ab['presets'][builds_mod.PRESET_EVEN]
-    assert even['wide']['_own'] == 0
-    ep = re.findall(r'<p class="wb-para">(.*?)</p>',
-                    W.build_paragraphs_html(facts, ab, builds_mod.PRESET_EVEN,
-                                            all_facts), re.S)
-    assert ('On the plot it adds no points: every spread it holds is already '
-            'in a build.' in W.gate_text(ep[1]))
-    # and the clause is on the PRESET's scale, both counts, like its
-    # neighbours (pre-fix it printed the all-nine count under every preset)
+    assert even['wide']['combo'] == 'E'
+    assert (even['wide']['size'], even['wide']['_own']) == (838, 589)
+    assert [t['in_wide'] for t in even['standouts']] == [True, True]
     eline = W.builds_summary(facts, ab, builds_mod.PRESET_EVEN, all_facts)
-    assert eline.endswith("; Build 1 wide (249 spreads) keeps 27 of Build 1's "
+    assert eline.endswith("; Build 1 wide (838 spreads) keeps 20 of Build 1's "
                           '29 guaranteed matchups in 0v0 / 1v1 / 2v2 shields '
-                          '(49 of its 53 overall).')
+                          '(39 of its 53 overall) and holds both standouts.')
+    faked = dict(wide, _own=0)
+    assert ('On the plot it adds no points: every spread it holds is already '
+            'in a build.'
+            in W.gate_text(W.wide_paragraph(facts, ab, bl, faked, all_facts)))
+    # The 1v1 preset is this page's PARTIAL case -- D, holding 9/6/13 and
+    # not 7/2/14 -- and it names them by IV, because the block below names
+    # them by IV and a reader here for one of them needs to see which
+    # (round 6: "It holds 9/6/13 of the standouts below, and not 7/2/14.").
+    one = ab['presets'][builds_mod.PRESET_ONE]
+    assert one['wide']['combo'] == 'D'
+    assert [t['in_wide'] for t in one['standouts']] == [False, True]
+    op = re.findall(r'<p class="wb-para">(.*?)</p>',
+                    W.build_paragraphs_html(facts, ab, builds_mod.PRESET_ONE,
+                                            all_facts), re.S)
+    assert ('It holds 9/6/13 below, and not 7/2/14.'
+            in W.gate_text(op[1]))
 
 
 @pytest.mark.local_artifacts
@@ -4336,6 +4438,11 @@ def test_the_wide_region_on_the_negative_page():
     also 22, but selected without the describability filter). Neither
     standout sits outside a build here, so the clause it adds to the
     negative summary is the retention alone.
+
+    Round 6b (the standout clause of the ranking key) leaves this page
+    ENTIRELY unchanged, and the reason is asserted below rather than
+    asserted away: no preset of any arm here has a standout outside a build,
+    so the new first clause is constant and the key reduces to round 6's.
     """
     _state, all_facts = _facts_for(MELMETAL)
     ab = all_facts[0]['_builds']
@@ -4345,6 +4452,10 @@ def test_the_wide_region_on_the_negative_page():
     assert (wide['combo'], wide['size'], wide['n_guaranteed']) == ('AG', 158, 22)
     assert (wide['_in_primary'], wide['_primary_size']) == (55, 55)
     assert wide['description'] is not None       # never a rule-less region
+    for facts in all_facts:
+        a = facts.get('_builds')
+        for b in (a or {}).get('presets', {}).values():
+            assert all(t['in_build'] is not None for t in b['standouts'])
     line = W.builds_summary(all_facts[0], ab, builds_mod.PRESET_FLAT,
                             all_facts)
     # pre-fix: '; Build 1 wide (426 spreads) guarantees 22.' -- a bare count
@@ -4363,3 +4474,31 @@ def test_the_wide_region_on_the_negative_page():
             if b['wide'] is None:
                 assert 'Build 1 wide' not in W.builds_summary(
                     facts, a, k, all_facts)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_wide_region_on_plain_sableye():
+    """The third preview page's pin, and the second page round 6b does not
+    move: plain Sableye's arm 0 flat preset picks C,D (703 spreads, 33
+    guaranteed) under both the round-6 key and the round-6b one, because
+    every standout here sits inside a build.
+    """
+    _state, all_facts = _facts_for(SABLEYE_PLAIN)
+    facts = all_facts[0]
+    ab = facts['_builds']
+    bl = ab['presets'][builds_mod.PRESET_FLAT]
+    wide = bl['wide']
+    assert wide is not None
+    assert (wide['combo'], wide['size'], wide['n_guaranteed']) == ('CD', 703,
+                                                                  33)
+    assert (wide['_in_primary'], wide['_primary_size']) == (318, 318)
+    assert wide['description'] is not None
+    line = W.builds_summary(facts, ab, builds_mod.PRESET_FLAT, all_facts)
+    assert line.endswith("; Build 1 wide (703 spreads) keeps 33 of Build 1's "
+                         '43 guaranteed matchups.')
+    # the reason it is unchanged, asserted rather than assumed
+    for f in all_facts:
+        a = f.get('_builds')
+        for b in (a or {}).get('presets', {}).values():
+            assert all(t['in_build'] is not None for t in b['standouts'])
