@@ -101,6 +101,21 @@ if [ "$SKIP_VERIFY" = false ] && [ "$EXPECTED_DIVES" -gt 0 ]; then
   fi
 fi
 
+# Unlisted-dive gate (added 2026-09-17). The dive list derives from the
+# opponent pools, so a pool regeneration can DROP a dive; nothing else removes
+# its page, and --delete only mirrors what is absent LOCALLY, so the dropped
+# dive would stay live and indexed, baked under older assumptions than its
+# neighbours. Refuse until scripts/prune_unlisted_dives.py --apply has removed
+# them (dry-run lists them and exits 1). Replay blobs and cache stay.
+if [ "$SKIP_VERIFY" = false ]; then
+  if ! (cd "$REPO_ROOT" && python scripts/prune_unlisted_dives.py --site "$SRC"); then
+    echo "error: dive pages exist for dives that are no longer in the registry (listed above)." >&2
+    echo "  fix:    python scripts/prune_unlisted_dives.py --apply" >&2
+    echo "  bypass: --skip-verify" >&2
+    exit 1
+  fi
+fi
+
 # Card-rerender gate: a renderer-side fix landed after the dives were simmed,
 # so the shipped HTML is stale until rebuilt from the replay blobs. The
 # sentinel is dropped when that happens and cleared by rerender_dive_cards.py.
