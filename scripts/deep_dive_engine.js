@@ -4729,6 +4729,42 @@ function _wbActiveLine(pay, scen) {
            mask: pay.rungs[0].mask };
 }
 
+// Which PLANE the section panel is drawing on for this render.
+//
+//   'rank'  -- stat-product rank (x) against matchups won (y). Every view
+//              the section had through v4.
+//   'stats' -- defense (x) against HP (y), where a two-stat box IS a
+//              rectangle and an attack-floor-plus-staircase build IS a
+//              staircase. The 2026-09-16 review's item 8: the page called
+//              one build "the bulk rectangle" and never drew a rectangle,
+//              because no view had axes it could be one on.
+//
+// Set once per wbRenderRoot call, read by every trace builder, so one
+// switch moves the whole panel instead of six call sites each deciding.
+var _wbPlaneMode = 'rank';
+
+function _wbXY(L, i, wins) {
+  return (_wbPlaneMode === 'stats')
+    ? [L.ivDef[i], L.ivHp[i]]
+    : [L.spRanks[i], wins[i]];
+}
+
+// Marker area by attack on the stats view: the third stat, which the two
+// axes cannot show. A flat size there would draw 4096 points that differ on
+// a stat the plot never mentions.
+function _wbAtkSizes(L, ivs) {
+  var lo = Infinity, hi = -Infinity, i;
+  for (i = 0; i < DATA.nIvs; i++) {
+    var a = L.ivAtk[i];
+    if (a < lo) lo = a;
+    if (a > hi) hi = a;
+  }
+  var span = (hi > lo) ? (hi - lo) : 1;
+  return ivs.map(function (iv) {
+    return 2.5 + 5.5 * ((L.ivAtk[iv] - lo) / span);
+  });
+}
+
 function _wbTrace(name, color, symbol, size, opacity) {
   return { type: 'scattergl', mode: 'markers', x: [], y: [], text: [],
            hoverinfo: 'text', name: name,
@@ -4766,8 +4802,9 @@ function _wbMarkTrace(label, iv, color, symbol, L, wins, side, den) {
   t.textposition = 'top center';
   t.textfont = { size: 10, color: color };
   t.marker.line = { width: 1.5, color: plotChrome().ink };
-  t.x = [L.spRanks[iv]];
-  t.y = [wins[iv]];
+  var mp = _wbXY(L, iv, wins);
+  t.x = [mp[0]];
+  t.y = [mp[1]];
   // `text` is the on-point label (mode carries 'text'); `hovertext` is the
   // hover card. Putting the multi-line hover body in `text` would print the
   // whole card next to the marker.
@@ -4783,7 +4820,8 @@ function _wbMarkTrace(label, iv, color, symbol, L, wins, side, den) {
 function _wbMutedTrace(L, wins, colors, den, side) {
   var t = _wbTrace('All spreads', colors.below, 'circle', 3, 0.4);
   for (var i = 0; i < DATA.nIvs; i++) {
-    t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+    var mp = _wbXY(L, i, wins);
+    t.x.push(mp[0]); t.y.push(mp[1]);
     t.text.push(_wbHover(i, L, wins, side, den));
   }
   t.name += ' (' + t.x.length + ')';
@@ -5049,7 +5087,12 @@ function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn) {
     var side = sideFn ? sideFn(i)
              : line ? _wbSideAt(L, line, i)
              : (noLine || 'no line on this page');
-    ox.push(L.spRanks[i]); oy.push(wins[i] + ynudge);
+    var mp = _wbXY(L, i, wins);
+    // The nudge is on the y axis, which is a win count on the rank plane and
+    // an integer HP on the stats plane -- a 0.05%-of-range offset is
+    // invisible on either, and the hover contest it wins is the same one.
+    oy.push(mp[1] + (_wbPlaneMode === 'stats' ? 0.02 : ynudge));
+    ox.push(mp[0]);
     ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side, den));
   }
   if (!ox.length) return null;
@@ -5199,14 +5242,25 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   var bp = pay.bp, block = wbPresetBlock(pay);
   var bcol = _wbBuildColors(root, bp);
   var none = _wbTrace('In no build', colors.below, 'circle', 3, 0.45);
+  var ivsOf = [];
   var ts = block.builds.map(function(b, k) {
-    return _wbTrace(_wbBuildName(block, k) + ': ' + b.desc,
+    // On the stats plane the legend has to carry the ATTACK cut: it is part
+    // of the rule and the two axes cannot show it, so two spreads at the
+    // same defense and HP can sit on opposite sides of a boundary the plot
+    // draws nothing for.
+    var note = (_wbPlaneMode === 'stats' && b.plane && b.plane.atkNote)
+             ? (' [' + b.plane.atkNote + ', not on these axes]') : '';
+    return _wbTrace(_wbBuildName(block, k) + ': ' + b.desc + note,
                     bcol[k] || colors.line, 'circle', 4, 0.85);
   });
+  ivsOf.push([]);
+  for (var q = 0; q < ts.length; q++) ivsOf.push([]);
   for (var i = 0; i < DATA.nIvs; i++) {
     var b = _wbBuildOf(bp, block, i);
     var t = (b < 0) ? none : ts[b];
-    t.x.push(L.spRanks[i]); t.y.push(wins[i]);
+    var mp = _wbXY(L, i, wins);
+    t.x.push(mp[0]); t.y.push(mp[1]);
+    ivsOf[b < 0 ? 0 : b + 1].push(i);
     t.text.push(_wbHover(i, L, wins,
                          _wbBuildSide(pay, block, b, scen), den));
   }
@@ -5214,9 +5268,67 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   for (var k2 = 0; k2 < ts.length; k2++) {
     ts[k2].name = wrapLegendName(ts[k2].name + ' (' + ts[k2].x.length + ')', 34);
   }
+  if (_wbPlaneMode === 'stats') {
+    // Attack is the stat neither axis carries, so it is the marker size.
+    // The muted "in no build" points stay small and flat: sizing 3000 grey
+    // points by a stat the reader is not being asked about is noise.
+    for (var k4 = 0; k4 < ts.length; k4++) {
+      ts[k4].marker.size = _wbAtkSizes(L, ivsOf[k4 + 1]);
+    }
+  }
   var out = [none];
   for (var k3 = 0; k3 < ts.length; k3++) if (ts[k3].x.length) out.push(ts[k3]);
   return { traces: out, missing: false };
+}
+
+// The outlines the stats view draws around each build, as Plotly shapes.
+// One case per describable shape, and NOTHING for a build no rule fits: an
+// outline its members do not fill would be the one dishonesty this view
+// cannot afford, so those builds are their points and nothing else.
+function _wbPlaneShapes(block, bcol, L) {
+  var dLo = Infinity, dHi = -Infinity, hLo = Infinity, hHi = -Infinity, i;
+  for (i = 0; i < DATA.nIvs; i++) {
+    if (L.ivDef[i] < dLo) dLo = L.ivDef[i];
+    if (L.ivDef[i] > dHi) dHi = L.ivDef[i];
+    if (L.ivHp[i] < hLo) hLo = L.ivHp[i];
+    if (L.ivHp[i] > hHi) hHi = L.ivHp[i];
+  }
+  var dPad = (dHi - dLo) * 0.03 || 1, hPad = (hHi - hLo) * 0.03 || 1;
+  var x0b = dLo - dPad, x1b = dHi + dPad, y0b = hLo - hPad, y1b = hHi + hPad;
+  var shapes = [];
+  function line(x0, y0, x1, y1, col) {
+    shapes.push({ type: 'line', x0: x0, y0: y0, x1: x1, y1: y1,
+                  line: { color: col, width: 2 } });
+  }
+  for (var k = 0; k < block.builds.length; k++) {
+    var pl = block.builds[k].plane, col = bcol[k] || '#888';
+    if (!pl || pl.kind === 'none') continue;
+    if (pl.kind === 'box') {
+      var x0 = (pl.def && pl.def[0] != null) ? pl.def[0] : x0b;
+      var x1 = (pl.def && pl.def[1] != null) ? pl.def[1] : x1b;
+      var y0 = (pl.hp && pl.hp[0] != null) ? pl.hp[0] : y0b;
+      var y1 = (pl.hp && pl.hp[1] != null) ? pl.hp[1] : y1b;
+      shapes.push({ type: 'rect', x0: x0, y0: y0, x1: x1, y1: y1,
+                    line: { color: col, width: 2 },
+                    fillcolor: 'rgba(0,0,0,0)' });
+    } else if (pl.kind === 'stair') {
+      // steps are [HP, defense needed at that HP]. HP is an integer stat, so
+      // each step owns the half-open band around its own HP row, and the
+      // boundary is the vertical segments plus the connectors between them.
+      var st = pl.steps.slice().sort(function (a, b) { return a[0] - b[0]; });
+      for (var j = 0; j < st.length; j++) {
+        var h = st[j][0], d = st[j][1];
+        var yTop = (j === st.length - 1) ? y1b : (h + st[j + 1][0]) / 2;
+        var yBot = (j === 0) ? (h - 0.5) : (h + st[j - 1][0]) / 2;
+        line(d, yBot, d, yTop, col);
+        if (j < st.length - 1) line(d, yTop, st[j + 1][1], yTop, col);
+      }
+    } else if (pl.kind === 'line') {
+      // Def + k*HP >= c, so the boundary is Def = c - k*HP.
+      line(pl.c - pl.k * y0b, y0b, pl.c - pl.k * y1b, y1b, col);
+    }
+  }
+  return shapes;
 }
 
 // How many of one region's guaranteed cells sit in one shield scenario.
@@ -5313,6 +5425,20 @@ function _wbUpset(root, pay) {
   var dots = { type: 'scattergl', mode: 'markers', x: dx, y: dy,
                xaxis: 'x', yaxis: 'y2', hoverinfo: 'skip',
                marker: { size: 9, color: dc }, showlegend: false };
+  // Two lines per row: the set's TARGET on the first, its counts on the
+  // second. Plotly honours <br> in tick text, so this halves the width the
+  // margin has to carry without dropping a word.
+  var rowTicks = rows.map(function (rr) {
+    return rr.key + ' ' + rr.short + '<br>' + rr.size + ' spreads / ' +
+           rr.nG + ' guaranteed';
+  });
+  var widest = 0;
+  rowTicks.forEach(function (t) {
+    t.split('<br>').forEach(function (ln) {
+      if (ln.length > widest) widest = ln.length;
+    });
+  });
+  var tickMargin = Math.max(90, Math.min(300, Math.ceil(widest * 5.4) + 16));
   var layout = {
     barmode: 'group', showlegend: false,
     xaxis: { domain: [0, 1], anchor: 'y2', tickvals: x, ticktext: ticks,
@@ -5320,14 +5446,19 @@ function _wbUpset(root, pay) {
     yaxis: { domain: [0.52, 1], title: 'spreads in region',
              showgrid: true, gridcolor: chrome.grid, zeroline: false },
     yaxis2: { domain: [0, 0.46], tickvals: rows.map(function(_r, i) { return i; }),
-              ticktext: rows.map(function(rr) {
-                return rr.key + ' ' + rr.short + ' (' + rr.size +
-                       ' spreads / ' + rr.nG + ' guaranteed)'; }),
+              ticktext: rowTicks,
               tickfont: { size: 9 }, autorange: 'reversed',
               showgrid: false, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 10 },
-    margin: { t: 16, b: 30, l: 230, r: 8 }
+    // The left margin is MEASURED from the labels rather than fixed at
+    // 230px: the pre-v5 rows ("A two-stat box for 0v1 Empoleon (665 spreads
+    // / 42 guaranteed)") ran off the left edge of the plot and the reader
+    // could not tell which set a row was (2026-09-16 review item 1). The
+    // labels now wrap onto two lines, and the margin is the longest LINE at
+    // the 9px tick font, which is ~5.4px per character in the stack Plotly
+    // falls back to, plus room for the tick itself.
+    margin: { t: 16, b: 30, l: tickMargin, r: 8 }
   };
   Plotly.react(host, [bar, dots], layout,
                { responsive: true, displayModeBar: false });
@@ -5337,12 +5468,15 @@ function _wbUpset(root, pay) {
 // a control that renders the rest. Built in the browser from the region's
 // membership mask and the page's own IV arrays, so a 318-spread build costs
 // the page 512 bytes rather than 318 strings.
+// v5 (2026-09-16 review item 7): the IV spreads and nothing else. The
+// level and the stat-product rank were two columns of noise beside the one
+// thing a reader is copying into the game's search bar, and at 25 rows they
+// made the list three times as tall as the spreads it lists. The order is
+// unchanged -- bulkiest first -- and the count is in the header above.
 function _wbMemberRows(out, L, from, to, rows) {
   for (var k = from; k < to && k < rows.length; k++) {
     var i = rows[k];
-    out.push('<div>' + DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i] +
-              ' @L' + Number(L.ivLv[i]).toFixed(1) +
-              ' -- stat-product rank ' + L.spRanks[i] + '</div>');
+    out.push(DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i]);
   }
 }
 
@@ -5363,21 +5497,28 @@ function wbRenderMembers(box, all) {
   var show = all ? idx.length : Math.min(topN, idx.length);
   var out = [];
   _wbMemberRows(out, L, 0, show, idx);
+  var html = out.join(', ');
   if (!all && idx.length > show) {
-    out.push('<p><button type="button" class="wb-val" ' +
-             'onclick="if(window.wbShowAllMembers)wbShowAllMembers(this)">' +
-             'Show all ' + idx.length + '</button></p>');
+    html += ', <button type="button" class="wb-val" ' +
+            'onclick="if(window.wbShowAllMembers)wbShowAllMembers(this)">' +
+            'Show all ' + idx.length + '</button>';
   }
-  box.innerHTML = out.join('');
+  box.innerHTML = html;
 }
 
 // Reveal the guarantee rows this scenario group shipped hidden. The rows
 // are server-rendered (same _g_row_html as the visible ones), so this only
 // unhides them -- the page never promises rows it does not carry.
+//
+// A group can carry TWO reveals -- the capped tail and the near-free tail
+// (2026-09-16 review item 4) -- so the button names the class it owns in
+// data-reveal and each one reveals only its own rows. Defaults to the
+// capped tail's class, which is what the pre-v5 control did.
 function wbMoreRows(btn) {
   var ul = btn.closest('ul');
   if (!ul) return;
-  ul.querySelectorAll('li.wb-hid').forEach(function(li) { li.hidden = false; });
+  var cls = btn.getAttribute('data-reveal') || 'wb-hid';
+  ul.querySelectorAll('li.' + cls).forEach(function(li) { li.hidden = false; });
   var own = btn.closest('li');
   if (own) own.hidden = true;
 }
@@ -5409,6 +5550,12 @@ function wbCompareBuilds(btn) {
   }
   push(pay.bp.rank1.iv);
   for (var b = 0; b < block.builds.length; b++) push(block.builds[b].mostWinning.iv);
+  // ... and the two standouts the block above names, so a reader who just
+  // read "it is in none of the builds" and clicked Compare finds it here
+  // (2026-09-16 review item 3). push() deduplicates, so a standout that IS
+  // a build's most-winning member does not appear twice.
+  var so = block.standouts || [];
+  for (var t = 0; t < so.length; t++) push(so[t].iv);
   if (window.cmpSetCandidates) window.cmpSetCandidates(list);
   var span = btn.parentNode.querySelector('.wb-spreads');
   if (span) {
@@ -5596,7 +5743,12 @@ function wbRenderRoot(root) {
   // number the builds were ranked on -- unless the section's own Shield
   // scenario control has narrowed the panel to one scenario, which moves the
   // axis and nothing else (the selection stays the preset's).
-  var weighted = (view0 === 'builds' && !scen && pblock);
+  // The stats view re-draws the BUILDS on the defense / HP plane, so it
+  // shares their grouping, their colours and their weighted win count; only
+  // the two axes and the region outlines are its own.
+  _wbPlaneMode = (view0 === 'stats' && pblock) ? 'stats' : 'rank';
+  var weighted = ((view0 === 'builds' || view0 === 'stats')
+                  && !scen && pblock);
   var wins = weighted ? wbWinsWeighted(pay.mi, pay.mode, pblock.weights)
                       : wbWins(pay.mi, pay.mode, scen ? scen.idx : null);
   // The y-axis denominator moves with the control and nothing else does:
@@ -5615,7 +5767,7 @@ function wbRenderRoot(root) {
   }
   var view = view0;
   var colors = _wbColors(root, pay);
-  var g = (view === 'builds' && pblock)
+  var g = ((view === 'builds' || (view === 'stats' && pblock)) && pblock)
         ? _wbBuildGroups(pay, L, wins, colors, den, root, scen)
         : _wbGroups(pay, view, L, wins, colors, scen, den);
   var traces = g.traces.slice();
@@ -5672,7 +5824,7 @@ function wbRenderRoot(root) {
       if (bt) traces.push(bt);
     }
   }
-  if (view === 'builds' && pblock) {
+  if ((view === 'builds' || view === 'stats') && pblock) {
     var bcolors = _wbBuildColors(root, pay.bp);
     var br1 = _wbIvIdx(_wbIvTriple(pay.bp.rank1.iv));
     var br1t = _wbMarkTrace('Stat-product rank-1', br1, colors.mark1,
@@ -5709,6 +5861,22 @@ function wbRenderRoot(root) {
                               den);
       if (gbt2) traces.push(gbt2);
     }
+    // The section's SECOND standout. It is the maximum of the main
+    // scatter's own default y axis, which this panel does not draw, so it
+    // gets a marker of its own rather than being left to look like any
+    // other point (2026-09-16 review item 3).
+    var bsi = pay.bp.bestScore ? _wbIvIdx(_wbIvTriple(pay.bp.bestScore.iv)) : -1;
+    if (bsi >= 0 && bsi !== gbi2) {
+      var bst = _wbMarkTrace('Highest Avg Battle Score', bsi,
+                             colors.mark1, 'x-open', L, wins,
+                             'the highest Avg Battle Score on the scatter (' +
+                             pay.bp.bestScore.avgStr + '); ' +
+                             _wbBuildSide(pay, pblock,
+                                          _wbBuildOf(pay.bp, pblock, bsi),
+                                          scen),
+                             den);
+      if (bst) traces.push(bst);
+    }
   }
   if (!pay.hasFloor && view === 'rank1') {
     var nr1 = _wbIvIdx(pay.rank1.iv);
@@ -5724,7 +5892,7 @@ function wbRenderRoot(root) {
     }
   }
   var ownSide = null;
-  if (view === 'builds' && pblock) {
+  if ((view === 'builds' || view === 'stats') && pblock) {
     // On the builds view a pasted mon's question is "is it in a build, and
     // what does that get me" -- not which side of the line it is on.
     ownSide = function(i) {
@@ -5736,13 +5904,19 @@ function wbRenderRoot(root) {
 
   var chrome = plotChrome();
   var layout = {
-    xaxis: { title: 'Stat product rank', autorange: 'reversed',
-             showgrid: false, zeroline: false },
+    xaxis: (_wbPlaneMode === 'stats')
+      ? { title: 'Defense', showgrid: true, gridcolor: chrome.grid,
+          zeroline: false }
+      : { title: 'Stat product rank', autorange: 'reversed',
+          showgrid: false, zeroline: false },
     // The denominator in the title: the main scatter's own "Wins vs PvPoke
     // default" axis honours the Shields dropdown, so a reader flipping
     // between the two meets two different scales. This one never moves, and
     // says what it is out of.
-    yaxis: { title: (weighted
+    yaxis: (_wbPlaneMode === 'stats')
+      ? { title: 'HP', showgrid: true, gridcolor: chrome.grid,
+          zeroline: false }
+      : { title: (weighted
               ? (pblock.scens.length === DATA.nScenarios
                  ? ('Matchups won, all ' + DATA.nScenarios +
                     ' shield scenarios (of ' + den + ')')
@@ -5754,7 +5928,7 @@ function wbRenderRoot(root) {
               : ('Matchups won (of ' + (DATA.nScenarios * DATA.nOpponents) +
                  ': ' + DATA.nScenarios + ' shield scenarios x ' +
                  DATA.nOpponents + ' opponents)')),
-             showgrid: true, gridcolor: chrome.grid, zeroline: false },
+          showgrid: true, gridcolor: chrome.grid, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 11 },
     margin: { t: 8, b: 44, l: 56, r: 8 },
@@ -5771,6 +5945,9 @@ function wbRenderRoot(root) {
                  bordercolor: chrome.legendBorder, borderwidth: 1 }),
     hoverlabel: { bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder }
   };
+  if (_wbPlaneMode === 'stats' && pblock) {
+    layout.shapes = _wbPlaneShapes(pblock, _wbBuildColors(root, pay.bp), L);
+  }
   if (g.missing) {
     layout.annotations = [{
       text: 'No cluster labels apply to this view.',

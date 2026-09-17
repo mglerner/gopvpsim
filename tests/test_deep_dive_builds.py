@@ -295,9 +295,17 @@ def _synthetic_ctx():
     meta = np.zeros((n, 8))
     meta[:, 0] = np.arange(n) % 16
     meta[:, 3] = 50.0
+    # Stand-in for the real ctx's mean battle score (build_ctx reads it off
+    # the blob's score cube). Only its ARGMAX is load-bearing here -- it is
+    # the section's "highest battle score" standout -- so a monotone
+    # stand-in built from the same win cube is enough, and keeping the key
+    # present is what stops this fixture drifting out of sync with
+    # build_ctx's contract.
+    avg_score = 500.0 + 50.0 * win2.astype(np.float64).mean(axis=1)
     return dict(win=win, win2=win2, planes=planes, atk=atk, dfn=dfn, hp=hp,
                 sp=sp, sp_rank=sp_rank, n_iv=n, n_sc=n_sc, n_opp=n_opp,
                 cells=cells, scen_labels=scen_labels, meta=meta,
+                avg_score=avg_score, best_score=int(np.argmax(avg_score)),
                 other_modes={}, names=[f'Opp{i}' for i in range(n_opp)],
                 sc=D.Scanner(planes))
 

@@ -514,10 +514,19 @@ def build_ctx(state, arm, mode='pvpoke', level='l50'):
             continue
         sc_m, _meta_m = brief.arm_view(state, arm, m, level=level)
         other[m] = brief.win_cube(sc_m).reshape(n_iv, n_sc * n_opp)
+    # The scatter's DEFAULT y axis, recomputed here on the same numbers the
+    # page draws: mean battle score over every (scenario, opponent) cell.
+    # ``deep_dive_rendering.scenario_ranks`` computes the identical quantity
+    # from the page's own flat score array, and its argmax -- the spread the
+    # scatter puts highest -- is one of the section's two standouts, so the
+    # two surfaces must be reading one number. Measured equal on Shadow
+    # Sableye GL arm 0 (534.2090643274854, spread 9/6/13@47.5).
+    avg_score = scores.reshape(n_iv, -1).mean(axis=1)
     return dict(other_modes=other, state=state, arm=arm, mode=mode, meta=meta,
                 scores=scores, win=win, win2=win2, planes=planes, atk=atk,
                 dfn=dfn, hp=hp, sp=sp, sp_rank=sp_rank, n_iv=n_iv, n_sc=n_sc,
                 n_opp=n_opp, triage=triage, cells=cells, names=names,
+                avg_score=avg_score, best_score=int(np.argmax(avg_score)),
                 scen_labels=scen_labels, sc=Scanner(planes),
                 label=state['moveset_data'][arm]['label'])
 
@@ -1148,6 +1157,13 @@ def region_block(L, ctx, inter, role, others, weights, wsum=None):
                   'jaccard': round(float(d95['jaccard']), 4),
                   'n_rule': d95['n_rule'], 'n_extra': d95['n_extra'],
                   'n_missing': d95['n_missing']}
+        # The rule's own (axis, op, threshold) triples, for the stats view:
+        # a box is only DRAWABLE as a rectangle if the panel can read its
+        # per-axis cuts, and re-parsing the printed sentence in JS would be
+        # a second implementation of the rule grammar.
+        if d95.get('terms') is not None:
+            dblock['terms'] = [[ax, op, float(t)] for ax, op, t in
+                               d95['terms']]
         if d95.get('steps') is not None:
             dblock['steps'] = [[float(a), float(b), int(c)]
                                for a, b, c in d95['steps']]
@@ -1313,6 +1329,80 @@ def top_tie(L):
             'size': int(top['size'])}
 
 
+def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
+    """One exceptional single spread, and its relationship to the builds.
+
+    A build is a REGION of at least ``MIN_SET`` spreads that all guarantee
+    the same matchups, so the single spread that wins the most matchups --
+    and the single spread with the highest average battle score -- can both
+    sit outside every build. That is not a defect of the selection and it is
+    not a reason to shrink a build; it is what "region" costs. The page says
+    so, marks both on the plot, and prints the two numbers a reader needs to
+    tell the two plans apart:
+
+    * ``n_own_decision_wins`` -- how many DECISION matchups this one spread
+      wins; and
+    * ``n_from_nearest`` -- how many of those the nearest build guarantees
+      to every one of its members.
+
+    The difference is the part that is this spread's own and nobody else's,
+    which is the whole case for hunting an exact spread rather than building
+    a region.
+    """
+    cells = frame['cells']
+    won = ctx['win2'][idx]
+    own = np.array([bool(won[c['k']]) for c in cells], dtype=bool)
+    n_own = int(own.sum())
+    in_build = next((i for i, b in enumerate(builds)
+                     if bool(b['_mask'][idx])), None)
+    nearest, n_from = None, 0
+    if builds:
+        if in_build is not None:
+            nearest = in_build
+            n_from = int((builds[in_build]['_g'] & own).sum())
+        else:
+            scored = [(int((b['_g'] & own).sum()), -i)
+                      for i, b in enumerate(builds)]
+            best = max(scored)
+            nearest, n_from = -best[1], best[0]
+    meta = ctx['meta']
+    return {
+        'kind': kind, 'idx': int(idx), 'iv': iv_str(meta, idx),
+        'sp_rank': int(ctx['sp_rank'][idx]),
+        'atk': float(ctx['planes']['atk'][idx]),
+        'def': float(ctx['planes']['def'][idx]),
+        'hp': float(ctx['planes']['hp'][idx]),
+        'cp': int(meta[idx, 4]),
+        'avg_score': float(ctx['avg_score'][idx]),
+        'wins_all': int(ctx['win2'][idx].sum()),
+        'wins_weighted': int(wsum[idx]),
+        'denominator': int(round(float(np.sum(weights)) * ctx['n_opp'])),
+        'denominator_all': int(ctx['n_sc'] * ctx['n_opp']),
+        'in_build': in_build,
+        'nearest_build': nearest,
+        'n_own_decision_wins': n_own,
+        'n_from_nearest': n_from,
+    }
+
+
+def standouts(ctx, frame, builds, weights, wsum):
+    """The two spreads the section marks outside the builds, deduplicated.
+
+    Order is fixed -- most wins first, then highest battle score -- so the
+    block, the plot legend and the card set name them the same way every
+    time. When one spread is both, it is printed once and says so.
+    """
+    gmw = int(np.argmax(ctx['win2'].sum(axis=1)))
+    best = int(ctx['best_score'])
+    out = [standout_block(ctx, frame, builds, 'wins', gmw, weights, wsum)]
+    if best == gmw:
+        out[0]['kind'] = 'both'
+    else:
+        out.append(standout_block(ctx, frame, builds, 'score', best,
+                                  weights, wsum))
+    return out
+
+
 def run_preset(ctx, sets, frame, preset):
     """Select and describe the builds for one preset."""
     weights = preset_weights(preset, ctx['scen_labels'])
@@ -1329,6 +1419,7 @@ def run_preset(ctx, sets, frame, preset):
         blk = region_block(L, ctx, b, role, others, weights, wsum=wsum)
         blk['_holds_gmw'] = bool(b['mask'][gmw])
         blk['_mask'] = b['mask']
+        blk['_g'] = b['g']
         builds.append(blk)
     wcell = cell_weights(frame['cells'], weights)
     counted = wcell > 0
@@ -1361,6 +1452,7 @@ def run_preset(ctx, sets, frame, preset):
         'rank1_status': r1_status,
         'fork_detail': fork_info,
         'objectives': objectives_block(ctx, builds, weights, wsum=wsum),
+        'standouts': standouts(ctx, frame, builds, weights, wsum),
         'has_fork': any(b['role'] == 'fork' for b in builds),
     }
 
@@ -1453,11 +1545,18 @@ def _region_key(inter):
 
 
 def set_short_label(name):
-    """A reader-facing name for one lattice set.
+    """A reader-facing name for one lattice set: its TARGET, in few words.
 
     The generator names are audit vocabulary ("S4 frontier (atk >= 148.1 ->
     1v2 Corviknight)"); the UpSet panel's rows sit under reader prose and get
     the page's own words. The full name stays in the hover.
+
+    Short on purpose (2026-09-16 review): these strings are the UpSet panel's
+    y tick labels, drawn into a left margin, and the long forms -- "two-stat
+    box for 0v1 Empoleon", "Atk 148.10 + defense staircase for 1v2
+    Corviknight" -- ran off the left edge of the plot. Each row now names the
+    set's TARGET plus the shape word ("0v1 Empoleon box"), and the panel
+    wraps the counts onto a second line.
     """
     import re as _re
     m = _re.match(r"S1 (\S+) cluster (\d+)$", name)
@@ -1473,19 +1572,84 @@ def set_short_label(name):
     m = _re.match(r"S2 rung \((\w+) >= ([0-9.]+)\)$", name)
     if m:
         return f"rung ({display_rule(m.group(1) + ' >= ' + m.group(2))})"
+    # "Box", not "rectangle": the page's own prose calls this build the bulk
+    # box, and the section plot's stats view draws it as a rectangle only on
+    # the Def/HP axes -- one name for it everywhere (2026-09-16 review).
     if name == 'S2 alternative rectangle':
-        return 'the bulk rectangle'
+        return 'the bulk box'
     m = _re.match(r"S3 package \[(.*)\]$", name)
     if m:
         return 'wins ' + m.group(1)
     m = _re.match(r"S4 frontier \(atk >= ([0-9.]+) -> (.*)\)$", name)
     if m:
-        return (f"Atk {_two_dp(m.group(1))} + defense staircase for "
-                f"{m.group(2)}")
+        return f"{m.group(2)} staircase"
     m = _re.match(r"S5 box -> (.*)$", name)
     if m:
-        return f"two-stat box for {m.group(1)}"
+        return f"{m.group(1)} box"
     return name
+
+
+def stair_atk_head(d):
+    """A staircase's attack floor, as the page PRINTS it ("Atk >= 150.24").
+
+    Not ``f"{d['atk_floor']:.2f}"``: ``atk_floor`` is the raw selected value
+    (150.245638...), and two-place formatting rounds it UP to 150.25 -- a bar
+    0.01 above the cut the build is actually made at, which excludes members
+    of the build being described. ``rule`` already carries ``print_thr``'s
+    shortest-exact decimal, so the head of the printed rule is the one
+    number every surface may quote.
+    """
+    return display_rule(d['rule']).split(' and Def >= d(HP)')[0]
+
+
+def build_plane(build):
+    """One build's shape on the stats view's Def (x) / HP (y) axes.
+
+    The section plot's own axes are stat-product rank and matchups won, on
+    which a rectangle is not a rectangle -- "the bulk box (Def >= 101.40, HP
+    >= 125)" was a phrase nothing on the page ever drew (2026-09-16 review).
+    The stats view draws each build where it IS a region:
+
+    * ``box``   -- axis-aligned cuts: a rectangle outline, clipped to the
+      grid by the panel. Cuts on ATTACK are invisible on these axes, so they
+      travel as ``atk_note`` and the caption says so.
+    * ``stair`` -- an attack floor plus a defense staircase: the staircase
+      polyline (Def needed at each HP), same caveat about the floor.
+    * ``line``  -- an attack floor plus a linear trade ``Def + k*HP >= c``:
+      the straight boundary that trade names.
+    * ``none``  -- no rule fits (or the rule cuts on attack alone), so the
+      build is drawn as its member POINTS and nothing else. An outline the
+      members do not fill would be the one dishonesty this view cannot
+      afford.
+    """
+    d = build['description']
+    if d is None:
+        return {'kind': 'none'}
+    fam = d['family']
+    if fam == 'atk_floor_frontier' and d.get('steps'):
+        return {'kind': 'stair',
+                'steps': [[float(h), float(dd)] for h, dd, _n in d['steps']],
+                'atkNote': stair_atk_head(d)}
+    if fam == 'atk_floor_trade' and d.get('trade_terms'):
+        t = d['trade_terms']
+        return {'kind': 'line', 'k': float(t['k']), 'c': float(t['c']),
+                'atkNote': f"Atk >= {float(t['atk_floor']):.2f}"}
+    terms = d.get('terms')
+    if not terms:
+        return {'kind': 'none'}
+    box = {'def': [None, None], 'hp': [None, None]}
+    atk_bits = []
+    for ax, op, t in terms:
+        if ax == 'atk':
+            atk_bits.append(f"Atk {op} {float(t):.2f}")
+            continue
+        slot = 0 if op == '>=' else 1
+        box[ax][slot] = float(t)
+    if box['def'] == [None, None] and box['hp'] == [None, None]:
+        return {'kind': 'none',
+                'atkNote': ' and '.join(atk_bits) if atk_bits else None}
+    return {'kind': 'box', 'def': box['def'], 'hp': box['hp'],
+            'atkNote': (' and '.join(atk_bits) if atk_bits else None)}
 
 
 def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
@@ -1585,6 +1749,7 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
                 'nNearFree': b['honesty']['n_cells_outside_wr_over_90'],
                 'nAllModes': b['honesty']['n_guaranteed_all_modes'],
                 'nModes': b['honesty']['n_modes'],
+                'plane': build_plane(b),
                 'mostWinning': {'iv': b['most_winning_member']['iv'],
                                 'idx': b['most_winning_member']['idx'],
                                 'wins': b['most_winning_member']['wins'],
@@ -1607,6 +1772,16 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             scens=[ctx['scen_labels'][i]
                    for i, w in enumerate(block['weights']) if w > 0],
             builds=pb, cols=col_rows,
+            standouts=[{'kind': t['kind'], 'iv': t['iv'],
+                        'inBuild': t['in_build'],
+                        'nearest': t['nearest_build'],
+                        'winsAll': t['wins_all'],
+                        'winsW': t['wins_weighted'],
+                        'den': t['denominator'],
+                        'denAll': t['denominator_all'],
+                        'spRank': t['sp_rank'],
+                        'avgScore': round(t['avg_score'], 4)}
+                       for t in block['standouts']],
             lattice=[{'key': p['key'], 'short': set_short_label(p['name']),
                       'name': p['name'], 'size': p['size'],
                       'nG': p['n_guaranteed'], 'nGw': p['n_guaranteed_weighted'],
@@ -1624,6 +1799,7 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
     r1 = int(np.argmin(ctx['sp_rank']))
     wins_all = ctx['win2'].sum(axis=1)
     gmw = int(np.argmax(wins_all))
+    bsi = int(ctx['best_score'])
     return {
         'mi': int(moveset_idx), 'mode': mode,
         'presetKeys': [k for k in PRESET_KEYS if k in pay_presets],
@@ -1638,4 +1814,17 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
         'gridBest': {'iv': iv_str(ctx['meta'], gmw), 'idx': gmw,
                      'wins': int(wins_all[gmw]),
                      'spRank': int(ctx['sp_rank'][gmw])},
+        # The scatter's default y axis, at its maximum: the spread the main
+        # plot puts highest. Carried so the stats view, the standouts block
+        # and the card set all mark the SAME spread.
+        # ``avgStr`` is the PRINTED form, formatted here. The panel's own
+        # test bars wbRenderRoot from formatting a number (a caption that
+        # formats a threshold is a second implementation of the page's
+        # rounding rules), so the string travels rather than the JS making
+        # one.
+        'bestScore': {'iv': iv_str(ctx['meta'], bsi), 'idx': bsi,
+                      'wins': int(wins_all[bsi]),
+                      'avg': round(float(ctx['avg_score'][bsi]), 4),
+                      'avgStr': f"{float(ctx['avg_score'][bsi]):.1f}",
+                      'spRank': int(ctx['sp_rank'][bsi])},
     }

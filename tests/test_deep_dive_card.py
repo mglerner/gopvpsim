@@ -441,3 +441,66 @@ def test_flip_line_pvpoke_default_candidate_gets_sp_line():
     html_out = dc.render_card_html(m, standalone=True)
     assert 'vs stat-product #1 (1/13/11): gains Lickitung 0v1' in html_out
     assert 'vs PvPoke default (4/15/9): this spread IS the PvPoke default' in html_out
+
+
+def test_card_carries_the_build_guarantee_and_its_rarest_cells():
+    """v5 (2026-09-16 review item 6): the card's spreads come from the
+    "Which one to build?" builds, and each one carries that build's
+    guarantee sentence plus its rarest guaranteed matchups in the section's
+    own outside-rate emphasis.
+
+    Pre-fix the card had no builds content at all: its three spreads were
+    stat-extreme POLES ("MATCHUP HUNTER", "MAX BULK") chosen by a rule no
+    other surface on the page uses, and the card named different spreads
+    than the section three inches below it.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'},
+        {'iv': 1, 'style': 'Highest battle score'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': [{'text': '1v2 Feraligatr (rank 30)', 'rate': 0.0999,
+                       'word': 'outside'},
+                      {'text': '0v1 Empoleon (rank 23)', 'rate': 0.2002,
+                       'word': 'outside'},
+                      {'text': '0v0 Furret (rank 43)', 'rate': 0.93,
+                       'word': 'outside'}]},
+        1: {'guarantee': 'wins 62 of 87 decision matchups; it is in none of '
+                         'the builds',
+            'cells': [{'text': '1v2 Electrode (Hisuian) (rank 34)',
+                       'rate': 0.08, 'word': 'grid'}]}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    assert m.spreads[0].guarantee.startswith('guarantees 55 of 87')
+    assert len(m.spreads[0].cells) == 3
+    html = dc.render_card_html(m, standalone=False)
+    assert 'guarantees 55 of 87 decision matchups (Build 1)' in html
+    assert 'wins 62 of 87 decision matchups' in html
+    # the three bands, on the three rates above: 10% -> o3, 20% -> o2,
+    # 93% -> o0 (the near-free tail, dimmed rather than dropped)
+    assert ('<span class="ddcard-o3">1v2 Feraligatr (rank 30) '
+            '(outside 10%)</span>' in html)
+    assert ('<span class="ddcard-o2">0v1 Empoleon (rank 23) '
+            '(outside 20%)</span>' in html)
+    assert ('<span class="ddcard-o0">0v0 Furret (rank 43) '
+            '(outside 93%)</span>' in html)
+    # a standout card quotes the GRID rate: "outside" has no meaning for one
+    # spread, and printing it as one would be a number about a region
+    assert '(grid 8%)' in html
+    # the role label is the build's name + its rule, uppercased by the CSS
+    assert '<div class="role">Build 1 -- Def &gt;= 132.00 and HP &gt;= 140</div>' in html
+    # the standalone export carries the same block and its own CSS rules
+    solo = dc.render_card_html(m, standalone=True)
+    assert 'guarantees 55 of 87 decision matchups (Build 1)' in solo
+    assert '.ddcard-o3 {' in solo
+
+
+def test_card_without_builds_keeps_the_old_spread_block():
+    """A dive with no builds (no replay blob, or compute_builds failed) gets
+    the pole card unchanged -- no empty guarantee row, no stray label."""
+    data_obj, ctx = _synthetic()
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    assert m.spreads[0].guarantee == '' and m.spreads[0].cells == []
+    html = dc.render_card_html(m, standalone=False)
+    assert 'ddcard-guar' not in html
+    assert '<div class="role">Max Bulk</div>' in html
