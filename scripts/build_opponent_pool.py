@@ -158,6 +158,13 @@ CURATED_INCLUSIONS = {
             'A supermega, so it fields THREE charged moves. Sableye and '
             'Malamar are the only two worth carrying -- the next mega is '
             'Mawile at #181, so the tier drops off a cliff after these two.'),
+        'Oinkologne (Female)': (
+            'Michael, 2026-09-17: "kind of surprisingly, female Oinkologne is '
+            'actually good" despite GL #113, so it needs this entry to clear '
+            'the cut. Two fast moves matter (MUD_SLAP and TAKE_DOWN), both with '
+            'BODY_SLAM / TRAILBLAZE; the dive override pins the charged pair. '
+            'The dive already existed last season (thresholds/oinkologne_female.toml) '
+            'and fell out when the pool was regenerated from the rank cut.'),
         'Rillaboom': (
             'Michael, 2026-09-09, asked for explicitly. NOT an ItsAxn pick -- '
             'he puts it in STRONG SPICE, not meta-or-better. GL #70, so it '

@@ -76,3 +76,8 @@ Cradily
 Wartortle
 Bombirdier
 Cradily (Shadow)
+
+# 2026-09-17 hand-appended curated inclusion (Michael): female Oinkologne is
+# good despite GL #113. The pool was NOT regenerated from today's rankings on
+# purpose; see build_opponent_pool.CURATED_INCLUSIONS for the entry.
+Oinkologne (Female)
