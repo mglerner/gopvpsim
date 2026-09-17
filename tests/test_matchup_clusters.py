@@ -1409,10 +1409,23 @@ def test_the_rendered_page_puts_the_clusters_section_above_the_scatter(
 
 
 def test_the_mini_grid_only_draws_once_the_section_is_open():
-    """The two JS guards the move needs: "checked" no longer implies "on
-    screen", and a best-buddy swap leaves a live but EMPTY grid div."""
+    """The guards the move needs.
+
+    The load-bearing one is ``_inClosedDetails``: measured in headless
+    Chrome on the round-7 preview, a CLOSED ``<details>`` is not
+    display:none in current Chrome -- #allscen-grid reported
+    ``offsetParent`` BODY and ``clientWidth`` 661 with its section closed,
+    and the minis inside it drew 212px wide. So every "is it on screen"
+    guard on the page passes inside a closed section, and deferring nine
+    4096-point panels until the reader opens it has to ask the <details>.
+    The offsetParent test stays beside it for UAs that DO use display:none.
+
+    The second guard is the best-buddy swap, which leaves a live but EMPTY
+    grid div whose cache key still matches.
+    """
     js = (_SCRIPTS / "deep_dive_engine.js").read_text()
-    assert 'if (grid.offsetParent === null) {' in js
+    assert 'function _inClosedDetails(el) {' in js
+    assert 'if (_inClosedDetails(grid) || grid.offsetParent === null) {' in js
     assert "if (key !== _allscenKey || !grid.children.length) {" in js
     # the toggle-open pass is what draws it the first time
     assert "if (det.querySelector('#allscen-grid')) refreshAllScenarios();" \
