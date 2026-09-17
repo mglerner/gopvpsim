@@ -3210,8 +3210,8 @@ def test_the_card_specs_come_from_the_builds(shadow_sableye):
     # battle score' (which printed no score) and 'Most wins (outside the
     # builds)' (which printed no win count).
     assert [s['title'] for s in specs] == [
-        'Build 1 -- Atk >= 150.24 + Def/HP steps',
-        'Build 2 -- Def >= 101.40 and HP >= 125',
+        'Build 1: Atk >= 150.24 + Def/HP steps',
+        'Build 2: Def >= 101.40 and HP >= 125',
         'Highest average battle score',
         'Most matchups won (outside the builds)']
     # the threshold on a card is the one the build is actually cut at:
@@ -3347,14 +3347,14 @@ def test_an_approximate_rule_is_flagged_on_a_synthetic_build():
     assert W.approx_clause(b_approx) == (
         'That rule takes in 1 spread that is not a member and misses 1; '
         'the member list in the table is the build.')
-    assert W.build_rule_phrase(b_approx).startswith('about ')
-    assert 'about ' in W.build_summary_phrase(b_approx)
-    assert W.card_title_rule(b_approx).startswith('about ')
+    assert W.build_rule_phrase(b_approx).startswith('roughly ')
+    assert 'roughly ' in W.build_summary_phrase(b_approx)
+    assert W.card_title_rule(b_approx).startswith('roughly ')
     # ... and an exact rule carries no hedge
     for phrase in (W.build_rule_phrase(b_exact),
                    W.build_summary_phrase(b_exact),
                    W.card_title_rule(b_exact)):
-        assert 'about' not in phrase, phrase
+        assert 'roughly' not in phrase, phrase
 
 
 def test_the_staircase_geometry_skips_zero_length_segments():
@@ -3583,13 +3583,13 @@ def test_every_approximate_rule_on_a_real_page_says_so(blob):
                 summary = W.build_summary_phrase(b, facts)
                 title = W.card_title_rule(b, facts)
                 if W.rule_is_approx(b):
-                    assert 'at about ' in para, (key, para[:120])
+                    assert 'at roughly ' in para, (key, para[:120])
                     assert 'the member list in the table is the build' in para
-                    assert 'about ' in summary, summary
-                    assert 'about ' in title, title
+                    assert 'roughly ' in summary, summary
+                    assert 'roughly ' in title, title
                 else:
-                    assert 'about' not in summary, summary
-                    assert 'about' not in title, title
+                    assert 'roughly' not in summary, summary
+                    assert 'roughly' not in title, title
 
 
 @pytest.mark.local_artifacts

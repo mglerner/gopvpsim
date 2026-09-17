@@ -456,7 +456,7 @@ def test_card_carries_the_build_guarantee_and_its_rarest_cells():
     """
     data_obj, ctx = _synthetic()
     ctx['rec_candidates'] = [
-        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'},
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'},
         {'iv': 1, 'style': 'Highest battle score'}]
     ctx['card_extras'] = {
         0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
@@ -488,7 +488,7 @@ def test_card_carries_the_build_guarantee_and_its_rarest_cells():
     # spread, and printing it as one would be a number about a region
     assert '(grid 8%)' in html
     # the role label is the build's name + its rule, uppercased by the CSS
-    assert '<div class="role">Build 1 -- Def &gt;= 132.00 and HP &gt;= 140</div>' in html
+    assert '<div class="role">Build 1: Def &gt;= 132.00 and HP &gt;= 140</div>' in html
     # the standalone export carries the same block and its own CSS rules
     solo = dc.render_card_html(m, standalone=True)
     assert 'guarantees 55 of 87 decision matchups (Build 1)' in solo
@@ -505,7 +505,7 @@ def test_card_carries_the_guarantee_key_in_its_own_foot():
     """
     data_obj, ctx = _synthetic()
     ctx['rec_candidates'] = [
-        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'}]
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'}]
     ctx['card_extras'] = {
         0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
             'cells': [{'text': '1v2 Feraligatr (rank 30)', 'rate': 0.0999,
@@ -536,7 +536,7 @@ def test_a_pinned_card_says_its_builds_come_from_another_level():
     """
     data_obj, ctx = _synthetic()
     ctx['rec_candidates'] = [
-        {'iv': 0, 'style': 'Build 1 -- Def >= 132.00 and HP >= 140'}]
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'}]
     ctx['card_extras'] = {
         0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
             'cells': []}}

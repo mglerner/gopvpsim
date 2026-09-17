@@ -1836,8 +1836,8 @@ def rule_is_approx(b):
 
 
 def _approx(b, rule):
-    """A rule that does not reproduce its own build is printed as "about"."""
-    return f"about {rule}" if rule_is_approx(b) else rule
+    """A rule that does not reproduce its own build is printed as "roughly"."""
+    return f"roughly {rule}" if rule_is_approx(b) else rule
 
 
 def approx_clause(b):
@@ -2422,7 +2422,7 @@ def card_specs(facts, arm_builds, preset=None):
         mw = b['most_winning_member']
         _add({
             'iv': [int(x) for x in mw['iv'].split('@')[0].split('/')],
-            'title': f"{role_short(b, i)} -- {card_title_rule(b, facts)}",
+            'title': f"{role_short(b, i)}: {card_title_rule(b, facts)}",
             'guarantee': (
                 f"guarantees "
                 f"{_guarantee_phrase(arm_builds, bl, b, article=False)} "
