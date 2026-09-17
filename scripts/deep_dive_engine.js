@@ -5233,8 +5233,33 @@ function _wbBuildOf(bp, block, i) {
 
 function _wbBuildName(block, b) {
   var roles = { primary: 'Build 1 (primary)', fork: 'Build 2 (fork)',
-                rank1: 'Build 3 (bulk)' };
+                rank1: 'Build 3 (bulk)', wide: 'Build 1 wide' };
   return roles[block.builds[b].role] || ('Build ' + (b + 1));
+}
+
+// A lighter tint of one build colour, for the wide region drawn under Build
+// 1. Alpha, not a mix toward a fixed white: the panel has a light and a dark
+// theme and a hard-coded blend would be invisible on one of them.
+function _wbTint(col) {
+  var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((col || '').trim());
+  if (!m) return col;
+  return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ','
+         + parseInt(m[3], 16) + ',0.40)';
+}
+
+// The colour for one payload build. The wide region is not a build a reader
+// picks, so it borrows the PRIMARY's colour at a lighter tint rather than
+// taking a fourth hue the legend would read as a third build.
+function _wbBuildCol(block, bcol, k, fallback) {
+  var role = block.builds[k] && block.builds[k].role;
+  if (role === 'wide') {
+    var pi = 0;
+    for (var j = 0; j < block.builds.length; j++) {
+      if (block.builds[j].role === 'primary') { pi = j; break; }
+    }
+    return _wbTint(bcol[pi] || fallback);
+  }
+  return bcol[k] || fallback;
 }
 
 // The builds view: every spread, coloured by the build it belongs to.
@@ -5251,7 +5276,8 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
     var note = (_wbPlaneMode === 'stats' && b.plane && b.plane.atkNote)
              ? (' [' + b.plane.atkNote + ', not on these axes]') : '';
     return _wbTrace(_wbBuildName(block, k) + ': ' + b.desc + note,
-                    bcol[k] || colors.line, 'circle', 4, 0.85);
+                    _wbBuildCol(block, bcol, k, colors.line),
+                    'circle', 4, 0.85);
   });
   ivsOf.push([]);
   for (var q = 0; q < ts.length; q++) ivsOf.push([]);
@@ -5277,7 +5303,17 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
     }
   }
   var out = [none];
-  for (var k3 = 0; k3 < ts.length; k3++) if (ts[k3].x.length) out.push(ts[k3]);
+  // The wide region draws BELOW every build: it is the context around Build
+  // 1, and a wider trace on top would hide the build it is context for.
+  // (Its MEMBERSHIP already loses every tie -- _wbBuildOf colours a spread by
+  // the first build holding it and the wide entry travels last -- so this
+  // trace carries only the spreads no build holds.)
+  for (var kw = 0; kw < ts.length; kw++) {
+    if (block.builds[kw].role === 'wide' && ts[kw].x.length) out.push(ts[kw]);
+  }
+  for (var k3 = 0; k3 < ts.length; k3++) {
+    if (block.builds[k3].role !== 'wide' && ts[k3].x.length) out.push(ts[k3]);
+  }
   return { traces: out, missing: false };
 }
 
@@ -5305,7 +5341,8 @@ function _wbPlaneShapes(block, bcol, L) {
                   line: { color: col, width: 2 } });
   }
   for (var k = 0; k < block.builds.length; k++) {
-    var pl = block.builds[k].plane, col = bcol[k] || '#888';
+    var pl = block.builds[k].plane;
+    var col = _wbBuildCol(block, bcol, k, '#888');
     if (!pl || pl.kind === 'none') continue;
     if (pl.kind === 'box') {
       var x0 = (pl.def && pl.def[0] != null) ? pl.def[0] : x0b;
@@ -5383,7 +5420,12 @@ function _wbUpset(root, pay) {
   var bcol = _wbBuildColors(root, bp);
   var cols = block.cols, rows = block.lattice;
   var colOfBuild = {};
-  for (var b = 0; b < block.builds.length; b++) colOfBuild[block.builds[b].col] = b;
+  for (var b = 0; b < block.builds.length; b++) {
+    // The wide region has no UpSet column (col === null): it is not one of
+    // the candidate regions the panel ranks.
+    if (block.builds[b].col == null) continue;
+    colOfBuild[block.builds[b].col] = b;
+  }
   // Under a narrow preset the number ABOVE the bar is the weighted count --
   // the one the ranking used and the one the table and the prose lead with.
   // Drawing the all-nine count there made the ties invisible: nine regions
@@ -5553,7 +5595,12 @@ function wbCompareBuilds(btn) {
     list.push(t);
   }
   push(pay.bp.rank1.iv);
-  for (var b = 0; b < block.builds.length; b++) push(block.builds[b].mostWinning.iv);
+  for (var b = 0; b < block.builds.length; b++) {
+    // Not the wide region: it is not a build to build, so its most-winning
+    // member is not a candidate the comparison table is about.
+    if (block.builds[b].role === 'wide') continue;
+    push(block.builds[b].mostWinning.iv);
+  }
   // ... and the two standouts the block above names, so a reader who just
   // read "it is in none of the builds" and clicked Compare finds it here
   // (2026-09-16 review item 3). push() deduplicates, so a standout that IS
@@ -5803,7 +5850,7 @@ function wbRenderRoot(root) {
     // Every marked point says its side of the line as well as its role: the
     // role alone ("the stat-product rank-1 spread") is the one hover on the
     // panel that did not answer the question the panel is about.
-    var r1t = _wbMarkTrace('Stat-product rank-1', r1i, colors.mark1, 'diamond',
+    var r1t = _wbMarkTrace('Stat-product rank-1 (SP1)', r1i, colors.mark1, 'diamond',
                            L, wins, 'the stat-product rank-1 spread; ' +
                            (line ? _wbSideAt(L, line, r1i) : noLine), den);
     if (r1t) traces.push(r1t);
@@ -5831,7 +5878,7 @@ function wbRenderRoot(root) {
   if ((view === 'builds' || view === 'stats') && pblock) {
     var bcolors = _wbBuildColors(root, pay.bp);
     var br1 = _wbIvIdx(_wbIvTriple(pay.bp.rank1.iv));
-    var br1t = _wbMarkTrace('Stat-product rank-1', br1, colors.mark1,
+    var br1t = _wbMarkTrace('Stat-product rank-1 (SP1)', br1, colors.mark1,
                             'diamond', L, wins,
                             'the stat-product rank-1 spread; ' +
                             _wbBuildSide(pay, pblock,
@@ -5884,7 +5931,7 @@ function wbRenderRoot(root) {
   }
   if (!pay.hasFloor && view === 'rank1') {
     var nr1 = _wbIvIdx(pay.rank1.iv);
-    var nr1t = _wbMarkTrace('Stat-product rank-1', nr1, colors.mark1, 'diamond',
+    var nr1t = _wbMarkTrace('Stat-product rank-1 (SP1)', nr1, colors.mark1, 'diamond',
                             L, wins, 'the stat-product rank-1 spread', den);
     if (nr1t) traces.push(nr1t);
     var gbi = _wbIvIdx(pay.gridBest.iv);

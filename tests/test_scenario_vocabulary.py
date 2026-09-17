@@ -329,7 +329,9 @@ def test_threats_section_carries_the_boundary_label():
         'ivA': [0, 5, 10, 15], 'ivD': [15] * 4, 'ivS': [15] * 4,
         'ivAtk': [100.0, 105.0, 110.0, 115.0],
         'ivDef': [100.0] * 4, 'ivHp': [135] * 4,
-        'recIvs': [0, 3], 'recStyles': ['bulk', 'atk'],
+        # The card's spreads and their short names (pre-2026-09-17
+        # this key was ``recStyles`` and carried pole labels).
+        'recIvs': [0, 3], 'recNames': ['Build 1', 'Build 2'],
     }
     html = rendering.render_opponent_threats_section(
         [{'opponent': 'Medicham', 'stat': 'atk', 'threshold': 105.0,

@@ -33,8 +33,11 @@ def _synthetic():
         'ivHp': [140, 138], 'ivCp': [1498, 1499], 'spRanks': [1, 57],
     }
     ctx = {
-        'rec_candidates': [{'iv': 0, 'style': 'Max Bulk'},
-                           {'iv': 1, 'style': 'Attack Weight'}],
+        # Pre-2026-09-17 these styles were the retired pole labels
+        # ('Max Bulk' / 'Attack Weight'); a card's style string is now its
+        # build title, or "Top pick #N" on a page with no builds.
+        'rec_candidates': [{'iv': 0, 'style': 'Top pick #1'},
+                           {'iv': 1, 'style': 'Top pick #2'}],
         'rec_idx': 0, 'flips': {}, 'flip_map': {}, 'has_bait_axis': False,
         'opp_label': 'PvPoke default',
         'key_wins': [('Azumarill', 612.0), ('Stunfisk (Galarian)', 540.0)],
@@ -56,7 +59,7 @@ def test_build_card_model_fields():
     assert m.moveset == 'Sand Attack / Air Cutter, Payback'
     # three (here two) spreads pulled in rec order, with the right IVs/stats
     assert [s.iv_str for s in m.spreads] == ['0/15/14', '1/13/11']
-    assert m.spreads[0].style == 'Max Bulk'
+    assert m.spreads[0].style == 'Top pick #1'
     assert m.spreads[0].sp_rank == 1
     assert abs(m.spreads[0].def_ - 132.1) < 1e-6
     # win-rate percentages round to whole numbers
@@ -572,10 +575,16 @@ def test_both_level_passes_hand_the_card_the_same_builds():
 
 def test_card_without_builds_keeps_the_old_spread_block():
     """A dive with no builds (no replay blob, or compute_builds failed) gets
-    the pole card unchanged -- no empty guarantee row, no stray label."""
+    the plain spread block -- no empty guarantee row, no stray label.
+
+    Pre-2026-09-17 the fallback was the stat-extreme POLE card, and this
+    asserted ``<div class="role">Max Bulk</div>``; the poles are retired, so
+    the fallback spreads are the composite-score top picks and the role line
+    is their rank.
+    """
     data_obj, ctx = _synthetic()
     m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
     assert m.spreads[0].guarantee == '' and m.spreads[0].cells == []
     html = dc.render_card_html(m, standalone=False)
     assert 'ddcard-guar' not in html
-    assert '<div class="role">Max Bulk</div>' in html
+    assert '<div class="role">Top pick #1</div>' in html
