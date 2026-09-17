@@ -4349,10 +4349,15 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     assert eline.endswith("; Build 1 wide (838 spreads) keeps 20 of Build 1's "
                           '29 guaranteed matchups in 0v0 / 1v1 / 2v2 shields '
                           '(39 of its 53 overall) and holds both standouts.')
+    # Round 7 retired the "_own == 0" caveat with the trace it was about:
+    # the wide region now draws a containment RING around every one of its
+    # members, so it always has points on the plot. Pinned as an ABSENCE
+    # with a positive control -- the paragraph must still be a paragraph.
     faked = dict(wide, _own=0)
-    assert ('On the plot it adds no points: every spread it holds is already '
-            'in a build.'
-            in W.gate_text(W.wide_paragraph(facts, ab, bl, faked, all_facts)))
+    faked_para = W.gate_text(W.wide_paragraph(facts, ab, bl, faked,
+                                              all_facts))
+    assert 'adds no points' not in faked_para
+    assert 'Build 1 wide is the looser target around Build 1' in faked_para
     # The 1v1 preset is this page's PARTIAL case -- D, holding 9/6/13 and
     # not 7/2/14 -- and it names them by IV, because the block below names
     # them by IV and a reader here for one of them needs to see which
@@ -4409,16 +4414,21 @@ def test_the_js_draws_the_wide_region_under_build_1_and_skips_it_elsewhere():
     js = ENGINE_JS.read_text()
     assert "wide: 'Build 1 wide'" in js
     assert 'function _wbTint(' in js and 'function _wbBuildCol(' in js
-    # the trace order: the wide region is pushed before the builds, and
-    # EMITTED even with no points of its own (pre-fix the push was guarded by
-    # "&& ts[kw].x.length", so Plotly dropped the named region off the legend
-    # on any page where every spread it holds is already in a build)
-    assert "if (block.builds[kw].role === 'wide') out.push(ts[kw]);" in js
-    assert "if (block.builds[k3].role !== 'wide' && ts[k3].x.length)" in js
-    # its legend count says WHICH count it is: the trace carries only the
-    # spreads no build claims, while the table row gives the region's size
-    assert "' not already in a build'" in js
-    assert "'all ' + block.builds[k2].size + ' already in a build'" in js
+    # Round 7: the region is a CONTAINMENT RING -- a larger hollow marker
+    # around every one of its members, pushed FIRST so it draws under
+    # everything else (pre-fix it was a solid trace carrying only the
+    # spreads no build held, which drew "Build 1 wide" beside Build 1
+    # instead of around it).
+    assert "var WB_RING_SYMBOL = 'circle-open';" in js
+    assert 'var WB_RING_SIZE = 9;' in js
+    assert 'if (wideIdx >= 0) out.push(ts[wideIdx]);' in js
+    assert "if (k3 !== wideIdx && ts[k3].x.length) out.push(ts[k3]);" in js
+    # ...and the round-6 legend phrasings are gone with the reason for them:
+    # the ring trace holds the whole region, so a bare count IS its size.
+    assert "' not already in a build'" not in js
+    assert "' already in a build'" not in js
+    assert ("ts[k2].name = wrapLegendName(ts[k2].name + ' (' + "
+            "ts[k2].x.length + ')'," in js)
     # it is not a build to build, so it is not a Compare candidate
     assert "if (block.builds[b].role === 'wide') continue;" in js
     # and it has no UpSet column
@@ -4505,9 +4515,222 @@ def test_the_wide_region_on_plain_sableye():
 
 
 # ---------------------------------------------------------------------------
-# 7. Round 7 (2026-09-17), item 4: the collapsed line names the standout the
-#    wide region holds instead of counting it
+# 7. Round 7 (2026-09-17): the containment ring, the section's own
+#    all-scenarios grid, and the named standout on the collapsed line
 # ---------------------------------------------------------------------------
+
+_RING_HARNESS = r"""
+// Node harness: the wide region's containment ring, and the mini variant.
+// Same slice and same globals as _BUILDS_HARNESS above.
+const fs = require('fs');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+const start = src.indexOf('function _wbRoot()');
+const end = src.indexOf('// ---- Re-theme the canvases');
+if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
+const block = src.slice(start, end);
+
+const N = 6;
+const DATA = {
+  nIvs: N, nScenarios: 2, nOpponents: 2, scenarioLabels: ['0v0', '1v1'],
+  ivA: [0,1,2,3,4,5], ivD: [15,14,13,12,11,10], ivS: [15,14,13,12,11,10],
+  ivAtk: [140,145,148.2,149,150.5,151], ivDef: [110,105,101.5,100,99,98],
+  ivHp: [130,128,126,124,122,120], ivLv: [50,50,50,50,50,50],
+  spRanks: [1,2,3,4,5,6], ivL51: null,
+};
+const SCORES = { '0|pvpoke': new Uint16Array([
+  600,400,400,400,  600,600,400,400,  600,600,600,400,
+  600,600,600,600,  600,600,600,600,  600,600,600,600]) };
+const SCORE_KEY_SEP = '|';
+function isWin(v) { return v > 500; }
+function scenLabel(si) { return DATA.scenarioLabels[si]; }
+function wrapLegendName(n) { return n; }
+function plotChrome() { return {ink:'#000', paper:'', plot:'', font:'', grid:'',
+  legendBg:'', legendBorder:'', hoverBg:'', hoverBorder:''}; }
+function _mcPayloadPage() { return null; }
+function _mcLabelsApply() { return false; }
+const state = { ownedByIv: null, compareCandidates: [] };
+const window = {};
+const document = { getElementById: () => null, addEventListener: () => {},
+                   querySelector: () => null, querySelectorAll: () => [] };
+const location = { hash: '' };
+const history = { replaceState: () => {} };
+const Plotly = { react: () => {}, newPlot: () => {}, restyle: () => {},
+                 Plots: { resize: () => {} } };
+const getComputedStyle = () => ({ getPropertyValue: () => '' });
+
+let out;
+eval(block + '\nout = {_wbBuildGroups, _wbBuildMarks, _wbMiniShrink, ' +
+     'wbPresetBlock, wbLevelArrays, wbWins, _wbBuildOf};');
+
+// Build 1 = spreads 0..1 ('Aw=='), Build 1 wide = spreads 0..3 ('Dw==',
+// 0b00001111): it CONTAINS Build 1 and reaches two spreads no build holds.
+const bp = {
+  mi: 0, mode: 'pvpoke', default: 'flat', presetKeys: ['flat'],
+  nDecision: 3, nMaterial: 1, nOpp: 2, topN: 25, colors: ['#a','#b','#c'],
+  scenLabels: ['0v0', '1v1'],
+  cells: [[0, 5, 1], [1, 9, 0], [0, 12, 0]],
+  regions: [{size: 2, nG: 2, nGmat: 1, bits: 'BQ==', mask: 'Aw=='},
+            {size: 4, nG: 1, nGmat: 0, bits: 'Ag==', mask: 'Dw=='}],
+  rank1: {iv: '0/15/15@50', idx: 0, wins: 1},
+  gridBest: {iv: '5/10/10@50', idx: 5, wins: 4},
+  bestScore: {iv: '4/11/11@50', idx: 4, avgStr: '512.0'},
+  presets: {
+    flat: {label: 'All shields, equal', tag: 'all shields, equal',
+           weights: [1, 1], scens: ['0v0', '1v1'], summary: 'S-flat',
+           builds: [{role: 'primary', combo: 'A', col: 0, region: 0, size: 2,
+                     desc: 'd0', nG: 2, nGw: 2, nGmat: 1,
+                     mostWinning: {iv: '1/14/14@50', idx: 1, wins: 2, den: 4}},
+                    {role: 'wide', combo: 'AB', col: null, region: 1, size: 4,
+                     desc: 'wide-rule', nG: 1, nGw: 1, nGmat: 0}],
+           cols: [], lattice: []}
+  }
+};
+const pay = {mi: 0, mode: 'pvpoke', hasFloor: false, views: [], bp: bp,
+             rank1: {iv: [0,15,15], level: 50},
+             gridBest: {iv: [5,10,10], level: 50},
+             examples: [], rungs: []};
+const L = out.wbLevelArrays();
+const fail = [];
+const block0 = out.wbPresetBlock(pay);
+const wins = out.wbWins(0, 'pvpoke', null);
+const g = out._wbBuildGroups(pay, L, wins, {below: '#z', line: '#y'}, 4,
+                             {querySelector: () => null}, null);
+const t = g.traces;
+
+// (a) the ring is trace 0 -- under every other trace
+if (!/^Build 1 wide/.test(t[0].name))
+  fail.push('the ring is not the first trace: ' + t.map(x => x.name));
+if (t[0].marker.symbol !== 'circle-open')
+  fail.push('the wide trace is not a ring: ' + t[0].marker.symbol);
+if (!(t[0].marker.size > 4))
+  fail.push('the ring is not larger than a build dot: ' + t[0].marker.size);
+
+// (b) it rings EVERY member of the region, including the two Build 1 holds
+if (t[0].x.length !== 4)
+  fail.push('the ring does not hold all 4 members: ' + t[0].x.length);
+if (t[0].name.indexOf('(4)') < 0)
+  fail.push('the legend count is not the region size: ' + t[0].name);
+if (/not already in a build|already in a build/.test(t[0].name))
+  fail.push('the round-6 legend phrasing survived: ' + t[0].name);
+
+// (c) Build 1's two members are still solid dots of their own, and the two
+// extras fall to the muted centre trace
+const byName = {};
+t.forEach(x => { byName[x.name.replace(/ \((\d+)\)$/, '')] = x; });
+if (!byName['In no build'] || byName['In no build'].x.length !== 4)
+  fail.push('the muted trace should hold 2 extras + 2 outsiders: ' +
+            JSON.stringify(Object.keys(byName)));
+const prim = t.filter(x => /^Build 1 \(primary\)/.test(x.name))[0];
+if (!prim || prim.x.length !== 2 || prim.marker.symbol !== 'circle')
+  fail.push('Build 1 lost its solid dots');
+
+// (d) hovering a ring names the region
+if (t[0].text[0].indexOf('Build 1 wide') < 0)
+  fail.push('the ring hover does not name the region: ' + t[0].text[0]);
+
+// (e) the minis: nine (here two) per-scenario trace sets with the same
+// shape, and every marker shrunk for a 200px panel
+const marks = out._wbBuildMarks(pay, block0, L, out.wbWins(0, 'pvpoke', 0),
+                                {below:'#z', line:'#y', mark1:'#m', mark2:'#n'},
+                                2, {idx: 0, label: '0v0'},
+                                {querySelector: () => null}, true);
+if (!marks.length) fail.push('the minis mark no spreads');
+marks.forEach(m => {
+  if (m.mode !== 'markers') fail.push('a mini mark kept its text label');
+});
+const mini = out._wbBuildGroups(pay, L, out.wbWins(0, 'pvpoke', 0),
+                                {below: '#z', line: '#y'}, 2,
+                                {querySelector: () => null},
+                                {idx: 0, label: '0v0'}).traces.concat(marks);
+const before = mini.map(x => x.marker.size);
+out._wbMiniShrink(mini);
+mini.forEach((x, i) => {
+  if (!(x.marker.size < before[i])) fail.push('mini marker not shrunk at ' + i);
+  if (x.marker.size < 2) fail.push('mini marker shrunk below 2px at ' + i);
+});
+if (!/^Build 1 wide/.test(mini[0].name))
+  fail.push('the mini ring is not the first trace either');
+
+if (fail.length) { console.error(fail.join('\n')); process.exit(1); }
+console.log('OK');
+"""
+
+
+@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+def test_the_wide_region_rings_every_member_and_draws_underneath(tmp_path):
+    """Run the ring code on a synthetic grid whose wide region CONTAINS
+    Build 1 -- the shape the round-6 trace could not draw.
+
+    Pre-fix values, measured against HEAD~ on this exact harness:
+
+        [{name: 'In no build (2)',                        n: 2, circle, 3},
+         {name: 'Build 1 wide: wide-rule
+                 (2 of 4 not already in a build)',        n: 2, circle, 4},
+         {name: 'Build 1 (primary): d0 (2)',              n: 2, circle, 4}]
+
+    ...i.e. the wide region was a SOLID trace of the 2 spreads no build
+    held, drawn ABOVE the muted remainder, with a legend count that had to
+    explain which count it was. Post-fix:
+
+        [{name: 'Build 1 wide: wide-rule (4)',   n: 4, circle-open, 9},
+         {name: 'In no build (4)',               n: 4, circle,      3},
+         {name: 'Build 1 (primary): d0 (2)',     n: 2, circle,      4}]
+    """
+    runner = tmp_path / 'wb_ring_check.js'
+    runner.write_text(_RING_HARNESS)
+    proc = subprocess.run(['node', str(runner), str(ENGINE_JS)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert proc.stdout.strip() == 'OK'
+
+
+def test_the_section_offers_its_own_all_scenarios_grid():
+    """Item 2's wiring, on both sides of the Py<->JS boundary.
+
+    The checkbox, the grid container and the caption are emitted hidden; the
+    JS reveals them on the builds view only and draws one mini per baked
+    scenario off the page's own score grid.
+    """
+    js = ENGINE_JS.read_text()
+    code = strip_js(js)
+    # the checkbox's handler is a real window export the markup can reach
+    assert 'window.wbToggleAllScen = wbToggleAllScen;' in js
+    assert 'function _wbAllScen(root, force)' in js
+    # one mini per baked scenario, y = wins in THAT scenario out of the pool
+    assert 'for (var si = 0; si < DATA.nScenarios; si++)' in code
+    assert "var wins = wbWins(pay.mi, pay.mode, si);" in js
+    assert 'var chrome = plotChrome(), den = DATA.nOpponents;' in js
+    # the y axis says what it is out of: one shield state, so the scale is
+    # the opponent pool, not the panel's (scenarios x opponents)
+    assert "title: { text: 'Wins (of ' + den + ')', font: { size: 9 } }" in js
+    # offered on the builds view only
+    assert "var offer = !!(pblock && view === 'builds');" in js
+    # and re-drawn by every panel render (a Build criteria change included)
+    assert '_wbAllScen(root, false);' in js
+    # nine scattergl panels are nine WebGL contexts: they are PURGED, not
+    # just dropped, or a Show / Build-criteria change leaks a set and the
+    # browser starts blanking plots elsewhere on the page
+    assert 'function _wbClearMinis(grid) {' in js
+    assert 'Plotly.purge(kids[i])' in js
+    assert js.count('_wbClearMinis(grid);') == 2
+    assert "grid.innerHTML = '';" in js
+
+    py = (SCRIPTS_DIR / 'deep_dive_which_build.py').read_text()
+    html = W.allscen_html()
+    assert 'class="wb-allscen-chk"' in html
+    assert 'wbToggleAllScen(this)' in html
+    # every one of the three pieces ships hidden: the JS owns when they show
+    assert html.count('hidden') == 3
+    assert 'Show all shield scenarios' in html
+    # the caption says what it shows AND that the colours follow the knob
+    cap = W.ALLSCEN_CAPTION
+    assert 'shield state by shield state' in cap
+    assert 'Build criteria' in cap
+    # the [hidden] override, without which a bare attribute loses to the
+    # display rule and the grid stays laid out when switched off
+    assert '.wb-allscen-grid[hidden] { display: none; }' in py
+    assert '.wb-allscen[hidden] { display: none; }' in py
+
 
 def test_a_standout_the_collapsed_line_holds_is_named_not_counted():
     """Item 4. Pre-fix the clause read "and holds 1 of the standouts" -- the

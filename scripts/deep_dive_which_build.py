@@ -887,6 +887,43 @@ def fixed_note(facts, page_movesets=1):
     return out
 
 
+# ---- the section's own all-shield-scenarios grid (round 7 item 2) --------
+# A checkbox under the UpSet + panel pair, offered on the builds view only,
+# drawing nine minis -- one per baked shield scenario -- on the panel's own x
+# axis against matchups won in THAT scenario. Everything is client-side off
+# the page's embedded score grid (deep_dive_engine.js `_wbAllScen`); no new
+# payload, no new sims.
+ALLSCEN_LABEL = 'Show all shield scenarios'
+ALLSCEN_CAPTION = (
+    "One mini per baked shield scenario, on the same axes as the panel "
+    "above: stat-product rank across (reversed), matchups won in THAT "
+    "scenario up. It is where each build's members band above the rest, "
+    "shield state by shield state -- the panel above asks the same question "
+    "once, over the shields the Build criteria preset counts. The colours "
+    "are that preset's builds, the ring is Build 1 wide around its members, "
+    "and the marked spreads are the panel's, so the grid re-draws when you "
+    "change Build criteria."
+)
+
+
+def allscen_html():
+    """The checkbox, the grid container and the caption, all hidden.
+
+    The JS reveals them on the builds view and draws the minis on demand:
+    nine 4096-point panels are not something to build before a reader asks
+    for them, and on every other Show view the colouring the caption
+    describes is not the one the panel above is using.
+    """
+    return (
+        '<label class="wb-allscen" hidden>'
+        '<input type="checkbox" class="wb-allscen-chk" '
+        'onchange="if(window.wbToggleAllScen)wbToggleAllScen(this)"> '
+        f'{_esc(ALLSCEN_LABEL)}</label>'
+        '<div class="wb-allscen-grid" hidden></div>'
+        f'<p class="wb-allscen-caption" hidden>{_esc(ALLSCEN_CAPTION)}</p>'
+    )
+
+
 BUILDS_CAPTION = (
     "Every spread on this grid, by stat product rank against the matchups it "
     "wins in the shield scenarios the Build criteria preset counts. One "
@@ -1647,6 +1684,20 @@ CSS = """
   margin: 6px 0 0; }
 #dd-which-build .wb-upset-caption { font-size: 0.82rem;
   color: var(--text-muted); margin: 4px 0 0; }
+/* The section's own 3x3 of per-scenario minis (round 7). The [hidden]
+   override is required: a bare `hidden` attribute loses to any display rule,
+   so the grid would stay laid out while the reader had it switched off. */
+#dd-which-build .wb-allscen { display: inline-flex; align-items: center;
+  gap: 4px; font-size: 0.85rem; margin: 10px 0 0; }
+#dd-which-build .wb-allscen[hidden] { display: none; }
+#dd-which-build .wb-allscen-grid { display: grid;
+  grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 0; }
+#dd-which-build .wb-allscen-grid[hidden] { display: none; }
+#dd-which-build .wb-allscen-mini { height: 200px; min-height: 200px; }
+#dd-which-build .wb-allscen-caption { font-size: 0.82rem;
+  color: var(--text-muted); margin: 4px 0 0; }
+@media (max-width: 40rem) {
+  #dd-which-build .wb-allscen-grid { grid-template-columns: repeat(2, 1fr); } }
 #dd-which-build .wb-mem-head { font-size: .74rem; letter-spacing: .09em;
   text-transform: uppercase; color: var(--text-muted); margin: 10px 0 4px;
   font-weight: 600; }
@@ -2503,13 +2554,11 @@ def wide_paragraph(facts, arm_builds, bl, wide, all_facts=None):
                 + ' below, and not ' + brief._and_list(
                 [_esc(t['iv'].split('@')[0]) for t in outside
                  if not t.get('in_wide')]) + '.')
-    # A region every one of whose spreads is already in a build draws no
-    # points of its own on the plot, and Plotly drops the empty trace: the
-    # row and this paragraph would otherwise name a 249-spread region the
-    # reader cannot find on either interactive surface (round 6 review).
-    if wide.get('_own') == 0:
-        out.append('On the plot it adds no points: every spread it holds is '
-                   'already in a build.')
+    # (Round 6 ended this paragraph with "On the plot it adds no points:
+    # every spread it holds is already in a build" whenever `_own` was 0 --
+    # true while the wide trace carried only the spreads no build held. Round
+    # 7 draws the region as a containment RING around every one of its
+    # members, so it always has points on the plot and the caveat is gone.)
     return '<p class="wb-para">' + ' '.join(out) + '</p>'
 
 
@@ -3444,7 +3493,12 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
         + (f'<p class="wb-upset-caption" hidden>'
            f'{_esc(UPSET_CAPTION)}</p>' if has_builds else '')
         + f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
-        f'<p class="wb-fixed">{_esc(fixed_note(facts, page_movesets))}</p>'
+        # Below the UpSet + panel pair and their captions, so the reader
+        # meets the one weighted answer before the nine per-scenario ones.
+        # Only where there is more than one shield state to lay side by side.
+        + (allscen_html()
+           if has_builds and len(pay['scenLabels']) > 1 else '')
+        + f'<p class="wb-fixed">{_esc(fixed_note(facts, page_movesets))}</p>'
         '</div>')
 
     # ---- compare button ---------------------------------------------------
