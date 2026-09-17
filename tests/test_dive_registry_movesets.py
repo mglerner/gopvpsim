@@ -71,16 +71,23 @@ def test_cradily_pairs_despite_the_plain_side_fast_pin(dives):
 
 
 def test_forretress_fast_move_pages_pair_only_like_with_like(dives):
-    # Shadow Forretress is not in the GL pool, so the only shadow Forretress
-    # GL page is the EXTRA_DIVES bug-bite one. It must pair with the plain
-    # bug-bite page (same --fast pin) and NOT with the volt-switch page,
-    # which is left without a partner.
+    # Two Forretress GL pages per form, split by --fast pin. Each must pair
+    # with the OTHER form's page carrying the same pin and never across
+    # pins. Until the 2026-09-17 pool regeneration Forretress (Shadow) was
+    # outside the GL cut, so the only shadow page was the EXTRA_DIVES
+    # bug-bite one and the volt-switch page had no partner (the pre-fix pin
+    # here was ``pair_partner(vs) is None``); it now derives the shadow
+    # volt-switch page and pairs with it.
     vs = _by_slug(dives, 'forretress-volt-switch-great-league')
+    vs_sh = _by_slug(dives, 'forretress-shadow-volt-switch-great-league')
     bb = _by_slug(dives, 'forretress-bug-bite-great-league')
     bb_sh = _by_slug(dives, 'forretress-shadow-bug-bite-great-league')
     assert dr.pair_partner(bb, dives) is bb_sh
     assert dr.pair_partner(bb_sh, dives) is bb
-    assert dr.pair_partner(vs, dives) is None
+    assert dr.pair_partner(vs, dives) is vs_sh
+    assert dr.pair_partner(vs_sh, dives) is vs
+    assert dr.pair_partner(vs, dives) is not bb_sh
+    assert dr.pair_partner(bb, dives) is not vs_sh
 
 
 def test_every_pair_is_symmetric_and_unique(dives):
