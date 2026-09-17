@@ -1,49 +1,49 @@
 # Top 30 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 52 unique species.
-# Generated 2026-09-10 by scripts/build_opponent_pool.py
+# Generated 2026-09-17 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
-Tinkaton
-Ninetales (Shadow)
-Corsola (Galarian)
-Corviknight
-Cramorant
-Quagsire (Shadow)
-Quagsire
-Altaria
 Melmetal
-Empoleon
-Mantine
-Ninetales
-Snorlax
-Empoleon (Shadow)
-Florges
-Corviknight (Shadow)
+Altaria
+Ninetales (Shadow)
+Cramorant
+Tinkaton
 Mimikyu
-Feraligatr
-Jellicent
+Corviknight
+Corsola (Galarian)
 Altaria (Shadow)
+Corviknight (Shadow)
+Florges
+Quagsire (Shadow)
+Ninetales
+Quagsire
 Araquanid
-Furret
-Azumarill
 Clodsire
-Fearow
-Vigoroth
-Deoxys (Defense)
+Sableye (Shadow)
 Marowak
-Annihilape
+Stunfisk
+Vigoroth
+Jellicent
+Empoleon
+Empoleon (Shadow)
+Fearow
+Mantine
+Snorlax
+Umbreon
+Araquanid (Shadow)
+Feraligatr
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,ICY_WIND
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,PLAY_ROUGH
 Sableye (Mega)
 Malamar (Mega)
 Aegislash (Shield)
 Aegislash (Blade)
+Deoxys (Defense)
 Ninetales (Alolan)
 Hippowdon (Shadow)
 Forretress
 Spidops
 Charjabug
 Morpeko (Full Belly)
-Stunfisk
 Toxapex
 Dondozo
 Jumpluff
