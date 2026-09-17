@@ -861,3 +861,30 @@ def test_the_section_view_ids_are_the_same_on_both_sides():
     assert "view === 'builds'" in js
     for vid, _label in which_build.VIEWS_FLOOR + which_build.VIEWS_NO_FLOOR:
         assert f"view === '{vid}'" in js or f"'{vid}'" in js, vid
+
+
+def test_a_blank_manual_entry_level_means_the_fitted_under_cap_level():
+    """Michael, 2026-09-17: the manual-entry form prefilled Level 50, so every
+    entry on a Great League page arrived as "current level 50" and the row
+    degraded to CP 0 / OVER. Pre-fix: the input carried value="50" and
+    readManualForm rejected a blank level (parseFloat('') is NaN). Now a
+    blank level is null -- current level unknown -- and the pipeline uses the
+    best under-cap level it fits, which is what the page assumes for every
+    grid spread; a typed level still trips the over-cap check.
+
+    strip_js blanks string literals, so the pins below match the stripped
+    shapes (an empty literal leaves whitespace behind)."""
+    text = strip_js(_js())
+    i = text.index('function readManualForm()')
+    body = text[i:text.index('function renderManualList', i)]
+    assert re.search(r"String\(levelRaw\)\.trim\(\) ===\s*\)\s*\? null : parseFloat\(levelRaw\)", body)
+    assert "level != null && (!isFinite(level)" in body
+    # the entries chip prints a level only when one was given
+    assert re.search(r"\(m\.level != null \?\s+\+ m\.level :\s*\)", text)
+    # the markup: no prefilled 50, a placeholder instead (positive control:
+    # the input itself is still emitted)
+    py = (_SCRIPTS / 'deep_dive.py').read_text()
+    k = py.index('id="manual-level"')
+    tag = py[k:k + 400]
+    assert 'placeholder="current"' in tag
+    assert 'value="50"' not in tag

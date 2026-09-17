@@ -1043,7 +1043,8 @@ function buildHoverText(iv) {
         var rcL = owned[0];
         var mc = (rcL.stats && rcL.stats.cp != null) ? rcL.stats.cp : '?';
         var ml = (rcL.stats && rcL.stats.level != null) ? rcL.stats.level : '?';
-        lines.push('  <b>CP ' + rcL.mon.cp + '</b> @ L' + rcL.mon.level +
+        lines.push('  <b>CP ' + rcL.mon.cp + '</b>' +
+                   (rcL.mon.level != null ? ' @ L' + rcL.mon.level : '') +
                    ' \u2192 CP ' + mc + ' @ L' + ml);
         if (rcL.csvSpecies && rcL.csvSpecies !== DATA.species) {
           lines.push('    (' + (rcL.mon.is_shadow ? 'Shadow ' : '') +
@@ -2027,14 +2028,20 @@ function readManualForm() {
   var atkIv = intVal('manual-atk');
   var defIv = intVal('manual-def');
   var staIv = intVal('manual-hp');
-  var level = floatVal('manual-level');
+  // Blank level = "current level unknown": the collection pipeline then
+  // uses the best under-cap level it fits for the IVs, which is what the
+  // page assumes for every grid spread. The old default of 50 made every
+  // manual entry on a Great League page "OVER" the cap by construction
+  // (Michael, 2026-09-17).
+  var levelRaw = document.getElementById('manual-level').value;
+  var level = (levelRaw == null || String(levelRaw).trim() === '') ? null : parseFloat(levelRaw);
   var isShadow = document.getElementById('manual-shadow').checked;
   if (!isFinite(atkIv) || atkIv < 0 || atkIv > 15) return null;
   if (!isFinite(defIv) || defIv < 0 || defIv > 15) return null;
   if (!isFinite(staIv) || staIv < 0 || staIv > 15) return null;
   // Hard ceiling is the CPM table's top level (DATA.levelCaps.maxCpm), not the
   // league cap: a pasted/typed mon may legitimately be above the league cap.
-  if (!isFinite(level) || level < 1 || level > levelCap('maxCpm')) return null;
+  if (level != null && (!isFinite(level) || level < 1 || level > levelCap('maxCpm'))) return null;
   // Dropdown values are full species keys ("Tinkaton", "Tinkatink",
   // "Corsola (Galarian)"). Split back into name + form for the mon
   // object; is_shadow comes from the checkbox, not the species string.
@@ -2101,7 +2108,7 @@ function renderManualList() {
     var label = (m.is_shadow ? 'S ' : '') + escapeHtml(m.name) +
                 (m.form ? ' (' + escapeHtml(m.form) + ')' : '') +
                 ' ' + m.atk_iv + '/' + m.def_iv + '/' + m.sta_iv +
-                ' L' + m.level;
+                (m.level != null ? ' L' + m.level : '');
     chips.push(
       '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;' +
       'background:var(--border);border-radius:3px">' + label +
