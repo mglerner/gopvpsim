@@ -5886,6 +5886,10 @@ function wbRenderRoot(root) {
                             den);
     if (br1t) traces.push(br1t);
     for (var mb = 0; mb < pblock.builds.length; mb++) {
+      // The wide region gets no triangle: the caption calls each triangle "a
+      // build's most-winning member", and it is not a build -- it is the
+      // region around Build 1 (2026-09-17 round 5).
+      if (pblock.builds[mb].role === 'wide') continue;
       var mwi = _wbIvIdx(_wbIvTriple(pblock.builds[mb].mostWinning.iv));
       var mwt = _wbMarkTrace(
         _wbBuildName(pblock, mb) + ': most-winning member', mwi,

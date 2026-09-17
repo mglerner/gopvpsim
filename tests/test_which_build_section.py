@@ -3327,6 +3327,15 @@ def test_each_build_carries_a_drawable_plane_or_says_it_cannot(
                 # the PRINTED attack floor, not the raw selected value
                 assert pl['atkNote'].startswith('Atk >= ')
                 assert '150.25' not in pl['atkNote']
+            # round 5: the BOX and LINE families' attack notes had the bug
+            # the staircase's ``stair_atk_head`` fixed -- f"{float(t):.2f}"
+            # printed the 150.245638 cut as "Atk >= 150.25" beside a rule
+            # that said 150.24, in one legend string (seen on the 1v1
+            # preset's wide region). Every attack cut the note carries must
+            # be spelled exactly as the build's own printed rule spells it.
+            if pl.get('atkNote'):
+                for bit in pl['atkNote'].split(' and '):
+                    assert bit in b['desc'], (bit, b['desc'])
             if pl['kind'] == 'line':
                 assert pl['k'] > 0 and pl['c'] > 0
     # this blob exercises three of the four on one arm
