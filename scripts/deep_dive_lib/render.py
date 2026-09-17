@@ -489,12 +489,21 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                base_form_info=None,
                                card_builds=None,
                                card_builds_pinned=False,
-                               card_build_membership=None):
+                               card_build_membership=None,
+                               clusters_sink=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
     results_html is always visible ("Deep Dive Results").
     analysis_html goes behind the toggle ("Deep Dive Analysis").
+
+    ``clusters_sink``, when a dict, receives the rendered "Matchup clusters"
+    section under ``'html'`` INSTEAD of it being appended to analysis_html.
+    Michael's 2026-09-17 round-7 decision moved that section to the top of
+    the page (directly under "Which one to build?"), and the caller owns the
+    placement because the slot it fills is emitted long before this pass
+    runs. With no sink the section stays where it was, first inside the
+    Dive Analysis collapsible.
 
     ``card_builds`` is the dive card's spread list taken from the "Which one
     to build?" builds (``deep_dive_which_build.card_specs``): one entry per
@@ -1176,10 +1185,14 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # make the clusters module depend on the module that depends on IT.
     import deep_dive_builds as _builds
     _mc_presets = [(k, tag, scens) for k, _lbl, scens, tag in _builds.PRESETS]
-    analysis_parts.append(matchup_clusters.render_section(
+    _mc_html = matchup_clusters.render_section(
         scores_flat, nIvs, nS, nO, scenarios, opponents, data_obj,
         opp_label, moveset_label, resolved_anchors_top,
-        bait_label=_mc_bait, presets=_mc_presets))
+        bait_label=_mc_bait, presets=_mc_presets)
+    if clusters_sink is None:
+        analysis_parts.append(_mc_html)
+    else:
+        clusters_sink['html'] = _mc_html
 
     analysis_parts.append(rendering.render_analysis_volatility_html(
         data_obj, nIvs, nS, scenarios, scene_ranks, avg_ranks, ranked,

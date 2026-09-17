@@ -257,6 +257,9 @@ function _initBestBuddy() {
   }
   _bbInitHost('dd-bb-prose-host', 'dd-bb-prose-tmpl');
   _bbInitHost('dd-bb-card-host', 'dd-bb-card-tmpl');
+  // Round 7: the Matchup clusters section moved out of the prose block to
+  // the top of the page, so it needs a host/template pair of its own.
+  _bbInitHost('dd-bb-clusters-host', 'dd-bb-clusters-tmpl');
   var dd = String((DATA.bestBuddy && DATA.bestBuddy.defaultDisplay) || 50);
   if (dd === '51') {
     var chk = document.getElementById('dd-bb-toggle');
@@ -284,6 +287,12 @@ function setBestBuddyLevel(mode) {
   // is silently missing after a toggle (and from page load when
   // defaultDisplay is 51).
   if (window.ddPopulateTooltips) window.ddPopulateTooltips();
+  // The swap replaced the Matchup clusters section's DOM, so its stat-plane
+  // panels and its all-scenarios mini-grid are empty divs again. Before
+  // round 7 the section rode inside a collapsible that was closed by
+  // default, so the toggle-open pass always got there first; now it can be
+  // open across a best-buddy toggle.
+  mcRenderPending();
   // If a collection is loaded, re-run it so each owned mon's stats / level /
   // CP / power-up recompute at the toggled cap (loadCollection ends with its
   // own updateView, so the scatter refreshes too). Otherwise refresh directly.
@@ -562,15 +571,7 @@ function toggleAllScenarios() {
   }
   grid.style.display = 'grid';
   if (note) note.style.display = 'block';
-  var key = state.movesetIdx + '|' + state.oppIvMode;
-  if (!_allscenRendered || key !== _allscenKey) {
-    var g2 = document.getElementById('allscen-grid');
-    g2.innerHTML = '';
-    renderAllScenarios();
-    _allscenRendered = true;
-    _allscenKey = key;
-  }
-  syncAllScenHighlight();
+  refreshAllScenarios();
 }
 function renderAllScenarios() {
   var grid = document.getElementById('allscen-grid');
@@ -645,10 +646,21 @@ function refreshAllScenarios() {
   var box = document.getElementById('allscen-toggle');
   var grid = document.getElementById('allscen-grid');
   if (!box || !box.checked || !grid) { _allscenRendered = false; _allscenKey = null; return; }
+  // Round 7: the grid lives inside the Matchup clusters <details>, which is
+  // CLOSED on load while the checkbox ships checked -- so "checked" no
+  // longer implies "on screen", and Plotly would size nine minis to zero.
+  // Drop the flags and let the toggle-open pass draw them.
+  if (grid.offsetParent === null) {
+    _allscenRendered = false; _allscenKey = null; return;
+  }
   var key = state.movesetIdx + '|' + state.oppIvMode;
-  if (key !== _allscenKey) {
+  // ...or when the grid element itself was replaced under us: the
+  // best-buddy swap assigns the host's innerHTML, which leaves a live but
+  // EMPTY grid div whose key still matches.
+  if (key !== _allscenKey || !grid.children.length) {
     grid.innerHTML = '';
     renderAllScenarios();
+    _allscenRendered = true;
     _allscenKey = key;
   }
   syncAllScenHighlight();
@@ -4476,6 +4488,14 @@ function mcSelectScenario(sel) {
 }
 window.mcSelectScenario = mcSelectScenario;
 
+// Draw every clusters section that is on screen and not yet drawn. Three
+// callers: the toggle-open hook, the page-load pass, and the best-buddy swap
+// (which replaces the section's DOM with an undrawn copy).
+function mcRenderPending() {
+  document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(
+    function(root) { if (root.offsetParent !== null) _mcRenderRoot(root); });
+}
+
 // Lazy render: <details> toggle events don't bubble but are observable with
 // a capturing listener, which also survives best-buddy innerHTML swaps.
 document.addEventListener('toggle', function(ev) {
@@ -4491,13 +4511,16 @@ document.addEventListener('toggle', function(ev) {
       try { Plotly.Plots.resize(p); } catch (e) {}
     }
   });
+  // The all-scenarios mini-grid is the clusters section's OPENING FIGURE
+  // (round 7), and its checkbox ships checked inside a closed <details>:
+  // this is the pass that actually draws it, the first time the reader
+  // opens the section.
+  if (det.querySelector('#allscen-grid')) refreshAllScenarios();
 }, true);
 
 // Immediate pass for the edge case where the user opened the Dive Analysis
 // details while the page was still loading (before this listener existed).
-document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(function(root) {
-  if (root.offsetParent !== null) _mcRenderRoot(root);
-});
+mcRenderPending();
 
 // ---------------------------------------------------------------------------
 // "Which one to build?" section (scripts/deep_dive_which_build.py).

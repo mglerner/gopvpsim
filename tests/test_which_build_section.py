@@ -4502,3 +4502,45 @@ def test_the_wide_region_on_plain_sableye():
         a = f.get('_builds')
         for b in (a or {}).get('presets', {}).values():
             assert all(t['in_build'] is not None for t in b['standouts'])
+
+
+# ---------------------------------------------------------------------------
+# 7. Round 7 (2026-09-17), item 4: the collapsed line names the standout the
+#    wide region holds instead of counting it
+# ---------------------------------------------------------------------------
+
+def test_a_standout_the_collapsed_line_holds_is_named_not_counted():
+    """Item 4. Pre-fix the clause read "and holds 1 of the standouts" -- the
+    count, with the reader left to guess WHICH of two different offers.
+    """
+    assert W.standout_short_phrase(
+        {'iv': '9/6/13@50', 'kind': 'score'}) == \
+        '9/6/13 (the highest avg battle score)'
+    assert W.standout_short_phrase(
+        {'iv': '7/2/14@49.5', 'kind': 'wins'}) == \
+        '7/2/14 (the most matchups won)'
+    # the parenthetical is the page's ONE canonical short name, not a second
+    # spelling composed here
+    assert W.CARD_SHORT['score'] == 'Highest avg battle score'
+
+    # the clause itself, on a synthetic block: one standout outside every
+    # build, held by the wide region
+    bl = {
+        'builds': [{'role': 'primary', 'n_guaranteed': 55,
+                    'n_guaranteed_weighted': 29, 'size': 61}],
+        'wide': {'role': 'wide', 'size': 644, 'n_guaranteed': 43,
+                 'n_guaranteed_weighted': 20, 'n_guaranteed_material': 0,
+                 '_primary_size': 61},
+        'standouts': [
+            {'iv': '9/6/13@50', 'kind': 'score', 'in_build': None,
+             'in_wide': True},
+            {'iv': '7/2/14@49.5', 'kind': 'wins', 'in_build': None,
+             'in_wide': False},
+        ],
+        'weights': [1] * 9,
+    }
+    ab = {'ctx': {'scen_labels': ['0v0', '0v1', '0v2', '1v0', '1v1', '1v2',
+                                  '2v0', '2v1', '2v2']}}
+    clause = W._wide_clause(ab, bl)
+    assert clause.endswith(' and holds 9/6/13 (the highest avg battle score)')
+    assert 'of the standouts' not in clause

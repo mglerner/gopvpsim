@@ -1290,3 +1290,133 @@ def test_preset_partitions_do_not_become_dropdown_options():
     assert 'all__even' not in opts
     # but it does get a block, so the option can select it
     assert 'data-scen="all__even"' in html
+
+
+# ---------------------------------------------------------------------------
+# Round 7 (2026-09-17): the section is second on the page, collapsed, and it
+# OPENS with the all-scenarios mini-grid that used to live 3 MB above it.
+# ---------------------------------------------------------------------------
+
+_SCRIPTS = REPO_ROOT / "scripts"
+
+
+def test_the_section_is_a_collapsed_details_around_the_unchanged_root():
+    """The wrapper is a <details>; `.dd-mc-root` stays the inner div.
+
+    That split is load-bearing, not cosmetic: the engine's lazy-render hook
+    is a capturing `toggle` listener that looks for `.dd-mc-root` INSIDE the
+    toggled element, and every visibility guard on the page is an
+    `offsetParent` check, which a closed <details> only reports for its
+    CONTENT. Making the root itself the <details> would silently draw nine
+    zero-width panels on load.
+    """
+    html = _render([])
+    assert html.startswith('<details class="dd-collapsible dd-mc-collapse" '
+                           'id="dd-matchup-clusters-section">')
+    assert ' open>' not in html.split('<summary', 1)[0]
+    assert '<summary class="dd-h2"' in html
+    assert 'Matchup clusters' in html.split('</summary>', 1)[0]
+    # the root div is INSIDE the details, and the details closes after it
+    root = html.index('<div class="dd-section dd-mc-root" '
+                      'id="dd-matchup-clusters">')
+    assert root > html.index('</summary>')
+    assert html.rstrip().endswith('</div></details>')
+    # the old always-visible <h2> is gone: the summary carries the title now
+    assert '<h2 class="dd-h2">Matchup clusters</h2>' not in html
+
+
+def test_the_mini_grid_is_the_sections_opening_figure():
+    """Checkbox + caption + grid, first thing inside the root, checked.
+
+    Checked-by-default is only honest because the <details> is closed: the
+    gesture that asks for the figure is opening the section.
+    """
+    html = _render([])
+    root = html.index('id="dd-matchup-clusters"')
+    box = html.index('id="allscen-toggle"')
+    note = html.index('id="allscen-note"')
+    grid = html.index('id="allscen-grid"')
+    assert root < box < note < grid
+    # ...and above the section's own prose
+    assert grid < html.index('IVs grouped by <b>which marginal')
+    assert 'id="allscen-toggle" checked ' in html
+    # neither the grid nor the caption ships display:none any more -- the
+    # section around them is what is collapsed
+    assert 'id="allscen-grid" style="display:grid;' in html
+    assert 'id="allscen-note" style="font-size:11px;' in html
+    # the caption keeps the smear-vs-band explanation
+    cap = html[note:grid]
+    assert 'smear rather than band' in cap
+    assert 'win-count y-axis' in cap
+
+
+def test_a_one_scenario_dive_gets_no_mini_grid():
+    assert mc._allscen_figure(1) == ''
+    assert mc._allscen_figure(0) == ''
+    assert 'allscen-grid' in mc._allscen_figure(9)
+
+
+def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
+    """Source scan of the emitter the markup moved OUT of. Absence pins with
+    a positive control: the strip must still be the strip."""
+    src = (_SCRIPTS / "deep_dive.py").read_text()
+    assert 'id="allscen-toggle"' not in src
+    assert 'id="allscen-grid"' not in src
+    assert 'id="allscen-note"' not in src
+    # positive controls: the strip and its neighbour are still emitted here
+    assert 'id="highlight-input"' in src
+    assert '<div class="highlight-strip" ' in src
+    # ...and the clusters section is now placed by this file, above the
+    # scatter controls
+    assert src.count('<!-- MATCHUP_CLUSTERS_SLOT -->') == 3
+    assert (src.index("html += '<!-- MATCHUP_CLUSTERS_SLOT -->'")
+            < src.index('\'<div class="controls" id="dd-scatter">\\n\''))
+
+
+@pytest.mark.render
+def test_the_rendered_page_puts_the_clusters_section_above_the_scatter(
+        small_dive_html):
+    """The order pin, on the artifact rather than the producing source.
+
+    Pre-round-7 order: ... #dd-scatter ... #allscen-grid ... #dd-slayer-builds
+    ... #dd-matchup-clusters ... (the section sat inside the Dive Analysis
+    collapsible, below everything). Now the section and its grid come FIRST.
+    """
+    h = small_dive_html
+    sect = h.index('id="dd-matchup-clusters-section"')
+    grid = h.index('id="allscen-grid"')
+    scatter = h.index('id="dd-scatter"')
+    recs = h.index('id="dd-recommendations"')
+    assert sect < grid < scatter < recs
+    # the section is no longer the first block of the Dive Analysis details
+    analysis = h.index('id="dd-analysis"')
+    assert sect < analysis
+    # the best-buddy duplication survives the move: one live copy in a host,
+    # one inert copy in the template the toggle swaps in
+    assert h.count('id="dd-matchup-clusters"') == 2
+    assert 'id="dd-bb-clusters-host"' in h
+    assert 'id="dd-bb-clusters-tmpl"' in h
+    assert (h.index('id="dd-bb-clusters-host"')
+            < h.index('id="dd-matchup-clusters"')
+            < h.index('id="dd-bb-clusters-tmpl"'))
+    # ...and the engine registers the pair, which is where the duplicate-id
+    # guard in tests/test_dive_dom_ids.py reads its host list from
+    js = (_SCRIPTS / "deep_dive_engine.js").read_text()
+    assert ("_bbInitHost('dd-bb-clusters-host', 'dd-bb-clusters-tmpl');"
+            in js)
+    # no stray marker shipped
+    assert 'MATCHUP_CLUSTERS_SLOT' not in h
+
+
+def test_the_mini_grid_only_draws_once_the_section_is_open():
+    """The two JS guards the move needs: "checked" no longer implies "on
+    screen", and a best-buddy swap leaves a live but EMPTY grid div."""
+    js = (_SCRIPTS / "deep_dive_engine.js").read_text()
+    assert 'if (grid.offsetParent === null) {' in js
+    assert "if (key !== _allscenKey || !grid.children.length) {" in js
+    # the toggle-open pass is what draws it the first time
+    assert "if (det.querySelector('#allscen-grid')) refreshAllScenarios();" \
+        in js
+    # and the swap redraws the section it just replaced
+    assert 'function mcRenderPending() {' in js
+    assert js.count('mcRenderPending();') >= 2
