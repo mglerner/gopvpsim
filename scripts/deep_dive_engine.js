@@ -5297,6 +5297,10 @@ function _wbPlaneShapes(block, bcol, L) {
   var x0b = dLo - dPad, x1b = dHi + dPad, y0b = hLo - hPad, y1b = hHi + hPad;
   var shapes = [];
   function line(x0, y0, x1, y1, col) {
+    // A zero-length segment draws nothing. Consecutive HP steps that share
+    // one defense floor emitted one per shared pair (2026-09-16 round-3
+    // review: one dead shape on the flat staircase, three on the 1v1 one).
+    if (x0 === x1 && y0 === y1) return;
     shapes.push({ type: 'line', x0: x0, y0: y0, x1: x1, y1: y1,
                   line: { color: col, width: 2 } });
   }

@@ -2728,7 +2728,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     import deep_dive_card as _ddcard
 
     def _render_level_body(dobj, sarr, *, write_card_out, robust_max_level,
-                           base_scores, base_info):
+                           base_scores, base_info, builds_pinned=False):
         """Render one level's prose sections + dive card from
         (data_obj, score_arrays). Mutates ``dobj`` (narrative flavors / tier
         renames, pops _cardCtx). Returns
@@ -2754,13 +2754,16 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             anchor_passing_sink=sink, threshold_registry=threshold_registry,
             moveset0_flavors_for_rename=ms0_flavors, focal_shadow=shadow,
             scores_base_arrays=base_scores, base_form_info=base_info,
-            # Level-default pass only. The builds -- and so the card spreads
-            # taken from them -- are computed at the LEAGUE CAP, which is the
-            # level the section's own panel is pinned to; handing them to the
-            # best-buddy L51 pass would headline L50-selected spreads under
-            # L51 stats and call one of them the highest battle score when
-            # the L51 grid's highest is a different spread.
-            card_builds=(which_build_cards if write_card_out else None))
+            # BOTH passes get the same spreads. The builds -- and the
+            # "Which one to build?" section itself -- are computed once, at
+            # the LEAGUE CAP; the best-buddy card shows the same build
+            # spreads with L51 stats and says on the card that the builds
+            # are pinned to the cap. Passing None here instead left the
+            # RETIRED stat-extreme poles ("MATCHUP HUNTER" / "MAX BULK") as
+            # the best-buddy card, above an L50 builds section, with none of
+            # the guarantee lines (2026-09-16 round-3 review).
+            card_builds=which_build_cards,
+            card_builds_pinned=builds_pinned)
         if split_info is not None:
             _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
             assert _expected in r_html, (
@@ -2886,7 +2889,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _results51, _analysis51, _card51_html, _, _ = _render_level_body(
             _dobj51, _sarr51, write_card_out=False,
             robust_max_level=best_buddy.get('alt_cap'),
-            base_scores=None, base_info=None)
+            base_scores=None, base_info=None, builds_pinned=True)
 
     # ---- Dive card injection (host + optional L51 template for the toggle) ----
     if _card50_html:

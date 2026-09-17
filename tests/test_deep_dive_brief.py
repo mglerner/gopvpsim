@@ -413,7 +413,7 @@ CTX = {'blob': 'test.pkl.gz', 'arm': 0, 'mode': 'pvpoke'}
 
 def test_gate_words_passes_clean_text():
     B.gate_words(["Atk >= 148.10 owns 0v1 Annihilape in Great League.",
-                  "Clean cuts that most builds should clear."], CTX)
+                  "Clean cuts holding between 10% and 90% of the grid."], CTX)
 
 
 @pytest.mark.parametrize('word', ['definitive', 'recommended', 'best',
@@ -433,13 +433,47 @@ def test_gate_words_allows_league_names_but_not_bare_great():
 
 
 def test_gate_words_allows_the_fixed_should_phrase_exactly_once():
-    B.gate_words(["Clean cuts that most builds should clear."], CTX)
+    """One allowed "should" is left: the expert-dive opening sentence.
+
+    The second one -- the field-6 header's "what most builds should clear
+    already" -- was dropped in round 4 of the 2026-09-16 review: it
+    collided with the named Builds three blocks above it, and it was the
+    last "should" on the page.
+    """
+    allowed = "Most Sableye should have at least 148.10 attack."
+    B.gate_words([allowed], CTX)
     with pytest.raises(B.GuardError) as exc:
-        B.gate_words(["most builds should clear", "most builds should clear"],
-                     CTX)
+        B.gate_words([allowed, allowed], CTX)
     assert 'G-words' in str(exc.value)
     with pytest.raises(B.GuardError):
         B.gate_words(["You should build for attack."], CTX)
+    # the retired exemption is really gone
+    assert not hasattr(B, 'SHOULD_ALLOWED_PHRASE')
+    with pytest.raises(B.GuardError):
+        B.gate_words(["Clean cuts that most builds should clear."], CTX)
+
+
+def test_the_material_cut_caption_carries_no_should():
+    """Round 4 of the 2026-09-16 review: the field-6 header was the last
+    "should" on a dive page, and its "what most builds should clear
+    already" collided with the named Builds three blocks above it ("does
+    Build 2 clear it?"). Pre-fix text: "The widest of them are what most
+    builds should clear already; the narrow ones at the bottom of the table
+    are not."
+
+    Scanned over the module's STRING LITERALS (ast), not its raw text: the
+    comment that records the retirement quotes the retired phrase.
+    """
+    import ast
+    tree = ast.parse(Path(B.__file__).read_text())
+    strings = [n.value for n in ast.walk(tree)
+               if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    assert len(strings) > 500, len(strings)      # the scan found the module
+    assert not [t for t in strings if 'most builds should clear' in t]
+    # positive control: the replacement clause is a literal in the same file
+    assert [t for t in strings
+            if 'sit under nearly every spread on the grid' in t]
+    assert [t for t in strings if 'Clean cuts holding between' in t]
 
 
 def test_gate_words_rejects_non_ascii():

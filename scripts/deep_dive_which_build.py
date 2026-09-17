@@ -865,10 +865,12 @@ BUILDS_CAPTION = (
     "Every spread on this grid, by stat product rank against the matchups it "
     "wins in the shield scenarios the Build criteria preset counts. One "
     "colour per build; the diamond is stat-product rank-1, each triangle a "
-    "build's most-winning member under this preset, and the open square the "
+    "build's most-winning member under this preset, the open square the "
     "spread that wins the most matchups over every shield scenario this dive "
     "baked -- which under a narrower preset is not the highest point on the "
-    "plot, because the axis is not counting the same matchups.")
+    "plot, because the axis is not counting the same matchups -- and the "
+    "open cross the spread with the highest Avg Battle Score on the main "
+    "scatter.")
 
 UPSET_CAPTION = (
     "Left: the named sets the lattice was built from (rows, labelled "
@@ -1689,8 +1691,17 @@ NEAR_FREE = 0.90
 # only one the build is really buying. Bands are inclusive upper bounds,
 # strongest first; anything above NEAR_FREE is dimmed instead.
 EMPH_BANDS = ((0.10, 'wb-o3'), (0.25, 'wb-o2'), (0.50, 'wb-o1'))
-EMPH_KEY = ("Weight follows the outside rate: bold = fewer than half the "
-            "other spreads win this; bold and underlined = fewer than a "
+# It sits directly under the lead, BEFORE the paragraphs: the paragraphs use
+# the typefaces and print "(outside 10%)" on their own rarest cells, so a key
+# under the table below them explained a notation the reader had already met
+# (2026-09-16 round-3 review). It also defines both rates the page prints --
+# the build's outside rate and the whole grid's rate, which the Standouts
+# block and the card use -- because the same three typefaces carry both.
+EMPH_KEY = ("Rates: outside N% is the share of the spreads NOT in that build "
+            "that win the same matchup anyway; grid N% (the Standouts block "
+            "and the cards at the top of the page) is the share of all the "
+            "spreads on the grid. Weight follows the rate: bold = fewer than "
+            "half of them win it; bold and underlined = fewer than a "
             "quarter; bold, underlined and italic = fewer than a tenth; "
             "dim = more than nine in ten win it anyway.")
 
@@ -1741,8 +1752,8 @@ def build_desc(b, steps=True):
     if d.get('steps'):
         if not steps:
             head = rule.split(' and Def >= d(HP)')[0]
-            hps = [h for h, _d, _n in d['steps']]
-            defs = [dd for _h, dd, _n in d['steps']]
+            hps = [h for h, _d, _n, _p in d['steps']]
+            defs = [dd for _h, dd, _n, _p in d['steps']]
             # Floor the low end and ceil the high one, so the printed band
             # CONTAINS every step of the staircase. Rounding either end to
             # nearest would print a range that excludes a real step by up to
@@ -1753,9 +1764,23 @@ def build_desc(b, steps=True):
             return (f"{head} and Def >= {lo:.2f}-{hi:.2f} depending on HP "
                     f"({min(hps):g}-{max(hps):g}; "
                     f"{brief._n(len(d['steps']))} steps, in the table)")
-        pairs = '; '.join(f"HP {h:g} -> Def {dd:g}" for h, dd, _n in d['steps'])
+        # The step's PRINTED decimal (the 4th field), not the raw float:
+        # formatting the float rounds half-up, above the true floor, and a
+        # reader applying the printed rule then excluded the boundary member
+        # of every step (2026-09-16 round-3 review: the printed rule
+        # reproduced 57 of the build's 61 spreads).
+        pairs = '; '.join(f"HP {h:g} -> Def {pr:g}"
+                          for h, _dd, _n, pr in d['steps'])
         return f"{rule}: {pairs}"
     return rule
+
+
+# The one set the header's own "Alternative" row is built from. Only a build
+# whose region IS that set may call itself "the bulk box": the definite
+# article was attached to any Def/HP rectangle, so one page called two
+# different boxes "the bulk box" and printed a third number for the header's
+# own (2026-09-16 round-3 review).
+ALT_SET_NAME = 'S2 alternative rectangle'
 
 
 def is_bulk_box(b):
@@ -1774,7 +1799,65 @@ def is_bulk_box(b):
     return terms == {'def': '>=', 'hp': '>='}
 
 
-def build_rule_phrase(b):
+def is_header_bulk_box(b, facts):
+    """Is this build's region exactly the rectangle the header names?"""
+    alt = (facts or {}).get('alternative') or {}
+    return (bool(alt.get('n')) and is_bulk_box(b)
+            and list(b.get('sets') or []) == [ALT_SET_NAME])
+
+
+def header_bulk_rule(facts):
+    """That rectangle's thresholds as the HEADER prints them.
+
+    One box, one pair of numbers on the page: the describer's own decimals
+    select the same spreads but print differently ("Def >= 120.00" under a
+    header row that says "Def >= 120.03"), which reads as two boxes.
+    """
+    alt = facts['alternative']
+    return ' and '.join(
+        brief.stat_threshold_str(ax, alt[key_p], alt[key_dp])
+        for key_p, key_dp, key_free, ax in (
+            ('printed_a', 'dp_a', 'free_a', alt['axes'][0]),
+            ('printed_b', 'dp_b', 'free_b', alt['axes'][1]))
+        if not alt[key_free])
+
+
+def rule_is_approx(b):
+    """Does the printed rule fail to reproduce its own member list?
+
+    The builds table already says so in its fidelity clause ("99% of the
+    same spreads (1 extra, 1 missed)"), but the summary line, the paragraph
+    and the card title printed the same rule as if it were exact -- a
+    known-wrong number carried on three surfaces and flagged on one
+    (2026-09-16 round-3 review).
+    """
+    d = b['description']
+    return bool(d) and bool(d.get('n_extra') or d.get('n_missing'))
+
+
+def _approx(b, rule):
+    """A rule that does not reproduce its own build is printed as "about"."""
+    return f"about {rule}" if rule_is_approx(b) else rule
+
+
+def approx_clause(b):
+    """The sentence a paragraph adds when its rule is the approximate one."""
+    if not rule_is_approx(b):
+        return ''
+    d = b['description']
+    n_x, n_m = int(d['n_extra']), int(d['n_missing'])
+    bits = []
+    if n_x:
+        bits.append(f"takes in {brief._n(n_x)} "
+                    f"{brief._noun(n_x, 'spread')} that "
+                    f"{'is not a member' if n_x == 1 else 'are not members'}")
+    if n_m:
+        bits.append(f"misses {brief._n(n_m)}")
+    return (f"That rule {' and '.join(bits)}; the member list in the table "
+            f"is the build.")
+
+
+def build_rule_phrase(b, facts=None):
     """One build's rule as a PARAGRAPH reads it, after "at ".
 
     The staircase prints its defense BAND and the HP range it spans rather
@@ -1787,26 +1870,36 @@ def build_rule_phrase(b):
                 f"spreads whose IV box is in the table")
     if d.get('steps'):
         head = builds.stair_atk_head(d)
-        hps = [h for h, _d, _n in d['steps']]
-        defs = [dd for _h, dd, _n in d['steps']]
+        hps = [h for h, _d, _n, _p in d['steps']]
+        defs = [dd for _h, dd, _n, _p in d['steps']]
         lo = math.floor(min(defs) * 100) / 100
         hi = math.ceil(max(defs) * 100) / 100
-        return (f"{head} with Def >= {lo:.2f} to {hi:.2f} depending on HP "
-                f"({min(hps):g}-{max(hps):g})")
-    rule = builds.display_rule(d['rule'])
+        return _approx(b, f"{head} with Def >= {lo:.2f} to {hi:.2f} "
+                          f"depending on HP ({min(hps):g}-{max(hps):g})")
+    if is_header_bulk_box(b, facts):
+        return f"the bulk box, {header_bulk_rule(facts)}"
+    rule = _approx(b, builds.display_rule(d['rule']))
     if is_bulk_box(b):
-        return f"the bulk box, {rule}"
+        return f"a Def/HP box, {rule}"
     return rule
 
 
-def build_summary_phrase(b):
+def build_summary_phrase(b, facts=None):
     """The same rule inside the collapsed one-line summary's parenthesis."""
     d = b['description']
     if d is None:
         return 'no rule fits it; its IV box is in the table'
+    if is_header_bulk_box(b, facts):
+        return f"the bulk box {header_bulk_rule(facts)}"
     if is_bulk_box(b):
-        return f"the bulk box {builds.display_rule(d['rule'])}"
-    return build_desc(b, steps=False)
+        return f"a Def/HP box {_approx(b, builds.display_rule(d['rule']))}"
+    return _approx(b, build_desc(b, steps=False))
+
+
+def rank1_iv(arm_builds):
+    """The stat-product rank-1 spread, as the builds' own "a/d/s@lv" string."""
+    ctx = arm_builds['ctx']
+    return builds.iv_str(ctx['meta'], int(np.argmin(ctx['sp_rank'])))
 
 
 def build_envelope(b):
@@ -1892,19 +1985,7 @@ def _wins_phrase(bl, b):
     return f"{mw['wins']} of {mw['denominator']} matchups"
 
 
-def _summary_desc(b):
-    """A build's description for the negative page's bridging clause.
-
-    "a disjoint 360-spread build (list of 360 spreads)" says the size twice
-    and gives a reader nothing to aim at. The envelope is too long for the
-    collapsed line, so the line points at it instead.
-    """
-    if b['description'] is None:
-        return 'no two- or three-stat rule fits it; its IV box is in the table'
-    return build_desc(b, steps=False)
-
-
-def _negative_bridge(arm_builds, bl):
+def _negative_bridge(arm_builds, bl, facts):
     """One clause joining a "zero matchups wide" summary to the builds table.
 
     The v3 negative sentence is about TOTAL wins and stays -- Michael's
@@ -1914,17 +1995,21 @@ def _negative_bridge(arm_builds, bl):
     """
     if not bl or not bl['builds']:
         return ''
+    # Named, in the same voice as the paragraphs and the table below: the
+    # clause used to call them "the 55-spread build" and "a disjoint
+    # 64-spread build" while every other surface on the page called the same
+    # two regions Build 1 and Build 2 (2026-09-16 round-3 review).
     p = bl['builds'][0]
-    out = (f" Which matchups you win still moves: the "
-           f"{brief._n(p['size'])}-spread build "
-           f"({_summary_desc(p)}) guarantees "
+    out = (f" Which matchups you win still moves: {role_short(p, 0)} "
+           f"({brief._n(p['size'])} spreads, "
+           f"{build_summary_phrase(p, facts)}) guarantees "
            f"{_guarantee_phrase(arm_builds, bl, p)}")
     rest = bl['builds'][1:]
     if rest:
         f = rest[0]
         n = (f['n_guaranteed_weighted'] if not _flat(bl) else f['n_guaranteed'])
-        out += (f", and a disjoint {brief._n(f['size'])}-spread build "
-                f"guarantees {brief._n(n)} others")
+        out += (f"; {role_short(f, 1)} ({brief._n(f['size'])} spreads, "
+                f"disjoint from it) guarantees {brief._n(n)} others")
     return out + '.'
 
 
@@ -1941,6 +2026,15 @@ STANDOUT_NOTE = (
     f"build without belonging to one. Hunting that exact spread is "
     f"legitimate -- in a limited meta especially -- but it is a different "
     f"plan from building a region.")
+# The same point when both standouts sit INSIDE a build, which the fixed
+# note above argues a case the page does not have (2026-09-16 round-3
+# review: it shipped on the plain-Sableye and Melmetal pages).
+STANDOUT_NOTE_INSIDE = (
+    "Every standout here sits inside a build. What a region guarantees, it "
+    "guarantees to every one of its members; the rest of what one exact "
+    "spread wins is what that spread adds on top of the region. Hunting it "
+    "is legitimate -- in a limited meta especially -- but it is a different "
+    "plan from building a region.")
 STANDOUT_KIND = {
     'wins': 'Wins the most matchups over all nine shield scenarios',
     'score': "Highest Avg Battle Score (the scatter's own y axis)",
@@ -1979,10 +2073,36 @@ def _paragraph_guarantee(arm_builds, bl, b):
         return (f"{_guarantee_phrase(arm_builds, bl, b)} "
                 f"({brief._n(mat)} of them material)")
     scens = _scen_weighted(bl, arm_builds['ctx']['scen_labels'])
+    # "and 44 of all 87 with 0 of those material" was a sentence a reader
+    # had to re-read; the count goes in its own bracket on the number it is
+    # a count of (2026-09-16 round-3 review).
     return (f"{brief._n(b['n_guaranteed_weighted'])} of the "
             f"{brief._n(bl['n_decision_weighted'])} decision matchups in "
             f"{scens}, and {brief._n(b['n_guaranteed'])} of all "
-            f"{brief._n(n_all)} with {brief._n(mat)} of those material")
+            f"{brief._n(n_all)} "
+            + ('(none of them material)' if not mat
+               else f"({brief._n(mat)} of them material)"))
+
+
+def counted_guaranteed(arm_builds, bl, b):
+    """One build's guaranteed cells the PRESET counts, and whether it fell back.
+
+    The paragraph opens "guarantees 29 of the 43 decision matchups in 0v0 /
+    1v1 / 2v2 shields" and then names its most notable three. Taken from all
+    nine scenarios, the lead example was a matchup the preset does not count
+    -- the sentence contradicting itself one line down (2026-09-16 round-3
+    review). Falls back to all nine only when the counted scenarios cannot
+    fill the list, and the caller then says so.
+    """
+    rows = b['guaranteed']
+    if _flat(bl) or not rows:
+        return rows, False
+    labels = arm_builds['ctx']['scen_labels']
+    counted = {labels[i] for i, w in enumerate(bl['weights']) if w > 0}
+    kept = [r for r in rows if r['scenario'] in counted]
+    if len(kept) >= TOP_CELLS:
+        return kept, False
+    return rows, True
 
 
 def build_paragraph(facts, arm_builds, bl, b, i, all_facts=None):
@@ -1998,11 +2118,25 @@ def build_paragraph(facts, arm_builds, bl, b, i, all_facts=None):
     who = _esc(brief.focal_name(facts['header']))
     moveset = _esc(display_moveset(facts['header']['arm_label']))
     name = _esc(role_short(b, i))
-    out = [f'<b>{name}</b> has {who} running {moveset} at '
-           f'{_esc(build_rule_phrase(b))}.']
+    if b['description'] is None:
+        # A build no rule fits is a LIST. "has Sableye running Shadow Claw /
+        # Drain Punch, Foul Play at no two- or three-stat rule" was not a
+        # sentence (2026-09-16 round-3 review).
+        out = [f'<b>{name}</b> is a list of {brief._n(b["size"])} {who} '
+               f'spreads ({moveset}) that no two- or three-stat rule fits; '
+               f'its IV envelope is in the table.']
+    else:
+        out = [f'<b>{name}</b> has {who} running {moveset} at '
+               f'{_esc(build_rule_phrase(b, facts))}.']
+        clause = approx_clause(b)
+        if clause:
+            out.append(_esc(clause))
     g = 'It guarantees ' + _esc(_paragraph_guarantee(arm_builds, bl, b))
-    if b['guaranteed']:
-        g += ', most notably ' + _top_cells_html(b['guaranteed'])
+    top, all_nine = counted_guaranteed(arm_builds, bl, b)
+    if top:
+        g += ', most notably ' + _top_cells_html(top)
+        if all_nine:
+            g += ' (over all nine shield scenarios)'
     gave = b['gives_up']
     if gave:
         names = brief._and_list(
@@ -2015,9 +2149,14 @@ def build_paragraph(facts, arm_builds, bl, b, i, all_facts=None):
         g += '; it gives up nothing the other builds guarantee'
     out.append(g + '.')
     mw = b['most_winning_member']
+    # When the most-winning member IS stat-product rank-1, "rank-1 is inside
+    # it" made a reader hunt the table for which member that was.
+    tail = (', which is stat-product rank-1'
+            if mw['iv'] == rank1_iv(arm_builds)
+            else f"; rank-1 is "
+                 f"{'inside' if b['rank1_in'] else 'outside'} it")
     out.append(f"Its most-winning member is {_esc(mw['iv'].split('@')[0])} "
-               f"({mw['wins']} of {mw['denominator']}); rank-1 is "
-               f"{'inside' if b['rank1_in'] else 'outside'} it.")
+               f"({mw['wins']} of {mw['denominator']}){tail}.")
     return '<p class="wb-para">' + ' '.join(out) + '</p>'
 
 
@@ -2063,14 +2202,21 @@ def standout_paragraph(facts, arm_builds, bl, t):
                          'no build to compare it against.')
         else:
             nb = bl['builds'][near]
+            nm = _esc(role_short(nb, near))
+            own, got = t['n_own_decision_wins'], t['n_from_nearest']
+            # NOT "the other N are this one spread's own": those cells are
+            # won by hundreds of other spreads -- what they lack is a
+            # region-wide guarantee. And the number a reader needs to
+            # compare the two plans is what the hunt COSTS, which the block
+            # did not print at all (2026-09-16 round-3 review).
             lines.append(
-                f"It is in none of the builds. Of the "
-                f"{t['n_own_decision_wins']} decision matchups it wins, "
-                f"{_esc(role_short(nb, near))} guarantees "
-                f"{t['n_from_nearest']} to every one of its "
-                f"{brief._n(nb['size'])} members, so the other "
-                f"{t['n_own_decision_wins'] - t['n_from_nearest']} are this "
-                f"one spread's own.")
+                f"It is in none of the builds. Of the {own} decision "
+                f"matchups it wins, {nm} guarantees {got} to every one of "
+                f"its {brief._n(nb['size'])} members; the other "
+                f"{own - got} come with no guarantee from it -- other "
+                f"spreads win those too, so they are not this one spread's "
+                f"alone. It loses {t['n_lost_from_nearest']} of the "
+                f"{nb['n_guaranteed']} matchups {nm} guarantees.")
     else:
         nb = bl['builds'][t['in_build']]
         lines.append(f"It is a member of {_esc(role_short(nb, t['in_build']))}, "
@@ -2079,8 +2225,9 @@ def standout_paragraph(facts, arm_builds, bl, t):
     if rows:
         lines.append('Its rarest wins: '
                      + _top_cells_html(rows, 'grid_wr', 'grid') + '.')
-    lines.append(f"It is 1 of the {brief._n(arm_builds['ctx']['n_iv'])} "
-                 f"spreads on this grid.")
+    # No "It is 1 of the 4096 spreads on this grid": every spread is, and
+    # the encounter-count sentence under the block already carries the
+    # rarity (2026-09-16 round-3 review).
     return '<p class="wb-para">' + ' '.join(lines) + '</p>'
 
 
@@ -2130,11 +2277,14 @@ def standouts_html(facts, arm_builds, preset, all_facts=None):
     body = ''.join(standout_paragraph(facts, arm_builds, bl, t)
                    for t in bl['standouts'])
     rarity = _rarity_sentence(facts, arm_builds)
+    note = (STANDOUT_NOTE
+            if any(t['in_build'] is None for t in bl['standouts'])
+            else STANDOUT_NOTE_INSIDE)
     return ('<div class="wb-standouts"><p class="wb-mem-head">Standouts</p>'
             + body
             + (f'<p class="wb-standout-note">{_esc(rarity)}</p>'
                if rarity else '')
-            + f'<p class="wb-standout-note">{_esc(STANDOUT_NOTE)}</p>'
+            + f'<p class="wb-standout-note">{_esc(note)}</p>'
             + '</div>')
 
 
@@ -2165,7 +2315,7 @@ def builds_summary(facts, arm_builds, preset, all_facts=None):
         if not bl:
             return base
         return (f"[{builds.PRESET_TAG[preset]}] " + base
-                + _negative_bridge(arm_builds, bl))
+                + _negative_bridge(arm_builds, bl, facts))
     clauses = []
     holder = None
     n_all = arm_builds['n_decision_cells']
@@ -2186,7 +2336,7 @@ def builds_summary(facts, arm_builds, preset, all_facts=None):
                    f"{brief._n(n_all)})")
         clauses.append(
             f"{role_short(b, i)} ({brief._n(b['size'])} spreads, "
-            f"{build_summary_phrase(b)}) guarantees {got}")
+            f"{build_summary_phrase(b, facts)}) guarantees {got}")
     if holder is not None:
         clauses[holder] += ' and holds rank-1'
     out = f"[{builds.PRESET_TAG[preset]}] " + '; '.join(clauses)
@@ -2195,18 +2345,33 @@ def builds_summary(facts, arm_builds, preset, all_facts=None):
     return out + '.'
 
 
-CARD_TITLE_SCORE = 'Highest battle score'
-CARD_TITLE_WINS = 'Most wins (outside the builds)'
+# Titled by what the card SHOWS. "Highest battle score" printed no score
+# and "Most wins" printed no win count, so the two standout cards carried
+# the same "wins 62 of 87 decision matchups" line and nothing told them
+# apart (2026-09-16 round-3 review).
+CARD_TITLE_SCORE = 'Highest average battle score'
+CARD_TITLE_WINS = 'Most matchups won (outside the builds)'
+CARD_TITLE_BOTH = 'Highest average battle score and most matchups won'
+# What a build's card adds to its title when that build's most-winning
+# member is ALSO a standout: the dedup dropped the standout card silently,
+# so the card set lost a role the page had named.
+CARD_ALSO = {
+    'both': 'also the highest average battle score and the most matchups won',
+    'score': 'also the highest average battle score',
+    'wins': 'also the most matchups won',
+}
 
 
-def card_title_rule(b):
+def card_title_rule(b, facts=None):
     """The build's rule, short enough to sit beside its name on a card."""
     d = b['description']
     if d is None:
         return f"{brief._n(b['size'])} spreads, no rule fits"
     if d.get('steps'):
-        return f"{builds.stair_atk_head(d)} + Def/HP steps"
-    return builds.display_rule(d['rule'])
+        return _approx(b, f"{builds.stair_atk_head(d)} + Def/HP steps")
+    if is_header_bulk_box(b, facts):
+        return header_bulk_rule(facts)
+    return _approx(b, builds.display_rule(d['rule']))
 
 
 def card_specs(facts, arm_builds, preset=None):
@@ -2238,20 +2403,26 @@ def card_specs(facts, arm_builds, preset=None):
     if not bl or not bl['builds']:
         return []
     n_all = arm_builds['n_decision_cells']
-    out, seen = [], set()
+    out, seen = [], {}
 
     def _add(spec):
         iv = tuple(spec['iv'])
         if iv in seen:
             return
-        seen.add(iv)
+        seen[iv] = spec
         out.append(spec)
+
+    def _also(iv, kind):
+        """Name the standout role on the card that already holds its spread."""
+        spec = seen.get(tuple(iv))
+        if spec and CARD_ALSO.get(kind):
+            spec['title'] = f"{spec['title']} ({CARD_ALSO[kind]})"
 
     for i, b in enumerate(bl['builds']):
         mw = b['most_winning_member']
         _add({
             'iv': [int(x) for x in mw['iv'].split('@')[0].split('/')],
-            'title': f"{role_short(b, i)} -- {card_title_rule(b)}",
+            'title': f"{role_short(b, i)} -- {card_title_rule(b, facts)}",
             'guarantee': (
                 f"guarantees "
                 f"{_guarantee_phrase(arm_builds, bl, b, article=False)} "
@@ -2271,33 +2442,42 @@ def card_specs(facts, arm_builds, preset=None):
         rows = sorted(standout_rows(arm_builds, t['idx']),
                       key=lambda r: (r['grid_wr'], r['rank']))
         near = t['nearest_build']
+        own, got = t['n_own_decision_wins'], t['n_from_nearest']
+        iv = [int(x) for x in t['iv'].split('@')[0].split('/')]
         if t['in_build'] is not None:
             nb = bl['builds'][t['in_build']]
             where = (f"it is in {role_short(nb, t['in_build'])}, which "
-                     f"guarantees {t['n_from_nearest']} of them")
+                     f"guarantees {got} of them")
         elif near is not None:
             nb = bl['builds'][near]
-            where = (f"it is in none of the builds; "
-                     f"{role_short(nb, near)} guarantees "
-                     f"{t['n_from_nearest']} of them, so the other "
-                     f"{t['n_own_decision_wins'] - t['n_from_nearest']} are "
-                     f"this one spread's own")
+            nm = role_short(nb, near)
+            where = (f"it is in none of the builds; {nm} guarantees {got} of "
+                     f"those to all {brief._n(nb['size'])} of its members "
+                     f"and {own - got} come with no guarantee from it; it "
+                     f"loses {t['n_lost_from_nearest']} that {nm} "
+                     f"guarantees")
         else:
             where = 'it is in none of the builds'
-        title = (CARD_TITLE_SCORE if t['kind'] == 'score'
-                 else CARD_TITLE_WINS)
         if t['kind'] == 'wins' and t['in_build'] is not None:
             # A most-winning spread INSIDE a build is already on that
             # build's card, or is one of its members; it does not need a
-            # card of its own titled "outside the builds".
+            # card of its own titled "outside the builds". It does need its
+            # role named on the card that holds it.
+            _also(iv, t['kind'])
             continue
-        if t['kind'] == 'both':
-            title = f"{CARD_TITLE_SCORE} and most wins"
+        title = {'score': CARD_TITLE_SCORE, 'wins': CARD_TITLE_WINS,
+                 'both': CARD_TITLE_BOTH}[t['kind']]
+        _also(iv, t['kind'])
+        score = (f"Avg Battle Score {t['avg_score']:.1f} (the main "
+                 f"scatter's y axis); " if t['kind'] != 'wins' else '')
+        wins = f"wins {t['wins_all']} of {t['denominator_all']} matchups"
+        if t['kind'] != 'score':
+            wins += ', the most of any spread on this grid'
         _add({
-            'iv': [int(x) for x in t['iv'].split('@')[0].split('/')],
+            'iv': iv,
             'title': title,
-            'guarantee': (f"wins {t['n_own_decision_wins']} of {n_all} "
-                          f"decision matchups; {where}"),
+            'guarantee': (f"{score}{wins}, and {own} of {n_all} decision "
+                          f"matchups; {where}"),
             'cells': [{'text': f"{r['cell']} (rank {r['rank']})",
                        'rate': float(r['grid_wr']), 'word': 'grid'}
                       for r in rows[:TOP_CELLS]],
@@ -2596,11 +2776,6 @@ def builds_table_html(arm_builds, preset):
     obj = objectives_line(arm_builds, preset)
     if obj:
         out.append(f'<p class="wb-obj">{_esc(obj)}</p>')
-    # The emphasis key, once per preset block rather than once per expander:
-    # it explains a typeface that every list below it, the standouts block
-    # and the card at the top of the page all use, and seven copies of it
-    # was 1.8 KB of one sentence in every file.
-    out.append(f'<p class="wb-g-head">{_esc(EMPH_KEY)}</p>')
     for i, b in enumerate(bl['builds']):
         out.append(
             f'<details class="wb-build" data-build="{i}">'
@@ -2609,7 +2784,7 @@ def builds_table_html(arm_builds, preset):
             f'its members ({brief._n(b["size"])})</summary>'
             + _guarantee_rows_html(arm_builds, b)
             + f'<p class="wb-mem-head">Members ({brief._n(b["size"])}), '
-              f'bulkiest first</p>'
+              f'highest stat product first</p>'
             + f'<div class="wb-mem" data-preset="{_esc(preset)}" '
               f'data-build="{i}"></div>'
             + '<p><button type="button" class="wb-btn" '
@@ -2633,6 +2808,10 @@ def builds_block_html(facts, arm_builds, all_facts):
         parts.append('<p class="wb-builds-lead">'
                      + _esc(builds_lead(facts, arm_builds, key, all_facts))
                      + '</p>')
+        # The emphasis key, once per preset block and ABOVE the paragraphs:
+        # they are the first prose that prints "(outside 10%)" in the page's
+        # three typefaces, so the key that defines both has to precede them.
+        parts.append(f'<p class="wb-g-head">{_esc(EMPH_KEY)}</p>')
         # The section's headline, one paragraph per named build. It sits
         # INSIDE the per-preset block so the Build criteria knob switches it
         # with the table it describes -- a paragraph naming builds the table
@@ -2863,7 +3042,7 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # gated sentence would fail on the duplicate, not on a defect.
     ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode}
     own = [CLUSTERS_FALLBACK_CAPTION, BUILDS_CAPTION, WEIGHTING_NOTE,
-           EMPH_KEY, STANDOUT_NOTE, STATS_CAPTION]
+           EMPH_KEY, STANDOUT_NOTE, STANDOUT_NOTE_INSIDE, STATS_CAPTION]
     own.extend(STANDOUT_KIND.values())
     for arm, facts in enumerate(all_facts):
         ab = facts.get('_builds')

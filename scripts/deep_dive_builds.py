@@ -393,7 +393,15 @@ def fit_frontier(target, planes, n):
         sel = target & (hp == h)
         d = float(dfn[sel].min())
         need[hp == h] = d
-        steps.append((float(h), d, int(sel.sum())))
+        # The 4th field is the decimal the PAGE prints for this step: the
+        # shortest one that selects exactly the same spreads at this HP row.
+        # Formatting the raw float rounds half-up, which lands ABOVE the
+        # true floor and excludes the boundary member of the step, so a
+        # reader applying the printed rule literally rebuilt a smaller
+        # build than the one it claimed to describe (2026-09-16 round-3
+        # review: 61 members, 57 selected).
+        steps.append((float(h), d, int(sel.sum()),
+                      print_thr(d, dfn[hp == h], '>=')[0]))
     m = (atk >= aT) & (dfn >= need)
     hs = np.array([s[0] for s in steps])
     ds = np.array([s[1] for s in steps])
@@ -410,7 +418,7 @@ def fit_frontier(target, planes, n):
     pa, _ = print_thr(aT, atk, '>=')
     text = f"atk >= {pa:g} and Def >= d(HP) [{len(steps)} steps]"
     return _desc_entry('atk_floor_frontier', text, m, target, extra={
-        'atk_floor': aT, 'steps': [[a, b, c] for a, b, c in steps],
+        'atk_floor': aT, 'steps': [[a, b, c, e] for a, b, c, e in steps],
         'slope_def_per_hp': slope, 'slope_r2': r2, 'monotone': monotone,
         'trade': (None if slope is None or slope >= 0
                   else f"1 HP buys ~{-slope:.2f} Def")})
@@ -1104,9 +1112,15 @@ def cell_rows(L, region_mask, g, ctx):
         ow = float(Wd[outside, ci].mean()) if n_out else 0.0
         modes_ok = 1 + sum(1 for w in ctx['other_modes'].values()
                            if bool(w[region_mask, c['k']].all()))
+        # RAW rates, not rounded here. The renderer rounds once, at print
+        # time, and the emphasis band + the near-free test read the same raw
+        # value: storing 4 dp double-rounded the printed percent (a true
+        # 0.3749632677 stored as 0.375 printed 38% where the data says 37%)
+        # and put a rate within 1e-4 of a band edge in the wrong band
+        # (2026-09-16 round-3 review).
         out.append({'ci': ci, 'cell': c['label'], 'scenario': c['scenario'],
-                    'rank': c['rank'], 'grid_wr': round(float(c['wr']), 4),
-                    'outside_wr': round(ow, 4), 'material': c['material'],
+                    'rank': c['rank'], 'grid_wr': float(c['wr']),
+                    'outside_wr': float(ow), 'material': c['material'],
                     'modes_ok': modes_ok})
     # Ascending outside rate: the rarest guarantee -- the one the rest of the
     # grid is least likely to hand a reader anyway -- reads first.
@@ -1165,8 +1179,8 @@ def region_block(L, ctx, inter, role, others, weights, wsum=None):
             dblock['terms'] = [[ax, op, float(t)] for ax, op, t in
                                d95['terms']]
         if d95.get('steps') is not None:
-            dblock['steps'] = [[float(a), float(b), int(c)]
-                               for a, b, c in d95['steps']]
+            dblock['steps'] = [[float(a), float(b), int(c), float(e)]
+                               for a, b, c, e in d95['steps']]
             dblock['atk_floor'] = float(d95['atk_floor'])
         if d95.get('trade_terms') is not None:
             dblock['trade_terms'] = d95['trade_terms']
@@ -1343,11 +1357,15 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
     * ``n_own_decision_wins`` -- how many DECISION matchups this one spread
       wins; and
     * ``n_from_nearest`` -- how many of those the nearest build guarantees
-      to every one of its members.
+      to every one of its members; and
+    * ``n_lost_from_nearest`` -- how many matchups that build guarantees
+      this spread does NOT win, which is what the hunt costs.
 
-    The difference is the part that is this spread's own and nobody else's,
-    which is the whole case for hunting an exact spread rather than building
-    a region.
+    The difference between the first two is the part the region does not
+    guarantee. It is NOT the part nobody else wins -- most of those cells
+    are won by a thousand other spreads; what they lack is a region-wide
+    guarantee (2026-09-16 round-3 review, which found the page claiming
+    exclusivity it had not measured).
     """
     cells = frame['cells']
     won = ctx['win2'][idx]
@@ -1355,7 +1373,7 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
     n_own = int(own.sum())
     in_build = next((i for i, b in enumerate(builds)
                      if bool(b['_mask'][idx])), None)
-    nearest, n_from = None, 0
+    nearest, n_from, n_lost = None, 0, 0
     if builds:
         if in_build is not None:
             nearest = in_build
@@ -1365,6 +1383,7 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
                       for i, b in enumerate(builds)]
             best = max(scored)
             nearest, n_from = -best[1], best[0]
+        n_lost = int((builds[nearest]['_g'] & ~own).sum())
     meta = ctx['meta']
     return {
         'kind': kind, 'idx': int(idx), 'iv': iv_str(meta, idx),
@@ -1382,6 +1401,7 @@ def standout_block(ctx, frame, builds, kind, idx, weights, wsum):
         'nearest_build': nearest,
         'n_own_decision_wins': n_own,
         'n_from_nearest': n_from,
+        'n_lost_from_nearest': n_lost,
     }
 
 
@@ -1628,7 +1648,7 @@ def build_plane(build):
     fam = d['family']
     if fam == 'atk_floor_frontier' and d.get('steps'):
         return {'kind': 'stair',
-                'steps': [[float(h), float(dd)] for h, dd, _n in d['steps']],
+                'steps': [[float(h), float(dd)] for h, dd, _n, _p in d['steps']],
                 'atkNote': stair_atk_head(d)}
     if fam == 'atk_floor_trade' and d.get('trade_terms'):
         t = d['trade_terms']

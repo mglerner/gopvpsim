@@ -513,7 +513,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                focal_shadow=False,
                                scores_base_arrays=None,
                                base_form_info=None,
-                               card_builds=None):
+                               card_builds=None,
+                               card_builds_pinned=False):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -529,6 +530,12 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     review item 6). The poles themselves are untouched: they still drive
     ``data_obj['recIvs']`` / ``recStyles``, which the scatter overlay and the
     opponent-threat chips read.
+
+    ``card_builds_pinned`` says the builds were computed on a DIFFERENT
+    grid than the one this pass renders (the best-buddy L51 pass reuses the
+    league-cap builds, because the section itself is rendered once, at the
+    cap). The card then prints one line saying so, rather than silently
+    disagreeing with the section below it.
 
     When ``anchor_passing_sink`` is a dict, it gets populated with
     ``{anchor_id: [passing_iv_idx, ...]}`` for every anchor-flip bullet
@@ -1549,6 +1556,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         'sibling_trade': _sibling_trade,
         'rec_candidates': _card_recs or chosen_recs,
         'card_extras': _card_extras,
+        'builds_pinned': bool(card_builds_pinned and _card_recs),
         'rec_idx': _rec_idx,
         'flips': flips,
         'flips_sp': flips_sp,

@@ -177,12 +177,13 @@ BANNED_WORDS = (
     'reliable', 'consistent', 'worth', 'great', 'good', 'bad', 'should',
 )
 BANNED_EXEMPT_PHRASES = ('Great League', 'Ultra League', 'Master League')
-SHOULD_ALLOWED_PHRASE = 'most builds should clear'
-# The second allowed "should": the expert-dive opening sentence. Both are
-# scrubbed before the banned-word scan, and between them they may appear at
-# most once in a rendered section.
-SHOULD_ALLOWED_PATTERNS = (re.escape(SHOULD_ALLOWED_PHRASE),
-                           r'most\s+[^.;:]{1,140}?should have at least')
+# The one allowed "should": the expert-dive opening sentence. It is scrubbed
+# before the banned-word scan and may appear at most once in a rendered
+# section. The field-6 header's "what most builds should clear already" was
+# the second one until 2026-09-16 round 3, where it collided with the named
+# Builds three blocks above it ("does Build 2 clear it?") and was reworded to
+# the descriptive voice the rest of the page now uses.
+SHOULD_ALLOWED_PATTERNS = (r'most\s+[^.;:]{1,140}?should have at least',)
 
 # The three floor primitives, strongest first. A threshold is one of exactly
 # these: an EXACT clean cut (nothing below wins, everything at or above does),
@@ -5476,8 +5477,8 @@ def _f6_rungs_below(facts):
     # says which is which; the header no longer claims.
     lines = [f"Clean cuts holding between {pct(MATERIAL_LO, 0)} and "
              f"{pct(MATERIAL_HI, 0)} of the grid, ascending. The widest of "
-             f"them are what {SHOULD_ALLOWED_PHRASE} already; the narrow ones "
-             f"at the bottom of the table are not."]
+             f"them sit under nearly every spread on the grid; the narrow "
+             f"ones at the bottom of the table do not."]
     axis = (facts['floor']['axis'] if has_floor
             else facts.get('floor_axis', 'atk'))
     rows = [[stat_threshold_str(axis, r['printed'], r['dp']),
