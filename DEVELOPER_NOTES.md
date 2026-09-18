@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2783<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2788<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -1317,11 +1317,13 @@ spread-selection rule on the page:
 - The threat rows' hint reads "-> won by Build 1 or Build 2" (it used to be
   "-> build <style>", which with the new names would have read "build Build
   1").
-- "Top Picks" keeps its own selection (top three by composite score) and is
-  headlined "7/2/12 -- in Build 1" / "-- in no build", from
-  `deep_dive_which_build.card_build_membership` (every member of every
-  build, threaded through `generate_analysis_sections(card_build_membership=)`
-  as `build_of`).
+- RETIRED 2026-09-17 (round 8 item 2): "Top Picks" kept its own selection
+  (top three by composite score) headlined "7/2/12 -- in Build 1" /
+  "-- in no build", from `deep_dive_which_build.card_build_membership`
+  (every member of every build, threaded through
+  `generate_analysis_sections(card_build_membership=)` as `build_of`). The
+  block, the membership map and the hand-off are all deleted; one Notable
+  spreads list in the section is the page's only ranking of single spreads.
 - The best-buddy (L51) pass reuses the league-cap spreads, as the card does,
   and the threat rows quote the card's own `PINNED_NOTE`.
 
@@ -1511,14 +1513,48 @@ What the wide surfaces print, after round 6:
   no triangle and "Compare these spreads" does not offer it, both because it
   is not a build to build, so a cell naming one pointed at a spread the
   reader could find on neither interactive surface.
-- `card_build_membership` includes the wide region LAST, under the name
-  "Build 1 wide only", so a Top Pick that no build holds but the wide region
-  does is labelled instead of reading "in no build" on a page whose builds
-  table names the same spread. Top Picks also carries one sentence saying
-  the two rankings answer different questions.
+- RETIRED 2026-09-17 (round 8 item 2): `card_build_membership` included the
+  wide region LAST, under the name "Build 1 wide only", so a Top Pick that
+  no build held but the wide region did was labelled instead of reading "in
+  no build" on a page whose builds table named the same spread; Top Picks
+  also carried one sentence saying the two rankings answered different
+  questions. The Notable spreads list says where every entry sits (build /
+  wide / family / none) in the entry itself, so there is no second map.
 - The wide region's combo is excluded from the UpSet panel's extra candidate
   columns: it took no column of its own (`col: null`) but could come back as
   an anonymous unselected column for the region the table above names.
+
+### Section-plot legend geometry (two Plotly facts, both measured)
+
+The section scatter owns a full-width row with its legend UNDER the plot
+(round 8 item 4), so the panel's height has to hold a legend whose height
+nobody can predict from the trace count. Two Plotly 2.35.2 behaviours decide
+how `_wbFitLegend` is written; both were measured in headless Chrome on
+2026-09-17 and neither is documented:
+
+- **A horizontal legend's DRAWN height is capped at half the graph height**
+  and the overflow becomes a scroll box. So `rect.bg`'s height reports the
+  CAP, not what the keys need (303px inside a 608px graph whose keys wanted
+  342), and a layout sized from the rect converges on the cap. The uncapped
+  content height is `gd._fullLayout.legend._height`, and it does NOT move
+  when the panel grows (342 at graph heights 608, 900 and 1000). Measure
+  that.
+- **`Plotly.react` does not re-read the graph div's height.** Setting
+  `style.height` from 685 to 900 left `_fullLayout.height` at 608 through a
+  react AND a tick. A `window` resize event picks it up (that is what
+  `responsive: true` listens to), `Plotly.Plots.resize` picks it up but is
+  debounced ~100ms, and `Plotly.relayout(gd, {autosize: true})` picks it up
+  SYNCHRONOUSLY while leaving responsive width alone. Use the relayout;
+  setting `layout.height` outright would work too but turns autosize off for
+  BOTH dimensions and kills responsive width.
+
+Sizing the legend's room from `ceil(nTraces / 3) * 18px` instead cost the
+round-7b render six clipped legend keys at a 900px viewport -- clipped by the
+plot svg's own `overflow: hidden`, so `elementFromPoint` missed them and
+legend-hover isolation was dead for both standouts, both most-winning members
+and SP1 -- while Plotly's automargin squeezed the plot area from 324px to
+186px. The invariant to hold is the PLOT AREA (322-324px at every width and
+both views); the panel's height is what moves.
 
 ## Article lifecycle
 

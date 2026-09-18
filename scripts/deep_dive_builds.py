@@ -2223,6 +2223,14 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
                 'iv': f['seed_iv'], 'kind': f['seed_kind'],
                 'rule': f['rule'], 'size': f['size'],
                 'nG': f['n_guaranteed'], 'nDec': f['n_decision_cells'],
+                # How faithfully the printed rule reproduces the member list.
+                # ``region_rule``'s d95 accepts anything from 0.95 up and
+                # prefers the SIMPLEST rule over the most faithful one, so a
+                # family can be a 96% description of itself -- which is the
+                # one thing every BUILD row is careful to say out loud. The
+                # hover says it too when it is not 1.0 (2026-09-17 round 8
+                # review).
+                'jac': round(float(f['rule_fidelity']), 4),
                 'seedIdx': key,
                 'mask': pack_mask([bool(x) for x in f['_mask']])})
         return fam_idx[key]
