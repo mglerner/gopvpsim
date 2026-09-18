@@ -3580,6 +3580,13 @@ def builds_table_html(arm_builds, preset):
             f'<td>{_esc(build_desc(f))}'
             + (f'<br><span class="wb-fid">seeded by the standout '
                f'{_esc(seeded_by)}</span>' if seeded_by else '')
+            # The same fidelity clause every BUILD row carries. A family's
+            # rule comes from the same ``region_rule`` describer, which
+            # accepts a 95%-faithful rule and prefers the simplest over the
+            # most faithful, so "the rule IS the region" is a claim this row
+            # has to make explicitly rather than by omission (2026-09-17
+            # round 8 review).
+            + f'<br><span class="wb-fid">{_esc(_fidelity_clause(f))}</span>'
             + '</td>'
             f'<td>{brief._n(f["size"])}</td>'
             f'<td>{brief._n(f["n_guaranteed"])} of '

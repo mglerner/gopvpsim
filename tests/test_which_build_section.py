@@ -5103,11 +5103,188 @@ def test_the_section_plot_legend_is_below_the_plot_and_wraps():
             in raw_body)
     # the geometry is computed from named pixel constants, not guessed
     for name in ('WB_PANEL_H', 'WB_PLOT_T', 'WB_LEG_PER_ROW', 'WB_LEG_ROW_H',
-                 'WB_LEG_GAP', 'WB_LEG_PAD'):
+                 'WB_LEG_GAP', 'WB_LEG_PAD', 'WB_PLOT_AREA'):
         assert f'var {name} = ' in src, name
+    # ...and the renderer's own first guess is built from them. WB_PANEL_H is
+    # no longer among them: since the round-8 review the renderer sizes from
+    # the PLOT AREA (WB_PANEL_H defines that constant and nothing else), so
+    # the panel's height follows the legend instead of the legend being
+    # squeezed into a 400px panel.
+    for name in ('WB_PLOT_T', 'WB_LEG_PER_ROW', 'WB_LEG_ROW_H',
+                 'WB_PLOT_AREA'):
         assert name in body, name
+    assert 'WB_PLOT_AREA = WB_PANEL_H - WB_PLOT_T -' in src
     assert 'panel.style.height = panelH' in body
     assert 'margin: { t: WB_PLOT_T, b: legB, l: 56, r: 8 }' in body
+    # the guess is corrected by a measurement before the reader sees it
+    assert '_wbFitLegend(panel, layout);' in body
+    i_react = body.index('Plotly.react(panel, traces, layout,')
+    assert body.index('_wbFitLegend(panel, layout);') > i_react, (
+        'the legend is measured before it is drawn')
+
+
+_LEGEND_FIT_HARNESS = r"""// Node harness: the panel's legend geometry, executed.
+const fs = require('fs');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+const start = src.indexOf('var WB_PANEL_H = ');
+const end = src.indexOf("// One family's name");
+if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
+const block = src.slice(start, end);
+
+// A panel whose legend reports whatever CONTENT height the case asks for,
+// with the drawn rect reporting Plotly's own cap (half the graph height) so
+// the measurement has to prefer the uncapped reading; plus a Plotly that
+// records how each redraw was asked for.
+let legH = 0, graphH = 0, relayouts = [], reacts = [];
+const legendG = { querySelector: (sel) => (sel === 'rect.bg'
+  ? { getAttribute: () => String(Math.min(legH, 0.5 * graphH)) } : null) };
+const panel = { style: {}, _fullLayout: { legend: {} },
+  querySelector: (sel) => (sel === 'g.legend' ? legendG : null) };
+const Plotly = {
+  react: (p, t, l, c) => { reacts.push(l.margin.b); },
+  relayout: (p, u) => {
+    // what the real one does, and the reason this is not a react: it picks
+    // the container's new height up
+    graphH = parseFloat(p.style.height);
+    relayouts.push({ b: u['margin.b'], autosize: u.autosize });
+  }
+};
+
+let out;
+eval(block + '\nout = {WB_PANEL_H, WB_PLOT_T, WB_PLOT_AREA, WB_LEG_GAP,' +
+     ' WB_LEG_PAD, WB_LEG_ROW_H, WB_LEG_PER_ROW, _wbLegBottom,' +
+     ' _wbLegendHeight, _wbFitLegend};');
+
+function run(measured, nTraces) {
+  legH = measured; relayouts = []; reacts = [];
+  // exactly the first guess wbRenderRoot makes, from the trace COUNT
+  const rows = Math.max(1, Math.ceil(nTraces / out.WB_LEG_PER_ROW));
+  const guess = out._wbLegBottom(rows * out.WB_LEG_ROW_H);
+  const layout = { margin: { t: out.WB_PLOT_T, b: guess, l: 56, r: 8 },
+                   legend: { y: -out.WB_LEG_GAP / out.WB_PLOT_AREA } };
+  panel.style.height = (out.WB_PLOT_T + out.WB_PLOT_AREA + guess) + 'px';
+  graphH = parseFloat(panel.style.height);
+  panel._fullLayout.legend._height = measured;
+  const passes = out._wbFitLegend(panel, layout);
+  const h = parseFloat(panel.style.height);
+  return { guess: guess, marginB: layout.margin.b, panelH: h,
+           plotArea: h - out.WB_PLOT_T - layout.margin.b,
+           legendBottom: out.WB_LEG_GAP + measured,
+           redraws: relayouts.length, reacts: reacts.length,
+           autosize: relayouts.every(r => r.autosize === true),
+           passes: passes, legY: layout.legend.y };
+}
+
+// ...and that the CAPPED reading is not the one used: a legend whose content
+// is 342px inside a 608px graph draws a 303px rect, and sizing from 303
+// converges on the cap instead of on the content.
+legH = 342; graphH = 608;
+panel._fullLayout.legend._height = 342;
+const measured = out._wbLegendHeight(panel);
+const capped = parseFloat(legendG.querySelector('rect.bg').getAttribute('height'));
+
+console.log(JSON.stringify({
+  area: out.WB_PLOT_AREA,
+  measured: measured, capped: capped,
+  // the 900px viewport of the round-8 review: 11 keys, 342px of legend
+  narrow: run(342, 11),
+  // the same 11 keys where the count formula happens to be right
+  exact: run(out.WB_LEG_ROW_H * 4, 11),
+  // one key, one row: the geometry must not move at all
+  single: run(out.WB_LEG_ROW_H, 1)
+}));
+"""
+
+
+@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+def test_the_panel_height_is_measured_from_the_legend_not_counted(tmp_path):
+    """Round 8 review, the major finding -- executed, not source-pinned.
+
+    Pre-fix ``wbRenderRoot`` reserved the legend's room from the TRACE
+    COUNT alone: ``legRows = ceil(traces.length / 3)`` and 18px a row. That
+    assumes three keys fit across the panel and that no key wraps. At a
+    900px viewport the panel is 604px wide, Plotly fits ONE key per row and
+    ``wrapLegendName(..., 34)`` gives the family and build keys two or three
+    lines each, so an 11-key legend measured 335px against the 72px the
+    formula reserved (bottom margin 122, panel 454). The pre-fix numbers,
+    measured in headless Chrome on the shipped shadow preview: legend box
+    top 220 / bottom 554 inside a ``main-svg`` of height 454 with
+    ``overflow: hidden``, so six keys -- both standout keys, both
+    most-winning-member keys and the SP1 key -- were cut off AND unhittable
+    (``document.elementFromPoint`` at each key's centre returned the caption
+    paragraph below the figure, so legend-hover isolation was dead for
+    exactly the marks a reader wants isolated). The plot was squeezed too,
+    261px at 1400 and 186px at 900 against the 324px the layout intends,
+    because Plotly's own automargin pushed into a panel whose CSS height
+    was pinned at 454.
+
+    Post-fix the count is only the first guess: the legend is measured after
+    the draw and the panel is redrawn to hold it, with the PLOT AREA as the
+    invariant.
+    """
+    runner = tmp_path / 'wb_legend_fit.js'
+    runner.write_text(_LEGEND_FIT_HARNESS)
+    proc = subprocess.run(['node', str(runner), str(ENGINE_JS)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    got = json.loads(proc.stdout)
+    assert got['area'] == 324, got['area']
+    # the measurement is the UNCAPPED content height, not the drawn rect:
+    # Plotly caps a horizontal legend at half the graph height and scrolls
+    # the rest, so sizing from the rect converges on the cap (303 inside a
+    # 608px graph) rather than on the 342 the keys need
+    assert got['measured'] == 342, got
+    assert got['capped'] == 304, got
+
+    narrow = got['narrow']
+    # the pre-fix reservation, still what the first guess computes
+    assert narrow['guess'] == 122, narrow
+    # ...and the correction, from the measurement
+    assert narrow['marginB'] == 44 + 6 + 342
+    assert narrow['panelH'] == 8 + 324 + 392
+    assert narrow['redraws'] == 1, 'one measurement, one correction'
+    assert narrow['passes'] == 1
+    # THE assertion the round-7b probe was missing: the legend fits
+    assert narrow['legendBottom'] <= narrow['panelH'] - narrow['plotArea'], (
+        'the legend still overflows the panel')
+    for case in ('narrow', 'exact', 'single'):
+        g = got[case]
+        assert g['plotArea'] == 324, (case, g)
+        assert g['legendBottom'] <= g['marginB'], (case, g)
+        assert abs(g['legY'] + 44 / 324) < 1e-9, (case, g)
+        # the redraw is a relayout carrying autosize, never a second react:
+        # react does not re-read the container's height (measured)
+        assert g['reacts'] == 0, (case, g)
+        assert g['autosize'], (case, g)
+    # a guess that is already right costs no redraw
+    assert got['exact']['redraws'] == 0 and got['single']['redraws'] == 0
+    assert got['single']['panelH'] == 400, 'the one-row panel moved'
+
+
+def test_no_live_string_names_the_retired_picks_block():
+    """Round 8 review, minor: stale prose pointing at a deleted section.
+
+    Pre-fix the opponent-filter banner read "The infographic card, threshold
+    tiers, Top Picks, and narrative are computed against the full N-opponent
+    pool" and the methodology line "(you filtered the opponent set; the
+    card, tiers, Top Picks and narrative above still use all N)". Round 8
+    retired that block, so both sentences sent the reader looking for a
+    heading the page no longer has (``grep 'Top Picks'`` returned three hits
+    on each of the four shipped previews; two were live prose).
+
+    Scanned on the RAW engine source, because ``strip_js`` blanks string
+    literals and would make this pin vacuous. The positive control is the
+    sentence itself: it must still be there, and must still name a section
+    the page really renders.
+    """
+    raw = ENGINE_JS.read_text()
+    assert 'Top Picks' not in raw
+    # positive control: the sentences survive, naming a live section
+    assert 'The infographic card, threshold tiers,' in raw
+    assert 'the card, tiers,' in raw
+    assert raw.count(W.SECTION_TITLE) >= 2, 'the banner lost its referent'
+    # ...and that section is the one whose title they quote
+    assert W.SECTION_TITLE == 'Which one to build?'
 
 
 # ---------------------------------------------------------------------------
@@ -5244,6 +5421,70 @@ def test_a_family_reaches_the_table_the_paragraph_and_the_payload(
     # the standout entry points at its family by index
     assert [t.get('family') for t in block['standouts']] == [0, 1]
     assert f0['seed_iv'].startswith('7/2/14')
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+@pytest.mark.parametrize('blob', [SABLEYE_SHADOW, SABLEYE_PLAIN, MELMETAL])
+def test_a_family_row_hedges_its_rule_the_way_a_build_row_does(blob):
+    """Round 8 review, minor: a family's rule was printed unqualified.
+
+    Pre-fix the family row's "What it is" cell rendered ``build_desc(f)`` and
+    "seeded by the standout ..." and stopped there, while every BUILD row
+    ends on ``_fidelity_clause`` ("exactly these spreads", or on the shadow
+    page's Build 1 wide "99% of the same spreads (4 extra, 3 missed)"). The
+    family's rule comes from the SAME describer, whose ``d95`` accepts any
+    rule from 0.95 fidelity up and deliberately prefers the SIMPLEST rule
+    over the most faithful one -- so the first family whose rule fits at 96%
+    would have been presented as if the rule WERE the region, which is the
+    one thing the builds are careful to say out loud. Nothing shipped was
+    wrong (all three shipped families are exact, jaccard 1.0, 0 extra, 0
+    missed); the row simply could not have said otherwise.
+
+    The payload could not either: ``add_family`` shipped
+    iv/kind/rule/size/nG/nDec/seedIdx/mask and no fidelity, so the hover and
+    the legend key had nothing to qualify with.
+    """
+    _state, all_facts = _facts_for(blob)
+    seen, all_fam_rows = 0, []
+    for ai, facts in enumerate(all_facts):
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        html = W.section_html(all_facts, ai)
+        pay = json.loads(
+            re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
+        rows = pay['bp'].get('families') or []
+        # the clause must be inside the FAMILY's own row: every build row
+        # already prints one, so a whole-page search would pass pre-fix
+        fam_rows = re.findall(r'<tr data-family="\d+">.*?</tr>', html, re.S)
+        all_fam_rows += fam_rows
+        for bl in ab['presets'].values():
+            for f in bl.get('families') or []:
+                seen += 1
+                clause = W._fidelity_clause(f)
+                cells = [r for r in fam_rows
+                         if W.family_title(f) in r and clause in r]
+                assert cells, (blob, W.family_title(f), clause)
+                # the clause is the BUILDS' own vocabulary, not a second one
+                assert (clause == 'exactly these spreads'
+                        or 'of the same spreads' in clause), clause
+                assert f['rule_fidelity'] >= 0.95
+        for r in rows:
+            assert 'jac' in r, 'the payload still cannot qualify the rule'
+            assert 0.95 <= r['jac'] <= 1.0, r['jac']
+    if seen == 0:
+        pytest.skip('no arm of this blob grows a family')
+    # positive control: the scan finds rows at all, and they are the family
+    # rows and not the build rows a whole-page search would have matched
+    assert all_fam_rows, 'no family row matched the row scanner'
+    assert not any('data-build=' in r for r in all_fam_rows)
+    # ...and the hover says it only when it is NOT exact, so an exact rule
+    # reads as the plain statement it is.
+    raw = ENGINE_JS.read_text()
+    assert 'function _wbFamilyFid(f) {' in raw
+    assert "if (typeof f.jac !== 'number' || f.jac >= 0.999) return '';" in raw
+    assert '_wbFamilyFid(f)' in _engine()
 
 
 def test_the_family_rings_are_drawn_under_everything_and_are_their_own_mark():

@@ -412,8 +412,12 @@ function yAxisTitle() {
 // views that sum over opponents -- scatter y-values, the Top-IVs table,
 // histograms, Matchups Kept, the hover matchup-diff lists, the per-shield
 // deltas, and the paste-box "Gives up vs #1" list -- but NOT the Python-baked
-// sections (infographic card, threshold tiers, Top Picks, narrative), which
-// are computed full-pool at bake time. The honesty banner names that split.
+// sections (infographic card, threshold tiers, "Which one to build?",
+// narrative), which are computed full-pool at bake time. The honesty banner
+// names that split. It must name a surface that is still ON the page: the
+// composite-score picks block was one of them until round 8 retired it, and
+// for one round the banner went on pointing at a block that no longer
+// existed (2026-09-17 round 8 review).
 // The "Comparing builds" widget (cmpSummary / cmpBestAvg / cmpUnifiedTable)
 // ALSO follows the filter -- its wins/avg/gives-up and the unified compare
 // table recompute over the selected subset (Michael's call 2026-07-03), so
@@ -545,8 +549,8 @@ function updateOppFilterBanner() {
     banner.style.display = 'block';
     banner.innerHTML = '<b>Filtered view.</b> The scatter, Top IVs table, histograms, and the '
       + 'Comparing-builds widget reflect the <b>' + sel + ' of ' + nO + '</b> opponents you have '
-      + 'checked. The infographic card, threshold tiers, Top Picks, and narrative are computed '
-      + 'against the full ' + nO + '-opponent pool and do <b>not</b> react to this filter.' + snap;
+      + 'checked. The infographic card, threshold tiers, "Which one to build?", and narrative are '
+      + 'computed against the full ' + nO + '-opponent pool and do <b>not</b> react to this filter.' + snap;
   } else {
     banner.style.display = 'none';
     banner.innerHTML = '';
@@ -3609,7 +3613,7 @@ function updateMethodology() {
   // stay honest about what the numbers on screen actually average over.
   if (oppFilterActive()) {
     h += 'against '+_oppSelCount()+' of the '+nO+' opponents in the __OPP_DESC_ESCAPED__ pool ';
-    h += '(you filtered the opponent set; the card, tiers, Top Picks and narrative above still use all '+nO+') ';
+    h += '(you filtered the opponent set; the card, tiers, "Which one to build?" and narrative above still use all '+nO+') ';
   } else {
     h += 'against each of the '+nO+' opponents in the __OPP_DESC_ESCAPED__ pool ';
   }
@@ -5535,12 +5539,93 @@ var WB_FAM_SIZE = 12;
 // with its legend underneath it; these are the pixel quantities that layout
 // is built from, named once so the panel's CSS height, its bottom margin and
 // its legend anchor cannot drift apart.
-var WB_PANEL_H = 400;      // plot height with a single legend row
+var WB_PANEL_H = 400;      // panel height with a single legend row
 var WB_PLOT_T = 8;         // top margin
-var WB_LEG_PER_ROW = 3;    // legend keys that fit across the section's width
+var WB_LEG_PER_ROW = 3;    // legend keys a wide panel fits across (a GUESS)
 var WB_LEG_ROW_H = 18;     // one wrapped legend row
 var WB_LEG_GAP = 44;       // x-axis title + breathing room above the legend
 var WB_LEG_PAD = 6;        // below the last legend row
+// The PLOT AREA is the invariant of this layout: the legend grows the panel
+// downward and never eats the plot. Everything else is derived from it.
+var WB_PLOT_AREA = WB_PANEL_H - WB_PLOT_T -
+                   (WB_LEG_GAP + WB_LEG_PAD + WB_LEG_ROW_H);
+
+// The height the legend's wrapped keys NEED, in px, or 0 before it exists.
+// ``_fullLayout.legend._height`` is the right reading and the drawn
+// background rect is the wrong one: Plotly caps a horizontal legend's drawn
+// height at HALF the graph's height and makes the overflow a scroll box, so
+// the rect reports the cap (303px inside a 608px graph whose legend really
+// wants 342) and a layout sized from it converges on the cap instead of on
+// the content. ``_height`` is the uncapped content height and does not move
+// when the panel grows (measured in headless Chrome, 2026-09-17: 342 at
+// graph heights 608, 900 and 1000). The rect is kept as a fallback for a
+// Plotly that stops exposing ``_height``, and it is never worse than the
+// trace-count guess it replaces.
+function _wbLegendHeight(panel) {
+  var lg = panel && panel._fullLayout && panel._fullLayout.legend;
+  if (lg && lg._height > 0) return lg._height;
+  var g = panel && panel.querySelector && panel.querySelector('g.legend');
+  if (g) {
+    var bg = g.querySelector('rect.bg');
+    if (bg) {
+      var h = parseFloat(bg.getAttribute('height'));
+      if (h > 0) return h;
+    }
+    if (g.getBBox) {
+      try {
+        var b = g.getBBox();
+        if (b && b.height > 0) return b.height;
+      } catch (e) { /* not laid out yet */ }
+    }
+  }
+  return 0;
+}
+
+// The bottom margin (and so the panel height) a legend of this measured
+// height needs. One place, so the first guess and the correction cannot
+// disagree about what "room for the legend" means.
+function _wbLegBottom(legH) {
+  return WB_LEG_GAP + WB_LEG_PAD + Math.ceil(legH);
+}
+
+// Draw-measure-relayout. Deriving the legend's height from the TRACE COUNT
+// is wrong at any width where Plotly fits fewer keys per row than
+// WB_LEG_PER_ROW guesses, or where wrapLegendName gives a key two or three
+// lines: on a 604px-wide panel (a 900px viewport) an eleven-key legend needs
+// 342px and the count formula reserved 72, so six keys -- both standout
+// keys, both most-winning-member keys and the SP1 key among them -- fell
+// outside the plot's own overflow:hidden. Clipped keys are not merely
+// invisible: elementFromPoint misses them, so legend-hover isolation is dead
+// for exactly the marks a reader most wants isolated (2026-09-17 round 8
+// review). So the count is only the FIRST GUESS; the legend's real height is
+// measured after the draw and the panel is grown to hold it, with the PLOT
+// AREA as the invariant.
+//
+// The redraw is a relayout carrying ``autosize``, NOT a second
+// ``Plotly.react``: react does not re-read the graph div's height at all
+// (measured in headless Chrome -- style.height 685 -> 900 left
+// _fullLayout.height at 608 through react and a tick), while
+// ``relayout(gd, {autosize: true})`` picks the new container height up
+// synchronously and leaves the responsive WIDTH behaviour alone, which
+// setting layout.height outright would not.
+//
+// Converges in one correction: the legend's content height is a function of
+// the panel's WIDTH, which a height change does not move. The pass cap is a
+// guard, not a search.
+function _wbFitLegend(panel, layout) {
+  for (var pass = 0; pass < 4; pass++) {
+    var legH = _wbLegendHeight(panel);
+    if (!legH) return pass;
+    var legB = _wbLegBottom(legH);
+    if (Math.abs(legB - layout.margin.b) <= 1) return pass;
+    layout.margin.b = legB;
+    layout.legend.y = -WB_LEG_GAP / WB_PLOT_AREA;
+    panel.style.height = (WB_PLOT_T + WB_PLOT_AREA + legB) + 'px';
+    Plotly.relayout(panel, { autosize: true, 'margin.b': legB,
+                             'legend.y': layout.legend.y });
+  }
+  return 4;
+}
 
 // One family's name, exactly as the table row and the standout paragraph
 // spell it. Formatted here rather than shipped because it is three payload
@@ -5560,6 +5645,17 @@ function _wbFamilyName(f) {
 // centre or the two read as unrelated objects.
 function _wbFamilyColor(f, colors) {
   return (f.kind === 'score') ? colors.mark1 : colors.mark2;
+}
+
+// Silent when the rule reproduces the member list exactly, which is the only
+// case in which "the rule IS the region" needs no qualifying. The describer
+// accepts a rule from 0.95 fidelity up and prefers the SIMPLEST over the most
+// faithful, so an inexact one has to say so on the mark a reader hovers, the
+// same way the table row's fidelity clause does (2026-09-17 round 8 review).
+function _wbFamilyFid(f) {
+  if (typeof f.jac !== 'number' || f.jac >= 0.999) return '';
+  return ' (the rule is a ' + Math.round(f.jac * 100) +
+         '% description of it, not an exact one)';
 }
 
 // One ring trace per family, over every member of the region. Drawn UNDER
@@ -5590,7 +5686,7 @@ function _wbFamilyTraces(pay, block, L, wins, colors, den) {
                      _wbFamilyColor(f, colors), WB_FAM_SYMBOL, WB_FAM_SIZE, 1);
     var side = 'in the ' + nm.charAt(0).toLowerCase() + nm.slice(1) + ' -- ' +
                f.size + ' spreads guaranteeing ' + f.nG + ' of ' + f.nDec +
-               ' decision matchups, not a build';
+               ' decision matchups, not a build' + _wbFamilyFid(f);
     for (var i = 0; i < DATA.nIvs; i++) {
       if (!_wbBit(m, i)) continue;
       var mp = _wbXY(L, i, wins);
@@ -6499,15 +6595,18 @@ function wbRenderRoot(root) {
   // with the UpSet and was already narrow; now the scatter owns the
   // section's full width, and a right-hand legend spends that width on
   // text. Wrapping a horizontal legend costs HEIGHT, so the panel grows
-  // downward one row per wrapped legend line and the plot area above it is
-  // never squeezed. The geometry is computed, not guessed: the legend's top
-  // is pinned WB_LEG_GAP px under the x-axis title in paper units, and the
-  // bottom margin is exactly deep enough to hold the gap plus the rows.
+  // downward to hold the legend and the plot area above it is never
+  // squeezed. The legend's top is pinned WB_LEG_GAP px under the x-axis
+  // title in paper units, and the bottom margin is exactly deep enough to
+  // hold the gap plus the legend. The row count below is only a FIRST GUESS
+  // at the legend's height, close enough to keep the corrective redraw to
+  // one; _wbFitLegend then measures the legend and sizes the panel from
+  // that (round 8 review -- the guess is wrong by 3x at 900px).
   var legRows = Math.max(1, Math.ceil(traces.length / WB_LEG_PER_ROW));
-  var legB = WB_LEG_GAP + WB_LEG_PAD + legRows * WB_LEG_ROW_H;
-  var panelH = WB_PANEL_H + (legRows - 1) * WB_LEG_ROW_H;
+  var legB = _wbLegBottom(legRows * WB_LEG_ROW_H);
+  var panelH = WB_PLOT_T + WB_PLOT_AREA + legB;
   panel.style.height = panelH + 'px';
-  var legY = -WB_LEG_GAP / Math.max(panelH - WB_PLOT_T - legB, 1);
+  var legY = -WB_LEG_GAP / WB_PLOT_AREA;
   var layout = {
     xaxis: (_wbPlaneMode === 'stats')
       ? { title: 'Defense', showgrid: true, gridcolor: chrome.grid,
@@ -6555,6 +6654,8 @@ function wbRenderRoot(root) {
   }
   Plotly.react(panel, traces, layout,
                { responsive: true, displayModeBar: false });
+  // ...and now that the legend exists, let ITS height set the panel's.
+  _wbFitLegend(panel, layout);
   _wbWireLegend(panel, traces.map(function(t) { return t.marker.opacity; }));
   if (cap) {
     var capText = '';
