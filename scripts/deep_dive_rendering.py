@@ -56,7 +56,6 @@ class AnalysisContext:
     flips: dict
     flip_summary: list
     flip_map: dict
-    rec_candidates: list
     hp_list: list
     anchor_flip_records: list
     all_matchup_boundaries: list
@@ -3333,84 +3332,22 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 """
 
 
-def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
-                               ref_iv, ref_atk, ref_def, opp_info_cache,
-                               focal_moves, focal_types, has_bait_axis=False,
-                               build_of=None):
-    """Render the top-3 IV recommendation cards as an HTML fragment.
-
-    Returned HTML is injected into the Notable IVs & Recommendations
-    section by ``render_results_section``.
-
-    The card headline is the spread plus where it sits in the "Which one to
-    build?" builds ("7/2/12 -- in Build 1", "-- in no build"), read off
-    ``build_of`` ({iv index: build name}). Until 2026-09-17 it was the
-    spread's STYLE ("Matchup Hunter: 7/2/12") from a stat-extreme taxonomy
-    that is now retired; the picks themselves are unchanged -- still the top
-    three by composite score.
-    """
-    if not rec_candidates:
-        return ''
-    parts = []
-    parts.append('<h4 class="dd-h3" style="margin-top:18px">Top Picks</h4>\n')
-    parts.append(
-        f'<p class="dd-small">Top candidates by average score, matchup flips, '
-        f'and rank stability vs {opp_label} opponents.</p>\n')
-    if build_of:
-        # The two rankings answer different questions, and the page now says
-        # so out loud: all three picks reading "in no build" beside a section
-        # that recommends builds looked like a contradiction (2026-09-17
-        # round 6 review).
-        parts.append(
-            '<p class="dd-small" style="color:var(--text-muted)">Top Picks '
-            'rank single spreads by average score; the builds in "Which one '
-            'to build?" rank regions by what every member is guaranteed. '
-            'They need not coincide -- the Standouts block there is the '
-            'reconciliation.</p>\n')
-    parts.append('<div class="dd-rec-grid">\n')
-    for rc in rec_candidates[:3]:
-        iv = rc['iv']
-        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
-        fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis,
-                                   expandable=True, id_prefix='frec')
-        parts.append('<div class="dd-rec-card">\n')
-        where = (build_of or {}).get(iv)
-        membership = (f' &mdash; in {_html.escape(where)}' if where
-                      else (' &mdash; in no build' if build_of else ''))
-        parts.append(f'<h4 style="color:var(--title)">'
-                     f'{iv_label(data_obj, iv)}{membership}'
-                     f'{tier_badge_html(data_obj, iv)}</h4>\n')
-        parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
-        parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
-        parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
-        parts.append(f'<p class="dd-prose">{prose}</p>\n')
-        focal_atk_rc = data_obj['ivAtk'][iv]
-        focal_def_rc = data_obj['ivDef'][iv]
-        focal_hp_rc = data_obj['ivHp'][iv]
-        ref_hp_val = data_obj['ivHp'][ref_iv]
-        bp_lines = []
-        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
-            for e in entries:
-                opp_name = e['opponent']
-                if opp_name in opp_info_cache and focal_moves:
-                    oi = opp_info_cache[opp_name]
-                    narr = analysis.narrate_flip(
-                        focal_atk_rc, focal_def_rc, focal_hp_rc,
-                        ref_atk, ref_def, ref_hp_val,
-                        oi['atk'], oi['def_'], opp_name,
-                        focal_moves, oi['moves'],
-                        focal_types, oi['types'],
-                        is_gain=is_gain,
-                    )
-                    if narr:
-                        bp_lines.append(narr)
-        if bp_lines:
-            parts.append(f'<p class="dd-small"><b style="color:var(--accent)">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
-        parts.append('</div>\n')
-    parts.append('</div>\n')
-    return ''.join(parts)
-
+# ---------------------------------------------------------------------------
+# RETIRED 2026-09-17 (round 8 item 2): the composite-score "Top Picks" cards.
+# ---------------------------------------------------------------------------
+# ``_render_iv_recommendations`` printed the top three of a composite of
+# average-score rank, matchup flips and rank stability -- the one selection
+# rule on the page that no other surface used. It named single spreads while
+# the "Which one to build?" section two inches below named regions, the two
+# lists routinely disagreed (all three picks reading "in no build" beside a
+# section recommending builds), and the page had to carry a paragraph
+# explaining why. Michael's call, 2026-09-17: one Notable spreads list
+# replaces both, in that section, built from the spreads the page already has
+# a reason to name (``deep_dive_which_build.notable_html``).
+#
+# The composite ranking itself is NOT gone from render.py: ``rec_candidates``
+# still resolves the page's lead spread and backs ``_ensure_rc`` for the dive
+# card. What is gone is its ranking reaching the reader as a ranking.
 
 # ---------------------------------------------------------------------------
 # Opponent-centric view ("Threats where your IV matters")
@@ -3776,21 +3713,19 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            effective_tiers, anchor_flip_records,
                            all_matchup_boundaries, score_arrays,
                            moveset_idx, flips, flip_map, avg_ranks,
-                           avg_scores, rec_candidates, slayer_iter_result,
+                           avg_scores, slayer_iter_result,
                            opp_info_cache, focal_moves, focal_types,
                            ref_atk, ref_def, ref_iv, opp_iv_mode,
                            scores_flat, nS, nO, scenarios, opponents,
                            anchor_passing_sink, has_toml_tiers, ranked,
                            hp_list, nIvs, has_bait_axis=False,
-                           build_of=None, builds_pinned=False):
+                           builds_pinned=False):
     """Render the always-visible Deep Dive Results section.
 
     Returns an HTML string. Computation (anchor aggregation, tier
     derivation, matchup boundaries) is done by the caller; this function
     only assembles HTML from pre-computed data.
 
-    ``build_of`` is ``{iv index: build name}`` over every member of every
-    "Which one to build?" build, for the Top Picks cards' membership label;
     ``builds_pinned`` is the best-buddy (L51) pass, whose builds are the
     league cap's.
     """
@@ -3924,10 +3859,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append(sim_tier_cards)
 
     # -- IV Recommendations (rendered first, injected into Notable IVs) --
-    rec_html = _render_iv_recommendations(
-        rec_candidates, flips, opp_label, data_obj, ref_iv, ref_atk,
-        ref_def, opp_info_cache, focal_moves, focal_types,
-        has_bait_axis=has_bait_axis, build_of=build_of)
+    # The Top Picks cards are retired (round 8 item 2); the section's
+    # Notable spreads block is the page's one list of single spreads.
+    rec_html = ''
 
     # -- Notable IVs & Recommendations --
     from deep_dive import build_iv_categories
