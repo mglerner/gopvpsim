@@ -3266,7 +3266,7 @@ def test_the_standouts_block_prints_what_is_the_spreads_own(shadow_sableye):
     # both sentences were in this block.
     assert 'Of the 62 decision matchups it wins, Build 1 guarantees 52' \
         not in text
-    assert '9/6/13 (highest avg battle score) differs from it by 6' in text
+    assert '9/6/13 (Highest avg battle score) differs from it by 6' in text
     # round 5: the remainder is not a COUNT any more -- the block names the
     # matchups and how much of the build wins each. Asserted in full in
     # test_the_standouts_name_the_matchups_behind_their_counts. (Round 4:
@@ -4110,7 +4110,7 @@ def test_one_short_name_per_standout_on_every_surface(shadow_sableye):
     # short name appears as the variant's label rather than as a heading.
     # Pre-round-8 both read "<short> (" as block heads.
     assert 'Most matchups won (' in text
-    assert '(highest avg battle score)' in text
+    assert '(Highest avg battle score)' in text
     assert 'Highest battle score' not in text
     assert 'Highest Avg Battle Score' not in text
     # the section PLOT's two standout markers carry the same two names
@@ -5378,7 +5378,7 @@ def test_the_notable_block_prints_what_michael_asked_each_entry_to_print(
     assert 'are matchups Build 1 does not guarantee' in text
     assert 'It loses 6 of the 55 matchups Build 1 guarantees' in text
     # (e) the variants sentence, naming the merged spread AND its reason
-    assert ('9/6/13 (highest avg battle score) differs from it by 6 decision '
+    assert ('9/6/13 (Highest avg battle score) differs from it by 6 decision '
             'matchups' in text)
     # (f) the fixed note and the encounter-count sentence moved here
     assert W.standout_note(all_facts[0], all_facts[0]['_builds'],
@@ -5468,3 +5468,46 @@ def test_the_section_ships_the_collection_list_container(shadow_sableye):
     # under the plot, not above it
     assert html.index('class="wb-yours"') > html.index('class="wb-panel"')
     assert '#dd-which-build .wb-yours[hidden] { display: none; }' in W.CSS
+
+
+def test_a_variant_keeps_the_pages_own_short_name_and_says_when_it_is_identical():
+    """Round 8, from the first round-8 render.
+
+    Two wordings the variants sentence got wrong on pages other than Shadow
+    Sableye, both fixed here:
+
+    * ``0/13/15 (sp1) differs from it by 3 decision matchups`` on the
+      Melmetal ULTRA page -- the sentence lower-cased the canonical short
+      name to fit, turning the section's own term SP1 into a second spelling
+      of it. The name now travels verbatim.
+    * ``0/15/15 (sp1) differs from it by 0 decision matchups`` on the plain
+      Sableye page -- a sentence about a difference that is not there. Two
+      spreads with identical decision-win sets now say so.
+
+    Driven through the renderer on synthetic blocks, so it runs with no blob.
+    """
+    bl = {'builds': [{'role': 'primary', 'size': 61, 'n_guaranteed': 55,
+                      'most_winning_member': {'iv': '8/7/5@50', 'wins': 378}}]}
+    same = {'variants': [{'iv': '0/15/15@50', 'roles': [('sp1', None)],
+                          'n_diff': 0}]}
+    out = W.notable_variants_sentence(bl, same)
+    assert out.startswith('0/15/15 (SP1) wins exactly the same decision '
+                          'matchups, so this entry is the offer')
+    assert 'sp1' not in out and 'by 0 ' not in out
+    near = {'variants': [{'iv': '0/13/15@50', 'roles': [('sp1', None)],
+                          'n_diff': 3}]}
+    out2 = W.notable_variants_sentence(bl, near)
+    assert ('0/13/15 (SP1) differs from it by 3 decision matchups'
+            in out2), out2
+    # a build's most-winning member keeps its own name, and a mixed span
+    # reads as a range
+    two = {'variants': [{'iv': '9/6/13@47.5', 'roles': [('score', None)],
+                         'n_diff': 6},
+                        {'iv': '7/2/12@50', 'roles': [('build', 0)],
+                         'n_diff': 2}]}
+    out3 = W.notable_variants_sentence(bl, two)
+    assert '9/6/13 (Highest avg battle score)' in out3
+    assert '7/2/12 (Build 1&#x27;s most-winning member)' in out3
+    assert 'differ from it by 2 to 6 decision matchups' in out3
+    # and no variants is no sentence
+    assert W.notable_variants_sentence(bl, {'variants': []}) == ''

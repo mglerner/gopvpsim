@@ -2832,16 +2832,27 @@ def notable_variants_sentence(bl, t):
     def _label(v):
         iv = _esc(v['iv'].split('@')[0])
         roles = [notable_role_short(bl, r) for r in v['roles']]
-        return f"{iv} ({_esc(brief._and_list(roles)).lower()})" if roles else iv
+        # The canonical short name VERBATIM. Lower-casing it to fit the
+        # sentence turned the page's own term SP1 into "sp1", which is a
+        # second spelling of a term the section is careful to have one of.
+        return f"{iv} ({_esc(brief._and_list(roles))})" if roles else iv
     ivs = brief._and_list([_label(v) for v in vs])
     diffs = sorted({v['n_diff'] for v in vs})
-    if len(diffs) == 1:
+    verb = 'differs' if len(vs) == 1 else 'differ'
+    if diffs[-1] == 0:
+        # Identical win sets. "differs from it by 0 decision matchups" is a
+        # sentence about a difference that is not there.
+        return (f"{ivs} {'wins' if len(vs) == 1 else 'win'} exactly the same "
+                f"decision matchups, so this entry is the offer and they are "
+                f"spellings of it.")
+    if diffs[0] == 0:
+        span = f"by up to {brief._n(diffs[-1])} decision matchups"
+    elif len(diffs) == 1:
         span = (f"by {brief._n(diffs[0])} decision "
                 f"{brief._noun(diffs[0], 'matchup')}")
     else:
         span = (f"by {brief._n(diffs[0])} to {brief._n(diffs[-1])} decision "
                 f"matchups")
-    verb = 'differs' if len(vs) == 1 else 'differ'
     return (f"{ivs} {verb} from it {span}, so this entry is the offer and "
             f"they are spellings of it.")
 
