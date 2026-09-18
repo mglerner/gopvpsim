@@ -5437,6 +5437,11 @@ def test_your_collection_is_listed_under_the_plot_grouped_by_build():
     assert 'DATA.spRanks[i]' in body
     assert 'wins[i]' in body and 'den' in body
     assert 'if (cps.length) bits.push(' in body
+    # ... and a manual entry typed with the level field blank knows NEITHER a
+    # level nor a current CP (``mon.cp`` is 0 there). Pre-fix the row read
+    # "1/15/13 (SP #9, wins 394 of 684, CP 0)" -- measured in headless Chrome
+    # on the round-8 Melmetal GL render.
+    assert 'if (mon.level == null || !(mon.cp > 0)) continue;' in body
     raw = ENGINE_JS.read_text()
     raw_body = raw[raw.index('function _wbYours('):
                    raw.index('function _wbWireLegend(')]

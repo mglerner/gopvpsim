@@ -5306,13 +5306,17 @@ function _wbYours(root, pay, block, wins, den) {
     var i = parseInt(key, 10);
     if (!(i >= 0 && i < DATA.nIvs)) continue;
     var recs = state.ownedByIv[i];
-    // The CURRENT CP, when the collection knows one. A manual entry with no
-    // level has no current CP, and the row says so rather than printing the
-    // page's fitted CP as though the reader's mon were already there.
+    // The CURRENT CP, only when the collection actually knows one. A manual
+    // entry typed with the level field blank knows neither a level nor a
+    // current CP -- ``mon.cp`` is 0 there, and printing "CP 0" beside a
+    // spread is worse than printing nothing (headless probe, 2026-09-17).
+    // The page's own FITTED CP is not a substitute: it is what the spread
+    // would be at the cap, not what the reader's mon is now.
     var cps = [];
     for (var r = 0; r < recs.length; r++) {
-      var cp = recs[r].mon && recs[r].mon.cp;
-      if (cp != null && cps.indexOf(cp) < 0) cps.push(cp);
+      var mon = recs[r].mon || {};
+      if (mon.level == null || !(mon.cp > 0)) continue;
+      if (cps.indexOf(mon.cp) < 0) cps.push(mon.cp);
     }
     var bits = [ 'SP #' + DATA.spRanks[i],
                  'wins ' + wins[i] + ' of ' + den ];
