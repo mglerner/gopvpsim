@@ -1557,6 +1557,288 @@ def standouts(ctx, frame, builds, weights, wsum):
     return out
 
 
+# ---------------------------------------------------------------------------
+# NOTABLE SPREADS (round 8 item 2)
+# ---------------------------------------------------------------------------
+# Through round 7 the page named single spreads in TWO places, on two
+# different rankings: the section's Standouts block (the most-winning spread
+# and the highest-average-score spread, chosen off the decision grid) and the
+# dive's "Top Picks" cards (the top three of a composite of average-score
+# rank, matchup flips and rank stability). Neither ranking knew about the
+# other, so a reader met "Top Picks" whose three entries all read "in no
+# build" beside a section recommending builds, and the page had to print a
+# paragraph explaining why its two lists disagreed.
+#
+# Round 8 item 2 (Michael, 2026-09-17) replaces both with ONE list. Its
+# entries are the spreads the page already has a reason to name:
+#
+#   * the most-winning spread and the highest-average-score spread (the two
+#     standouts);
+#   * SP1, the stat-product rank-1 spread; and
+#   * each build's most-winning member, which moves with the preset.
+#
+# The composite-score ranking is retired -- it was the one selection rule on
+# the page no other surface used.
+#
+# The entries are then DEDUPLICATED BY PROFILE, because the interesting
+# question about two named spreads is whether they win different matchups,
+# not whether their IVs differ: two entries sharing at least
+# ``NOTABLE_DEDUP_J`` of their decision-cell wins (Jaccard) collapse to one,
+# the first in the fixed order above named and the rest listed as variants
+# with how many matchups separate them. A list of five spreads that all win
+# the same 60 matchups is one offer printed five times.
+NOTABLE_DEDUP_J = 0.90
+
+# The fixed order. First wins the naming when two entries merge, so the two
+# standouts -- the spreads the plot marks and the cards headline -- lead.
+NOTABLE_ROLE_ORDER = ('wins', 'both', 'score', 'sp1', 'build')
+
+
+def notable_spreads(ctx, frame, builds, standouts_out, weights, wsum):
+    """The one list of single spreads the section names, deduplicated.
+
+    Returns one :func:`standout_block` per surviving entry, with two extra
+    keys:
+
+    * ``roles`` -- every reason this spread is on the list, as
+      ``(kind, build index or None)`` pairs, in the fixed order. One spread
+      can hold several (the most-winning spread IS often Build 1's
+      most-winning member), and an entry that holds several says so rather
+      than appearing once per reason.
+    * ``variants`` -- the entries that merged into it, each with ``n_diff``:
+      how many decision matchups separate the two win sets (the symmetric
+      difference). That is the number a reader needs -- "differs by two
+      matchups" is actionable, "Jaccard 0.94" is not.
+    """
+    Wd = frame['Wd']
+    cands = [{'kind': t['kind'], 'build': None, 'idx': int(t['idx'])}
+             for t in standouts_out]
+    cands.append({'kind': 'sp1', 'build': None,
+                  'idx': int(np.argmin(ctx['sp_rank']))})
+    for i, b in enumerate(builds):
+        cands.append({'kind': 'build', 'build': i,
+                      'idx': int(b['most_winning_member']['idx'])})
+    # (a) exact dedup: the same SPREAD reached by two reasons is one entry.
+    order, by_idx = [], {}
+    for c in cands:
+        e = by_idx.get(c['idx'])
+        if e is None:
+            e = {'idx': c['idx'], 'roles': []}
+            by_idx[c['idx']] = e
+            order.append(e)
+        if (c['kind'], c['build']) not in e['roles']:
+            e['roles'].append((c['kind'], c['build']))
+    # (b) profile dedup: near-identical decision-win sets are one offer.
+    kept = []
+    for e in order:
+        w = Wd[e['idx']] if Wd.shape[1] else np.zeros(0, bool)
+        hit = None
+        for prev in kept:
+            pw = Wd[prev['idx']] if Wd.shape[1] else np.zeros(0, bool)
+            union = int((w | pw).sum())
+            if union and int((w & pw).sum()) / union >= NOTABLE_DEDUP_J:
+                hit = prev
+                break
+        if hit is None:
+            e['variants'] = []
+            kept.append(e)
+        else:
+            hit['variants'].append(
+                {'idx': e['idx'], 'iv': iv_str(ctx['meta'], e['idx']),
+                 'roles': e['roles'],
+                 'sp_rank': int(ctx['sp_rank'][e['idx']]),
+                 'n_diff': int((w ^ Wd[hit['idx']]).sum())})
+    out = []
+    for e in kept:
+        blk = standout_block(ctx, frame, builds, e['roles'][0][0], e['idx'],
+                             weights, wsum)
+        blk['roles'] = e['roles']
+        blk['variants'] = e['variants']
+        out.append(blk)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# FAMILIES (round 8 item 1) -- the region around a standout that no build is
+# ---------------------------------------------------------------------------
+# A build is an INTERSECTION OF NAMED SETS, so the grid structure the five
+# set generators see decides what can be a build at all. A standout -- the
+# spread winning the most decision matchups, or the one with the highest
+# average battle score -- routinely sits in none of them, and the section
+# could say only "it is outside every build" and list what that costs.
+#
+# There IS a region around such a spread: drop the standout's rarest
+# guarantees one at a time until the spreads winning ALL the remaining ones
+# number at least MIN_BUILD, and what is left is a describable set of spreads
+# that guarantee most of what the standout guarantees. The 2026-09-17 corpus
+# run (userdata/analysis/2026-09-17_seeded_lattice/v2/summary.md) measured
+# these regions on every arm of the corpus and found they must NOT enter the
+# lattice: seeded primaries are tight (median 60 spreads against 128), the
+# fork loses cells on 19 of the comparisons and vanishes on 16. Michael's
+# call, 2026-09-17: they are shown as FAMILIES around the standouts,
+# alongside the builds, and the lattice stays unseeded.
+#
+# A family is therefore NOT a build. It never enters the lattice, it takes no
+# UpSet column, it gets no card, and the builds table labels its row "family
+# (not a build)". It is a pure function of (grid, seed spread): the growth
+# reads only the seed's own decision-cell wins, so the same seed gives the
+# same family under every preset. What the PRESET changes is which standouts
+# are outside every build, and so which families are drawn -- which is why
+# the cache below is keyed on the seed alone.
+FAMILY_MIN = MIN_BUILD
+
+
+def _family_grow(Wd, own, min_members, order, wr):
+    """Greedily drop cells from ``own`` until >= ``min_members`` spreads win all.
+
+    ``order`` is the greedy rule:
+
+    * ``'rate'`` -- drop the cell with the lowest GRID win rate first (the
+      rarest guarantee, which is the one fewest spreads can be asked to
+      hold);
+    * ``'members'`` -- drop the cell whose removal admits the most members.
+
+    Member counting is incremental: with ``cnt`` the number of kept cells each
+    spread wins, the members after dropping cell ``c`` are the current members
+    plus the spreads missing exactly one kept cell, that one being ``c``. That
+    turns the ``'members'`` rule from a quadratic pile of ``all()`` reductions
+    into one pass per candidate.
+    """
+    keep = list(own)
+    cnt = Wd[:, keep].sum(axis=1).astype(np.int32)
+    while True:
+        K = len(keep)
+        mem = cnt == K
+        n_mem = int(mem.sum())
+        if n_mem >= min_members:
+            break
+        if K <= 1:
+            return None
+        if order == 'rate':
+            drop = min(keep, key=lambda ci: (wr[ci], ci))
+        else:
+            near = np.nonzero(cnt == K - 1)[0]
+            sub = Wd[near] if near.size else None
+            best = None
+            for ci in keep:
+                gain = 0 if sub is None else int((~sub[:, ci]).sum())
+                score = (gain, -wr[ci], -ci)
+                if best is None or score > best[0]:
+                    best = (score, ci)
+            drop = best[1]
+        cnt -= Wd[:, drop]
+        keep.remove(drop)
+    g = Wd[mem].all(axis=0)
+    return dict(mask=mem, keep=list(keep), order=order, n_mem=n_mem,
+                n_g=int(g.sum()))
+
+
+def family_region(ctx, frame, idx, min_members=FAMILY_MIN, cache=None):
+    """The family around one spread, or None.
+
+    Both greedy orders are run and the one ending with more guaranteed cells
+    is kept (ties: more members) -- the same two-order search the 2026-09-17
+    seeded-lattice prototype used, so the numbers on the page are the corpus
+    run's numbers.
+
+    None when the spread wins no decision cell, when no region of
+    ``min_members`` can be grown, or when NO RULE FITS the region at 95%
+    fidelity. The last is deliberate: every surface that shows a family names
+    its rule (the legend key, the table row, the standout's paragraph), and a
+    region the page cannot describe is a region a reader cannot aim at. The
+    honest output there is silence, not an outline with no sentence.
+    """
+    if cache is not None and idx in cache:
+        return cache[idx]
+
+    def _done(v):
+        if cache is not None:
+            cache[idx] = v
+        return v
+
+    cells = frame['cells']
+    Wd = frame['Wd']
+    if not cells or not Wd.shape[1]:
+        return _done(None)
+    wr = np.array([c['wr'] for c in cells], dtype=np.float64)
+    own = np.nonzero(Wd[idx])[0]
+    if own.size == 0:
+        return _done(None)
+    cands = [r for r in (_family_grow(Wd, own, min_members, 'rate', wr),
+                         _family_grow(Wd, own, min_members, 'members', wr))
+             if r is not None]
+    if not cands:
+        return _done(None)
+    cands.sort(key=lambda r: (-r['n_g'], -r['n_mem']))
+    r = cands[0]
+    mask = r['mask']
+    d95 = region_rule(ctx, mask)
+    if d95 is None:
+        return _done(None)
+    # The same description block a BUILD carries, so every surface that
+    # prints a rule -- the legend's short form, the table's stepped-out
+    # staircase, the paragraph -- renders a family through the build
+    # renderers rather than through a second copy of the rule grammar.
+    dblock = {'family': d95['family'], 'rule': d95['rule'],
+              'jaccard': round(float(d95['jaccard']), 4),
+              'n_rule': d95['n_rule'], 'n_extra': d95['n_extra'],
+              'n_missing': d95['n_missing']}
+    if d95.get('terms') is not None:
+        dblock['terms'] = [[ax, op, float(t)] for ax, op, t in d95['terms']]
+    if d95.get('steps') is not None:
+        dblock['steps'] = [[float(a), float(b), int(c), float(e)]
+                           for a, b, c, e in d95['steps']]
+        dblock['atk_floor'] = float(d95['atk_floor'])
+    if d95.get('trade_terms') is not None:
+        dblock['trade_terms'] = d95['trade_terms']
+    g = Wd[mask].all(axis=0)
+    r1 = int(np.argmin(ctx['sp_rank']))
+    return _done({
+        'seed_idx': int(idx),
+        'rank1_in': bool(mask[r1]),
+        'seed_iv': iv_str(ctx['meta'], idx),
+        'description': dblock,
+        'rule': _desc_text({'description': dblock})[0],
+        'rule_family': d95['family'],
+        'rule_fidelity': round(float(d95['jaccard']), 4),
+        'size': int(mask.sum()),
+        'n_guaranteed': int(g.sum()),
+        'n_decision_cells': len(cells),
+        'n_seed_cells': int(own.size),
+        'n_cells_dropped': int(own.size) - len(r['keep']),
+        'order': r['order'],
+        'orders': {c['order']: [c['n_mem'], c['n_g']] for c in cands},
+        '_mask': mask,
+        '_g': g,
+    })
+
+
+def families(ctx, frame, standouts_out, cache=None):
+    """One family per standout that sits in no build, deduplicated by mask.
+
+    Standouts INSIDE a build get no family: the build is already the region
+    around them, and a second outline over the same points would be two names
+    for one answer. Each standout gets ``family`` -- the index of its family
+    in the returned list, or None.
+    """
+    out = []
+    for t in standouts_out:
+        t['family'] = None
+        if t['in_build'] is not None:
+            continue
+        fam = family_region(ctx, frame, t['idx'], cache=cache)
+        if fam is None:
+            continue
+        hit = next((i for i, f in enumerate(out)
+                    if np.array_equal(f['_mask'], fam['_mask'])), None)
+        if hit is None:
+            hit = len(out)
+            fam = dict(fam, seed_kind=t['kind'])
+            out.append(fam)
+        t['family'] = hit
+    return out
+
+
 def run_preset(ctx, sets, frame, preset):
     """Select and describe the builds for one preset."""
     weights = preset_weights(preset, ctx['scen_labels'])
@@ -1618,6 +1900,23 @@ def run_preset(ctx, sets, frame, preset):
     for t in standouts_out:
         t['in_wide'] = (None if wide is None
                         else bool(wide['_mask'][t['idx']]))
+    # The families, LAST: they are drawn only around standouts that sit in no
+    # build, and which standouts those are is what the preset changes. The
+    # regions themselves are preset-independent, so the cache on ``ctx``
+    # means a family is grown once per arm however many presets show it.
+    fam_cache = ctx.setdefault('_family_cache', {})
+    fams = families(ctx, frame, standouts_out, cache=fam_cache)
+    # The one list of single spreads (round 8 item 2). Computed AFTER the
+    # builds, the wide region and the families, because every entry says
+    # where it sits relative to all three.
+    notable = notable_spreads(ctx, frame, builds, standouts_out, weights,
+                              wsum)
+    fam_masks = [f['_mask'] for f in fams]
+    for t in notable:
+        t['in_wide'] = (None if wide is None
+                        else bool(wide['_mask'][t['idx']]))
+        t['family'] = next((i for i, m in enumerate(fam_masks)
+                            if bool(m[t['idx']])), None)
     wcell = cell_weights(frame['cells'], weights)
     counted = wcell > 0
     singles = [d for d in L['inters'] if len(d['combo']) == 1]
@@ -1650,6 +1949,8 @@ def run_preset(ctx, sets, frame, preset):
         'fork_detail': fork_info,
         'objectives': objectives_block(ctx, builds, weights, wsum=wsum),
         'standouts': standouts_out,
+        'notable': notable,
+        'families': fams,
         'wide': wide,
         'has_fork': any(b['role'] == 'fork' for b in builds),
     }
@@ -1912,6 +2213,20 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
             regions[ri]['mask'] = pack_mask([bool(x) for x in inter['mask']])
         return ri
 
+    fam_rows, fam_idx = [], {}
+
+    def add_family(f):
+        key = int(f['seed_idx'])
+        if key not in fam_idx:
+            fam_idx[key] = len(fam_rows)
+            fam_rows.append({
+                'iv': f['seed_iv'], 'kind': f['seed_kind'],
+                'rule': f['rule'], 'size': f['size'],
+                'nG': f['n_guaranteed'], 'nDec': f['n_decision_cells'],
+                'seedIdx': key,
+                'mask': pack_mask([bool(x) for x in f['_mask']])})
+        return fam_idx[key]
+
     pay_presets = {}
     for key, block in res['presets'].items():
         keys = [p['key'] for p in block['lattice_sets']]
@@ -2007,7 +2322,16 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
                    for i, w in enumerate(block['weights']) if w > 0],
             builds=pb, cols=col_rows,
             wide=bool(block.get('wide')),
+            # Families are NOT builds: no UpSet column, no card, no lattice
+            # row. A preset carries only INDICES into the payload's one
+            # family table -- a family is a pure function of (grid, seed), so
+            # the three presets show the same regions and shipping a 684-byte
+            # membership mask once per preset would have been 2.7 KB of the
+            # same bytes three times (the payload's size cap caught exactly
+            # that).
+            families=[add_family(f) for f in block.get('families') or []],
             standouts=[{'kind': t['kind'], 'iv': t['iv'],
+                        'family': t.get('family'),
                         'inBuild': t['in_build'],
                         'inWide': t.get('in_wide'),
                         'nearest': t['nearest_build'],
@@ -2045,6 +2369,9 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
         'nDecision': len(cells), 'nMaterial': int(frame['mat'].sum()),
         'nOpp': int(ctx['n_opp']),
         'cells': cells, 'regions': regions, 'presets': pay_presets,
+        # One row per family, referenced by index from every preset that
+        # draws it (see ``add_family``).
+        'families': fam_rows,
         'rank1': {'iv': iv_str(ctx['meta'], r1), 'idx': r1,
                   'wins': int(wins_all[r1])},
         'gridBest': {'iv': iv_str(ctx['meta'], gmw), 'idx': gmw,

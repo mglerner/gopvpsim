@@ -5159,7 +5159,7 @@ function _wbMcApplies(pay, mcPay) {
 
 // Your pasted collection, on this panel, in every view -- same gold star the
 // cluster panels use, hover naming the mon and its side of the line.
-function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn) {
+function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn, borderFn) {
   if (!state.ownedByIv) return null;
   // The same tiny y-nudge the cluster panels and the main scatter apply, for
   // the same measured reason: a star sitting at the EXACT coordinates of a
@@ -5173,7 +5173,7 @@ function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn) {
     if (wins[w] > ymax) ymax = wins[w];
   }
   var ynudge = (isFinite(ymin) && ymax > ymin) ? (ymax - ymin) * 0.0005 : 0;
-  var ox = [], oy = [], ot = [];
+  var ox = [], oy = [], ot = [], ob = [];
   for (var key in state.ownedByIv) {
     var i = parseInt(key, 10);
     if (!(i >= 0 && i < DATA.nIvs)) continue;
@@ -5191,12 +5191,159 @@ function _wbOwnedTrace(pay, L, wins, line, den, noLine, sideFn) {
     oy.push(mp[1] + (_wbPlaneMode === 'stats' ? 0.02 : ynudge));
     ox.push(mp[0]);
     ot.push('Yours: ' + names + '<br>' + _wbHover(i, L, wins, side, den));
+    // Round 8 item 3(a): the star's BORDER is the colour of the build it is
+    // in. A collection of 40 stars on one plot answered "you own these
+    // spreads" and nothing else; the border answers "and this one is a
+    // Build 1 spread" without a click. The fill stays gold on every star --
+    // that is what says "yours" -- so the build reads as an outline.
+    ob.push(borderFn ? borderFn(i) : plotChrome().ink);
   }
   if (!ox.length) return null;
   var t = _wbTrace('Yours (' + ox.length + ')', '#ffd700', 'star', 12, 1);
-  t.marker.line = { width: 1.5, color: plotChrome().ink };
+  t.marker.line = { width: 2, color: borderFn ? ob : plotChrome().ink };
   t.x = ox; t.y = oy; t.text = ot;
   return t;
+}
+
+// ---- round 8 item 3: where one spread sits, for the collection overlay --
+// The four answers in the order they are asked, which is also the order the
+// "Your collection" list groups by: a build first (a spread in a build is in
+// that build, whatever else contains it), then the wide region, then a
+// family, then nothing. Returns {kind, i} with `i` the build or family
+// index, so the star's border colour and the list's group heading are read
+// off ONE classification rather than two that could disagree.
+function _wbOwnWhere(pay, block, i) {
+  var b = _wbBuildOf(pay.bp, block, i);
+  if (b >= 0 && block.builds[b].role !== 'wide') return { kind: 'build', i: b };
+  for (var w = 0; w < block.builds.length; w++) {
+    if (block.builds[w].role !== 'wide') continue;
+    var wm = pay.bp.regions[block.builds[w].region].mask;
+    if (wm && _wbBit(_wbMask(wm), i)) return { kind: 'wide', i: w };
+  }
+  var fams = _wbFamilies(pay, block);
+  for (var f = 0; f < fams.length; f++) {
+    if (fams[f].mask && _wbBit(_wbMask(fams[f].mask), i)) {
+      return { kind: 'family', i: f };
+    }
+  }
+  return { kind: 'none', i: -1 };
+}
+
+// The colour that classification is drawn in. A build takes its own hue; the
+// wide region takes Build 1's at the tint its ring is drawn in; a family
+// takes its seed standout's marker colour, the colour of the ring it is
+// already drawn as; nothing takes the muted grey the population uses.
+function _wbOwnColorOf(pay, block, bcol, colors, w) {
+  if (w.kind === 'build' || w.kind === 'wide') {
+    return _wbBuildCol(block, bcol, w.i, colors.line);
+  }
+  if (w.kind === 'family') {
+    return _wbFamilyColor(_wbFamilies(pay, block)[w.i], colors);
+  }
+  return colors.below;
+}
+
+function _wbOwnColor(pay, block, bcol, colors, i) {
+  return _wbOwnColorOf(pay, block, bcol, colors,
+                       _wbOwnWhere(pay, block, i));
+}
+
+// The reader-facing name of that classification. "only" on the wide and
+// family headings because both contain build members too, and a heading
+// that did not say so would look like a fourth build.
+function _wbOwnGroupName(pay, block, w) {
+  if (w.kind === 'build') return _wbBuildName(block, w.i);
+  if (w.kind === 'wide') return _wbBuildName(block, w.i) + ' only';
+  if (w.kind === 'family') {
+    return _wbFamilyName(_wbFamilies(pay, block)[w.i]) + ' only';
+  }
+  return 'In no build';
+}
+
+// What one owned spread's hover says about where it sits. The build's own
+// guarantee sentence when a build holds it; otherwise the region or family
+// that does, named, so a star outside every build never reads as bare.
+function _wbOwnSide(pay, block, scen, i) {
+  var w = _wbOwnWhere(pay, block, i);
+  if (w.kind === 'build') return _wbBuildSide(pay, block, w.i, scen);
+  if (w.kind === 'wide') {
+    return _wbBuildSide(pay, block, -1, scen) + '; inside ' +
+           _wbBuildName(block, w.i);
+  }
+  if (w.kind === 'family') {
+    var f = _wbFamilies(pay, block)[w.i];
+    return _wbBuildSide(pay, block, -1, scen) + '; inside the ' +
+           _wbFamilyName(f).charAt(0).toLowerCase() +
+           _wbFamilyName(f).slice(1) + ' (' + _wbFamilyCounts(f) +
+           ', not a build)';
+  }
+  return _wbBuildSide(pay, block, -1, scen);
+}
+
+// ---- round 8 item 3(b): "Your collection", grouped by build -------------
+// The stars say WHERE each owned spread sits; this says WHICH spreads those
+// are, in one place, grouped the way the reader's question is shaped ("what
+// have I already got for Build 1?"). Drawn from the same collection state
+// and the same classification the stars use, so the two cannot disagree,
+// and re-rendered whenever the collection or the Build-criteria preset
+// changes. Hidden outright when the collection is empty.
+function _wbYours(root, pay, block, wins, den) {
+  var box = root.querySelector('.wb-yours');
+  if (!box) return;
+  function clear() { box.hidden = true; box.innerHTML = ''; }
+  if (!state.ownedByIv || !block || !pay.bp) return clear();
+  var groups = [], byKey = {};
+  function bucket(w) {
+    var k = w.kind + ':' + w.i;
+    if (!byKey[k]) {
+      byKey[k] = { w: w, rows: [] };
+      groups.push(byKey[k]);
+    }
+    return byKey[k];
+  }
+  var n = 0;
+  for (var key in state.ownedByIv) {
+    var i = parseInt(key, 10);
+    if (!(i >= 0 && i < DATA.nIvs)) continue;
+    var recs = state.ownedByIv[i];
+    // The CURRENT CP, when the collection knows one. A manual entry with no
+    // level has no current CP, and the row says so rather than printing the
+    // page's fitted CP as though the reader's mon were already there.
+    var cps = [];
+    for (var r = 0; r < recs.length; r++) {
+      var cp = recs[r].mon && recs[r].mon.cp;
+      if (cp != null && cps.indexOf(cp) < 0) cps.push(cp);
+    }
+    var bits = [ 'SP #' + DATA.spRanks[i],
+                 'wins ' + wins[i] + ' of ' + den ];
+    if (cps.length) bits.push('CP ' + cps.join('/'));
+    bucket(_wbOwnWhere(pay, block, i)).rows.push({
+      iv: _wbIvStr(i), sp: DATA.spRanks[i],
+      text: _wbIvStr(i) + ' (' + bits.join(', ') + ')' });
+    n++;
+  }
+  if (!n) return clear();
+  var bcol = _wbBuildColors(root, pay.bp), colors = _wbColors(root, pay);
+  var rank = { build: 0, wide: 1, family: 2, none: 3 };
+  groups.sort(function (a, b) {
+    return (rank[a.w.kind] - rank[b.w.kind]) || (a.w.i - b.w.i);
+  });
+  var out = ['<p class="wb-mem-head">Your collection, by build</p>'];
+  for (var g = 0; g < groups.length; g++) {
+    var grp = groups[g];
+    grp.rows.sort(function (a, b) { return a.sp - b.sp; });
+    out.push('<p class="wb-yours-head"><span class="wb-yours-dot" ' +
+             'style="background:' +
+             _wbOwnColorOf(pay, block, bcol, colors, grp.w) + '"></span>' +
+             escapeHtml(_wbOwnGroupName(pay, block, grp.w)) + ' (' +
+             grp.rows.length + ')</p><ul class="wb-yours-list">');
+    for (var rr = 0; rr < grp.rows.length; rr++) {
+      out.push('<li>' + escapeHtml(grp.rows[rr].text) + '</li>');
+    }
+    out.push('</ul>');
+  }
+  box.innerHTML = out.join('');
+  box.hidden = false;
 }
 
 // Legend hover isolates a group, the same affordance the main scatter has.
@@ -5369,6 +5516,88 @@ function _wbBuildCol(block, bcol, k, fallback) {
 var WB_RING_SYMBOL = 'circle-open';
 var WB_RING_SIZE = 9;
 
+// ---- round 8 item 1: the FAMILY marker ----------------------------------
+// A family is the region grown around a standout that sits in no build. It
+// is NOT a build and it is not the wide region either, so it must be
+// readable as neither: it takes no build hue (it is drawn in its own
+// standout's marker colour, so the ring and the marker at its centre read as
+// one object) and it does not reuse the wide region's plain open circle. An
+// open circle with a centre dot, one size larger than the wide ring, is a
+// mark nothing else on this panel draws.
+var WB_FAM_SYMBOL = 'circle-open-dot';
+var WB_FAM_SIZE = 12;
+
+// Section-plot geometry (round 8 item 4). The panel is one full-width row
+// with its legend underneath it; these are the pixel quantities that layout
+// is built from, named once so the panel's CSS height, its bottom margin and
+// its legend anchor cannot drift apart.
+var WB_PANEL_H = 400;      // plot height with a single legend row
+var WB_PLOT_T = 8;         // top margin
+var WB_LEG_PER_ROW = 3;    // legend keys that fit across the section's width
+var WB_LEG_ROW_H = 18;     // one wrapped legend row
+var WB_LEG_GAP = 44;       // x-axis title + breathing room above the legend
+var WB_LEG_PAD = 6;        // below the last legend row
+
+// One family's name, exactly as the table row and the standout paragraph
+// spell it. Formatted here rather than shipped because it is three payload
+// numbers in a fixed order, not a sentence -- the rule string inside it IS
+// authored in Python and travels verbatim.
+function _wbFamilyCounts(f) {
+  return f.size + ' spreads, guarantees ' + f.nG + ' of ' + f.nDec;
+}
+
+function _wbFamilyName(f) {
+  return 'Family around ' + String(f.iv).split('@')[0];
+}
+
+// A family's colour is its SEED standout's marker colour: the most-winning
+// spread is drawn in mark2 and the highest-average-score spread in mark1
+// (see _wbBuildMarks), and the ring around each has to match the mark at its
+// centre or the two read as unrelated objects.
+function _wbFamilyColor(f, colors) {
+  return (f.kind === 'score') ? colors.mark1 : colors.mark2;
+}
+
+// One ring trace per family, over every member of the region. Drawn UNDER
+// everything else for the same reason the wide ring is: they are context
+// around points other traces own, and a larger marker on top would hide both
+// the build member inside it and the standout at the centre.
+// One preset's families, resolved. The preset carries indices into the
+// payload's single family table (the regions are preset-independent, so the
+// masks travel once).
+function _wbFamilies(pay, block) {
+  var out = [], idx = (block && block.families) || [];
+  var all = (pay.bp && pay.bp.families) || [];
+  for (var k = 0; k < idx.length; k++) {
+    if (all[idx[k]]) out.push(all[idx[k]]);
+  }
+  return out;
+}
+
+function _wbFamilyTraces(pay, block, L, wins, colors, den) {
+  var out = [], fams = _wbFamilies(pay, block);
+  for (var k = 0; k < fams.length; k++) {
+    var f = fams[k];
+    if (!f.mask) continue;
+    var m = _wbMask(f.mask);
+    var nm = _wbFamilyName(f);
+    var t = _wbTrace(wrapLegendName(nm + ': ' + f.rule + ' (' +
+                                    _wbFamilyCounts(f) + ')', 34),
+                     _wbFamilyColor(f, colors), WB_FAM_SYMBOL, WB_FAM_SIZE, 1);
+    var side = 'in the ' + nm.charAt(0).toLowerCase() + nm.slice(1) + ' -- ' +
+               f.size + ' spreads guaranteeing ' + f.nG + ' of ' + f.nDec +
+               ' decision matchups, not a build';
+    for (var i = 0; i < DATA.nIvs; i++) {
+      if (!_wbBit(m, i)) continue;
+      var mp = _wbXY(L, i, wins);
+      t.x.push(mp[0]); t.y.push(mp[1]);
+      t.text.push(_wbHover(i, L, wins, side, den));
+    }
+    if (t.x.length) out.push(t);
+  }
+  return out;
+}
+
 // The builds view: every spread, coloured by the build it belongs to.
 function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   var bp = pay.bp, block = wbPresetBlock(pay);
@@ -5464,6 +5693,10 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   // around Build 1, and the larger marker on top would hide both the build
   // it is context for and the muted centre the extras need.
   var out = [];
+  // The family rings sit under even the wide ring: a family can contain
+  // members of a build AND spreads the wide rule reaches, and it is the
+  // outermost annotation of the three.
+  out = out.concat(_wbFamilyTraces(pay, block, L, wins, colors, den));
   if (wideIdx >= 0) out.push(ts[wideIdx]);
   out.push(none);
   for (var k3 = 0; k3 < ts.length; k3++) {
@@ -6238,18 +6471,39 @@ function wbRenderRoot(root) {
       if (gbt) traces.push(gbt);
     }
   }
-  var ownSide = null;
+  var ownSide = null, ownBorder = null;
   if ((view === 'builds' || view === 'stats') && pblock) {
     // On the builds view a pasted mon's question is "is it in a build, and
-    // what does that get me" -- not which side of the line it is on.
-    ownSide = function(i) {
-      return _wbBuildSide(pay, pblock, _wbBuildOf(pay.bp, pblock, i), scen);
+    // what does that get me" -- not which side of the line it is on. Round 8
+    // item 3 widens that answer past the builds: the wide region and the
+    // family are exactly what a reader told "in no build" asks about next,
+    // and the star's border carries the same classification as a colour.
+    ownSide = function(i) { return _wbOwnSide(pay, pblock, scen, i); };
+    var ownCols = _wbBuildColors(root, pay.bp);
+    ownBorder = function(i) {
+      return _wbOwnColor(pay, pblock, ownCols, colors, i);
     };
   }
-  var ownT = _wbOwnedTrace(pay, L, wins, line, den, noLine, ownSide);
+  var ownT = _wbOwnedTrace(pay, L, wins, line, den, noLine, ownSide,
+                           ownBorder);
   if (ownT) traces.push(ownT);
 
   var chrome = plotChrome();
+  // ---- round 8 item 4: the legend lives BELOW the plot, always ----------
+  // Through round 7 a legend of more than six keys went VERTICAL on the
+  // right of the panel. That was affordable while the panel shared its row
+  // with the UpSet and was already narrow; now the scatter owns the
+  // section's full width, and a right-hand legend spends that width on
+  // text. Wrapping a horizontal legend costs HEIGHT, so the panel grows
+  // downward one row per wrapped legend line and the plot area above it is
+  // never squeezed. The geometry is computed, not guessed: the legend's top
+  // is pinned WB_LEG_GAP px under the x-axis title in paper units, and the
+  // bottom margin is exactly deep enough to hold the gap plus the rows.
+  var legRows = Math.max(1, Math.ceil(traces.length / WB_LEG_PER_ROW));
+  var legB = WB_LEG_GAP + WB_LEG_PAD + legRows * WB_LEG_ROW_H;
+  var panelH = WB_PANEL_H + (legRows - 1) * WB_LEG_ROW_H;
+  panel.style.height = panelH + 'px';
+  var legY = -WB_LEG_GAP / Math.max(panelH - WB_PLOT_T - legB, 1);
   var layout = {
     xaxis: (_wbPlaneMode === 'stats')
       ? { title: 'Defense', showgrid: true, gridcolor: chrome.grid,
@@ -6278,18 +6532,11 @@ function wbRenderRoot(root) {
           showgrid: true, gridcolor: chrome.grid, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 11 },
-    margin: { t: 8, b: 44, l: 56, r: 8 },
+    margin: { t: WB_PLOT_T, b: legB, l: 56, r: 8 },
     showlegend: true,
-    // A horizontal legend under a 400px panel wraps to three or four rows
-    // once the rung ladder is long (seven rungs plus "Below the line" plus
-    // the marked spreads), and the rows eat the plot. Past six keys it goes
-    // vertical, outside the plot on the right.
-    legend: (traces.length > 6
-             ? { orientation: 'v', x: 1.02, xanchor: 'left', y: 1,
-                 bgcolor: chrome.legendBg, bordercolor: chrome.legendBorder,
-                 borderwidth: 1 }
-             : { orientation: 'h', y: -0.22, bgcolor: chrome.legendBg,
-                 bordercolor: chrome.legendBorder, borderwidth: 1 }),
+    legend: { orientation: 'h', y: legY, yanchor: 'top', x: 0,
+              xanchor: 'left', bgcolor: chrome.legendBg,
+              bordercolor: chrome.legendBorder, borderwidth: 1 },
     hoverlabel: { bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder }
   };
   if (_wbPlaneMode === 'stats' && pblock) {
@@ -6360,6 +6607,11 @@ function wbRenderRoot(root) {
     var upcap = root.querySelector('.wb-upset-caption');
     if (upcap) upcap.hidden = (view !== 'builds');
   }
+  // "Your collection", grouped by build: same collection state and same
+  // classification the stars above it use, so the two cannot disagree. It
+  // re-renders here, which is every place the collection or the preset can
+  // have changed.
+  _wbYours(root, pay, pblock, wins, den);
   // The per-scenario minis last: they reuse this render's grouping helpers,
   // and a Build-criteria change or a Show change has to move them too.
   _wbAllScen(root, false);

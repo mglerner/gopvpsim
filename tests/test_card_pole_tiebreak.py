@@ -92,6 +92,7 @@ sys.path.insert(0, str(REPO_ROOT / 'scripts'))
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 import deep_dive_rendering as rendering                           # noqa: E402
+import deep_dive_which_build as which_build                       # noqa: E402
 
 _SCENARIOS9 = [(a, b) for a in range(3) for b in range(3)]
 
@@ -183,38 +184,43 @@ def test_a_stealable_bullet_collapses_identical_shield_sets():
     assert 'both spreads steal' not in html2
 
 
-def test_top_picks_are_labelled_by_build_membership_not_by_a_style():
-    """Pre-fix: ``<h4 ...>Matchup Hunter: 7/2/12</h4>``. The picks are
-    unchanged (top three by composite score); only the label moved to
-    where each pick sits in the builds."""
-    data_obj = {
-        'ivA': [7, 8], 'ivD': [2, 7], 'ivS': [12, 5],
-        'ivAtk': [149.2, 150.3], 'ivDef': [96.6, 97.2], 'ivHp': [125, 119],
-        'spRanks': [913, 1103], 'ivTiers': [-1, -1],
-    }
-    recs = [{'iv': 0, 'avg_rank': 6, 'avg_score': 533.5, 'gains': 71,
-             'losses': 4, 'net': 67, 'range': 300, 'score': 1.0},
-            {'iv': 1, 'avg_rank': 9, 'avg_score': 533.0, 'gains': 60,
-             'losses': 9, 'net': 51, 'range': 300, 'score': 0.5}]
-    html = rendering._render_iv_recommendations(
-        recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {}, None, None,
-        build_of={1: 'Build 1'})
-    assert '>8/7/5 &mdash; in Build 1<' in html
-    assert '>7/2/12 &mdash; in no build<' in html
-    for style in _RETIRED_STYLES:
-        assert style not in html
-    # the two rankings are different questions, and the page says so where a
-    # reader meets three picks labelled "in no build" (round 6 review)
-    assert 'Top Picks rank single spreads by average score' in html
-    assert 'the Standouts block there is the reconciliation' in html
-    # a pick no BUILD holds but the wide region does is named, not "in no
-    # build": the builds table names that same spread on the same page
-    wide = rendering._render_iv_recommendations(
-        recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {}, None, None,
-        build_of={0: 'Build 1 wide only', 1: 'Build 1'})
-    assert '>7/2/12 &mdash; in Build 1 wide only<' in wide
-    assert 'in no build' not in wide
-    # with no builds on the page at all the cards say nothing about builds
-    plain = rendering._render_iv_recommendations(
-        recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {}, None, None)
-    assert 'in no build' not in plain and '>7/2/12<' in plain
+def test_the_top_picks_cards_are_gone_from_the_renderer():
+    """RETIRED 2026-09-17 (round 8 item 2): the composite-score Top Picks.
+
+    This test used to render the cards and pin their build-membership label
+    (pre-fix values, for the record):
+
+        html = rendering._render_iv_recommendations(
+            recs, {}, 'PvPoke default', data_obj, 0, 149.2, 96.6, {},
+            None, None, build_of={1: 'Build 1'})
+        assert '>8/7/5 &mdash; in Build 1<' in html
+        assert '>7/2/12 &mdash; in no build<' in html
+        assert 'Top Picks rank single spreads by average score' in html
+        assert 'the Standouts block there is the reconciliation' in html
+        # and with build_of={0: 'Build 1 wide only', 1: 'Build 1'}
+        assert '>7/2/12 &mdash; in Build 1 wide only<' in wide
+
+    Michael's call, 2026-09-17: one Notable spreads list in the "Which one to
+    build?" section replaces both that block and the section's own Standouts
+    block, so the page has ONE ranking of single spreads instead of two that
+    disagreed. The composite ranking is retired from the reader-facing page;
+    ``rec_candidates`` still resolves the lead spread for the dive card.
+
+    The absence is pinned with a positive control, like the pole pins above:
+    the scan reads the module that really does render that section, so a
+    renamed renderer fails here instead of making the absence vacuous.
+    """
+    text = _RENDERING.read_text()
+    assert not hasattr(rendering, '_render_iv_recommendations'), \
+        'the Top Picks renderer is back'
+    assert 'Top Picks rank single spreads by average score' not in text
+    assert 'def _render_iv_recommendations' not in text
+    assert 'build_of' not in text
+    # positive control: this IS the module that renders the IV
+    # Recommendations section, and its one remaining hand-off is empty.
+    assert 'def render_results_section(' in text
+    assert "rec_html = ''" in text
+    # the replacement lives in the section module, and it is one list
+    assert which_build.NOTABLE_HEAD == 'Notable spreads'
+    assert not hasattr(which_build, 'standouts_html')
+    assert not hasattr(which_build, 'card_build_membership')

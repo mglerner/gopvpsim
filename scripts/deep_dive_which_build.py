@@ -935,14 +935,20 @@ BUILDS_CAPTION = (
     "hollow ring in a lighter tint of Build 1's colour around every spread "
     "it holds, drawn under everything else: Build 1's members are filled "
     "dots inside rings, and a ring with only a faint grey centre is a "
-    "spread the wider rule reaches that no build holds. The diamond is "
+    "spread the wider rule reaches that no build holds. A family -- the "
+    "region grown around a standout that sits in no build -- is a hollow "
+    "ring with a centre dot in that standout's own marker colour, one size "
+    "larger, under everything else again; it is not a build and its legend "
+    "key says what it guarantees. The diamond is "
     "stat-product rank-1 (SP1), each triangle a "
     "build's most-winning member under this preset, the open square the "
     "spread that wins the most matchups over every shield scenario this dive "
     "baked -- which under a narrower preset is not the highest point on the "
     "plot, because the axis is not counting the same matchups -- and the "
     "open cross the spread with the highest Avg Battle Score on the main "
-    "scatter.")
+    "scatter. Gold stars are your own collection, each outlined in the "
+    "colour of the build that holds it, a lighter tint for the wide region, "
+    "a family's own colour for a family and grey for none.")
 
 UPSET_CAPTION = (
     "Left: the named sets the lattice was built from (rows, labelled "
@@ -965,13 +971,16 @@ STATS_CAPTION = (
     "trade as its boundary line. A build no rule fits is drawn as its points "
     "and nothing else. Build 1 wide is the hollow ring around each spread it "
     "holds, drawn under the rest at one size -- it is the only marker here "
-    "whose size does not follow attack. "
+    "whose size does not follow attack, and a family's ring-with-a-dot is "
+    "drawn the same way. "
     "A cut on ATTACK cannot be drawn on these axes, so a "
     "build that has one carries it in the legend key instead: two spreads at "
     "the same defense and HP can sit on opposite sides of it. The diamond is "
     "stat-product rank-1 (SP1), the open square the spread that wins the most "
     "matchups, the open cross the highest Avg Battle Score, and gold stars "
-    "your own collection.")
+    "your own collection -- each star outlined in the colour of the build "
+    "that holds it, a lighter tint for the wide region, a family's own "
+    "colour for a family and grey for none.")
 
 
 def _caption_for(view, facts, fields, all_facts=None):
@@ -1679,6 +1688,14 @@ CSS = """
 /* The wide region borrows Build 1's colour at the tint the panel draws it
    in, whatever index its row carries. */
 #dd-which-build .wb-swatch.wb-wide { background: var(--wb-b0); opacity: 0.4; }
+/* A family is not a build and does not take a build hue: it is drawn in its
+   own standout's marker colour, as a hollow ring with a centre dot, and the
+   table's swatch says the same thing in 10px. */
+#dd-which-build .wb-swatch.wb-fam { background: transparent;
+  border: 2px solid var(--wb-mark2); border-radius: 50%; width: 8px;
+  height: 8px; }
+#dd-which-build .wb-swatch.wb-fam[data-fam-kind="score"] {
+  border-color: var(--wb-mark1); }
 #dd-which-build .wb-obj { font-size: 0.86rem; margin: 8px 0 0; }
 #dd-which-build .wb-weighting { font-size: 0.78rem; color: var(--text-muted);
   margin: 8px 0 0; }
@@ -1724,16 +1741,39 @@ CSS = """
 #dd-which-build .wb-o0 { color: var(--text-muted); opacity: 0.75; }
 #dd-which-build .wb-para { font-size: 0.92rem; margin: 0 0 10px; }
 #dd-which-build .wb-para b { color: var(--title); }
-#dd-which-build .wb-standouts { margin: 14px 0 0; padding: 10px 12px;
+#dd-which-build .wb-notable { margin: 14px 0 0; padding: 10px 12px;
   background: var(--surface-2); border: 1px solid var(--border-2);
   border-radius: 6px; }
-#dd-which-build .wb-standouts .wb-mem-head { margin-top: 0; }
+#dd-which-build .wb-notable .wb-mem-head { margin-top: 0; }
 #dd-which-build .wb-standout-note { font-size: 0.82rem;
   color: var(--text-muted); margin: 6px 0 0; }
 #dd-which-build .wb-mem { font-size: 0.8rem; line-height: 1.5; }
-#dd-which-build .wb-plotrow { display: flex; flex-wrap: wrap; gap: 10px; }
-#dd-which-build .wb-upset { flex: 1 1 320px; min-width: 300px; height: 400px; }
-#dd-which-build .wb-plotrow .wb-panel { flex: 2 1 420px; min-width: 320px; }
+/* ---- round 8 item 4: one plot per ROW, never side by side ----
+   Through round 7 the UpSet panel and the section scatter shared a flex row
+   (`flex: 1 1 320px` / `flex: 2 1 420px`), so between roughly 700px and
+   1100px of section width the pair split into two columns and NEITHER was
+   readable (Michael's 2026-09-17 screenshot). There is no viewport at which
+   they share a row now: the UpSet is its own full-width block above the
+   scatter, the scatter is its own full-width block below it, and the plot's
+   legend sits under the plot rather than beside it. */
+#dd-which-build .wb-yours { margin: 10px 0 0; padding: 8px 12px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: 6px; font-size: 0.82rem; }
+#dd-which-build .wb-yours[hidden] { display: none; }
+#dd-which-build .wb-yours .wb-mem-head { margin-top: 0; }
+#dd-which-build .wb-yours-head { margin: 8px 0 2px; font-weight: 600;
+  font-size: 0.82rem; }
+#dd-which-build .wb-yours-dot { display: inline-block; width: 9px;
+  height: 9px; border-radius: 50%; margin-right: 6px;
+  vertical-align: middle; }
+#dd-which-build .wb-yours-list { margin: 0 0 6px; padding-left: 20px;
+  line-height: 1.5; }
+#dd-which-build .wb-plotrow { display: block; }
+#dd-which-build .wb-upset { display: block; width: 100%;
+  height: 400px; min-height: 400px; margin: 0 0 6px; }
+#dd-which-build .wb-upset[hidden] { display: none; }
+#dd-which-build .wb-plotrow .wb-panel { display: block; width: 100%;
+  margin: 10px 0 0; }
 """
 
 
@@ -2199,7 +2239,17 @@ STANDOUT_NOTE = (
     f"matchup profile of a spread above. If you already have one of them, "
     f"build it: each is the top of this grid on the measure that named it. "
     f"If you are hunting, hunt a build instead{{window}}. What this page "
-    f"cannot give you is a region that lands you on one of these profiles.")
+    f"cannot give you is a region that lands you on one of these profiles"
+    f"{{family}}.")
+# The families clause, when there is at least one. Round 8 item 1 added the
+# region grown AROUND a standout, which is the closest thing to a profile a
+# region can be -- so the sentence above, which through round 7 ended flat at
+# "cannot give you", would have been a claim this page's own plot disproves.
+# It is still true as written (a family guarantees a SUBSET of the standout's
+# wins to all its members, not the profile), and the clause says how close.
+STANDOUT_NOTE_FAMILY = (
+    "; the closest it comes is the {fams} drawn around {them}, which "
+    "{verb} {counts} of the {n} decision matchups to every member")
 # The window clause, when the page can name both of its edges. Filled from the
 # brief's own floor, the primary build's printed attack rung and the bulk of
 # the standouts themselves -- never hard-coded: the numbers are per-page
@@ -2267,7 +2317,20 @@ def standout_note(facts, arm_builds, bl):
                 rung=f"{role_short(builds_list[0], 0)}'s {rung} attack rung",
                 bulk=f"Def >= {d0:.2f} and HP >= {h0}",
                 n=brief._n(n_win), grid=brief._n(ctx['n_iv']))
-    return STANDOUT_NOTE.format(window=window)
+    fams = bl.get('families') or [] if bl else []
+    family = ''
+    if fams:
+        n_dec = fams[0]['n_decision_cells']
+        family = STANDOUT_NOTE_FAMILY.format(
+            fams=('family' if len(fams) == 1 else 'families'),
+            them=brief._and_list([family_title(f).replace('Family around ',
+                                                          '')
+                                  for f in fams]),
+            verb=('guarantees' if len(fams) == 1 else 'guarantee'),
+            counts=brief._and_list([brief._n(f['n_guaranteed'])
+                                    for f in fams]),
+            n=brief._n(n_dec))
+    return STANDOUT_NOTE.format(window=window, family=family)
 # The same point when both standouts sit INSIDE a build, which the fixed
 # note above argues a case the page does not have (2026-09-16 round-3
 # review: it shipped on the plain-Sableye and Melmetal pages).
@@ -2286,6 +2349,86 @@ STANDOUT_KIND = {
     'both': ("Most matchups won (all nine shield scenarios) and highest avg "
              "battle score"),
 }
+
+# ---------------------------------------------------------------------------
+# FAMILIES (round 8 item 1)
+# ---------------------------------------------------------------------------
+# Vocabulary added here (docs style rule, per document):
+#
+# - Family: the region grown AROUND a standout -- the spread's own decision
+#   wins, minus its rarest ones, until at least MIN_BUILD spreads guarantee
+#   every matchup that is left. It is NOT a build: it never enters the
+#   lattice, takes no UpSet column, and gets no card. It exists because a
+#   standout that sits in no build otherwise leaves the reader with one exact
+#   spread and nothing to aim at near it.
+#
+# Every surface that shows a family carries the same three numbers -- its
+# size, what it guarantees, and out of how many -- and the word "family"
+# before them, so no surface can be read as offering a fourth build.
+FAMILY_NOT_A_BUILD = 'family (not a build)'
+
+
+# ``build_desc`` and ``_fidelity_clause`` read only ``description`` and
+# ``size``, both of which a family carries, so the table renders a family's
+# staircase through the SAME renderer the builds use rather than a second
+# copy of the rule grammar.
+def family_title(f):
+    """'Family around 7/2/14' -- the one name every surface uses."""
+    return f"Family around {f['seed_iv'].split('@')[0]}"
+
+
+def family_counts(f):
+    """'54 spreads, guarantees 54 of 87' -- the legend key's tail."""
+    return (f"{brief._n(f['size'])} spreads, guarantees "
+            f"{brief._n(f['n_guaranteed'])} of "
+            f"{brief._n(f['n_decision_cells'])}")
+
+
+def family_legend(f):
+    """The plot legend key: name, rule, counts. Also the table row's cells."""
+    return f"{family_title(f)}: {f['rule']} ({family_counts(f)})"
+
+
+def family_of(bl, t):
+    """The family seeded by one standout, or None."""
+    fi = t.get('family')
+    if fi is None:
+        return None
+    fams = bl.get('families') or []
+    return fams[fi] if fi < len(fams) else None
+
+
+def family_sentence(bl, t):
+    """The standout paragraph's one sentence about its own family.
+
+    Names the family, its rule, its size and what it guarantees -- and
+    measures it against the build the standout is nearest, because "54 of
+    87" only means something beside the 55 a build guarantees. That
+    comparison is the reason the sentence exists: without it a reader cannot
+    tell whether the family is a near-miss or a different plan.
+    """
+    f = family_of(bl, t)
+    if f is None:
+        return ''
+    out = (f"It sits in a family of {brief._n(f['size'])} spreads, "
+           f"{f['rule']}, that guarantee "
+           f"{brief._n(f['n_guaranteed'])} of the "
+           f"{brief._n(f['n_decision_cells'])} decision matchups together")
+    near = t['nearest_build']
+    if near is not None and near < len(bl['builds']):
+        nb = bl['builds'][near]
+        gap = f['n_guaranteed'] - nb['n_guaranteed']
+        nm = role_short(nb, near)
+        if gap == 0:
+            out += f" -- level with {nm}'s {brief._n(nb['n_guaranteed'])}"
+        elif gap < 0:
+            out += (f" -- {brief._n(-gap)} short of {nm}'s "
+                    f"{brief._n(nb['n_guaranteed'])}")
+        else:
+            out += (f" -- {brief._n(gap)} more than {nm}'s "
+                    f"{brief._n(nb['n_guaranteed'])}")
+    return out + (f"; that is a {FAMILY_NOT_A_BUILD}, and it takes no "
+                  f"column in the panel below and no card.")
 
 
 def _cell_phrase(r, rate_key='outside_wr', word='outside'):
@@ -2605,16 +2748,121 @@ def standout_rows(arm_builds, idx):
             for c in frame['cells'] if won[c['k']]]
 
 
-def standout_paragraph(facts, arm_builds, bl, t):
-    """One standout spread: what it is, where it sits, what is its own."""
+# The page's name for each reason a spread is on the notable list. The two
+# standouts keep the exact headings the round-7 block used (the card titles
+# lead with the same words); SP1 and a build's most-winning member are new to
+# the list, and each is named by what it IS rather than by the ranking that
+# found it.
+NOTABLE_ROLE = dict(STANDOUT_KIND)
+NOTABLE_ROLE['sp1'] = 'Stat-product rank-1 (SP1)'
+
+
+def notable_role_name(bl, role):
+    """One (kind, build index) pair, in the page's own words."""
+    kind, bi = role
+    if kind == 'build':
+        b = bl['builds'][bi]
+        return f"{role_short(b, bi)}'s most-winning member"
+    return NOTABLE_ROLE.get(kind, kind)
+
+
+def notable_role_short(bl, role):
+    """The same role, in the page's canonical SHORT name.
+
+    The heading form carries its scope in brackets ("Most matchups won (all
+    nine shield scenarios)"), which cannot go inside the variants sentence's
+    own parenthesis without nesting one bracket in another.
+    """
+    kind, bi = role
+    if kind == 'build':
+        b = bl['builds'][bi]
+        return f"{role_short(b, bi)}'s most-winning member"
+    if kind == 'sp1':
+        return 'SP1'
+    return CARD_SHORT.get(kind, NOTABLE_ROLE.get(kind, kind))
+
+
+def notable_where(bl, t):
+    """Which build, wide region, family or none holds this spread.
+
+    One sentence, and it always says something: "in no build" alone was the
+    round-7 answer, and the two objects the section has added since -- the
+    wide region and the family -- are exactly what a reader who has just been
+    told "no build" wants next.
+    """
+    if t['in_build'] is not None:
+        nb = bl['builds'][t['in_build']]
+        return (f"It is a member of {_esc(role_short(nb, t['in_build']))}, "
+                f"which guarantees {t['n_from_nearest']} of the "
+                f"{t['n_own_decision_wins']} decision matchups it wins.")
+    where = 'It is in none of the builds'
+    wide = bl.get('wide')
+    if wide is not None and t.get('in_wide') is not None:
+        where += (f", though {_esc(role_short(wide))} holds it"
+                  if t['in_wide']
+                  else f", and {_esc(role_short(wide))} does not hold it "
+                       f"either")
+    f = family_of(bl, t)
+    if f is not None and f['seed_idx'] != t['idx']:
+        where += f", and it sits in the {_esc(family_title(f).lower())}"
+    near = t['nearest_build']
+    if near is None:
+        return where + ', and this moveset has no build to compare it against.'
+    nb = bl['builds'][near]
+    return (f"{where}. Of the {t['n_own_decision_wins']} decision matchups "
+            f"it wins, {_esc(role_short(nb, near))} guarantees "
+            f"{t['n_from_nearest']} to every one of its "
+            f"{brief._n(nb['size'])} members.")
+
+
+def notable_variants_sentence(bl, t):
+    """The entries that merged into this one, and by how much they differ.
+
+    "7/2/14; 9/6/13, 7/2/12, 10/5/15 and 9/0/14 differ from it by one to
+    three matchups" -- the RANGE, not a per-spread list, because the number
+    that matters is how small it is. A single variant prints its own count.
+    """
+    vs = t.get('variants') or []
+    if not vs:
+        return ''
+    # Each variant carries the REASON it was on the list, because that is the
+    # part the merge would otherwise delete: 9/6/13 merging into 7/2/14 must
+    # not take "the highest avg battle score" off the page with it -- the
+    # card set still headlines that spread under that name.
+    def _label(v):
+        iv = _esc(v['iv'].split('@')[0])
+        roles = [notable_role_short(bl, r) for r in v['roles']]
+        return f"{iv} ({_esc(brief._and_list(roles)).lower()})" if roles else iv
+    ivs = brief._and_list([_label(v) for v in vs])
+    diffs = sorted({v['n_diff'] for v in vs})
+    if len(diffs) == 1:
+        span = (f"by {brief._n(diffs[0])} decision "
+                f"{brief._noun(diffs[0], 'matchup')}")
+    else:
+        span = (f"by {brief._n(diffs[0])} to {brief._n(diffs[-1])} decision "
+                f"matchups")
+    verb = 'differs' if len(vs) == 1 else 'differ'
+    return (f"{ivs} {verb} from it {span}, so this entry is the offer and "
+            f"they are spellings of it.")
+
+
+def notable_paragraph(facts, arm_builds, bl, t):
+    """One notable spread: what it is, where it sits, what is its own.
+
+    Round 8 item 2. The body is the round-5/6/7 standout paragraph -- the
+    wins clause against the nearest build's best member, the two cell lists,
+    the measured peer count -- generalised to any spread the page names, plus
+    the three things the list adds: every ROLE this one spread holds, the
+    family around it, and the near-identical spreads that merged into it.
+
+    The printed facts are fixed by Michael's round-8 spec: IVs, stats, CP, SP
+    rank, wins, decision cells won, where it sits, and (outside a build) the
+    two matchup lists.
+    """
     rows = standout_rows(arm_builds, t['idx'])
-    head = _esc(STANDOUT_KIND.get(t['kind'], t['kind']))
+    head = _esc(' / '.join(notable_role_name(bl, r) for r in t['roles']))
     iv = _esc(t['iv'].split('@')[0])
     near = t['nearest_build']
-    # The EDGE, in the scale the preset counts (the paragraphs' rule): the
-    # number that makes this spread a standout is only readable next to the
-    # best a build can offer, which is its most-winning member's count
-    # (2026-09-17 round 5, item 3(i)). Pre-round-5 the win count stood alone.
     if _flat(bl):
         wins_clause = (f'It wins {t["wins_all"]} of {t["denominator_all"]} '
                        f'matchups over all nine shield scenarios')
@@ -2622,9 +2870,13 @@ def standout_paragraph(facts, arm_builds, bl, t):
         scens = _scen_weighted(bl, arm_builds['ctx']['scen_labels'])
         wins_clause = (f'It wins {t["wins_weighted"]} of {t["denominator"]} '
                        f'matchups in {_esc(scens)}')
+    # The decision-matchup count belongs to THIS spread, so it goes in
+    # before the nearest build's number: appended after that clause it read
+    # as the build's member's count ("Build 1's most-winning member wins
+    # 378, and 62 of the 87 decision matchups").
+    wins_clause += (f', and {t["n_own_decision_wins"]} of the '
+                    f'{arm_builds["n_decision_cells"]} decision matchups')
     if near is not None and t['in_build'] is None:
-        # ``most_winning_member['wins']`` is already on the preset's scale,
-        # which is why the two halves of this sentence can be compared.
         _nb = bl['builds'][near]
         wins_clause += (f"; {_esc(role_short(_nb, near))}'s most-winning "
                         f"member wins {_nb['most_winning_member']['wins']}")
@@ -2632,44 +2884,29 @@ def standout_paragraph(facts, arm_builds, bl, t):
              f'def / {int(t["hp"])} hp, CP {t["cp"]}, stat-product rank '
              f'{t["sp_rank"]}, Avg Battle Score {t["avg_score"]:.1f}. '
              + wins_clause + '.']
+    lines.append(notable_where(bl, t))
     if t['in_build'] is None:
-        if near is None:
-            lines.append('It is in none of the builds, and this moveset has '
-                         'no build to compare it against.')
-        else:
+        if t.get('beyond_cells'):
             nb = bl['builds'][near]
             nm = role_short(nb, near)
-            own, got = t['n_own_decision_wins'], t['n_from_nearest']
-            # NOT "the other N are this one spread's own": those cells are
-            # won by hundreds of other spreads -- what they lack is a
-            # region-wide guarantee (2026-09-16 round-3 review). Round 5
-            # replaces the counted remainder with the two LISTS behind it:
-            # which matchups they are, and how much of the build wins each.
-            wide = bl.get('wide')
-            where = 'It is in none of the builds'
-            if wide is not None and t.get('in_wide') is not None:
-                where += (f", though {_esc(role_short(wide))} holds it"
-                          if t['in_wide']
-                          else f", and {_esc(role_short(wide))} does not "
-                               f"hold it either")
-            lines.append(
-                f"{where}. Of the {own} decision "
-                f"matchups it wins, {_esc(nm)} guarantees {got} to every one "
-                f"of its {brief._n(nb['size'])} members.")
-            if t.get('beyond_cells'):
-                lines.append(_beyond_cells_html(t['beyond_cells'], nm,
-                                                nb['size']))
-            if t.get('lost_cells'):
-                lines.append(_lost_cells_html(t['lost_cells'], nm,
-                                              nb['n_guaranteed']))
-            elif t['n_lost_from_nearest'] == 0:
-                lines.append(f"It loses none of the {nb['n_guaranteed']} "
-                             f"matchups {_esc(nm)} guarantees.")
-        # The measured version of the block's closing claim. "No region that
-        # size reproduces this profile" is a statement about regions; this is
-        # the stronger one about SPREADS, and it is the one a careful reader
-        # would otherwise doubt (2026-09-17 round 6 review).
+            lines.append(_beyond_cells_html(t['beyond_cells'], nm,
+                                            nb['size']))
+        if t.get('lost_cells'):
+            nb = bl['builds'][near]
+            lines.append(_lost_cells_html(t['lost_cells'],
+                                          role_short(nb, near),
+                                          nb['n_guaranteed']))
+        elif near is not None and t['n_lost_from_nearest'] == 0:
+            nb = bl['builds'][near]
+            lines.append(f"It loses none of the {nb['n_guaranteed']} "
+                         f"matchups {_esc(role_short(nb, near))} guarantees.")
+        # The family this spread SEEDS (round 8 item 1), named where the
+        # reader has just been told what the nearest build costs.
+        fam_line = family_sentence(bl, t)
+        if fam_line:
+            lines.append(fam_line)
         peers = t.get('n_profile_peers')
+        own = t['n_own_decision_wins']
         if peers is not None and own:
             lines.append(
                 f"No other spread on this grid wins all {own} of the decision "
@@ -2678,21 +2915,12 @@ def standout_paragraph(facts, arm_builds, bl, t):
                 f"{brief._noun(peers, 'spread')} on this grid "
                 f"{'wins' if peers == 1 else 'win'} all {own} of the decision "
                 f"matchups it wins.")
-    else:
-        nb = bl['builds'][t['in_build']]
-        lines.append(f"It is a member of {_esc(role_short(nb, t['in_build']))}, "
-                     f"which guarantees {t['n_from_nearest']} of the "
-                     f"{t['n_own_decision_wins']} decision matchups it wins.")
-    # "Its rarest wins" only on the INSIDE branch. Outside, the two lists
-    # above already print every cell with its grid rate in the page's own
-    # emphasis spelling, and this sentence named three of them a second time
-    # (2026-09-17 round 6 review).
     if rows and t['in_build'] is not None:
         lines.append('Its rarest wins: '
                      + _top_cells_html(rows, 'grid_wr', 'grid') + '.')
-    # No "It is 1 of the 4096 spreads on this grid": every spread is, and
-    # the encounter-count sentence under the block already carries the
-    # rarity (2026-09-16 round-3 review).
+    var = notable_variants_sentence(bl, t)
+    if var:
+        lines.append(var)
     return '<p class="wb-para">' + ' '.join(lines) + '</p>'
 
 
@@ -2734,18 +2962,35 @@ def _rarity_sentence(facts, arm_builds):
             f"{brief._n(n)} on this grid: {counts}. Model: {caveat}.")
 
 
-def standouts_html(facts, arm_builds, preset, all_facts=None):
-    """The Standouts block: the two spreads that can beat every build."""
+NOTABLE_HEAD = 'Notable spreads'
+NOTABLE_LEAD = (
+    "Every single spread this page names, on one list: the spread that wins "
+    "the most matchups, the one with the highest avg battle score, SP1, "
+    "and each build's most-winning member. Entries whose decision-matchup "
+    "wins overlap by {j} or more are merged, because two spreads that win "
+    "the same matchups are one offer.").format(j=_pct(builds.NOTABLE_DEDUP_J))
+
+
+def notable_html(facts, arm_builds, preset, all_facts=None):
+    """The Notable spreads block: every single spread the page names.
+
+    Round 8 item 2 replaces two blocks with this one -- the section's own
+    Standouts block and the dive's composite-score "Top Picks" cards, which
+    ranked single spreads by a rule no other surface used and routinely
+    disagreed with the section two inches above it.
+    """
     bl = arm_builds['presets'].get(preset)
-    if not bl or not bl.get('standouts'):
+    if not bl or not bl.get('notable'):
         return ''
-    body = ''.join(standout_paragraph(facts, arm_builds, bl, t)
-                   for t in bl['standouts'])
+    body = ''.join(notable_paragraph(facts, arm_builds, bl, t)
+                   for t in bl['notable'])
     rarity = _rarity_sentence(facts, arm_builds)
     note = (standout_note(facts, arm_builds, bl)
             if any(t['in_build'] is None for t in bl['standouts'])
             else STANDOUT_NOTE_INSIDE)
-    return ('<div class="wb-standouts"><p class="wb-mem-head">Standouts</p>'
+    return ('<div class="wb-notable">'
+            f'<p class="wb-mem-head">{_esc(NOTABLE_HEAD)}</p>'
+            f'<p class="wb-standout-note">{_esc(NOTABLE_LEAD)}</p>'
             + body
             + (f'<p class="wb-standout-note">{_esc(rarity)}</p>'
                if rarity else '')
@@ -2983,42 +3228,14 @@ def card_specs(facts, arm_builds, preset=None):
     return out
 
 
-def card_build_membership(arm_builds, preset=None):
-    """``{'7/2/12': 'Build 1', ...}`` -- the named build each spread is in.
-
-    Every MEMBER of every selected build, not just the card's spreads: the
-    dive's "Top Picks" cards are chosen by their own composite score and then
-    labelled with where they sit, which is only answerable from the masks.
-    A spread in no build is simply absent, and the caller says "in no build".
-
-    Computed under the page's DEFAULT preset, like :func:`card_specs`, and for
-    the same reason: the cards are static HTML that does not follow the knob.
-    """
-    if not arm_builds or not arm_builds.get('presets'):
-        return {}
-    key = preset or (builds.PRESET_FLAT
-                     if builds.PRESET_FLAT in arm_builds['presets']
-                     else next(iter(arm_builds['presets'])))
-    bl = arm_builds['presets'].get(key)
-    if not bl or not bl['builds']:
-        return {}
-    meta = arm_builds['ctx']['meta']
-    out = {}
-    for i, b in enumerate(bl['builds']):
-        name = role_short(b, i)
-        for idx in np.nonzero(b['_mask'])[0]:
-            out.setdefault(builds.iv_str(meta, int(idx)).split('@')[0], name)
-    # The wide region LAST, so a spread in a real build is named by that
-    # build. A pick the builds miss but the wide region holds was labelled
-    # "in no build" on a page whose builds table names the same spread as the
-    # wide region's most-winning member (2026-09-17 round 6 review).
-    wide = bl.get('wide')
-    if wide is not None and wide.get('_mask') is not None:
-        name = f"{role_short(wide)} only"
-        for idx in np.nonzero(wide['_mask'])[0]:
-            out.setdefault(builds.iv_str(meta, int(idx)).split('@')[0], name)
-    return out
-
+# RETIRED 2026-09-17 (round 8 item 2): ``card_build_membership``, the
+# {iv string: build name} map over every member of every build. Its one
+# reader was the composite-score "Top Picks" cards' membership label, and
+# those cards are gone -- the Notable spreads block prints where each spread
+# it names sits, straight off the same masks, for the spreads the section
+# itself chose. The measurements the map's test pinned (61 + 114 members and
+# 583 wide-only spreads on Shadow Sableye arm 0) are pinned by the wide
+# region's own tests.
 
 def builds_lead(facts, arm_builds, preset, all_facts=None):
     """The sentence under the section's own lead: which preset, what it does."""
@@ -3333,6 +3550,37 @@ def builds_table_html(arm_builds, preset):
                              extra='<span class="wb-fid">not a build of its '
                                    'own -- the region around Build 1</span>',
                              cls=' wb-wide', mw_cell='--'))
+    # Round 8 item 1: one row per FAMILY, after every build and after the
+    # wide region. Same columns, so the three numbers line up with the
+    # builds' -- and the first column says "family (not a build)" before the
+    # reader reaches them, because a row in a builds table is otherwise a
+    # build by position.
+    for j, f in enumerate(bl.get('families') or []):
+        seed = next((t for t in (bl.get('standouts') or [])
+                     if t.get('family') == j), None)
+        seeded_by = (STANDOUT_KIND.get(seed['kind'], seed['kind'])
+                     if seed else '')
+        rows.append(
+            f'<tr data-family="{j}">'
+            f'<td><span class="wb-swatch wb-fam" '
+            f'data-fam-kind="{_esc(f["seed_kind"])}"></span>'
+            f'{_esc(family_title(f))}'
+            f'<br><span class="wb-fid">{_esc(FAMILY_NOT_A_BUILD)}</span></td>'
+            f'<td>{_esc(build_desc(f))}'
+            + (f'<br><span class="wb-fid">seeded by the standout '
+               f'{_esc(seeded_by)}</span>' if seeded_by else '')
+            + '</td>'
+            f'<td>{brief._n(f["size"])}</td>'
+            f'<td>{brief._n(f["n_guaranteed"])} of '
+            f'{brief._n(f["n_decision_cells"])} decision matchups</td>'
+            f'<td>--</td>'
+            f'<td>{"in" if f["rank1_in"] else "out"}</td>'
+            f'<td><span class="wb-fid">not a build: the region grown around '
+            f'{_esc(f["seed_iv"].split("@")[0])} until '
+            f'{brief._n(builds.MIN_BUILD)} spreads guarantee every matchup '
+            f'left in it. It takes no column in the panel below and no '
+            f'card.</span></td>'
+            '</tr>')
     out = ['<table class="wb-builds-table">', head] + rows + ['</table>']
     obj = objectives_line(arm_builds, preset)
     if obj:
@@ -3379,7 +3627,7 @@ def builds_block_html(facts, arm_builds, all_facts):
         # below no longer lists is the failure this placement rules out.
         parts.append(build_paragraphs_html(facts, arm_builds, key, all_facts))
         parts.append(builds_table_html(arm_builds, key))
-        parts.append(standouts_html(facts, arm_builds, key, all_facts))
+        parts.append(notable_html(facts, arm_builds, key, all_facts))
         parts.append('</div>')
     parts.append(f'<p class="wb-weighting">{_esc(WEIGHTING_NOTE)}</p>')
     parts.append('</div>')
@@ -3496,12 +3744,19 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
         f'<select class="wb-scen" onchange="if(window.wbSelectView)'
         f'wbSelectView(this)">{scen_opts}</select></label>'
         '</div>'
-        + ('<div class="wb-plotrow"><div class="wb-upset"></div>'
+        # Round 8 item 4: the UpSet panel is its own full-width row ABOVE
+        # the scatter, its caption directly under it, and the scatter its own
+        # full-width row below. Nothing shares a row at any viewport width.
+        + ('<div class="wb-plotrow">'
+           '<div class="wb-upset"></div>'
+           f'<p class="wb-upset-caption" hidden>{_esc(UPSET_CAPTION)}</p>'
            '<div class="wb-panel"></div></div>'
            if has_builds else '<div class="wb-panel"></div>')
-        + (f'<p class="wb-upset-caption" hidden>'
-           f'{_esc(UPSET_CAPTION)}</p>' if has_builds else '')
         + f'<p class="wb-caption">{_esc(pay["views"][0]["caption"])}</p>'
+        # Round 8 item 3(b): the reader's own collection, grouped by build.
+        # Filled in the browser from the same collection state the gold
+        # stars read, and hidden outright when there is none.
+        + ('<div class="wb-yours" hidden></div>' if has_builds else '')
         # Below the UpSet + panel pair and their captions, so the reader
         # meets the one weighted answer before the nine per-scenario ones.
         # Only where there is more than one shield state to lay side by side.
@@ -3609,7 +3864,8 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # gated sentence would fail on the duplicate, not on a defect.
     ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode}
     own = [CLUSTERS_FALLBACK_CAPTION, BUILDS_CAPTION, WEIGHTING_NOTE,
-           EMPH_KEY, STANDOUT_NOTE, STANDOUT_NOTE_INSIDE, STATS_CAPTION]
+           EMPH_KEY, STANDOUT_NOTE, STANDOUT_NOTE_INSIDE, STATS_CAPTION,
+           STANDOUT_NOTE_FAMILY]
     own.extend(STANDOUT_KIND.values())
     for arm, facts in enumerate(all_facts):
         ab = facts.get('_builds')
@@ -3629,7 +3885,7 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
                 own.append(gate_text(
                     build_paragraphs_html(facts, ab, key, all_facts)))
                 own.append(gate_text(
-                    standouts_html(facts, ab, key, all_facts)))
+                    notable_html(facts, ab, key, all_facts)))
         own.extend(lead_sentences(all_facts, arm))
         own.append(fixed_note(facts, page_movesets=2))
         if facts['floor'] is None:

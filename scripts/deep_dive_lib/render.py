@@ -489,7 +489,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                base_form_info=None,
                                card_builds=None,
                                card_builds_pinned=False,
-                               card_build_membership=None,
                                clusters_sink=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
@@ -517,12 +516,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     When it is empty (a moveset with no decision cells, an old blob, or a
     dive with no replay blob) all three fall back to the composite-score top
     picks, labelled "Top pick #N" -- never to a pole.
-
-    ``card_build_membership`` is ``{'7/2/12': 'Build 1', ...}`` over EVERY
-    member of every build (``deep_dive_which_build.card_build_membership``),
-    so the "Top Picks" cards -- which are chosen by their own composite
-    score, not by the builds -- can say which build each pick sits in. It
-    replaces the retired style label ("Matchup Hunter: 7/2/12").
 
     ``card_builds_pinned`` says the builds were computed on a DIFFERENT
     grid than the one this pass renders (the best-buddy L51 pass reuses the
@@ -864,14 +857,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         _triple_idx.setdefault(
             (data_obj['ivA'][_i], data_obj['ivD'][_i], data_obj['ivS'][_i]),
             _i)
-    _build_of = {}
-    for _tri, _name in (card_build_membership or {}).items():
-        try:
-            _bi = _triple_idx.get(tuple(int(x) for x in _tri.split('/')))
-        except ValueError:                      # pragma: no cover - bad key
-            _bi = None
-        if _bi is not None:
-            _build_of[_bi] = _name
     _card_recs, _card_extras, _card_names = [], {}, []
     for _spec in (card_builds or []):
         _iv = _triple_idx.get(tuple(int(x) for x in _spec['iv']))
@@ -1127,7 +1112,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         all_matchup_boundaries=all_matchup_boundaries,
         score_arrays=score_arrays, moveset_idx=moveset_idx,
         flips=flips, flip_map=flip_map, avg_ranks=avg_ranks,
-        avg_scores=avg_scores, rec_candidates=rec_candidates,
+        avg_scores=avg_scores,
         slayer_iter_result=slayer_iter_result,
         opp_info_cache=opp_info_cache, focal_moves=focal_moves,
         focal_types=focal_types, ref_atk=ref_atk, ref_def=ref_def,
@@ -1137,7 +1122,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         has_toml_tiers=has_toml_tiers, ranked=ranked,
         hp_list=hp_list, nIvs=nIvs,
         has_bait_axis=has_bait_axis,
-        build_of=_build_of,
         builds_pinned=bool(card_builds_pinned and _card_recs),
     )
     logger.info(f"  Results section rendered in "

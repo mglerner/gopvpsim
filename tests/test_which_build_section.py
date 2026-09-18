@@ -1286,11 +1286,12 @@ def test_section_is_omitted_without_a_blob_path():
     # Three maps now: the rendered sections, the presets each arm's section
     # actually built, and the card spreads taken from those builds (v5 --
     # the card no longer picks its own poles). Pre-v5 this was ``({}, {})``.
-    # Four maps now: the rendered sections, the live presets, the card
-    # spreads taken from those builds, and every build's MEMBERSHIP (round 5
-    # -- the Top Picks cards say which build each pick sits in). Pre-round-5
-    # this was ``({}, {}, {})``; pre-v5 ``({}, {})``.
-    assert deep_dive._which_build_sections({}) == ({}, {}, {}, {})
+    # Three maps: the rendered sections, the live presets, and the card
+    # spreads taken from those builds. The fourth -- every build's MEMBERSHIP
+    # -- went out with the Top Picks cards it labelled (round 8 item 2);
+    # pre-round-8 this was ``({}, {}, {}, {})``, pre-round-5 ``({}, {}, {})``
+    # and pre-v5 ``({}, {})``.
+    assert deep_dive._which_build_sections({}) == ({}, {}, {})
 
 
 # ---------------------------------------------------------------------------
@@ -1330,7 +1331,16 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # is longer: measured 175.6 KB here against 174.4 KB at 62c4b6d, which
     # was already inside 1 KB of the old ceiling. Nothing per-IV entered the
     # section; the two numbers below cap the part that would show it.
-    assert len(html) < 180_000, len(html)
+    #
+    # Round 8 (2026-09-17) raised it 180 KB -> 196 KB. Two blocks grew: the
+    # Standouts block became the Notable spreads list, which names SP1 and
+    # every build's most-winning member as well as the two standouts (four
+    # entries here against two, each with its own where-it-sits sentence and
+    # rarest-wins list), and every family added a table row with its
+    # staircase stepped out. Measured 190.1 KB here against 175.6 KB at
+    # 7bc9b51. Nothing per-IV entered the section; the payload cap below is
+    # the number that would show it.
+    assert len(html) < 196_000, len(html)
     payload = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
     # One 512-byte mask per printed rung plus one for the bulk pair, and
@@ -1345,14 +1355,27 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # and Even presets, so ``bp.regions`` gains ONE 684-character mask
     # (+782 B, 15 regions -> 16), and the collapsed lines gain the "and
     # holds both standouts" clause (+314 B over three presets).
-    assert len(json.dumps(payload)) < 50_000, len(json.dumps(payload))
+    #
+    # Round 8 raised it 50 KB -> 53 KB for the family membership masks: two
+    # families on this arm, 684 base64 characters each, shipped ONCE at the
+    # top of ``bp`` with the presets carrying indices into that table (a
+    # family is a pure function of (grid, seed), so a per-preset copy would
+    # have been the same bytes three times -- which is what this cap caught
+    # when it was first written that way). Measured 51.2 KB here.
+    assert len(json.dumps(payload)) < 53_000, len(json.dumps(payload))
     # Round 5 (2026-09-17) raised the builds-half ceiling from 24 KB to 28
     # KB: the nested wide build adds one payload build per preset, and with
     # it one 684-character membership mask each (measured 25.5 KB here,
     # against 23.4 KB before it). Round 6b did not move it: 26.3 KB.
     # The builds half is the part that would grow if a member LIST ever
     # replaced a packed mask.
-    assert len(json.dumps(payload['bp'])) < 28_000, len(json.dumps(payload['bp']))
+    #
+    # Round 8: 28 KB -> 30 KB. The families arrive here -- one table of
+    # two (a rule string plus a 684-character membership mask each), an
+    # index array per preset, and a ``family`` field on each standout.
+    # The notable list itself is server-rendered HTML and costs the
+    # payload nothing. Measured 28.2 KB here against 26.3 KB at 7bc9b51.
+    assert len(json.dumps(payload['bp'])) < 30_000, len(json.dumps(payload['bp']))
 
 
 @pytest.mark.local_artifacts
@@ -2304,7 +2327,13 @@ def test_the_section_is_byte_deterministic_with_the_control(shadow_sableye):
     # 48 KB -> 50 KB in round 6b, for the one extra region mask the wide
     # region's new ranking key puts in ``bp.regions``; see the accounting on
     # ``test_real_section_is_ascii_deterministic_and_small``.
-    assert len(json.dumps(pay)) < 50_000, len(json.dumps(pay))
+    # Round 8: 50 KB -> 53 KB for the family membership masks. There is ONE
+    # table of them at the top of ``bp`` and the presets carry indices into
+    # it -- a family is a pure function of (grid, seed), so shipping a
+    # 684-byte mask once per preset would have been the same bytes three
+    # times, which this cap caught when it was written that way. Measured
+    # 51.2 KB here.
+    assert len(json.dumps(pay)) < 53_000, len(json.dumps(pay))
     # v5 adds a fifth caption per scenario (the stats view). It is a SHORT
     # sentence, deliberately not a ninth copy of the view's own 900-
     # character caption -- that is what this cap exists to catch. Measured
@@ -3226,11 +3255,18 @@ def test_the_standouts_block_prints_what_is_the_spreads_own(shadow_sableye):
         for other in bl['builds']:
             assert got >= sum(1 for ci, c in enumerate(cells)
                               if won[c['k']] and other['_g'][ci])
-    html = W.standouts_html(all_facts[0], ab, builds_mod.PRESET_FLAT,
-                            all_facts)
+    html = W.notable_html(all_facts[0], ab, builds_mod.PRESET_FLAT,
+                          all_facts)
     text = W.gate_text(html)
     assert 'Of the 62 decision matchups it wins, Build 1 guarantees 49' in text
-    assert 'Of the 62 decision matchups it wins, Build 1 guarantees 52' in text
+    # Round 8 item 2 merged 9/6/13 into 7/2/14 (six decision matchups apart,
+    # above the 90% profile bar), so its own entry -- which read "Of the 62
+    # decision matchups it wins, Build 1 guarantees 52 to every one of its 61
+    # members" -- is a variant line on 7/2/14's entry instead. Pre-round-8
+    # both sentences were in this block.
+    assert 'Of the 62 decision matchups it wins, Build 1 guarantees 52' \
+        not in text
+    assert '9/6/13 (highest avg battle score) differs from it by 6' in text
     # round 5: the remainder is not a COUNT any more -- the block names the
     # matchups and how much of the build wins each. Asserted in full in
     # test_the_standouts_name_the_matchups_behind_their_counts. (Round 4:
@@ -3317,39 +3353,38 @@ def test_the_card_specs_come_from_the_builds(shadow_sableye):
 
 @pytest.mark.local_artifacts
 @pytest.mark.slow
-def test_build_membership_covers_every_member_of_every_build(shadow_sableye):
-    """Round 5 item 1(c): the dive's "Top Picks" cards are chosen by their own
-    composite score, so saying which build each one sits in needs the MASKS,
-    not the card's four spreads. Pre-round-5 those cards printed a stat-extreme
-    style instead ("Matchup Hunter: 7/2/12").
+def test_the_wide_region_holds_the_standout_no_build_does(shadow_sableye):
+    """RETIRED 2026-09-17 (round 8 item 2): ``card_build_membership``.
+
+    This test pinned the {iv string: build name} map that labelled the
+    composite-score "Top Picks" cards. Those cards are gone -- one Notable
+    spreads list replaces them -- and so is the map. Pre-fix values, for the
+    record: ``len(memb) == 61 + 114 + 583``, values exactly {'Build 1',
+    'Build 2', 'Build 1 wide only'}, 61 in Build 1 and 114 in Build 2, each
+    build's most-winning member mapping to its own build's short name, and
+    ``memb['7/2/14'] == 'Build 1 wide only'``.
+
+    What survives is the MEASUREMENT behind the last of those, which is a
+    fact about the section and not about the retired cards: no build holds
+    7/2/14 -- it fails Build 1's attack rung and the bulk box alike -- and
+    round 6b's wide-region ranking key exists precisely so the wide region
+    does. Recomputed here from the masks the page prints.
     """
     _state, all_facts, _path = shadow_sableye
     ab = all_facts[0]['_builds']
     bl = ab['presets'][builds_mod.PRESET_FLAT]
-    memb = W.card_build_membership(ab)
-    # Round 6: the wide region is in the map too, LAST and under its own
-    # name, so a Top Pick no build holds is not labelled "in no build" on a
-    # page whose builds table names the same spread. Pre-fix: 61 + 114 only.
-    inb = bl['builds'][0]['_mask'] | bl['builds'][1]['_mask']
-    n_wide_only = int((bl['wide']['_mask'] & ~inb).sum())
-    assert n_wide_only == 583          # round 6 (E,F): 231
-    assert len(memb) == 61 + 114 + n_wide_only
-    assert set(memb.values()) == {'Build 1', 'Build 2', 'Build 1 wide only'}
-    assert sum(1 for v in memb.values() if v == 'Build 1') == 61
-    assert sum(1 for v in memb.values() if v == 'Build 2') == 114
     meta = ab['ctx']['meta']
-    for i, b in enumerate(bl['builds']):
-        assert memb[b['most_winning_member']['iv'].split('@')[0]] == \
-            W.role_short(b, i)
-    # 7/2/14 is the standout that fails Build 1's rung and the bulk box
-    # alike, so no BUILD holds it -- and round 6b's ranking key is exactly
-    # why the wide region now does, which is the case this label exists for
-    # (round 6: '7/2/14' not in memb at all).
-    assert memb['7/2/14'] == 'Build 1 wide only'
-    # and the map is over THIS grid's spreads
-    import numpy as _np
-    some = builds_mod.iv_str(meta, int(_np.nonzero(bl['builds'][0]['_mask'])[0][0]))
-    assert some.split('@')[0] in memb
+    i7 = next(k for k in range(ab['ctx']['n_iv'])
+              if builds_mod.iv_str(meta, k).split('@')[0] == '7/2/14')
+    assert [int(b['_mask'].sum()) for b in bl['builds']] == [61, 114]
+    assert not any(b['_mask'][i7] for b in bl['builds'])
+    assert bl['wide']['_mask'][i7]
+    inb = bl['builds'][0]['_mask'] | bl['builds'][1]['_mask']
+    assert int((bl['wide']['_mask'] & ~inb).sum()) == 583   # round 6 (E,F): 231
+    # ... and the Notable spreads block is where a reader now reads it
+    text = W.gate_text(W.notable_html(all_facts[0], ab,
+                                      builds_mod.PRESET_FLAT, all_facts))
+    assert 'It is in none of the builds, though Build 1 wide holds it.' in text
 
 
 @pytest.mark.local_artifacts
@@ -3731,11 +3766,16 @@ def test_the_standouts_block_claims_no_exclusivity(shadow_sableye):
     _state, all_facts, _path = shadow_sableye
     ab = all_facts[0]['_builds']
     bl = ab['presets'][builds_mod.PRESET_FLAT]
-    text = W.gate_text(W.standouts_html(all_facts[0], ab,
-                                        builds_mod.PRESET_FLAT, all_facts))
+    text = W.gate_text(W.notable_html(all_facts[0], ab,
+                                      builds_mod.PRESET_FLAT, all_facts))
     assert "spread's own" not in text
     assert 'It is 1 of the 4096 spreads on this grid.' not in text
     cells = ab['frame']['cells']
+    # Round 8 item 2: the block prints one paragraph per NOTABLE entry, and
+    # 9/6/13 merged into 7/2/14. The recomputation below is unchanged and
+    # still runs over both standouts; only the printed-sentence assertions
+    # are scoped to the entries that survived the merge.
+    printed = {t['idx'] for t in bl['notable']}
     for t in bl['standouts']:
         if t['in_build'] is not None:
             continue
@@ -3748,6 +3788,8 @@ def test_the_standouts_block_claims_no_exclusivity(shadow_sableye):
         assert lost == sum(1 for ci, c in enumerate(cells)
                            if nb['_g'][ci] and not won[c['k']])
         assert lost == nb['n_guaranteed'] - got
+        if t['idx'] not in printed:
+            continue
         assert (f"guarantees {got} to every one of its {nb['size']} members"
                 in text)
         # round 5: the counted remainder became the named list, and the cost
@@ -3778,7 +3820,7 @@ def test_the_fixed_standout_note_fits_the_page_it_is_on(blob):
         for key, bl in ab['presets'].items():
             if not bl.get('standouts'):
                 continue
-            text = W.gate_text(W.standouts_html(facts, ab, key, all_facts))
+            text = W.gate_text(W.notable_html(facts, ab, key, all_facts))
             note = W.standout_note(facts, ab, bl)
             if any(t['in_build'] is None for t in bl['standouts']):
                 seen_outside += 1
@@ -3970,10 +4012,16 @@ def test_the_standouts_name_the_matchups_behind_their_counts(shadow_sableye):
     assert shares[0] == 0.0 and max(shares) > W.MEMBER_SHARE_TAIL
     for r in t['beyond_cells']:
         assert abs(r['share'] - beyond[r['cell']]) < 1e-12
-    html = W.standouts_html(facts, ab, builds_mod.PRESET_FLAT, all_facts)
+    html = W.notable_html(facts, ab, builds_mod.PRESET_FLAT, all_facts)
     text = W.gate_text(html)
     # (i) the edge, against the best a region can offer
-    assert ("It wins 382 of 684 matchups over all nine shield scenarios; "
+    # Round 8 item 2 put this spread's own decision-matchup count in before
+    # the build it is measured against; appended after that clause it read as
+    # the build's member's count. Pre-round-8: "It wins 382 of 684 matchups
+    # over all nine shield scenarios; Build 1's most-winning member wins
+    # 378."
+    assert ("It wins 382 of 684 matchups over all nine shield scenarios, and "
+            "62 of the 87 decision matchups; "
             "Build 1's most-winning member wins 378." in text)
     # (ii) the cells it wins that the build does not guarantee, with the
     #      share of the build's members that win each, and the >25% tail
@@ -3994,7 +4042,15 @@ def test_the_standouts_name_the_matchups_behind_their_counts(shadow_sableye):
         'members)</span>' in html
     # (iv) round 6: the MEASURED version of the block's closing claim, and
     # recomputed here from the cube rather than re-asserting the producer
+    #
+    # Round 8 item 2 merged 9/6/13 into 7/2/14's entry (six decision matchups
+    # apart, above the 90% profile bar), so its own paragraph -- which ended
+    # "Only 2 other spreads on this grid win all 62 of the decision matchups
+    # it wins." -- is a variant line now. The MEASUREMENT is still recomputed
+    # for both standouts; only the printed sentence is asserted for the entry
+    # the block prints.
     import numpy as _np
+    printed = {t3['idx'] for t3 in bl['notable']}
     for t2, sentence in ((bl['standouts'][0],
                           'No other spread on this grid wins all 62 of the '
                           'decision matchups it wins.'),
@@ -4005,11 +4061,21 @@ def test_the_standouts_name_the_matchups_behind_their_counts(shadow_sableye):
                          for c in cells])
         peers = int(Wd[:, own].all(axis=1).sum()) - 1
         assert t2['n_profile_peers'] == peers
-        assert sentence in text
+        if t2['idx'] in printed:
+            assert sentence in text
+        else:
+            assert sentence not in text
     # and the "Its rarest wins" sentence is gone from the OUTSIDE branch: it
     # named three cells the two lists above had already printed with their
-    # grid rates (round 6 review)
-    assert 'Its rarest wins' not in text
+    # grid rates (round 6 review). Round 8 item 2 put three INSIDE-a-build
+    # entries in this same block (SP1 and the two builds' most-winning
+    # members), and those do carry it -- so the absence is scoped to the
+    # paragraph it was ever about. Pre-round-8 the block held only the two
+    # standouts and the bare `not in text` was the whole test.
+    outside = re.search(r'<p class="wb-para">(.*?)</p>', html, re.S).group(1)
+    assert '7/2/14' in outside and 'in none of the builds' in outside
+    assert 'Its rarest wins' not in W.gate_text(outside)
+    assert 'Its rarest wins' in text, 'the inside entries lost their control'
 
 
 @pytest.mark.local_artifacts
@@ -4038,10 +4104,13 @@ def test_one_short_name_per_standout_on_every_surface(shadow_sableye):
     assert W.CARD_TITLE_BOTH.startswith(W.CARD_SHORT['both'])
     # the chips read the card's shorts, so the section head a reader lands on
     # starts with the chip they came from
-    text = W.gate_text(W.standouts_html(facts, ab, builds_mod.PRESET_FLAT,
-                                        all_facts))
-    for short in ('Most matchups won', 'Highest avg battle score'):
-        assert f'{short} (' in text
+    text = W.gate_text(W.notable_html(facts, ab, builds_mod.PRESET_FLAT,
+                                      all_facts))
+    # Round 8 item 2: 9/6/13 merged into 7/2/14's entry, so its canonical
+    # short name appears as the variant's label rather than as a heading.
+    # Pre-round-8 both read "<short> (" as block heads.
+    assert 'Most matchups won (' in text
+    assert '(highest avg battle score)' in text
     assert 'Highest battle score' not in text
     assert 'Highest Avg Battle Score' not in text
     # the section PLOT's two standout markers carry the same two names
@@ -4331,10 +4400,14 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
                          '55 guaranteed matchups and holds both standouts.')
     assert line.count('guarantees') == 2
     # and the standouts say where they sit relative to it
-    so = W.gate_text(W.standouts_html(facts, ab, builds_mod.PRESET_FLAT,
+    so = W.gate_text(W.notable_html(facts, ab, builds_mod.PRESET_FLAT,
                                       all_facts))
+    # Round 8 item 2: both standouts still sit in the wide region and in no
+    # build (asserted on the data above), but the block prints one entry for
+    # the two of them -- 9/6/13 merged into 7/2/14. Pre-round-8 this sentence
+    # appeared twice.
     assert so.count('It is in none of the builds, though Build 1 wide '
-                    'holds it.') == 2
+                    'holds it.') == 1
     assert 'Build 1 wide does not hold it either' not in so
     # Under the Even preset it is E -- also holding both standouts, on the
     # preset's own scale, and the clause carries both counts like its
@@ -4952,3 +5025,441 @@ def test_the_rendered_section_carries_its_own_scenario_grid(shadow_sableye):
     assert '<label class="wb-allscen" hidden>' in h
     assert '<div class="wb-allscen-grid" hidden>' in h
     assert '<p class="wb-allscen-caption" hidden>' in h
+
+
+# ---------------------------------------------------------------------------
+# Round 8 item 4: one plot per row
+# ---------------------------------------------------------------------------
+
+def test_the_upset_and_the_scatter_never_share_a_row():
+    """Michael, 2026-09-17: at some widths the UpSet panel and the section
+    scatter split a flex row and neither was readable.
+
+    Pre-fix the CSS carried ``.wb-plotrow { display: flex; flex-wrap: wrap;
+    gap: 10px; }`` with ``.wb-upset { flex: 1 1 320px; min-width: 300px; }``
+    and ``.wb-plotrow .wb-panel { flex: 2 1 420px; min-width: 320px; }``, so
+    between roughly 700px and 1100px of section width the two sat side by
+    side at 320px each. There is no viewport at which they share a row now.
+
+    Pinned on the CSS the section ships and on the DOM order it emits, not on
+    a screenshot: the failure was a layout rule, and the rule is the artifact.
+    """
+    css = W.CSS
+    assert '#dd-which-build .wb-plotrow { display: block; }' in css
+    row = [ln for ln in css.splitlines()
+           if ln.startswith('#dd-which-build .wb-plotrow')
+           or ln.startswith('#dd-which-build .wb-upset ')]
+    assert row, 'the plot-row rules vanished'
+    joined = '\n'.join(row)
+    assert 'flex' not in joined, joined
+    # Both blocks claim the full width of the section.
+    assert '#dd-which-build .wb-upset { display: block; width: 100%;' in css
+    assert ('#dd-which-build .wb-plotrow .wb-panel { display: block; '
+            'width: 100%;') in css
+
+
+@pytest.mark.local_artifacts
+def test_the_upset_block_precedes_the_scatter_in_the_rendered_section(
+        shadow_sableye):
+    """Round 8 item 4, on the artifact: the UpSet div comes FIRST, its
+    caption directly under it, and the scatter panel below both -- so the
+    stacking order the CSS enforces is also the reading order.
+
+    Pre-fix the emitted markup was
+    ``<div class="wb-plotrow"><div class="wb-upset"></div>
+    <div class="wb-panel"></div></div>`` with the UpSet's caption AFTER the
+    pair, i.e. under the scatter it does not describe.
+    """
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    i_up = html.index('class="wb-upset"')
+    i_cap = html.index('class="wb-upset-caption"')
+    i_panel = html.index('class="wb-panel"')
+    assert i_up < i_cap < i_panel, (i_up, i_cap, i_panel)
+
+
+def test_the_section_plot_legend_is_below_the_plot_and_wraps():
+    """Round 8 item 4, the JS half.
+
+    Pre-fix ``wbRenderRoot`` sent a legend of more than six keys VERTICAL on
+    the right (``orientation: 'v', x: 1.02``), which spent a third of a
+    now-full-width panel on legend text. The legend is horizontal and under
+    the plot at every trace count; wrapping costs height, so the panel grows
+    by one row per wrapped legend line rather than squeezing the plot.
+    """
+    src = _engine()
+    body = src[src.index('function wbRenderRoot('):
+               src.index('function wbSelectView(')]
+    assert "orientation: 'v'" not in body, 'the vertical branch is still there'
+    assert 'x: 1.02' not in body
+    # strip_js blanks string literals (quotes included), so the orientation
+    # and the anchors read as runs of spaces here.
+    assert re.search(r'legend: \{ orientation:\s+, y: legY, yanchor:\s+,',
+                     body), 'the legend is not anchored below the plot'
+    raw = ENGINE_JS.read_text()
+    raw_body = raw[raw.index('function wbRenderRoot('):
+                   raw.index('function wbSelectView(')]
+    assert ("legend: { orientation: 'h', y: legY, yanchor: 'top', x: 0,"
+            in raw_body)
+    # the geometry is computed from named pixel constants, not guessed
+    for name in ('WB_PANEL_H', 'WB_PLOT_T', 'WB_LEG_PER_ROW', 'WB_LEG_ROW_H',
+                 'WB_LEG_GAP', 'WB_LEG_PAD'):
+        assert f'var {name} = ' in src, name
+        assert name in body, name
+    assert 'panel.style.height = panelH' in body
+    assert 'margin: { t: WB_PLOT_T, b: legB, l: 56, r: 8 }' in body
+
+
+# ---------------------------------------------------------------------------
+# Round 8 item 1: families
+# ---------------------------------------------------------------------------
+
+def _families(res, preset='flat'):
+    return res['presets'][preset]['families']
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_family_is_grown_around_every_standout_outside_a_build(
+        shadow_sableye):
+    """Round 8 item 1, recomputed from the blob.
+
+    Pre-fix there was no such object at all: a standout outside every build
+    left the reader one exact spread and nothing to aim at near it, and the
+    block's closing note said so ("what this page cannot give you is a region
+    that lands you on one of these profiles").
+
+    The two numbers are the 2026-09-17 corpus run's own, measured on this
+    arm: 7/2/14 grows a 54-spread family guaranteeing 54 of the 87 decision
+    matchups, 9/6/13 a 52-spread one guaranteeing 57. Both rules are an
+    attack floor plus a defense staircase.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    assert ab['n_decision_cells'] == 87
+    for key in ab['presets']:
+        bl = ab['presets'][key]
+        outside = [t for t in bl['standouts'] if t['in_build'] is None]
+        assert len(outside) == 2, key
+        fams = bl['families']
+        assert len(fams) == 2, key
+        assert [t['family'] for t in outside] == [0, 1], key
+        by_iv = {f['seed_iv'].split('@')[0]: f for f in fams}
+        assert set(by_iv) == {'7/2/14', '9/6/13'}, key
+        assert (by_iv['7/2/14']['size'],
+                by_iv['7/2/14']['n_guaranteed']) == (54, 54), key
+        assert (by_iv['9/6/13']['size'],
+                by_iv['9/6/13']['n_guaranteed']) == (52, 57), key
+        for f in fams:
+            assert f['n_decision_cells'] == 87
+            assert f['rule'].startswith('Atk >= 148.77'), f['rule']
+            assert 'defense staircase' in f['rule'], f['rule']
+            # A family is grown from the seed's own wins alone, so the seed
+            # is always in it.
+            assert f['_mask'][f['seed_idx']]
+            # ... and every member guarantees every cell the family claims.
+            assert int(ab['frame']['Wd'][f['_mask']].all(axis=0).sum()) == \
+                f['n_guaranteed']
+    # A family is a pure function of (grid, seed): the preset decides which
+    # standouts are OUTSIDE a build, never what the region around one is.
+    sigs = {tuple((f['seed_iv'], f['_mask'].tobytes())
+                  for f in ab['presets'][k]['families'])
+            for k in ab['presets']}
+    assert len(sigs) == 1, 'a family moved with the preset'
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_standout_inside_a_build_gets_no_family(sableye_plain):
+    """"Standouts inside a build get no family" (Michael, 2026-09-17): the
+    build IS the region around it, and a second outline over the same points
+    would be two names for one answer.
+
+    Plain Sableye is the page where every standout sits inside a build --
+    the same page the fixed note's INSIDE variant ships on.
+    """
+    _state, all_facts, _path = sableye_plain
+    found = False
+    for facts in all_facts:
+        ab = facts.get('_builds')
+        if not ab:
+            continue
+        for bl in ab['presets'].values():
+            inside = [t for t in bl['standouts'] if t['in_build'] is not None]
+            if not inside:
+                continue
+            found = True
+            for t in inside:
+                assert t['family'] is None, t['iv']
+            assert len(bl['families']) == sum(
+                1 for t in bl['standouts'] if t['family'] is not None)
+    assert found, 'no arm of this blob has a standout inside a build'
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_family_reaches_the_table_the_paragraph_and_the_payload(
+        shadow_sableye):
+    """Round 8 item 1, on the artifact. Three surfaces, one set of numbers.
+
+    Pre-fix none of the three mentioned a family, and the standouts note
+    closed on a claim ("cannot give you ... a region that lands you on one of
+    these profiles") that the plot now draws two counterexamples to.
+    """
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    ab = all_facts[0]['_builds']
+    f0 = _families(ab)[0]
+    # (a) the table row, after the builds, labelled as not a build
+    assert 'data-fam-kind="wins"' in html
+    assert W.FAMILY_NOT_A_BUILD == 'family (not a build)'
+    assert 'Family around 7/2/14' in html
+    i_b1 = html.index('Build 1 (primary)')
+    assert html.index('Family around 7/2/14') > i_b1
+    assert '54 of 87 decision matchups' in html
+    assert 'seeded by the standout Most matchups won' in html
+    # the row prints the staircase stepped out, as a build's row does
+    assert 'HP 115 -&gt; Def' in html or 'HP 115 -> Def' in html
+    # (b) the standout's paragraph names its family in one sentence
+    assert 'It sits in a family of 54 spreads' in html
+    assert 'guarantee 54 of the 87 decision matchups together' in html
+    # (c) the payload carries it -- and it is NOT a build, a region or a
+    # lattice row
+    pay = json.loads(
+        re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
+    idx = pay['bp']['presets']['flat']['families']
+    assert idx == [0, 1], 'a preset carries INDICES into the one family table'
+    fams = [pay['bp']['families'][k] for k in idx]
+    assert fams[0]['size'] == 54 and fams[0]['nG'] == 54
+    assert fams[0]['nDec'] == 87 and fams[0]['kind'] == 'wins'
+    assert fams[0]['mask'], 'a family with no membership mask draws nothing'
+    # one table, shared by every preset that draws the same region
+    assert len(pay['bp']['families']) == 2
+    assert all(p['families'] == [0, 1]
+               for p in pay['bp']['presets'].values())
+    block = pay['bp']['presets']['flat']
+    assert not any(b.get('role') == 'family' for b in block['builds'])
+    assert not any('Family' in (r.get('name') or '') for r in block['lattice'])
+    assert not any('Family' in (c.get('combo') or '') for c in block['cols'])
+    # the standout entry points at its family by index
+    assert [t.get('family') for t in block['standouts']] == [0, 1]
+    assert f0['seed_iv'].startswith('7/2/14')
+
+
+def test_the_family_rings_are_drawn_under_everything_and_are_their_own_mark():
+    """Round 8 item 1, the JS half.
+
+    A family must be readable as neither a build (a filled dot in a build
+    hue) nor the wide region (a plain open circle in a tint of Build 1's
+    hue), so it gets an open circle with a centre dot in its own standout's
+    marker colour, one size larger than the wide ring, drawn first so it sits
+    under every other trace. Pre-fix none of these symbols existed.
+    """
+    src = _engine()
+    assert "var WB_FAM_SYMBOL = " in src
+    assert 'var WB_FAM_SIZE = 12;' in src
+    raw = ENGINE_JS.read_text()
+    assert "var WB_FAM_SYMBOL = 'circle-open-dot';" in raw
+    assert "var WB_RING_SYMBOL = 'circle-open';" in raw, 'the wide ring moved'
+    body = src[src.index('function _wbFamilyTraces('):
+               src.index('function _wbBuildGroups(')]
+    assert '_wbFamilyColor(f, colors)' in body
+    assert '_wbMask(f.mask)' in body and '_wbBit(m, i)' in body
+    # colour by the seed standout, the same two colours the marks use
+    col = src[src.index('function _wbFamilyColor('):
+              src.index('function _wbFamilyTraces(')]
+    assert 'colors.mark1' in col and 'colors.mark2' in col
+    # drawn FIRST inside the builds grouping, so under the rings and the dots
+    grp = src[src.index('function _wbBuildGroups('):
+              src.index('function _wbBuildMarks(')]
+    i_fam = grp.index('_wbFamilyTraces(pay, block, L, wins, colors, den)')
+    i_wide = grp.index('if (wideIdx >= 0) out.push(ts[wideIdx]);')
+    assert i_fam < i_wide
+
+
+# ---------------------------------------------------------------------------
+# Round 8 item 2: the one Notable spreads list
+# ---------------------------------------------------------------------------
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_notable_list_is_the_named_spreads_deduplicated_by_profile(
+        shadow_sableye):
+    """Round 8 item 2, recomputed from the blob.
+
+    Pre-fix the page ranked single spreads TWICE: the section's Standouts
+    block named two (the most-winning spread and the highest-avg-score one)
+    and the dive's "Top Picks" cards named three more off a composite of
+    average-score rank, matchup flips and rank stability. One list now, built
+    from the spreads the page already has a reason to name, and merged where
+    two of them win the same matchups.
+
+    On this arm the five candidates are 7/2/14 (most wins), 9/6/13 (highest
+    avg battle score), 0/15/15 (SP1), 8/7/5 (Build 1's most-winning member)
+    and 2/11/13 (Build 2's). 9/6/13 merges into 7/2/14 -- six decision
+    matchups apart -- leaving four entries.
+    """
+    _state, all_facts, _path = shadow_sableye
+    ab = all_facts[0]['_builds']
+    Wd = ab['frame']['Wd']
+    meta = ab['ctx']['meta']
+    assert ([t['iv'].split('@')[0] for t in ab['presets']['flat']['notable']]
+            == ['7/2/14', '0/15/15', '8/7/5', '2/11/13'])
+    # A build's most-winning member is chosen on the preset's own weighted
+    # count, so the last two entries move with the knob (Even shields:
+    # 9/2/7 and 9/0/14). The two standouts and SP1 do not.
+    assert ([t['iv'].split('@')[0] for t in ab['presets']['even']['notable']]
+            == ['7/2/14', '0/15/15', '9/2/7', '9/0/14'])
+    for key, bl in ab['presets'].items():
+        nb = bl['notable']
+        ivs = [t['iv'].split('@')[0] for t in nb]
+        assert ivs[:2] == ['7/2/14', '0/15/15'], (key, ivs)
+        assert len(nb) == 4, (key, ivs)
+        assert [r[0] for r in nb[0]['roles']] == ['wins']
+        assert nb[1]['roles'] == [('sp1', None)]
+        assert nb[2]['roles'] == [('build', 0)]
+        assert nb[3]['roles'] == [('build', 1)]
+        # the variant carries the reason it was on the list
+        v = nb[0]['variants']
+        assert len(v) == 1 and v[0]['iv'].split('@')[0] == '9/6/13'
+        assert v[0]['roles'] == [('score', None)]
+        assert v[0]['n_diff'] == 6
+        # recomputed: the merge is above the bar and every kept pair below it
+        def _j(a, b):
+            u = int((Wd[a] | Wd[b]).sum())
+            return (int((Wd[a] & Wd[b]).sum()) / u) if u else 0.0
+        assert _j(nb[0]['idx'], v[0]['idx']) >= builds_mod.NOTABLE_DEDUP_J
+        assert int((Wd[nb[0]['idx']] ^ Wd[v[0]['idx']]).sum()) == 6
+        for a in range(len(nb)):
+            for b in range(a + 1, len(nb)):
+                assert _j(nb[a]['idx'], nb[b]['idx']) < \
+                    builds_mod.NOTABLE_DEDUP_J, (key, ivs[a], ivs[b])
+        # every entry is a real spread of this grid, and SP1 really is SP1
+        for t in nb:
+            assert builds_mod.iv_str(meta, t['idx']) == t['iv']
+        assert nb[1]['sp_rank'] == 1
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_notable_block_prints_what_michael_asked_each_entry_to_print(
+        shadow_sableye):
+    """Round 8 item 2, on the artifact: IVs, stats, CP, SP rank, wins,
+    decision cells won, where it sits, and -- for an entry no build holds --
+    the two matchup lists round 5 added.
+
+    Pre-fix this block was headed "Standouts" and carried two entries; SP1
+    and the builds' most-winning members were named only in the table, and
+    the page's other list of single spreads was the retired Top Picks.
+    """
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    text = W.gate_text(W.notable_html(all_facts[0], all_facts[0]['_builds'],
+                                      builds_mod.PRESET_FLAT, all_facts))
+    assert 'Notable spreads' in html
+    assert '<p class="wb-mem-head">Standouts</p>' not in html
+    # (a) the four entry heads, each naming why the spread is on the list
+    for head in ('Most matchups won (all nine shield scenarios): 7/2/14',
+                 'Stat-product rank-1 (SP1): 0/15/15',
+                 "Build 1's most-winning member: 8/7/5",
+                 "Build 2's most-winning member: 2/11/13"):
+        assert head in text, head
+    # (b) stats, CP and SP rank on every entry; the wins clause names this
+    #     spread's own decision count BEFORE the build it is measured against
+    assert ('148.79 atk / 96.35 def / 126 hp, CP 1499, stat-product rank 817'
+            in text)
+    assert ('It wins 382 of 684 matchups over all nine shield scenarios, and '
+            '62 of the 87 decision matchups; '
+            "Build 1's most-winning member wins 378." in text)
+    # (c) where it sits -- build, wide region, family or none
+    assert 'It is in none of the builds, though Build 1 wide holds it.' in text
+    assert 'It is a member of Build 2, which guarantees 41 of the 47' in text
+    # (d) the two matchup lists, on the outside-a-build entry only
+    assert 'are matchups Build 1 does not guarantee' in text
+    assert 'It loses 6 of the 55 matchups Build 1 guarantees' in text
+    # (e) the variants sentence, naming the merged spread AND its reason
+    assert ('9/6/13 (highest avg battle score) differs from it by 6 decision '
+            'matchups' in text)
+    # (f) the fixed note and the encounter-count sentence moved here
+    assert W.standout_note(all_facts[0], all_facts[0]['_builds'],
+                           all_facts[0]['_builds']['presets']['flat']) in text
+    assert 'Rocket-grunt encounters' in text
+
+
+# ---------------------------------------------------------------------------
+# Round 8 item 3: the collection, by build
+# ---------------------------------------------------------------------------
+
+def test_each_owned_star_is_outlined_in_its_builds_colour():
+    """Round 8 item 3(a). Pre-fix every gold star carried the same ink-colour
+    border (``t.marker.line = { width: 1.5, color: plotChrome().ink }``), so a
+    collection of 40 stars said "you own these" and nothing else."""
+    src = _engine()
+    body = src[src.index('function _wbOwnedTrace('):
+               src.index('function _wbOwnWhere(')]
+    assert 'sideFn, borderFn) {' in body
+    assert 'ob.push(borderFn ? borderFn(i) : plotChrome().ink);' in body
+    assert ('t.marker.line = { width: 2, color: borderFn ? ob : '
+            'plotChrome().ink };') in body
+    # the classification is read ONCE and drives both the border and the list
+    w = src[src.index('function _wbOwnWhere('):
+            src.index('function _wbOwnColorOf(')]
+    assert '_wbBuildOf(pay.bp, block, i)' in w
+    assert "role !== " in w and '_wbFamilies(pay, block)' in w
+    raw = ENGINE_JS.read_text()
+    rw = raw[raw.index('function _wbOwnWhere('):
+             raw.index('function _wbOwnColorOf(')]
+    # build, then the wide region, then a family, then nothing
+    assert rw.index("{ kind: 'build'") < rw.index("{ kind: 'wide'") \
+        < rw.index("{ kind: 'family'") < rw.index("{ kind: 'none'")
+    # and the builds view hands both of them in
+    rr = src[src.index('function wbRenderRoot('):
+             src.index('function wbSelectView(')]
+    assert '_wbOwnSide(pay, pblock, scen, i)' in rr
+    assert '_wbOwnColor(pay, pblock, ownCols, colors, i)' in rr
+
+
+def test_your_collection_is_listed_under_the_plot_grouped_by_build():
+    """Round 8 item 3(b): the same collection state the stars read, grouped
+    the way the reader's question is shaped. Pre-fix there was no such list --
+    a reader could see a gold star inside Build 1 but had no way to read off
+    which of their own mons those stars were."""
+    src = _engine()
+    body = src[src.index('function _wbYours('):
+               src.index('function _wbWireLegend(')]
+    assert "root.querySelector(" in body
+    assert 'state.ownedByIv' in body
+    # grouped in Michael's order, builds first and "in no build" last
+    assert 'var rank = { build: 0, wide: 1, family: 2, none: 3 };' in body
+    # each row is IVs, SP rank, wins out of the axis denominator, and the
+    # CURRENT CP only when the collection knows one. strip_js blanks string
+    # literals, so the two labelled bits are read raw.
+    assert 'DATA.spRanks[i]' in body
+    assert 'wins[i]' in body and 'den' in body
+    assert 'if (cps.length) bits.push(' in body
+    raw = ENGINE_JS.read_text()
+    raw_body = raw[raw.index('function _wbYours('):
+                   raw.index('function _wbWireLegend(')]
+    assert "'SP #' + DATA.spRanks[i]" in raw_body
+    assert "'wins ' + wins[i] + ' of ' + den" in raw_body
+    assert "'CP ' + cps.join(" in raw_body
+    # hidden outright when there is no collection
+    assert 'function clear() { box.hidden = true; box.innerHTML =' in body
+    assert 'if (!n) return clear();' in body
+    # re-rendered by the one function a preset change and a collection load
+    # both go through
+    rr = src[src.index('function wbRenderRoot('):
+             src.index('function wbSelectView(')]
+    assert '_wbYours(root, pay, pblock, wins, den);' in rr
+
+
+@pytest.mark.local_artifacts
+def test_the_section_ships_the_collection_list_container(shadow_sableye):
+    """The container is server-rendered and starts hidden, so a page with no
+    collection shows nothing at all rather than an empty heading."""
+    _state, all_facts, _path = shadow_sableye
+    html = W.section_html(all_facts, 0)
+    assert '<div class="wb-yours" hidden></div>' in html
+    # under the plot, not above it
+    assert html.index('class="wb-yours"') > html.index('class="wb-panel"')
+    assert '#dd-which-build .wb-yours[hidden] { display: none; }' in W.CSS
