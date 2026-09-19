@@ -1127,95 +1127,31 @@ def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
 # carrying the payload inside the section keeps the L50/L51 variants
 # self-contained across the innerHTML swap.
 
-# 2026-09-17 round 7 (Michael): the section is a top-level COLLAPSED
-# <details> sitting directly under "Which one to build?", and it OPENS with
-# the all-scenarios mini-grid -- the 3x3 of per-scenario scatters coloured by
-# each scenario's own clusters, which used to live in the main scatter's
-# control strip ~3 MB above the section that defines its colours. The
-# <details> is the wrapper, not the root: `.dd-mc-root` stays the inner div,
-# so the engine's lazy-render hook (a capturing `toggle` listener that looks
-# for `.dd-mc-root` INSIDE the toggled element) and every `offsetParent`
-# visibility check keep working unchanged.
-SECTION_DETAILS_ID = "dd-matchup-clusters-section"
+# 2026-09-19 round 9 (Michael): this content is a SUBSECTION of "Which one
+# to build?" -- it renders into that section's "Why these regions" expander,
+# which supplies the heading and the collapsible. Round 7's own top-level
+# <details id="dd-matchup-clusters-section">, its summary note and its
+# opening nine-mini figure are gone: the figure was the same nine scenarios
+# on the same x axis as the section's own grid directly above it, and the two
+# are one grid now (deep_dive_engine.js `_wbAllScen`). `.dd-mc-root` is still
+# the root the engine's lazy-render hook looks for, unchanged.
 SECTION_TITLE = "Matchup clusters"
 SECTION_SUMMARY_BASE = "IVs grouped by which marginal matchups they win"
 
 
-def _summary_note(grid_nS):
-    """The collapsed line's parenthetical, for a dive that baked `grid_nS`.
-
-    It promises the opening figure only when there IS one, and counts the
-    dive's own scenarios rather than a hard-coded nine: _allscen_figure
-    draws nothing for one baked scenario (or none), and a three-scenario
-    bake used to be told it opens with nine.
-    """
-    if grid_nS > 1:
-        return (f"{SECTION_SUMMARY_BASE} - opens with all {grid_nS} shield "
-                "scenarios side by side")
-    return SECTION_SUMMARY_BASE
-
-
 def _section_open(grid_nS):
-    """The collapsed <details> + summary + the section div, in one string.
+    """The clusters body, open.
 
-    `grid_nS` is how many scenarios the OPENING FIGURE shows -- the dive's
-    baked count where the grid is drawn, and 0 where it is not (the
-    no-clusters early return below), which is what keeps the summary line
-    from promising a figure the page does not carry.
+    Round 9 (Michael's 2026-09-19 decision (b)): this is a SUBSECTION of
+    "Which one to build?" -- it renders inside that section's "Why these
+    regions" expander, which supplies the heading, the collapsible and the
+    summary line. So no ``<details>``, no ``dd-h2`` and no summary note here;
+    ``grid_nS`` is kept in the signature because the caller still passes the
+    dive's baked scenario count, and dropping it would be a second edit in
+    every call site for no gain.
     """
-    return (
-        f'<details class="dd-collapsible dd-mc-collapse" '
-        f'id="{SECTION_DETAILS_ID}">'
-        f'<summary class="dd-h2" style="cursor:pointer">{SECTION_TITLE} '
-        f'<span style="font-weight:400;font-size:0.8rem;'
-        f'color:var(--text-muted)">({_summary_note(grid_nS)})</span>'
-        f'</summary>'
-        f'<div class="dd-section dd-mc-root" id="dd-matchup-clusters">'
-        f'<!-- matchup-clusters:v1 -->'
-    )
-
-
-def _allscen_figure(nS):
-    """The all-scenarios mini-grid: this section's OPENING FIGURE.
-
-    One mini per baked shield scenario, average score against stat-product
-    rank, coloured by that scenario's own clusters. Content is byte-for-byte
-    what the control strip emitted; only the home moved (round 7).
-
-    The checkbox ships CHECKED because the <details> around it is closed:
-    opening the section is already the gesture that asks for the figure, and
-    a reader who opened it to see the clusters should not have to find a
-    second control. Uncheck still hides it, and the engine only draws the
-    minis once the section is actually open (Plotly sizes to zero inside a
-    closed <details>).
-    """
-    if nS <= 1:
-        return ''
-    return (
-        '<label class="dd-allscen" style="display:flex;align-items:center;'
-        'gap:4px;font-size:13px;margin:0 0 2px 0">'
-        '<input type="checkbox" id="allscen-toggle" checked '
-        'onchange="toggleAllScenarios()"> '
-        'Show all shield scenarios</label>\n'
-        # Caption first, then the grid (the control-strip order). The minis
-        # plot the AVERAGED score on y while their colours come from the
-        # clustering, whose bands are horizontal only on a win-count axis --
-        # so the caption says where to look for the bands rather than
-        # letting the smear read as the clustering.
-        '<p id="allscen-note" style="font-size:11px;'
-        'color:var(--text-muted);margin:4px 0 0 0">Each mini plots average '
-        'score against stat-product rank, coloured by that scenario\'s own '
-        'matchup clusters -- IV spreads grouped by which marginal matchups '
-        'they win, defined below (title: K, silhouette and the first stat '
-        'split). On this y-axis the clusters smear rather than band; to see '
-        'them as bands you need a win-count y-axis: <b>Show: clusters</b> '
-        'in &quot;Which one to build?&quot; just above, or the main scatter '
-        'below with <b>Y-axis</b> set to Wins and <b>Color</b> set to '
-        'Matchup cluster. The stat-plane panels below show them as stat '
-        'regions instead. Click a mini to select that shield scenario.</p>\n'
-        '<div id="allscen-grid" style="display:grid;'
-        'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;"></div>\n'
-    )
+    return (f'<div class="dd-section dd-mc-root" id="dd-matchup-clusters">'
+            f'<!-- matchup-clusters:v1 -->')
 
 
 def _esc(s):
@@ -1622,7 +1558,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         return (_section_open(0)
                 + '<p style="font-size:13px;color:var(--text-muted)">Not '
                 'available: this dive baked no shield scenarios to cluster.'
-                '</p></div></details>\n')
+                '</p></div>\n')
 
     _tags = preset_tags(presets)
     scen_labels = list(computed.keys())
@@ -1691,7 +1627,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             "display": disp_lbl,
         }
 
-    parts = [_section_open(nS if nS > 1 else 0), _allscen_figure(nS)]
+    parts = [_section_open(nS if nS > 1 else 0)]
     parts.append(
         '<p style="font-size:13px">IVs grouped by <b>which marginal '
         'matchups they win</b> (their win/loss fingerprint over the '
@@ -1851,5 +1787,5 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     parts.append('<script type="application/json" class="dd-mc-data">'
                  + json.dumps(payload, separators=(",", ":"))
                  + '</script>')
-    parts.append('</div></details>\n')
+    parts.append('</div>\n')
     return "\n".join(parts)

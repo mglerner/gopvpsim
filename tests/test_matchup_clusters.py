@@ -1300,113 +1300,71 @@ def test_preset_partitions_do_not_become_dropdown_options():
 _SCRIPTS = REPO_ROOT / "scripts"
 
 
-def test_the_section_is_a_collapsed_details_around_the_unchanged_root():
-    """The wrapper is a <details>; `.dd-mc-root` stays the inner div.
+def test_the_section_is_a_subsection_of_which_one_to_build():
+    """Round 9: the content renders into "Which one to build?", not beside it.
 
-    That split is load-bearing, not cosmetic: the engine's lazy-render hook
-    is a capturing `toggle` listener that looks for `.dd-mc-root` INSIDE the
-    toggled element, and every visibility guard on the page is an
-    `offsetParent` check, which a closed <details> only reports for its
-    CONTENT. Making the root itself the <details> would silently draw nine
-    zero-width panels on load.
+    Michael's 2026-09-19 decision (b). ``.dd-mc-root`` is still the inner div
+    every engine guard looks for -- the lazy-render hook is a capturing
+    ``toggle`` listener that looks for ``.dd-mc-root`` INSIDE the toggled
+    element, and it now finds it inside the section's "Why these regions"
+    expander instead of inside a ``<details>`` of its own.
+
+    Pre-fix the render opened with ``<details class="dd-collapsible
+    dd-mc-collapse" id="dd-matchup-clusters-section">`` carrying a
+    ``<summary class="dd-h2">Matchup clusters ...</summary>`` and closed with
+    ``</div></details>``.
     """
     html = _render([])
-    assert html.startswith('<details class="dd-collapsible dd-mc-collapse" '
-                           'id="dd-matchup-clusters-section">')
-    assert ' open>' not in html.split('<summary', 1)[0]
-    assert '<summary class="dd-h2"' in html
-    assert 'Matchup clusters' in html.split('</summary>', 1)[0]
-    # the root div is INSIDE the details, and the details closes after it
-    root = html.index('<div class="dd-section dd-mc-root" '
-                      'id="dd-matchup-clusters">')
-    assert root > html.index('</summary>')
-    assert html.rstrip().endswith('</div></details>')
-    # the old always-visible <h2> is gone: the summary carries the title now
-    assert '<h2 class="dd-h2">Matchup clusters</h2>' not in html
+    assert html.startswith('<div class="dd-section dd-mc-root" '
+                           'id="dd-matchup-clusters">')
+    assert '<details class="dd-collapsible dd-mc-collapse"' not in html
+    assert 'id="dd-matchup-clusters-section"' not in html
+    assert '<summary class="dd-h2"' not in html
+    assert html.rstrip().endswith('</div>')
+    assert not hasattr(mc, 'SECTION_DETAILS_ID')
+    # positive control: the body itself is unchanged -- the prose, the
+    # scenario selector and the payload are all still here
+    assert 'IVs grouped by <b>which marginal' in html
+    assert 'class="dd-mc-scen"' in html
+    assert 'class="dd-mc-data"' in html
 
 
-def test_the_mini_grid_is_the_sections_opening_figure():
-    """Checkbox + caption + grid, first thing inside the root, checked.
+def test_the_clusters_section_no_longer_carries_a_mini_grid():
+    """Its nine-mini grid merged into the section's one grid (round 9).
 
-    Checked-by-default is only honest because the <details> is closed: the
-    gesture that asks for the figure is opening the section.
+    Pre-fix ``_allscen_figure(9)`` emitted ``id="allscen-toggle" checked``,
+    ``id="allscen-note"`` and ``id="allscen-grid"`` as the section's opening
+    figure -- the same nine shield scenarios on the same x axis as the
+    "Which one to build?" grid directly above it.
     """
     html = _render([])
-    root = html.index('id="dd-matchup-clusters"')
-    box = html.index('id="allscen-toggle"')
-    note = html.index('id="allscen-note"')
-    grid = html.index('id="allscen-grid"')
-    assert root < box < note < grid
-    # ...and above the section's own prose
-    assert grid < html.index('IVs grouped by <b>which marginal')
-    assert 'id="allscen-toggle" checked ' in html
-    # neither the grid nor the caption ships display:none any more -- the
-    # section around them is what is collapsed
-    assert 'id="allscen-grid" style="display:grid;' in html
-    assert 'id="allscen-note" style="font-size:11px;' in html
-    # the caption keeps the smear-vs-band explanation
-    cap = html[note:grid]
-    assert 'smear rather than band' in cap
-    assert 'win-count y-axis' in cap
+    for dead in ('allscen-toggle', 'allscen-note', 'allscen-grid'):
+        assert dead not in html, dead
+    assert not hasattr(mc, '_allscen_figure')
+    src = (_SCRIPTS / 'deep_dive_matchup_clusters.py').read_text()
+    assert 'id="allscen-grid"' not in src
+    # positive control: the one grid that replaced it is emitted by the
+    # section renderer, behind the figure's third tab
+    wb = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    assert 'wb-allscen-grid' in wb
+    assert "VIEW_ALLSCEN = ('allscen'" in wb
 
 
-def test_the_opening_caption_defines_its_colours_before_it_uses_them():
-    """The caption that now INTRODUCES the section had two reader-flow gaps.
+def test_the_section_open_helper_is_just_the_body_div():
+    """No collapsed line to keep honest any more: the section it is inside
+    carries the summary.
 
-    Pre-fix it said "coloured by that scenario's own matchup clusters"
-    before the section had said what a matchup cluster IS (the definition
-    paragraph follows the grid), and its "the main scatter on a win-count
-    y-axis shows them as bands" was a forward reference to a plot ~3 MB
-    below that also needs two dropdowns set -- while "Show: clusters"
-    inside "Which one to build?", directly ABOVE, already draws these
-    labels on a win-count axis and went unmentioned.
-
-    Pre-fix values: 'defined below' absent; 'Which one to build?' absent;
-    'Y-axis' absent.
+    Pre-fix ``_section_open(9)`` returned a ``<details>`` whose summary read
+    "... opens with all 9 shield scenarios side by side", ``_section_open(3)``
+    said 3 and ``_section_open(1)`` promised no figure.
     """
-    html = _render([])
-    note = html.index('id="allscen-note"')
-    cap = html[note:html.index('id="allscen-grid"')]
-    # the term is glossed where it is first used
-    assert 'which marginal matchups they win' in cap
-    assert 'defined below' in cap
-    # the nearer surface is named first, and the far one says what to set
-    assert 'Which one to build?' in cap
-    assert 'Y-axis' in cap
-    # positive controls: the round-7 explanation survives
-    assert 'smear rather than band' in cap
-    assert 'win-count y-axis' in cap
-
-
-def test_a_one_scenario_dive_gets_no_mini_grid():
-    assert mc._allscen_figure(1) == ''
-    assert mc._allscen_figure(0) == ''
-    assert 'allscen-grid' in mc._allscen_figure(9)
-    # ...and the collapsed line does not promise the figure it has not got
-    one = mc._section_open(1)
-    assert 'side by side' not in one and 'nine' not in one
-    assert 'which marginal matchups they win' in one
-
-
-def test_the_summary_line_counts_the_scenarios_this_dive_baked():
-    """The collapsed line's promise has to match the dive.
-
-    Pre-fix SECTION_SUMMARY_NOTE was a module CONSTANT reading "opens with
-    all nine shield scenarios side by side" whatever the bake was: correct
-    on the nine-scenario dives we render and a known-wrong statement on any
-    other (a three-scenario bake still said nine; a one-scenario bake said
-    it with no grid on the page at all, since _allscen_figure returns '').
-
-    Pre-fix values: `'nine' in mc.SECTION_SUMMARY_NOTE` -> True, and
-    `mc._section_open` took no arguments (TypeError on `_section_open(3)`).
-    """
-    assert 'all 9 shield scenarios side by side' in mc._section_open(9)
-    assert 'all 3 shield scenarios side by side' in mc._section_open(3)
-    for n in (9, 3, 1):
-        assert 'nine' not in mc._section_open(n)
-    # the rendered section (9 baked) says nine as a number, once
-    html = _render([])
-    assert html.count('all 9 shield scenarios side by side') == 1
+    for n in (9, 3, 1, 0):
+        out = mc._section_open(n)
+        assert out.startswith('<div class="dd-section dd-mc-root"')
+        assert 'side by side' not in out
+        assert '<details' not in out
+    # the title constant survives for the expander that names it
+    assert mc.SECTION_TITLE == 'Matchup clusters'
 
 
 def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
@@ -1419,13 +1377,14 @@ def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
     # positive controls: the strip and its neighbour are still emitted here
     assert 'id="highlight-input"' in src
     assert '<div class="highlight-strip" ' in src
-    # ...and the clusters section is now placed by this file, above the
-    # scatter controls
-    # a floor, not an equality: one more mention of the marker (a
-    # comment, a second placement guard) is not a regression
+    # ...and the slot this file FILLS is emitted by the section renderer
+    # now (round 9), with a fallback here for a page that has no section.
+    # A floor, not an equality: one more mention of the marker (a comment, a
+    # second placement guard) is not a regression.
     assert src.count('<!-- MATCHUP_CLUSTERS_SLOT -->') >= 2
-    assert (src.index("html += '<!-- MATCHUP_CLUSTERS_SLOT -->'")
-            < src.index('\'<div class="controls" id="dd-scatter">\\n\''))
+    assert "if not which_build_html:" in src
+    wb = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    assert "CLUSTERS_SLOT = '<!-- MATCHUP_CLUSTERS_SLOT -->'" in wb
 
 
 @pytest.mark.render
@@ -1438,11 +1397,19 @@ def test_the_rendered_page_puts_the_clusters_section_above_the_scatter(
     collapsible, below everything). Now the section and its grid come FIRST.
     """
     h = small_dive_html
-    sect = h.index('id="dd-matchup-clusters-section"')
-    grid = h.index('id="allscen-grid"')
+    sect = h.index('id="dd-matchup-clusters"')
     scatter = h.index('id="dd-scatter"')
     recs = h.index('id="dd-recommendations"')
-    assert sect < grid < scatter < recs
+    # Round 9: the clusters body renders INSIDE "Which one to build?" when
+    # the page has one, and at the slot's fallback position -- still above
+    # the scatter -- when it does not. This fixture is a blob-free dive, so
+    # it takes the fallback; the section case is pinned on the real preview
+    # by tests/test_which_build_section.py. Pre-fix the order was
+    # #dd-matchup-clusters-section then #allscen-grid then #dd-scatter.
+    if 'id="dd-which-build"' in h:
+        assert h.index('id="dd-which-build"') < sect
+    assert sect < scatter < recs
+    assert 'id="dd-matchup-clusters-section"' not in h
     # the section is no longer the first block of the Dive Analysis details
     analysis = h.index('id="dd-analysis"')
     assert sect < analysis
@@ -1463,7 +1430,7 @@ def test_the_rendered_page_puts_the_clusters_section_above_the_scatter(
     assert 'MATCHUP_CLUSTERS_SLOT' not in h
 
 
-def test_the_mini_grid_only_draws_once_the_section_is_open():
+def test_the_section_only_draws_once_it_is_open():
     """The guards the move needs.
 
     The load-bearing one is ``_inClosedDetails``: measured in headless
@@ -1480,11 +1447,14 @@ def test_the_mini_grid_only_draws_once_the_section_is_open():
     """
     js = (_SCRIPTS / "deep_dive_engine.js").read_text()
     assert 'function _inClosedDetails(el) {' in js
-    assert 'if (_inClosedDetails(grid) || grid.offsetParent === null) {' in js
-    assert "if (key !== _allscenKey || !grid.children.length) {" in js
-    # the toggle-open pass is what draws it the first time
-    assert "if (det.querySelector('#allscen-grid')) refreshAllScenarios();" \
-        in js
+    # Round 9: the guard moved to the section's own box renderer, which is
+    # what defers the figures inside a closed expander. Pre-fix the two
+    # pinned lines were ``if (_inClosedDetails(grid) || grid.offsetParent ===
+    # null) {`` and ``if (key !== _allscenKey || !grid.children.length) {``
+    # in refreshAllScenarios, and the toggle hook read
+    # ``if (det.querySelector('#allscen-grid')) refreshAllScenarios();``.
+    assert 'if (_inClosedDetails(boxes[i])) continue;' in js
+    assert "if (!force && key === _wbAllScenKey && grid.children.length)" in js
     # and the swap redraws the section it just replaced
     assert 'function mcRenderPending() {' in js
     assert js.count('mcRenderPending();') >= 2
