@@ -3462,7 +3462,11 @@ def test_cluster_corroboration_line_is_gated_on_the_silhouette(
     state, facts, path = sableye_shadow_facts
     cc = facts['cluster_corroboration']
     assert cc['sil'] >= B.CLUSTER_SIL_MIN                 # measured 0.4506
-    marker = "the dive page's Matchup clusters section"
+    # Round 10 renamed the source by WHERE IT IS on the page: the clusters
+    # are a subsection of "Which one to build?" now, so "the dive page's
+    # Matchup clusters section" (the pre-fix marker) named a section that
+    # no longer exists at the top level (2026-09-19 round-10 review).
+    marker = "the dive page's matchup clusters, under \"Why these regions\""
     lines = B._f14_how_sure(facts)['lines']
     hits = [ln for ln in lines if marker in ln]
     assert len(hits) == 1
