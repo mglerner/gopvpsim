@@ -99,6 +99,14 @@ TERMS = {
     'rung':
         "An attack value above the line at which some further matchup flips "
         "for every spread that reaches it.",
+    # Round 10: the qualifier that keeps "guarantees" honest, and the
+    # rate the "Rarest win" column leads with -- both were first used in the
+    # table and defined nowhere on the page (2026-09-19 round-10 review).
+    'opponent-iv mode':
+        "One of the ways every opponent was made for this bake -- "
+        "PvPoke-default IVs or the bulkiest ones, each with and without the "
+        "focal side baiting -- so a claim that holds in all of them does "
+        "not depend on how the opponent was made.",
     'upset plot':
         "A bar chart of set intersections: each column is one candidate "
         "region, and the dots under it mark which named sets it lies inside "
@@ -109,7 +117,9 @@ TERMS = {
 # from the registry key. The section writes "SP1" after defining it once, so
 # a reader scanning the terms at the foot for SP1 has to find it there
 # (2026-09-17 round 6 review).
-DISPLAY = {'stat-product rank-1': 'stat-product rank-1 (SP1)'}
+DISPLAY = {'stat-product rank-1': 'stat-product rank-1 (SP1)',
+           'upset plot': 'UpSet plot',
+           'opponent-iv mode': 'opponent-IV mode'}
 
 # term -> "<guide-slug>#<heading-anchor>", relative to the guides directory.
 # Absent = no guide covers the term today, and the hover definition stands

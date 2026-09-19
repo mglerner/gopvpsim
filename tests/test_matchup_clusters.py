@@ -377,7 +377,8 @@ def test_degeneracy_floor_reports_counts_and_leaves_the_bits_out_of_all():
     # the FINDING (what the shield state does) rather than the floor
     assert d["reason"].startswith("every spread wins ")
     assert f"of {nO} opponents here" in d["reason"]
-    assert "Only 2 opponents are sharp marginals" in d["reason"]
+    # Pre-fix: "Only 2 opponents are sharp marginals" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "Only 2 opponents are contested" in d["reason"]
     assert "2 distinct win patterns" in d["reason"]
     assert (f"below the {mc.DEGEN_MIN_SHARP}-opponent / "
             f"{mc.DEGEN_MIN_PATTERNS}-pattern floor") in d["reason"]
@@ -420,7 +421,8 @@ def test_fragmented_reason_is_distinct_from_degenerate():
     assert "too fragmented" in e["reason"]
     # and it says the opposite of the degenerate reason about the bits
     assert f"still count toward the {mc.ALL_SCEN_DISPLAY}" in e["reason"]
-    assert "7 sharp marginal opponents" in e["reason"]
+    # Pre-fix: "7 sharp marginal opponents" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "7 contested opponents" in e["reason"]
     assert "9 distinct win patterns" in e["reason"]
     assert str(mc._small_pop_floor(mc.MIN_CLUSTER_IVS, nIvs)) in e["reason"]
 
@@ -1015,7 +1017,8 @@ def test_shadow_sableye_gl_reference_values():
     assert two_v_zero["degenerate"] is True
     assert two_v_zero["n_sharp"] == 1
     assert f"of {nO} opponents here" in two_v_zero["reason"]
-    assert "1 opponent is a sharp marginal" in two_v_zero["reason"]
+    # Pre-fix: "1 opponent is a sharp marginal" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "1 opponent is contested" in two_v_zero["reason"]
     zero_v_two = out["0v2"]
     assert zero_v_two["degenerate"] is True
     assert (zero_v_two["n_sharp"], zero_v_two["n_patterns"]) == (5, 16)
@@ -1127,8 +1130,9 @@ def test_signpost_names_the_sharpest_single_scenarios_with_their_size():
     # ... with K, the silhouette and the count it was measured over
     top = computed[ranked[0][1]]
     assert f'K={top["res"]["k"]}' in line
+    # Pre-fix: '... sharp marginal' (round 10: the clusters body speaks the section's own vocabulary).
     assert f'silhouette {ranked[0][0]:.2f} over {len(top["res"]["sharp"])} ' \
-        'sharp marginal' in line
+        'contested opponent' in line
     # and it only appears in the combined block
     html = mc.render_section(
         arr.ravel().tolist(), nIvs, 9, nO, SCENARIOS9,
@@ -1242,13 +1246,14 @@ def test_a_single_scenario_preset_resolves_to_that_scenarios_partition():
     assert pay['allByPreset']['flat'] == mc.ALL_SCEN_KEY
     assert pay['allByPreset']['even'] == 'all__even'
     assert pay['allByPreset']['one_one'] == '1v1'
-    # NOT the bare '1v1 shields': that put two entries in the dropdown
-    # reading as the same scenario (2026-09-16 review). The option says
-    # instead that "all scenarios" resolves to 1v1 under this preset.
-    assert (pay['allLabelByPreset']['one_one']
-            == 'all scenarios = 1v1 shields here')
-    assert pay['allLabelByPreset']['flat'] == 'all scenarios'
-    assert pay['allLabelByPreset']['even'] == 'all scenarios (even shields)'
+    # ``allLabelByPreset`` is GONE (round 10). It existed to re-label the
+    # clusters' own "all scenarios" <option>, and that <select> is deleted:
+    # the section has ONE Shield-scenario control, which drives these blocks
+    # through ``_wbSyncScen`` -> ``mcSetScenario``. Pre-fix this asserted
+    # pay['allLabelByPreset']['one_one'] == 'all scenarios = 1v1 shields
+    # here', ['flat'] == 'all scenarios' and ['even'] == 'all scenarios
+    # (even shields)'.
+    assert 'allLabelByPreset' not in pay
     for key, mapped in pay['allByPreset'].items():
         assert mapped in pay['scens'], (key, mapped)
 
@@ -1272,7 +1277,9 @@ def test_a_preset_block_prints_its_own_clusters_and_says_what_it_omits():
     block = _block('all__even')
     assert 'Cluster' in block            # its own cluster table
     assert 'Depth-3 decision tree' in block      # its own stat rules
-    assert "Build criteria preset's own combined partition" in block
+    # Pre-fix: "preset's own" -- the one "preset" that survived in reader
+    # text (2026-09-19 round-10 review).
+    assert "Build criteria setting's own combined partition" in block
     assert 'are not repeated here' in block
     # the two heavy tables are NOT in it
     assert 'Matchup flip thresholds' not in block
@@ -1284,12 +1291,18 @@ def test_a_preset_block_prints_its_own_clusters_and_says_what_it_omits():
 
 
 def test_preset_partitions_do_not_become_dropdown_options():
+    """There is no dropdown here at all any more (round 10).
+
+    Pre-fix the clusters body carried its own ``select.dd-mc-scen`` and this
+    asserted ``mc.ALL_SCEN_KEY in opts`` and ``'all__even' not in opts``.
+    The per-preset combined partition still gets its own server-side block,
+    which is what the section's one control switches to.
+    """
     html = _render_with_presets()
-    opts = re.findall(r'<option value="([^"]+)"', html)
-    assert mc.ALL_SCEN_KEY in opts
-    assert 'all__even' not in opts
-    # but it does get a block, so the option can select it
+    assert re.findall(r'<option value="([^"]+)"', html) == []
+    assert 'class="dd-mc-scen"' not in html
     assert 'data-scen="all__even"' in html
+    assert f'data-scen="{mc.ALL_SCEN_KEY}"' in html
 
 
 # ---------------------------------------------------------------------------
@@ -1324,8 +1337,13 @@ def test_the_section_is_a_subsection_of_which_one_to_build():
     assert not hasattr(mc, 'SECTION_DETAILS_ID')
     # positive control: the body itself is unchanged -- the prose, the
     # scenario selector and the payload are all still here
-    assert 'IVs grouped by <b>which marginal' in html
-    assert 'class="dd-mc-scen"' in html
+    # Round 10: the round-8 intro paragraphs and the second Shield-scenario
+    # <select> went with the move into "Why these regions", whose own lead is
+    # the one sentence that says what the clusters are. Pre-fix both
+    # 'IVs grouped by <b>which marginal' and 'class="dd-mc-scen"' were here.
+    assert 'IVs grouped by <b>which marginal' not in html
+    assert 'class="dd-mc-scen"' not in html
+    assert 'class="dd-mc-panel"' in html        # positive control: the panels
     assert 'class="dd-mc-data"' in html
 
 

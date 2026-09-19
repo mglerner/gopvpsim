@@ -263,6 +263,12 @@ DEEP_DIVE_CSS = """
 .dd-h3 { color: var(--accent); font-size: 1rem; margin: 14px 0 8px 0; }
 .dd-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 0.82rem; width: 100%; }
 .dd-table.dd-narrow { width: auto; }
+/* The three clusters tables are wider than the column they sit in --
+   2,034 px inside 1,140 px on the shadow page -- and since round 9 put
+   that body inside "Which one to build?" their overflow made the whole
+   section scroll sideways. Each scrolls in its own box instead
+   (CLAUDE.md's table convention; 2026-09-19 round-10 review). */
+.dd-mc-wide { overflow-x: auto; max-width: 100%; }
 .dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
 .dd-table th { background: var(--surface-2); color: var(--accent); font-weight: 600; }
 .dd-table td { background: var(--surface-2); }

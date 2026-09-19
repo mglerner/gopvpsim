@@ -1877,7 +1877,14 @@ def run_preset(ctx, sets, frame, preset):
                        if t['in_build'] is None]
         w = wide_build(L, prim, ctx, outside_idx)
         if w is not None:
-            wide = region_block(L, ctx, w, 'wide', [], weights, wsum=wsum)
+            # ``others`` is every SELECTED build (the wide is not one of
+            # them, so nothing to exclude). Round 9 passed [], which made
+            # ``gives_up`` empty by construction on every page and let the
+            # table print the positive claim "nothing the other builds
+            # guarantee" for a region that is a strict subset of Build 1's
+            # guarantees (2026-09-19 round-10 review, major 1).
+            wide = region_block(L, ctx, w, 'wide',
+                                [o for _r, o in kept], weights, wsum=wsum)
             wide['_mask'] = w['mask']
             wide['_g'] = w['g']
             wide['_in_primary'] = int((w['mask'] & prim['mask']).sum())

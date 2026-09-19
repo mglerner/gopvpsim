@@ -114,11 +114,20 @@ def _fragments(text, n=D1_WINDOW):
 # render rather than a duplicated string, so the rule below is a ceiling and
 # the authored-text rule is the one stated exactly.
 D1_ROUND8_SHARED_WINDOWS = 3555
-# Round 9 as shipped: 1,186, and every one of them is a FAMILY row -- the
-# same rule, the same staircase steps and the same two counts, because a
-# family is grown around a standout and does not move with the Build
-# criteria setting. That is a per-preset render of identical data, not a
-# duplicated string, so the rule is a ceiling with headroom rather than zero.
+# Round 9 as shipped: 1,186 (the round-10 reviewer's independent split, which
+# unescapes HTML and strips <script>, measured 1,176 -- same direction, same
+# magnitude). MOST of that is FAMILY-ROW DATA -- the same rule, the same
+# staircase steps and the same two counts, because a family is grown around a
+# standout and does not move with the Build criteria setting -- which is a
+# per-preset render of identical data rather than a duplicated string. But
+# three of the ten maximal shared runs were authored template prose still
+# inside the preset loop, and the round-10 reviewer named them: the lead's
+# "decision matchups (a top-50 opponent and shield state ...)" parenthetical,
+# the family sentence, and the notable entry's "that is a family (not a
+# build) ... No other spread on this grid wins all 62 ..." run. Round 10
+# retired the first with the lead itself; the other two are family/notable
+# DATA sentences whose wording happens to coincide. So this stays a ceiling
+# with headroom, and the exact rules above are the ones stated exactly.
 D1_SHARED_WINDOW_CEILING = 1500
 
 
@@ -161,6 +170,47 @@ def test_d1_no_authored_paragraph_is_rendered_more_than_once(shadow_section):
         if n > 1:
             offenders[name] = n
     assert not offenders, offenders
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_d1_no_rendered_paragraph_is_repeated_verbatim(shadow_section):
+    """No ``<p>`` in the section prints twice.
+
+    The constants test above only sees module-level UPPERCASE strings, so it
+    missed the two sentences the round-9 reorganization itself built inside
+    the preset loop and shipped three times each: the single-stat-line
+    sentence ("Single-stat line: Attack >= 148.10 decides 0v1 Annihilape.
+    SP1 is 6.34 short." -- 3 copies) and the species/moveset opening of the
+    verdict lead ("Sableye (Shadow) running Shadow Claw / Drain Punch, Foul
+    Play." -- 3 copies). Pre-fix (9cb2b26) this test found both.
+    """
+    import collections
+    import html as _h
+    paras = [' '.join(_h.unescape(_TAGS.sub(' ', m)).split())
+             for m in re.findall(r'<p\b[^>]*>.*?</p>', shadow_section, re.S)]
+    counts = collections.Counter(q for q in paras if len(q) >= 60)
+    dupes = {q[:90]: n for q, n in counts.items() if n > 1}
+    # The two TEMPLATE sentences render exactly once now. The residue is
+    # FOUR data paragraphs a family row and a notable entry build per
+    # setting: the two "The region grown around 7/2/14 / 9/6/13 until 50
+    # spreads guarantee every matchup left in it..." sentences, "No other
+    # spread on this grid wins all 62 of the decision matchups it wins." and
+    # "9/6/13 (Highest avg battle score) differs from it by 6 decision
+    # matchups...". They coincide because a family is grown around a
+    # standout and does not move with the Build criteria setting, so each is
+    # a real per-setting render of identical data. Hoisting them would mean
+    # lifting per-family rows out of a per-setting table, so this is a named
+    # ceiling rather than zero. Pre-fix (9cb2b26): SIX -- these four plus
+    # the line-status sentence and the lead's species/moveset opening, which
+    # ARE templates and now render once.
+    assert len(dupes) <= 4, dupes
+    assert all(n == 3 for n in dupes.values()), dupes
+    assert shadow_section.count('class="wb-linestatus"') == 1
+    assert shadow_section.count('class="wb-who"') == 1
+    # positive control: the sentence that CAN differ by setting still has one
+    # copy per Build criteria setting.
+    assert shadow_section.count('class="wb-answer-line"') >= 3
 
 
 @pytest.mark.local_artifacts
@@ -256,7 +306,41 @@ def test_d2_one_collection_loader_and_one_manual_parser():
     """One CSV loader and one manual-entry parser serve both entry points."""
     js = _js()
     assert len(re.findall(r'^function loadCollection\(', js, re.M)) == 1
-    assert len(re.findall(r'^function readManualForm\(', js, re.M)) <= 1
+    # ``== 1``, not ``<= 1``: the round-9 form passed at zero, which is an
+    # absence pin with no positive control (2026-09-19 round-10 review).
+    assert len(re.findall(r'^function readManualForm\(', js, re.M)) == 1
+    # ...and the section's entry point reaches that one form rather than
+    # shipping a second paste box of its own.
+    assert 'function wbOpenCollection(' in js
+
+
+def test_d2_one_scenario_setter():
+    """One function puts a shield scenario on every handle in the section.
+
+    Pre-fix (9cb2b26) there were FOUR unlinked "Shield scenario:" selects
+    inside one section -- the figure box's, expander F's, expander G's and
+    the clusters subsection's own ``select.dd-mc-scen`` -- and
+    ``wbSelectView`` re-rendered only the ``.wb-plotbox`` that owned the
+    changed one, so narrowing the figure to 1v1 left the other three on
+    "all" with no signal.
+    """
+    # The SELECTOR is a string literal, which strip_js blanks, so the scan
+    # for it reads the raw source and the value-write is checked on the
+    # stripped one.
+    raw = ENGINE_JS.read_text(encoding='utf-8')
+    js = _js()
+    setters = [n for n, body in _defs(raw)
+               if "querySelectorAll('select.wb-scen')" in body]
+    assert setters == ['_wbSyncScen'], setters
+    body = js.split('function _wbSyncScen(', 1)[1].split('\nfunction ', 1)[0]
+    assert re.search(r'\.value\s*=[^=]', body), body
+    # ...and the clusters subsection follows it rather than a select of its
+    # own. Positive control: the block markup it switches is still emitted.
+    MC_src = (SCRIPTS_DIR / 'deep_dive_matchup_clusters.py').read_text()
+    assert 'class="dd-mc-scen"' not in MC_src
+    assert 'dd-mc-scen-block' in MC_src
+    assert 'function mcSelectScenario(' not in js
+    assert 'function mcSetScenario(' in js
 
 
 def test_d2_one_row_expander_builder():
@@ -396,13 +480,19 @@ def test_d4_the_merged_section_fits_the_budget(shadow_section):
     that ``deep_dive.generate_interactive_html`` fills, so what this measures
     is everything the reorganization actually authors.
 
-    Round 8: 178,751 bytes. Round 9 as shipped: 184,376 (+3.1%), against
-    the 424,223 the two round-8 blocks took between them.
+    Round 8: 178,751 bytes. Round 9: 184,376 (+3.1%). Round 10: 177,815 --
+    below round 8's section ALONE, against the 424,223 the two round-8
+    blocks took between them.
     """
+    # One assertion, because there is one question. The round-9 second line
+    # compared two module constants summing to 424,223 against a measured
+    # value already capped at 185,000, so it could never fail while the cap
+    # held (2026-09-19 round-10 review).
     n = _section_bytes(shadow_section)
-    assert n < D4_CEILING, f"section is {n:,} bytes (ceiling {D4_CEILING:,})"
-    assert (D4_ROUND8_PAGE_SECTION_BYTES + D4_ROUND8_CLUSTERS_BYTES
-            > n)      # the sum the merge had to beat
+    assert n < D4_CEILING, (
+        f"section is {n:,} bytes (ceiling {D4_CEILING:,}; round 8 "
+        f"{D4_ROUND8_PAGE_SECTION_BYTES:,} + clusters "
+        f"{D4_ROUND8_CLUSTERS_BYTES:,})")
 
 
 # ---------------------------------------------------------------------------
