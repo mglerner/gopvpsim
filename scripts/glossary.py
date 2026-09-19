@@ -76,6 +76,33 @@ TERMS = {
     'build criteria':
         "Which shield scenarios the ranking counts: all nine equally, the "
         "three even ones, or 1v1 alone.",
+    # ---- round 9: the six terms the 2026-09-19 communication review found
+    # printed on the page and defined nowhere on it.
+    # Worded around the other registry keys on purpose: a definition that
+    # spells another registered term would be marked inside its own tooltip
+    # (test_no_definition_contains_another_registered_term).
+    'wide':
+        "The looser rule drawn around a region of the grid: it holds every "
+        "spread that region holds and more, so it wins less for every "
+        "member but is easier to hit.",
+    'family':
+        "A region grown around one standout spread until at least fifty "
+        "spreads all win every matchup left in it: something to aim at near "
+        "a spread the table's own regions miss.",
+    'staircase':
+        "A rule whose defense floor steps DOWN as HP goes up, so bulk can be "
+        "spent on either stat: one floor per HP value rather than one floor "
+        "for all of them.",
+    'bulk box':
+        "A rule that is a defense floor and an HP floor and nothing else -- "
+        "a rectangle on the defense / HP plane.",
+    'rung':
+        "An attack value above the line at which some further matchup flips "
+        "for every spread that reaches it.",
+    'upset plot':
+        "A bar chart of set intersections: each column is one candidate "
+        "region, and the dots under it mark which named sets it lies inside "
+        "(Lex et al. 2014).",
 }
 
 # term -> the heading a definition list PRINTS for it, where that differs

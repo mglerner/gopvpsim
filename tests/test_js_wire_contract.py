@@ -560,20 +560,35 @@ console.log(JSON.stringify([_mcHeadline(pay, '1v1'), _mcHeadline(pay, '0v0'),
     assert got[2] == ""                   # unknown label
 
 
-def test_mini_grid_title_is_gated_on_the_same_predicate_as_its_colors():
-    """B3: `_mcLabelsApply()` guards the COLORS and the TITLE together.
+def test_the_cluster_coloured_minis_read_the_clusters_payload_only():
+    """Round 9 replaced the clusters section's own nine-mini grid with a
+    colour mode of the section's one grid, so the B3 gate it carried
+    (``_mcLabelsApply()`` guarding the mini TITLE as well as its colours)
+    went with the titles: the merged mini is titled by its shield scenario
+    and nothing else, and it claims no K / silhouette / split over data the
+    baked labels may not describe.
 
-    state.oppIvMode is composed from the Opponent IVs and Bait dropdowns, so
-    one click off either default makes the baked labels not describe the
-    displayed grid. The colors always fell back to neutral there; the title
-    kept asserting "K=2, silhouette 0.65, split atk 148.06" over data those
-    labels do not describe.
+    Pre-fix this asserted three lines of ``renderAllScenarios``:
+    ``var mApply = _mcLabelsApply();``,
+    ``var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;``
+    and ``var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';``. What
+    survives is the property that made the gate necessary: the colours come
+    from the clusters payload and from nowhere else, and a scenario it did
+    not cluster gets no invented groups.
     """
     raw = _js()
-    assert "var mApply = _mcLabelsApply();" in raw
-    assert "var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;" \
-        in raw
-    assert "var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';" in raw
+    assert 'function renderAllScenarios(' not in raw
+    body = _js_fn(raw, '_wbClusterMiniTraces')
+    assert '_mcPayloadPage()' in body
+    assert 'if (!sc || !sc.labels) return null;' in body
+    # ...and the caller falls back to the build colouring rather than drawing
+    # an uncoloured grid under a cluster legend.
+    caller = _js_fn(raw, '_wbAllScen')
+    assert "if (cMode === 'cluster') traces = _wbClusterMiniTraces" in caller
+    assert 'if (!traces) {' in caller
+    # positive control: the headline helper the old gate protected is still
+    # here for the stat-plane panels that do print it.
+    assert 'function _mcHeadline(' in raw
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
@@ -760,7 +775,11 @@ def test_the_more_control_and_its_hidden_rows_are_one_contract():
     assert 'window.wbMoreRows = wbMoreRows;' in js
     body = _js_fn(js, 'wbMoreRows')
     assert "getAttribute('data-reveal')" in body
-    assert "'li.' + cls" in body
+    # Round 9: the same reveal serves the guarantee lists' hidden <li> rows
+    # AND the notable entries' inline "+N" <span>s, so the selector is the
+    # class alone and the scope is the nearest list or the button's parent.
+    assert "'.' + cls" in body
+    assert "btn.closest('ul') || btn.parentElement" in body
     # the default is the class the pre-v5 control hard-coded, so an older
     # button with no attribute still reveals its own rows
     assert "|| 'wb-hid'" in body

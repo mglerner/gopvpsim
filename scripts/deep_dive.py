@@ -2305,15 +2305,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if which_build_html:
         html += which_build_html
 
-    # "Matchup clusters" -- second on the page, directly under the build
-    # brief and collapsed like it (Michael's 2026-09-17 round-7 decision).
-    # It used to be the first block inside the Dive Analysis collapsible, ~3
-    # MB below the all-scenarios mini-grid its own clusters colour; the grid
-    # is now that section's opening figure. Filled after the render passes
-    # below, because the section is produced by generate_analysis_sections
-    # (it needs the score grid) and, when best-buddy is active, needs a
-    # host/template pair of its own.
-    html += '<!-- MATCHUP_CLUSTERS_SLOT -->'
+    # "Matchup clusters" -- round 9 (Michael's 2026-09-19 decision (b)): no
+    # longer a section of its own. The slot it fills is emitted INSIDE the
+    # "Which one to build?" section, in its "Why these regions" expander
+    # (deep_dive_which_build.CLUSTERS_SLOT), so the content lands there and
+    # the page's top level carries one collapsible instead of two. The
+    # fallback below keeps a page with no build brief (no replay blob) from
+    # losing the clusters entirely.
+    if not which_build_html:
+        html += '<!-- MATCHUP_CLUSTERS_SLOT -->'
 
     # Controls
     # The Build-criteria presets this page's section actually produced, in
