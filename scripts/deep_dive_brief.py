@@ -5985,8 +5985,12 @@ def _f14_how_sure(facts):
         # It names its SOURCE and its RELATION to the printed line: the same
         # sentence under agreement and disagreement would leave the reader
         # no cue which one they are looking at.
-        src = (f"the dive page's Matchup clusters section, which partitions "
-               f"this same grid by whole win/loss fingerprint across all "
+        # Named by where it is on the page, not by a section that no
+        # longer exists at the top level: the clusters are a subsection of
+        # "Which one to build?" now (2026-09-19 round-10 review).
+        src = (f"the dive page's matchup clusters, under \"Why these "
+               f"regions\", which partition this same grid by whole "
+               f"win/loss fingerprint across all "
                f"{_n(cc['n_scens'])} non-degenerate shield scenarios")
         if fl is None:
             lines.append(
@@ -5999,7 +6003,7 @@ def _f14_how_sure(facts):
             lines.append(
                 f"Independent check: {src}, also splits it on "
                 f"{AXIS_WORD[cc['stat']]} -- at {fmt(cc['value'])}, "
-                f"{fmt(gap)} {where} the line printed here "
+                f"{fmt(gap)} {where} the single-stat line "
                 f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
         else:
             lines.append(

@@ -101,7 +101,11 @@ def test_the_glossary_display_names_are_real_terms():
     assert glossary.DISPLAY
     for key, shown in glossary.DISPLAY.items():
         assert key in glossary.TERMS, key
-        assert key in shown, (key, shown)      # the heading still names it
+        # Case-insensitive: 'UpSet plot' is a proper name (Lex et al.
+        # 2014) whose registry key is lower-cased for lookup, and
+        # 'opponent-IV mode' capitalises IV (round 10). Pre-fix this
+        # asserted an exact substring and barred both.
+        assert key.lower() in shown.lower(), (key, shown)
     assert glossary.DISPLAY['stat-product rank-1'].endswith('(SP1)')
 
 
@@ -1399,10 +1403,15 @@ def test_real_section_is_collapsed_and_carries_the_headline(shadow_sableye):
     # your stat-product rank-1."
     assert 'Build 1 (61 spreads' in summary
     assert '55 of 87 decision matchups' in summary
-    assert 'Build 2 (114 spreads' in summary
-    # item 8(a): the bulk box is called a box in prose, on the one plane
-    # (the stats view) where the page draws it as one
-    assert 'the bulk box Def &gt;= 101.40 and HP &gt;= 125' in summary
+    # Round 10: only the FIRST clause carries the word "spreads" and the
+    # denominator; the rest carry the count alone, and every rule is the
+    # table's own one-clause form. Pre-fix: 'Build 2 (114 spreads' and
+    # 'the bulk box Def &gt;= 101.40 and HP &gt;= 125' (2026-09-19 round-10 review).
+    assert 'Build 2 (114: ' in summary
+    assert 'Def &gt;= 101.40 and HP &gt;= 125 (bulk box)' in summary
+    # ...and the lead build carries BOTH guarantee numbers, which is the one
+    # place the two-number rule had not reached (pre-fix: absent).
+    assert 'under every opponent-IV mode' in summary
     # round 5: the collapsed line spells the term out, because a reader who
     # never opens the section sees only this line (pre-round-5: 'holds
     # rank-1')
@@ -1456,12 +1465,15 @@ def test_reader_facing_text_never_says_brief_verdict_or_recommended(
 # least" is allowed exactly once per rendered section, and the summary quotes
 # it a second time by design).
 _SECTION_CHROME = (
+    # Round 10: "the view the line above was derived on" pointed UP at a
+    # line that round 9 moved DOWN into the "The single-stat line" expander
+    # (2026-09-19 round-10 review).
     'Stat-product rank against matchups won with PvPoke-default opponent '
     'IVs at the league cap over the whole opponent pool and, with Shield '
-    'scenario on all, every baked shield state -- the view the line above '
-    'was derived on. The Shield scenario selector on this row is the '
-    "section's own; the scatter's dropdowns and the opponent filter do not "
-    'drive this panel.',
+    'scenario on all, every baked shield state -- the view the single-stat '
+    'line in the expander below was derived on. The Shield scenario '
+    "selector on this row is the section's own; the scatter's dropdowns and "
+    'the opponent filter do not drive this panel.',
     'Compare these spreads',
     'All 4 movesets on this page share one line: at least 148.10 attack.',
     'Shield scenario: ',
@@ -2701,16 +2713,19 @@ def test_the_degenerate_sentence_has_one_source():
 
     The section used to state a dead shield state in the brief's counts ("2
     contested matchups over 3 distinct win patterns") while the clusters view
-    of the SAME state stated it in the clusters section's ("1 opponent is a
-    sharp marginal"), two clicks apart, neither defined where it was printed.
+    of the SAME state stated it in the clusters section's ("1 opponent is
+    contested"), two clicks apart, neither defined where it was printed.
     """
     import deep_dive_matchup_clusters as M
     # The split-out finding is BYTE-IDENTICAL inside the reason string it came
     # out of, so the clusters section's own sentence did not move.
     assert M.degenerate_reason(1, 2, 74, 76, 76).startswith(
         'every spread wins 74-76 of 76 opponents here, so the IV choice '
+        # Round 10: the clusters body says "contested", the table's own
+        # word, instead of "sharp marginal" -- an undefined near-synonym it
+        # used 49 times on the shadow page (2026-09-19 round-10 review).
         'moves at most 2 matchups in this shield state. Only 1 opponent is '
-        'a sharp marginal (2 distinct win patterns)')
+        'contested (2 distinct win patterns)')
     assert M.degenerate_reason(1, 1, 76, 76, 76).startswith(
         'every spread wins exactly 76 of 76 opponents here -- no IV choice '
         'changes this shield state.')
@@ -2738,14 +2753,16 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     """
     _state, all_facts, _path = shadow_sableye
     html = W.section_html(all_facts, 0)
-    # Round 9: each setting owns TWO blocks -- the verdict lead plus its
-    # table, and its notable entries -- because the invariant blocks between
-    # them (the keys, the collection entry, the figure) render once (DRY
-    # rule D1). Pre-fix there was one block per setting.
+    # Round 10: each setting owns THREE blocks -- the verdict sentence, its
+    # table, and its notable entries -- because the two sentences that
+    # CANNOT vary with the setting (species/moveset, and the single-stat
+    # line) render once each, between the first two groups (DRY rule D1).
+    # Pre-fix (9cb2b26) it was two, with the verdict lead and the
+    # line-status sentence inside the first.
     blocks = re.findall(r'<div class="wb-preset" data-preset="(\w+)"( hidden)?>',
                         html)
-    assert [b[0] for b in blocks] == ['flat', 'even', 'one_one'] * 2
-    assert [bool(b[1]) for b in blocks] == [False, True, True] * 2
+    assert [b[0] for b in blocks] == ['flat', 'even', 'one_one'] * 3
+    assert [bool(b[1]) for b in blocks] == [False, True, True] * 3
     # one table per preset, each with the seven columns the reader reads.
     # Round 9 (proposal s.3) renamed and re-ordered them: 'What it is' is
     # 'Rule' and carries the rule alone, 'Rarest win' is new, the SP1 column
@@ -2754,15 +2771,22 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     # Spreads, Guarantees, Most-winning member, SP1,
     # 'Gives up (guaranteed by another build, not this one)'.
     assert html.count('<table class="wb-builds-table">') == 3
-    for col in ('Build', 'Rule', 'Spreads', 'Guarantees', 'Rarest win',
+    for col in ('Build', 'Rule', 'Spreads', 'Guarantees',
                 'Best member / SP1'):
         assert f'<th>{col}</th>' in html, col
+    # Round 10 gave "Rarest win" the hover its cells' "outside N%" needs --
+    # the glossary's own 'outside rate' sentence (pre-fix: a bare <th>).
+    assert f'title="{W._esc(W.RAREST_HOVER)}">Rarest win</abbr>' in html
     assert '<th>What it is</th>' not in html
     assert f'title="{W.GIVES_UP_HOVER}">Gives up</abbr>' in html
     # Under a preset that counts fewer than all nine scenarios the two
     # count-bearing headers say which scale their numbers are on; the
     # default preset's table keeps the short headers above.
-    assert '<th>Guarantees (in the counted shields / overall)</th>' in html
+    # Round 10 hung the weighting note on this header as its hover, under
+    # exactly the settings whose clause it explains (pre-fix: a bare <th>,
+    # with the note as a paragraph under every table).
+    assert ('<abbr title="' + W._esc(W.WEIGHTING_NOTE)
+            + '">Guarantees (in the counted shields / overall)</abbr>') in html
     assert '<th>Best member (in 1v1 shields) / SP1</th>' in html
     # the per-ROW expanders and their members box (pre-fix: separate
     # <details class="wb-build"> blocks under the table)
@@ -2770,10 +2794,14 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     assert html.count('<tr class="wb-rowexp">') >= 6
     assert html.count('class="wb-mem"') >= 6
     assert 'wbCompareBuilds(this)' in html
-    # the note that says what the Build criteria setting does and does not
-    # weight, printed ONCE outside the three preset blocks (DRY rule D1)
+    # The note that says what the Build criteria setting does and does not
+    # weight is the HOVER on the header it is about, under the two settings
+    # whose clause it explains -- not a 60-word paragraph under every table.
+    # Pre-fix: one <p class="wb-weighting"> printed under all three
+    # (2026-09-19 round-10 review).
     import html as _hh
-    assert _hh.unescape(html).count(W.WEIGHTING_NOTE) == 1
+    assert 'class="wb-weighting"' not in html
+    assert _hh.unescape(html).count(W.WEIGHTING_NOTE) == 2
 
 
 @pytest.mark.local_artifacts
@@ -2993,7 +3021,9 @@ def test_the_summary_always_says_where_rank1_sits(shadow_sableye):
                     in line), key
     even = W.builds_summary(all_facts[0], ab, builds_mod.PRESET_EVEN,
                             all_facts)
-    assert ('Build 3 (114 spreads' in even
+    # Pre-fix: 'Build 3 (114 spreads' (2026-09-19 round-10 review: "spreads" is on the
+    # first clause only).
+    assert ('Build 3 (114: ' in even
             and 'holds stat-product rank-1 (SP1)' in even), even
 
 
@@ -3266,7 +3296,11 @@ def test_the_builds_table_replaces_the_per_build_paragraphs(shadow_sableye):
     assert 'should' not in text
     # ...and the table lives inside the per-preset block, so the knob
     # switches it with the verdict lead above it
-    block = W.builds_block_html(all_facts[0], ab, all_facts)
+    # Round 10 split the per-setting loop: the verdict sentence and the
+    # table are two groups of .wb-preset blocks with the ONE setting-
+    # invariant sentence (the single-stat line) between them. Pre-fix this
+    # read W.builds_block_html(...), which carried both.
+    block = W.tables_block_html(all_facts[0], ab)
     for key in ab['presets']:
         one = block[block.index(f'data-preset="{key}"'):]
         one = one[:one.index('</table>')]
@@ -3532,19 +3566,29 @@ def test_the_builds_caption_explains_every_marker_the_view_draws():
     the same view has drawn since round 3 -- an unexplained marker in the
     default view. The stats caption already named it.
     """
-    assert 'open cross' in W.BUILDS_CAPTION
-    assert 'Avg Battle Score' in W.BUILDS_CAPTION
-    for marker in ('diamond', 'triangle', 'open square'):
-        assert marker in W.BUILDS_CAPTION, marker
+    # Round 10 cut this caption to two sentences: the legend already names
+    # every key on its own line (11 keys, zero overlaps, measured), and at
+    # 900 px the round-9 caption was 20 lines under it. The markers it
+    # listed are the legend's job; the caption says what the PICTURE is.
+    # Pre-fix: 'open cross', 'Avg Battle Score', 'diamond', 'triangle' and
+    # 'open square' were all in BUILDS_CAPTION (2026-09-19 round-10 review).
+    for marker in ('open cross', 'diamond', 'triangle', 'open square'):
+        assert marker not in W.BUILDS_CAPTION, marker
+    assert 'hollow ring' in W.BUILDS_CAPTION
+    assert 'Gold stars' in W.BUILDS_CAPTION
     # positive control: the stats caption's own wording is unchanged
     assert 'the open cross the highest Avg Battle Score' in W.STATS_CAPTION
     # round 5: the builds view draws one more trace -- the wide region
     # around Build 1 -- so the caption names it too. Round 7b: it is the
     # containment ring, named by the wording its own test pins.
-    assert 'Build 1 wide' in W.BUILDS_CAPTION
-    assert 'lighter tint' in W.BUILDS_CAPTION
-    for cap in (W.BUILDS_CAPTION, W.STATS_CAPTION):
-        assert 'stat-product rank-1 (SP1)' in cap
+    # Round 10 cut the builds caption to two sentences: the LEGEND names
+    # every key on its own line (measured: 11 keys, 0 overlapping pairs at
+    # 1400 and 900 px), so the caption says what the picture is rather than
+    # re-describing them. Pre-fix: 'Build 1 wide', 'lighter tint' and
+    # 'stat-product rank-1 (SP1)' were all in it (2026-09-19 round-10 review). The
+    # wide rule is still named as a ring, and the STATS caption is unchanged.
+    assert 'the wide rule' in W.BUILDS_CAPTION
+    assert 'stat-product rank-1 (SP1)' in W.STATS_CAPTION
 
 
 def test_the_emphasis_key_defines_both_rates_it_weights():
@@ -3579,10 +3623,20 @@ def test_an_approximate_rule_is_flagged_on_a_synthetic_build():
     b_approx = dict(b_exact, description=approx)
     assert not W.rule_is_approx(b_exact)
     assert W.rule_is_approx(b_approx)
-    assert W.approx_clause(b_exact) == ''
-    assert W.approx_clause(b_approx) == (
-        'That rule takes in 1 spread that is not a member and misses 1; '
-        'the member list in the table is the build.')
+    # ``approx_clause`` is DELETED (round 10). Pre-fix:
+    #   W.approx_clause(b_exact)  == ''
+    #   W.approx_clause(b_approx) == 'That rule takes in 1 spread that is
+    #       not a member and misses 1; the member list in the table is the
+    #       build.'
+    # The row expander printed it directly under ``_fidelity_clause``, which
+    # says the same two counts, and under a Rule cell whose "~" hover says
+    # them a third time (2026-09-19 round-10 review).
+    assert not hasattr(W, 'approx_clause')
+    assert W._fidelity_clause(b_approx) == (
+        'The rule covers 99% of the same spreads (1 extra, 1 missed); '
+        'the member list is the build.')
+    assert W._fidelity_clause(b_exact) == (
+        'The rule fits exactly: these spreads and no others.')
     assert W.build_rule_phrase(b_approx).startswith('roughly ')
     assert 'roughly ' in W.build_summary_phrase(b_approx)
     assert W.card_title_rule(b_approx).startswith('roughly ')
@@ -3830,7 +3884,12 @@ def test_every_approximate_rule_on_a_real_page_says_so(blob):
                     assert W.RULE_APPROX_GLYPH in cell, (key, cell)
                     assert 'class="wb-approx"' in cell
                     assert 'of the same spreads' in cell
-                    assert 'the member list in the table is the build' in exp
+                    # Round 10: the row expander says the fidelity ONCE, in
+                    # ``_fidelity_clause``'s own sentence. Pre-fix it also
+                    # carried approx_clause's 'the member list in the table
+                    # is the build'.
+                    assert 'of the same spreads' in exp
+                    assert 'the member list is the build' in exp
                     assert 'roughly ' in summary, summary
                     assert 'roughly ' in title, title
                 else:
@@ -3918,12 +3977,22 @@ def test_the_notable_list_ends_on_one_advice_callout(blob):
         if not ab:
             continue
         tail = W.gate_text(W.notable_tail_html(facts, ab))
-        assert W.NOTABLE_ADVICE in tail
-        # ...and it is invariant, so it is rendered once per page, not once
+        # Round 10: the call-out follows the page's LINE STATUS. Pre-fix it
+        # was the fixed NOTABLE_ADVICE on every page, so Melmetal GL -- no
+        # line, and an SP1 that already wins the most -- read "If you are
+        # hunting, hunt a build instead -- see the single-stat line for what
+        # changes the score" four inches under "No single-stat line on this
+        # moveset." (2026-09-19 round-10 review, major 4).
+        want = W.notable_advice(facts)
+        assert want in tail
+        if facts['floor'] is None and W.sp1_wins_most(facts):
+            assert want is W.NOTABLE_ADVICE_SP1
+            assert 'single-stat line' not in tail
+        # ...and it is invariant per page, so it is rendered once, not once
         # per Build criteria setting (DRY rule D1)
         for key in ab['presets']:
             entries = W.gate_text(W.notable_html(facts, ab, key, all_facts))
-            assert W.NOTABLE_ADVICE not in entries
+            assert want not in entries
         seen += 1
     assert seen >= 1, blob
 
@@ -4007,7 +4076,7 @@ def test_the_emphasis_key_is_printed_once_above_the_figure(shadow_sableye):
     """
     _state, all_facts, _path = shadow_sableye
     ab = all_facts[0]['_builds']
-    block = W.builds_block_html(all_facts[0], ab, all_facts)
+    block = W.tables_block_html(all_facts[0], ab)
     key = W._esc(W.EMPH_KEY)
     assert block.count(key) == 0
     html = W.section_html(all_facts, 0)
@@ -4015,11 +4084,16 @@ def test_the_emphasis_key_is_printed_once_above_the_figure(shadow_sableye):
     # ahead of the figure, and after the table whose cells it weights
     assert html.index(key) < html.index('<div class="wb-plotbox"')
     assert html.index('wb-builds-table') < html.index(key)
-    # the verdict lead is still the first thing in each preset block
-    for k in ab['presets']:
-        one = block[block.index(f'data-preset="{k}"'):]
-        one = one[:one.index('</table>')]
-        assert one.index('wb-builds-lead') < one.index('wb-builds-table'), k
+    # Round 10: the verdict sentence is its own group of .wb-preset blocks
+    # ABOVE the setting-invariant single-stat-line sentence, which is above
+    # the tables (pre-fix: 'wb-builds-lead' then 'wb-builds-table' inside
+    # one block). Reading order: who -> verdict -> line -> table.
+    # On the MARKUP, not the class names: section_html prefixes a <style>
+    # block that mentions every one of these selectors.
+    assert (html.index('<p class="wb-who">')
+            < html.index('<p class="wb-answer-line">')
+            < html.index('<p class="wb-linestatus">')
+            < html.index('<table class="wb-builds-table">'))
     # and the members list header names the sort order the JS actually uses
     assert 'highest stat product first' in html
     assert 'bulkiest first' not in html
@@ -4266,23 +4340,26 @@ def test_the_single_stat_line_status_prints_this_pages_own_two_numbers(
     _state, all_facts, _path = shadow_sableye
     facts = all_facts[0]
     ab = facts['_builds']
-    line = W.line_status_sentence(facts, ab, builds_mod.PRESET_FLAT)
+    # Round 10: the sentence takes no preset -- nothing in it varies with
+    # the Build criteria setting, so it renders ONCE (DRY rule D1). Pre-fix:
+    # line_status_sentence(facts, ab, PRESET_FLAT) and _sp1_gap(facts, ab).
+    line = W.line_status_sentence(facts)
     assert line.startswith('Single-stat line: Attack >= 148.10 decides ')
     assert W.printed_value(facts['floor']) == '148.10'
-    # SP1 is below the line here, and the shortfall is measured on the
-    # line's own axis from the builds context's full-precision planes --
-    # never from the page's 2-dp arrays, which would mis-side a boundary
-    # spread.
-    gap = W._sp1_gap(facts, ab)
+    # The shortfall is the ONE ``stage11_rank1`` computed against the line's
+    # full-precision T, which is what expander F's five-row strip prints.
+    # Pre-fix this sentence said 6.34 and that strip said 6.35, because the
+    # gap was re-derived from the 2-dp value the headline SPEAKS.
+    gap = W._sp1_gap(facts)
     assert gap is not None and gap > 0
-    assert f'SP1 is {gap:.2f} short.' in line
+    assert gap == facts['rank1']['shortfall']
+    assert f'SP1 is {B.fmt(gap)} short.' in line
+    assert '6.34' not in line
     # the negative case: a page with no line says so in one sentence
     off = dict(facts)
     off['floor'] = None
-    assert W.line_status_sentence(off, ab) == W.NO_LINE_STATUS
-    # ...and an off-axis line reports no shortfall it cannot measure
-    bad = dict(facts, floor=dict(facts['floor'], axis='sp'))
-    assert W._sp1_gap(bad, ab) is None
+    assert W.line_status_sentence(off) == W.NO_LINE_STATUS
+    assert W._sp1_gap(off) is None
 
 
 def test_a_wide_region_must_be_big_and_must_hold_the_primary():
@@ -4495,6 +4572,15 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
             "and keeps 43 of Build 1's 55 guaranteed matchups (none of them "
             "material)" in exp)
     assert 'The 12 it gives up out here: 1v2 Feraligatr (grid 11%)' in exp
+    # ...and the TABLE cell says so too. Pre-fix the wide row printed the
+    # positive claim "nothing the other builds guarantee", because
+    # ``run_preset`` passed ``others=[]`` and ``gives_up`` was empty by
+    # construction on every page (2026-09-19 round-10 review, major 1). The column
+    # counts what ANY other build on the table guarantees and this one does
+    # not -- Build 1's 12 plus Build 2's, 30 here.
+    assert bl['wide']['gives_up']
+    assert W._gives_up_text(bl['wide']) != 'nothing the other builds guarantee'
+    assert W._gives_up_text(bl['wide']).startswith('30: ')
     # its rule, hedged the way every approximate rule is
     cell = W.rule_cell_html(bl['wide'], facts)
     assert W.RULE_APPROX_GLYPH in cell
@@ -4513,10 +4599,15 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     # reaches them, ends on the standouts (round 6: it ended on "...55
     # guaranteed matchups." and said nothing about them, because "holds
     # neither standout" is a non-finding)
+    # Round 10: the collapsed line is the VERDICT and stops at the builds;
+    # the wide region's retention clause is the wide ROW, which now also
+    # prints what it gives up. Pre-fix the line ended "; Build 1 wide (644
+    # spreads) keeps 43 of Build 1's 55 guaranteed matchups and holds both
+    # standouts." (2026-09-19 round-10 review).
     line = W.builds_summary(facts, ab, builds_mod.PRESET_FLAT, all_facts)
-    assert line.endswith("; Build 1 wide (644 spreads) keeps 43 of Build 1's "
-                         '55 guaranteed matchups and holds both standouts.')
+    assert 'Build 1 wide' not in line
     assert line.count('guarantees') == 2
+    assert "keeps 43 of Build 1's 55 guaranteed matchups" in exp
     # and the standouts say where they sit relative to it
     so = W.gate_text(W.notable_html(facts, ab, builds_mod.PRESET_FLAT,
                                       all_facts))
@@ -4537,10 +4628,15 @@ def test_the_wide_region_on_shadow_sableye(shadow_sableye):
     assert even['wide']['combo'] == 'E'
     assert (even['wide']['size'], even['wide']['_own']) == (838, 589)
     assert [t['in_wide'] for t in even['standouts']] == [True, True]
+    # Round 10: the wide clause is the wide ROW's, not the collapsed line's.
+    # Pre-fix this line ended "; Build 1 wide (838 spreads) keeps 20 of
+    # Build 1's 29 guaranteed matchups in 0v0 / 1v1 / 2v2 shields (39 of its
+    # 53 overall) and holds both standouts." (2026-09-19 round-10 review).
     eline = W.builds_summary(facts, ab, builds_mod.PRESET_EVEN, all_facts)
-    assert eline.endswith("; Build 1 wide (838 spreads) keeps 20 of Build 1's "
-                          '29 guaranteed matchups in 0v0 / 1v1 / 2v2 shields '
-                          '(39 of its 53 overall) and holds both standouts.')
+    assert 'Build 1 wide' not in eline
+    assert "keeps 20 of Build 1's 29 guaranteed matchups" in W.gate_text(
+        W.build_row_expander(ab, even, even['wide'], 3,
+                             builds_mod.PRESET_EVEN, facts, wide=True))
     # Round 7 retired the "_own == 0" caveat with the trace it was about:
     # the wide region draws a containment RING around every one of its
     # members, so it always has points on the plot. Pinned as an ABSENCE
@@ -4697,9 +4793,14 @@ def test_the_wide_region_on_plain_sableye():
                                                                   33)
     assert (wide['_in_primary'], wide['_primary_size']) == (318, 318)
     assert wide['description'] is not None
+    # Round 10: the wide clause is the wide ROW's, not the collapsed line's.
+    # Pre-fix the line ended "; Build 1 wide (703 spreads) keeps 33 of Build
+    # 1's 43 guaranteed matchups." (2026-09-19 round-10 review).
     line = W.builds_summary(facts, ab, builds_mod.PRESET_FLAT, all_facts)
-    assert line.endswith("; Build 1 wide (703 spreads) keeps 33 of Build 1's "
-                         '43 guaranteed matchups.')
+    assert 'Build 1 wide' not in line
+    assert "keeps 33 of Build 1's 43 guaranteed matchups" in W.gate_text(
+        W.build_row_expander(ab, bl, wide, 2, builds_mod.PRESET_FLAT, facts,
+                             wide=True))
     # the reason it is unchanged, asserted rather than assumed
     for f in all_facts:
         a = f.get('_builds')
@@ -5019,11 +5120,13 @@ def test_the_builds_caption_describes_the_ring_and_not_the_retired_trace():
     """
     # absence pin for the retired phrasing...
     assert 'only the spreads no build holds' not in W.BUILDS_CAPTION
-    # ...with the replacement as the positive control that gives it meaning
+    # ...with the replacement as the positive control that gives it meaning.
+    # Round 10 shortened the builds caption to two sentences, so the three
+    # detail phrases moved out of it (pre-fix: 'around every spread it
+    # holds', 'faint grey centre' and 'lighter tint' were all here); the
+    # ring is still named, and the STATS caption keeps the long form.
     assert 'hollow ring' in W.BUILDS_CAPTION
-    assert 'around every spread it holds' in W.BUILDS_CAPTION
-    assert 'faint grey centre' in W.BUILDS_CAPTION
-    assert 'lighter tint' in W.BUILDS_CAPTION
+    assert 'faint grey centre' not in W.BUILDS_CAPTION
     # the stats view draws the ring too, at one fixed size
     assert 'hollow ring' in W.STATS_CAPTION
     assert 'does not follow attack' in W.STATS_CAPTION
@@ -5637,7 +5740,11 @@ def test_a_family_row_hedges_its_rule_the_way_a_build_row_does(blob):
                     assert 'of the same spreads' in clause, clause
                 else:
                     assert W.RULE_APPROX_GLYPH not in cell
-                    assert clause == 'exactly these spreads', clause
+                    # Round 10: a sentence, not a fragment -- it renders on
+                    # a <p> of its own in the row expander. Pre-fix:
+                    # clause == 'exactly these spreads'.
+                    assert clause == ('The rule fits exactly: these spreads '
+                                      'and no others.'), clause
                 # the expander under the row carries the clause in full
                 exp = W.gate_text(W.build_row_expander(ab, bl, None, 0, 'flat',
                                                        facts, family=f))

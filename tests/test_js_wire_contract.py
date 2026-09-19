@@ -861,17 +861,17 @@ def test_the_clusters_payload_carries_one_all_scenarios_key_per_preset():
     # name the JS would look up and miss
     for key, mapped in keyed['allByPreset'].items():
         assert mapped is None or mapped in keyed['scens'], (key, mapped)
-        if mapped is not None:
-            assert keyed['allLabelByPreset'][key]
-    # the per-preset combined entries are NOT separate dropdown options
-    opts = re.findall(r'<option value="([^"]+)"', html)
-    assert clusters.ALL_SCEN_KEY in opts
-    assert not [o for o in opts if o.startswith(
-        clusters.ALL_SCEN_KEY + clusters.ALL_SCEN_PRESET_SEP)]
-    # the JS reads the map through the same two names
+    # Round 10 deleted ``allLabelByPreset`` with the <option> it re-labelled
+    # (pre-fix: this asserted keyed['allLabelByPreset'][key] for every mapped
+    # preset and that clusters.ALL_SCEN_KEY appeared among the <option>
+    # values). The clusters body has no <select> of its own now; the
+    # section's one Shield-scenario control drives it.
+    assert 'allLabelByPreset' not in keyed
+    assert re.findall(r'<option value="([^"]+)"', html) == []
+    # the JS still reads the map that DID keep a reader (D5)
     js = _js()
     assert 'payload.allByPreset' in js or 'pay.allByPreset' in js
-    assert 'allLabelByPreset' in js
+    assert 'allLabelByPreset' not in js
 
 
 def test_the_section_view_ids_are_the_same_on_both_sides():

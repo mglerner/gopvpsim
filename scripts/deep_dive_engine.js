@@ -4305,8 +4305,8 @@ function _mcEffectiveScen(payload, value) {
 function _mcRenderRoot(root) {
   var payload = _mcPayload(root);
   if (!payload) return;
-  var sel = root.querySelector('select.dd-mc-scen');
-  var scen = _mcEffectiveScen(payload, sel ? sel.value : payload['default']);
+  var scen = _mcEffectiveScen(
+    payload, root.getAttribute('data-mc-scen') || payload['default']);
   var sc = payload.scens[scen];
   var panels = root.querySelectorAll('.dd-mc-panel');
   var panelBox = root.querySelector('.dd-mc-panels');
@@ -4423,17 +4423,19 @@ function mcRefreshAll() {
   });
 }
 
-function mcSelectScenario(sel) {
-  var root = sel.closest('.dd-mc-root');
+function mcSetScenario(root, value) {
   if (!root) return;
   var payload = _mcPayload(root);
-  var shown = payload ? _mcEffectiveScen(payload, sel.value) : sel.value;
+  if (value) root.setAttribute('data-mc-scen', value);
+  var want = root.getAttribute('data-mc-scen') ||
+             (payload ? payload['default'] : '');
+  var shown = payload ? _mcEffectiveScen(payload, want) : want;
   root.querySelectorAll('.dd-mc-scen-block').forEach(function(b) {
     b.style.display = (b.getAttribute('data-scen') === shown) ? 'block' : 'none';
   });
   _mcRenderRoot(root);
 }
-window.mcSelectScenario = mcSelectScenario;
+window.mcSetScenario = mcSetScenario;
 
 // Draw every clusters section that is on screen and not yet drawn. Three
 // callers: the toggle-open hook, the page-load pass, and the best-buddy swap
@@ -5764,7 +5766,20 @@ function _wbBuildMarks(pay, pblock, L, wins, colors, den, scen, root, mini) {
                            den, mini);
     if (bst) out.push(bst);
   }
+  _wbStaggerLabels(out);
   return out;
+}
+
+// Alternate the on-point labels top / bottom, in the order the marks were
+// built, so two named spreads at the same rank do not print over each other.
+function _wbStaggerLabels(traces) {
+  var k = 0;
+  for (var i = 0; i < traces.length; i++) {
+    var t = traces[i];
+    if (!t || t.mode !== 'markers+text') continue;
+    t.textposition = (k % 2) ? 'bottom center' : 'top center';
+    k++;
+  }
 }
 
 // ---- the section's own all-shield-scenarios grid (round 7 item 2) --------
@@ -5876,7 +5891,7 @@ function _wbAllScen(root, box, force) {
       grid.appendChild(d);
       var wins = wbWins(pay.mi, pay.mode, si);
       if (!wins) return;
-      var y = wins, yTitle = 'Wins (of ' + den + ')';
+      var y = wins, yTitle = 'Wins (of ' + den + ')';   // one shield state
       if (yMode === 'score') {
         var sc = computeScenarioAvgPure(pay.mi, si);
         if (sc) { y = sc; yTitle = 'Avg battle score'; }
@@ -5909,7 +5924,7 @@ function _wbAllScen(root, box, force) {
       d.addEventListener('click', function() {
         if (!scenSel) return;
         scenSel.value = scenLabel(si);
-        wbSelectView(scenSel);
+        wbSelectView(scenSel);   // -> _wbSyncScen: every handle, one value
       });
     })(si);
   }
@@ -6148,15 +6163,32 @@ function _wbMemberRows(out, L, from, to, rows) {
 // collection panel (round 9 item 3). It opens and scrolls to the ONE panel,
 // so there is still one CSV loader (loadCollection) and one manual-entry
 // form; the answer comes back into .wb-yours, under the builds table.
+var _wbCameFromSection = false;
+
 function wbOpenCollection(btn) {
   var panel = document.getElementById('collection-panel');
   if (!panel) return;
   if (panel.tagName === 'DETAILS') panel.open = true;
+  // One-shot: the next successful load or manual add scrolls the reader
+  // back to the answer, which is up here under the builds table. Round 9
+  // sent them down and left them there (2026-09-19 round-10 review).
+  _wbCameFromSection = true;
   panel.scrollIntoView({ block: 'center' });
   var ta = document.getElementById('collection-csv');
   if (ta && ta.focus) { try { ta.focus(); } catch (e) {} }
 }
 window.wbOpenCollection = wbOpenCollection;
+
+// Called by wbRefresh once the collection has changed: if the reader got to
+// the panel through the section's own entry point, bring them back to it.
+function wbReturnFromCollection() {
+  if (!_wbCameFromSection) return;
+  _wbCameFromSection = false;
+  var mine = document.querySelector('.wb-mine');
+  if (mine && mine.scrollIntoView) {
+    mine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
 
 function wbRenderMembers(box, all) {
   var root = box.closest('.wb-root');
@@ -6337,27 +6369,16 @@ window.wbPresetScenLabel = wbPresetScenLabel;
 // re-labelled for the active preset. The label text comes from the clusters
 // payload (Python spelled it); this only selects which one.
 function wbSyncClusterAllOption() {
-  var pk = wbActivePresetKey();
   document.querySelectorAll('.dd-mc-root').forEach(function(root) {
     var pay = _mcPayload(root);
-    var sel = root.querySelector('select.dd-mc-scen');
-    if (!pay || !sel || !pay.allByPreset) return;
+    if (!pay || !pay.allByPreset) return;
     var allKey = pay.allKey || 'all';
-    var opt = null;
-    for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === allKey) opt = sel.options[i];
-    }
-    if (!opt) return;
-    var mapped = pay.allByPreset[pk] || allKey;
-    var lbl = (pay.allLabelByPreset && pay.allLabelByPreset[pk]) || null;
-    var sc = pay.scens[mapped];
-    opt.setAttribute('data-mapped', mapped);
-    if (lbl) {
-      opt.textContent = lbl + (sc ? (' (K=' + sc.k + ', silhouette ' +
-        Number(sc.sil).toFixed(2) + (sc.split ? ', split ' + sc.split : '') +
-        ')') : '');
-    }
-    if (sel.value === allKey) mcSelectScenario(sel);
+    var cur = root.getAttribute('data-mc-scen') || pay['default'];
+    // Only the combined entry moves with the Build criteria setting; a
+    // single shield state is the same partition under every setting. The
+    // K / silhouette numbers the old <option> carried are printed in the
+    // block's own headline, which this re-render replaces.
+    if (cur === allKey) mcSetScenario(root, allKey);
   });
 }
 
@@ -6622,9 +6643,8 @@ function wbRenderBox(root, box) {
               : scen
               ? ('Matchups won in ' + scen.label + ' shields (of ' +
                  DATA.nOpponents + ' opponents)')
-              : ('Matchups won (of ' + (DATA.nScenarios * DATA.nOpponents) +
-                 ': ' + DATA.nScenarios + ' shield scenarios x ' +
-                 DATA.nOpponents + ' opponents)')),
+              : ('Matchups won (of ' +
+                 (DATA.nScenarios * DATA.nOpponents) + ')')),
           showgrid: true, gridcolor: chrome.grid, zeroline: false },
     paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
     font: { color: chrome.font, size: 11 },
@@ -6732,6 +6752,29 @@ function wbRenderRoot(root) {
   root.setAttribute('data-wb-rendered', '1');
 }
 
+// The section's ONE scenario setter (DRY rule D2). The figure box, the two
+// expanders' boxes and the clusters subsection are four panels that all
+// answer "in which shield state?", and round 9 gave each its own unlinked
+// handle: narrowing the figure to 1v1 left the other three on "all" with no
+// signal. One value, every handle.
+function _wbSyncScen(root, value) {
+  if (!root || !value) return;
+  root.querySelectorAll('select.wb-scen').forEach(function(s) {
+    if (s.value !== value) s.value = value;
+  });
+  root.querySelectorAll('.dd-mc-root').forEach(function(mc) {
+    var pay = _mcPayload(mc);
+    if (!pay) return;
+    var want = (value === WB_ALL_SCEN) ? (pay.allKey || 'all') : value;
+    // A scenario the clusters pass never computed leaves them where they
+    // are rather than blanking the panels.
+    if (!mc.querySelector('.dd-mc-scen-block[data-scen="' +
+                          (window.CSS && CSS.escape ? CSS.escape(want) : want) +
+                          '"]')) return;
+    mcSetScenario(mc, want);
+  });
+}
+
 // The section's ONE view dispatcher (DRY rule D2). Every control that
 // changes what a figure shows calls it: the three tab strips, each box's
 // Shield-scenario select, and the merged grid's two toggles. A tab carries
@@ -6749,6 +6792,13 @@ function wbSelectView(el) {
       tabs[i].setAttribute('aria-selected', tabs[i] === el ? 'true' : 'false');
     }
   }
+  // A Shield-scenario change is a SECTION-level change: every open panel
+  // and the clusters subsection follow it, so the whole root redraws.
+  if (el.classList && el.classList.contains('wb-scen')) {
+    _wbSyncScen(root, el.value);
+    wbRenderRoot(root);
+    return;
+  }
   if (box) wbRenderBox(root, box);
   else wbRenderRoot(root);
 }
@@ -6763,6 +6813,7 @@ function wbRefresh() {
   if (!root || !root.hasAttribute('data-wb-rendered')) return;
   if (root.offsetParent !== null && root.open) wbRenderRoot(root);
   else root.removeAttribute('data-wb-rendered');
+  wbReturnFromCollection();
 }
 window.wbRefresh = wbRefresh;
 

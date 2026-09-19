@@ -2596,13 +2596,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'gap:4px;margin:6px 20px 0 0;font-size:12px;color:var(--text)">\n'
     )
     # (The all-scenarios small-multiples toggle used to live here, left-
-    # aligned in this strip, with its 3x3 grid below it. Michael's
-    # 2026-09-17 round-7 decision moved the checkbox AND the grid into the
-    # Matchup clusters section as that section's opening figure: the minis
-    # are coloured by that section's own clusters and sat ~3 MB above the
-    # section that defines them. Emitted by
-    # deep_dive_matchup_clusters._allscen_figure; the ids and the JS are
-    # unchanged.)
+    # aligned in this strip, with its 3x3 grid below it. Round 7 moved it
+    # into the Matchup clusters section; round 9 merged that grid with the
+    # "Which one to build?" section's own into ONE grid, which is now the
+    # third tab of that section's one figure --
+    # deep_dive_which_build.plotbox_html + deep_dive_engine.js `_wbAllScen`,
+    # parameterised by a Y mode and a colour mode. The old ids
+    # (#allscen-toggle, #allscen-grid), the checkbox and
+    # `_allscen_figure` are all deleted.)
     html += (
         '  <label style="display:flex;align-items:center;gap:4px">'
         'Highlight IVs: '

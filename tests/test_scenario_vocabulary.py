@@ -271,8 +271,11 @@ def test_rendered_scenario_blocks_use_the_canonical_labels():
     # is NOT an '{a}v{b}' label, and every other key must still be one.
     assert got == {rendering.scenario_label(p) for p in SCENARIOS9} | {'all'}
     assert all(re.fullmatch(r'\dv\d', g) for g in got - {'all'})
-    # and the selector options agree with the blocks
-    assert set(re.findall(r'<option value="([^"]+)"', html)) == got
+    # Round 10: there is no <select> in this body -- the section's own
+    # Shield-scenario control switches these blocks through
+    # ``_wbSyncScen`` -> ``mcSetScenario``, keyed on exactly these values.
+    # Pre-fix: set(re.findall(r'<option value="([^"]+)"', html)) == got.
+    assert re.findall(r'<option value="([^"]+)"', html) == []
 
 
 # ---------------------------------------------------------------------------

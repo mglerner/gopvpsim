@@ -826,8 +826,8 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
     the explanation that follows it, not the headline.
     """
     finding = degenerate_finding(wins_lo, wins_hi, nO)
-    subj = ("opponent is a sharp marginal" if n_sharp == 1
-            else "opponents are sharp marginals")
+    subj = ("opponent is contested" if n_sharp == 1
+            else "opponents are contested")
     pat = "pattern" if n_patterns == 1 else "patterns"
     return (f"{finding}. Only {n_sharp} {subj} ({n_patterns} distinct win "
             f"{pat}), below the {DEGEN_MIN_SHARP}-opponent / "
@@ -837,7 +837,7 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
 
 
 def fragmented_reason(n_sharp, n_patterns, min_cluster_ivs,
-                      what="sharp marginal opponents"):
+                      what="contested opponents"):
     """The other honest no-clusters outcome: enough marginals, no partition.
 
     Distinct from ``degenerate_reason`` on purpose (Feraligatr UL 0v0: 12
@@ -1105,7 +1105,7 @@ def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
             return {
                 "reason": fragmented_reason(
                     n_bits, n_patterns_all, min_cluster_ivs,
-                    what="concatenated marginal-matchup bits"),
+                    what="concatenated contested-matchup bits"),
                 "degenerate": False, "combined": meta,
                 "n_sharp": n_bits, "n_patterns": n_patterns_all}
         entry["combined"] = meta
@@ -1136,7 +1136,7 @@ def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
 # are one grid now (deep_dive_engine.js `_wbAllScen`). `.dd-mc-root` is still
 # the root the engine's lazy-render hook looks for, unchanged.
 SECTION_TITLE = "Matchup clusters"
-SECTION_SUMMARY_BASE = "IVs grouped by which marginal matchups they win"
+SECTION_SUMMARY_BASE = "IVs grouped by which contested matchups they win"
 
 
 def _section_open(grid_nS):
@@ -1241,23 +1241,6 @@ def _scen_display(label, tags=None):
     return f'{label} shields'
 
 
-def _all_labels(all_by_preset, tags):
-    """The "all scenarios" option's label while each preset is selected.
-
-    A preset that weights ONE scenario resolves to that scenario's own
-    partition, and labelling the option "1v1 shields" put two entries in the
-    dropdown reading as the same scenario (2026-09-16 review). The option
-    says instead that "all scenarios" IS that scenario under this preset.
-    """
-    out = {}
-    for k, v in all_by_preset.items():
-        if v is None:
-            continue
-        if is_all_scen_key(v):
-            out[k] = _scen_display(v, tags)
-        else:
-            out[k] = f'{ALL_SCEN_DISPLAY} = {_scen_display(v, tags)} here'
-    return out
 
 
 def _scen_short_note(entry):
@@ -1273,27 +1256,13 @@ def _scen_short_note(entry):
     if entry.get("combined"):
         unit = "bit" if n == 1 else "bits"
     else:
-        unit = "marginal" if n == 1 else "marginals"
+        unit = "contested" if n == 1 else "contested"
     pat = "pattern" if p == 1 else "patterns"
     if entry.get("degenerate"):
         return f'degenerate ({n} {unit} / {p} {pat})'
     return f'no clusters ({n} {unit} / {p} {pat}, too fragmented)'
 
 
-def _scen_option_note(entry):
-    """What a dropdown option carries after the scenario name.
-
-    A clustered scenario carries its QUALITY (K and silhouette), so the list
-    itself is the one-glance "where is the structure on this page" view --
-    the section's default is the combined entry, which is routinely the
-    least separated partition on the page, and without this a reader has no
-    signal that a single scenario separates twice as cleanly one click away.
-    A scenario with no clusters carries its counts instead.
-    """
-    if "res" in entry:
-        return (f' (K={entry["res"]["k"]}, silhouette '
-                f'{entry["res"]["silhouette"]:.2f})')
-    return f' - {_scen_short_note(entry)}'
 
 
 def _entry_opp_names(entry, disp):
@@ -1325,7 +1294,7 @@ def _scen_headline(label, entry, nO, tags=None):
     if comb:
         excl = (' (' + _esc(', '.join(comb["excluded"])) +
                 ' excluded as degenerate)') if comb["excluded"] else ''
-        head = (f'{comb["n_bits"]} win/loss bits (one per sharp marginal '
+        head = (f'{comb["n_bits"]} win/loss bits (one per contested '
                 f'opponent per scenario) concatenated across '
                 f'{len(comb["scens"])} of {comb["n_total"]} shield '
                 f'scenarios{excl}')
@@ -1333,7 +1302,7 @@ def _scen_headline(label, entry, nO, tags=None):
         wr = entry["wr"]
         n_win = int((wr == 1.0).sum())
         n_loss = int((wr == 0.0).sum())
-        head = (f'{len(res["sharp"])} sharp marginal opponents '
+        head = (f'{len(res["sharp"])} contested opponents '
                 f'of {nO} ({n_win} always-win / {n_loss} always-lose at '
                 f'every IV)')
     sil = res["silhouette"]
@@ -1386,8 +1355,8 @@ def _sharpest_signpost(computed, tags=None):
         split = e.get("root_split")
         n = len(e["res"]["sharp"])
         bits.append(f'{_esc(_scen_display(lbl, tags))} (K={e["res"]["k"]}, '
-                    f'silhouette {sil:.2f} over {n} sharp '
-                    f'{"marginal" if n == 1 else "marginals"}'
+                    f'silhouette {sil:.2f} over {n} contested '
+                    f'{"opponent" if n == 1 else "opponents"}'
                     + (f', split {_esc(split)}' if split else '') + ')')
     return (f'<p style="font-size:12px;color:var(--text-muted)">Sharpest '
             f'single scenarios on this page: {" and ".join(bits)} -- pick '
@@ -1420,11 +1389,11 @@ def _cluster_table(entry, opp_names):
             f'<td style="text-align:right">{c["mean_marginal_wins"]:.1f}</td>'
             f'<td>{gtxt}</td></tr>')
     return (
-        '<table class="dd-table dd-narrow"><thead><tr>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead><tr>'
         '<th>Cluster</th><th>IVs</th><th>atk (mean)</th><th>def (mean)</th>'
-        '<th>hp (mean)</th><th>SP rank</th><th>marginal wins (mean)</th>'
+        '<th>hp (mean)</th><th>SP rank</th><th>contested wins (mean)</th>'
         '<th>gains vs previous cluster</th>'
-        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>")
 
 
 def _winrate_grid(entry, opp_names):
@@ -1440,12 +1409,12 @@ def _winrate_grid(entry, opp_names):
         rows.append(f"<tr><td>{_esc(opp_names[o])}</td>{cells}</tr>")
     return (
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
-        'font-size:13px">Per-cluster win rates vs each marginal opponent'
+        'font-size:13px">Per-cluster win rates vs each contested opponent'
         '</summary>'
-        '<table class="dd-table dd-narrow"><thead>'
-        f'<tr><th>Marginal opponent</th>{head}</tr></thead><tbody>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead>'
+        f'<tr><th>Contested opponent</th>{head}</tr></thead><tbody>'
         + "".join(rows) +
-        '</tbody></table>'
+        '</tbody></table></div>'
         '<p style="font-size:12px;color:var(--text-muted)">Green tint = the '
         'cluster mostly wins that matchup, red tint = mostly loses; the '
         'percentage is the share of the cluster\'s IVs that win.</p>'
@@ -1509,11 +1478,11 @@ def _flip_table_html(entry, opp_names, has_anchors):
         '</summary>'
         '<p style="font-size:12px;color:var(--text-muted)">'
         f'{_esc(BEST_RULE_TIP)}</p>'
-        '<table class="dd-table dd-narrow"><thead><tr>'
-        '<th>Marginal opponent</th><th>Win rate</th>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead><tr>'
+        '<th>Contested opponent</th><th>Win rate</th>'
         f'<th title="{_esc(BEST_RULE_TIP)}">Best single-stat rule</th>'
         '<th>Rule accuracy</th><th>Named anchor?</th>'
-        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>"
         f'<p style="font-size:12px;color:var(--text-muted)">{foot}</p>'
         '</details>')
 
@@ -1562,13 +1531,10 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
 
     _tags = preset_tags(presets)
     scen_labels = list(computed.keys())
-    # The per-preset combined entries are NOT their own dropdown options: the
-    # "all scenarios" option re-labels itself with the page's Build criteria
-    # preset and selects the matching partition. They still get their own
-    # server-side block, because the tables under the panels have to be the
-    # tables for the partition on screen.
-    option_labels = [lbl for lbl in scen_labels
-                     if lbl == ALL_SCEN_KEY or not is_all_scen_key(lbl)]
+    # Every per-preset combined entry gets its own server-side block, because
+    # the tables under the panels have to be the tables for the partition on
+    # screen; which one is shown follows the section's one Shield-scenario
+    # control through ``_wbSyncScen`` -> ``mcSetScenario``.
     all_by_preset = resolve_all_scen_keys(computed, presets or [])
     # Default view: the combined entry when it clustered (it is the
     # section's own question -- which fights do you win across every shield
@@ -1591,11 +1557,9 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     payload = {"palette": CLUSTER_PALETTE, "default": default_scen,
                "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {},
                # preset key -> the `scens` key its "all scenarios" view
-               # draws, plus the label the option carries while it is
-               # selected. Both from Python: the JS re-labels the option, it
-               # does not compose the words.
-               "allByPreset": all_by_preset,
-               "allLabelByPreset": _all_labels(all_by_preset, _tags)}
+               # draws. ``allLabelByPreset`` went with the <option> it
+               # re-labelled (round 10: one scenario control per section).
+               "allByPreset": all_by_preset}
     for lbl, entry in computed.items():
         disp_lbl = _scen_display(lbl, _tags)
         if "res" not in entry:
@@ -1628,44 +1592,14 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         }
 
     parts = [_section_open(nS if nS > 1 else 0)]
-    parts.append(
-        '<p style="font-size:13px">IVs grouped by <b>which marginal '
-        'matchups they win</b> (their win/loss fingerprint over the '
-        'opponents that some IVs beat and others don\'t), instead of by '
-        'average score. Clusters largely correspond to stat-threshold '
-        'regions (see each scenario\'s stat-rules accuracy below): '
-        'crossing a breakpoint or bulkpoint typically moves an IV to the '
-        'next cluster, gaining a named set of matchups and sometimes '
-        'trading others away.</p>')
-    parts.append(
-        '<p style="font-size:13px">Every shield scenario the dive baked is '
-        'clustered separately -- including the lopsided ones, which are '
-        'often the sharpest partition on the page; compare the silhouettes '
-        'in the dropdown below -- plus an '
-        f'<b>{ALL_SCEN_DISPLAY}</b> view that concatenates every '
-        'non-degenerate scenario\'s marginal-matchup bits into one '
-        'fingerprint. That combined view is not an average of scores: it is '
-        '"which fights do you win across every shield state", asked once. '
-        'Scenarios with too little structure to cluster are listed with '
-        'their counts rather than hidden.</p>')
-    parts.append(
-        f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
-        f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
-        f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
-        f'play, over the full opponent pool; this section does not follow '
-        f'the scatter\'s moveset / opponent-IV / bait dropdowns or the '
-        f'opponent filter.</p>')
-
-    # scenario selector (server-side blocks + client panels both follow it)
-    opts = "".join(
-        f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
-        f'{_esc(_scen_display(lbl, _tags))}'
-        f'{_esc(_scen_option_note(computed[lbl]))}</option>'
-        for lbl in option_labels)
-    parts.append(
-        '<label style="font-size:13px">Shield scenario: '
-        '<select class="dd-mc-scen" onchange="if(window.mcSelectScenario)'
-        'mcSelectScenario(this)">' + opts + '</select></label>')
+    # No intro paragraphs, no dropdown, no provenance line HERE. Round 9
+    # moved this body inside "Which one to build?" -> "Why these regions",
+    # whose own lead is the one sentence that says what the clusters are;
+    # round 8's ~150-word intro then stood between that lead and the first
+    # panel (2026-09-19 round-10 review, major 6). The second "Shield
+    # scenario:" <select> went with them: the section has ONE scenario
+    # control (``select.wb-scen``), and ``_wbSyncScen`` drives these blocks
+    # from it. The provenance sentence is emitted LAST, under the tables.
 
     # three stat-plane panels (client-rendered)
     parts.append(
@@ -1729,7 +1663,7 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                 parts.append(_rules_block(entry))
                 parts.append(
                     '<p style="font-size:12px;color:var(--text-muted)">'
-                    'This is the Build criteria preset\'s own combined '
+                    'This is the Build criteria setting\'s own combined '
                     'partition: the clusters and the stat rules above are '
                     'its own. The per-matchup win-rate grid and the flip '
                     f'table are printed for the {_esc(ALL_SCEN_DISPLAY)} '
@@ -1742,12 +1676,20 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                 parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
         parts.append('</div>')
 
+    parts.append(
+        f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
+        f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
+        f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
+        f'play, over the full opponent pool; this does not follow '
+        f'the scatter\'s moveset / opponent-IV / bait dropdowns or the '
+        f'opponent filter.</p>')
+
     knobs = cluster_params()   # every number quoted below comes from them
     parts.append(
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
         'font-size:13px">How this works</summary>'
         '<p style="font-size:12px;color:var(--text-muted)">'
-        'Per shield scenario: an opponent is a <b>sharp marginal</b> when '
+        'Per shield scenario: an opponent is <b>contested</b> when '
         f'between {knobs["sharp_lo_pct"]}% and {knobs["sharp_hi_pct"]}% of '
         'this dive\'s IV spreads beat it (everyone '
         'else is settled and can\'t distinguish IVs). Each IV\'s '
@@ -1764,12 +1706,12 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         f'{knobs["sil_epsilon"]} of the best silhouette wins). Silhouettes '
         'are comparable between the scenarios on this page, not between '
         'species. Clusters are ordered weakest to '
-        'strongest by mean marginal wins. The scatter panels project the '
+        'strongest by mean contested wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
         'that overlap completely in score separate cleanly there. A '
         'scenario is reported as <b>degenerate</b> (no clustering '
         'attempted) when it has fewer than '
-        f'{knobs["degen_min_sharp"]} sharp marginals or fewer than '
+        f'{knobs["degen_min_sharp"]} contested opponents or fewer than '
         f'{knobs["degen_min_patterns"]} distinct win patterns -- on that '
         'little data every candidate K scores near-perfectly, which is a '
         'measurement artifact and not structure -- and its bits are left '
