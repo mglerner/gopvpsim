@@ -349,15 +349,28 @@ def test_d3_the_clusters_section_is_a_subsection_now():
 # D4. Byte budget
 # ---------------------------------------------------------------------------
 
-# Measured at 0ca9693 on the round-8 Shadow Sableye preview page: the
-# ``<details class="wb-root">`` section was 178,751 bytes and the Matchup
-# clusters section 245,472 beside it, for 424,223 together. The merged
-# section must be smaller than that sum -- it deletes three per-build
-# paragraphs, one of the two nine-mini grids, the duplicated emphasis keys,
-# the duplicated view captions and the clusters section's own chrome.
-# ``section_html`` also emits a ``<style>`` prelude (11,580 bytes at 0ca9693)
-# that the page hoists and this measurement excludes, exactly as the round-8
-# figure did.
+# What this measures, exactly: the bytes ``section_html`` AUTHORS, from
+# ``<details class="wb-root">`` on. It excludes the ``<style>`` prelude the
+# page hoists (11,580 bytes at 0ca9693) and it excludes the Matchup clusters
+# body, which reaches the page through a slot marker
+# (``deep_dive.generate_interactive_html`` fills it) rather than through this
+# renderer.
+#
+# Round 8, same measurement on the same page and arm: 178,751 bytes, with the
+# Matchup clusters section's live copy a further 245,472 beside it. Round 9
+# as shipped: 184,376 -- under the 185,000 cap and far under the two round-8
+# blocks together, but 5,625 bytes MORE than round 8's section alone. That is
+# the honest number: the reorganization deletes three per-build paragraphs,
+# one of the two nine-mini grids, the duplicated emphasis keys and the
+# duplicated view captions, and it adds the mirror control, the line-status
+# sentence, the collection block, three tab strips, three plot boxes, the
+# per-row steps tables and six new glossary entries (each printed twice, as
+# a hover and as a Terms row). The net is +3.1%.
+#
+# At PAGE level the merged <details> on the shadow preview is 668,057 bytes,
+# because best-buddy is active there and the clusters body ships twice (a
+# live host plus an inert <template>) -- exactly as it did in round 8, when
+# the same two copies sat in a sibling section.
 D4_ROUND8_PAGE_SECTION_BYTES = 178_751
 D4_ROUND8_CLUSTERS_BYTES = 245_472
 D4_CEILING = 185_000
@@ -383,7 +396,8 @@ def test_d4_the_merged_section_fits_the_budget(shadow_section):
     that ``deep_dive.generate_interactive_html`` fills, so what this measures
     is everything the reorganization actually authors.
 
-    Round 8: 178,751 bytes. Round 9 as shipped: 184,376.
+    Round 8: 178,751 bytes. Round 9 as shipped: 184,376 (+3.1%), against
+    the 424,223 the two round-8 blocks took between them.
     """
     n = _section_bytes(shadow_section)
     assert n < D4_CEILING, f"section is {n:,} bytes (ceiling {D4_CEILING:,})"
