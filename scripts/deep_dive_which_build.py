@@ -1812,8 +1812,15 @@ CSS = """
   vertical-align: middle; }
 #dd-which-build .wb-yours-list { margin: 0 0 6px; padding-left: 20px;
   line-height: 1.5; }
+/* 520px, not 400: the set panel's row axis is domain [0, 0.46] of the
+   panel, so at 400px its eight rows got 23px each and every one of the
+   two-line row labels ("A 0v1 Empoleon box / 665 spreads / 42 guaranteed")
+   overlapped its neighbour by 3-4px. Measured in headless Chrome at 1400px
+   on the 2026-09-19 shadow preview: seven overlapping pairs at 400px, zero
+   at 520px. This is the round-9 reviewer's second unverified finding, and
+   it was real. */
 #dd-which-build .wb-upset { display: block; width: 100%;
-  height: 400px; min-height: 400px; margin: 0 0 6px; }
+  height: 520px; min-height: 520px; margin: 0 0 6px; }
 #dd-which-build .wb-upset[hidden] { display: none; }
 #dd-which-build .wb-panel { display: block; width: 100%;
   margin: 10px 0 0; }
