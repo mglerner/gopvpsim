@@ -3560,8 +3560,16 @@ def _which_build_sections(state):
     * a guard failure inside the brief -- the brief's whole contract is that
       a printed number was re-derived, so a page that swallowed a guard and
       rendered anyway would be the one outcome worse than no section;
-    * any other exception -- the dive's own output must not die for an
-      analysis block that sits above it.
+    * the blob named on the state is gone from disk -- same shape as having
+      no path at all, just discovered one layer later.
+
+    Nothing else degrades. This used to catch ``Exception``, and on
+    2026-09-20 the pre-dive grid measured what that bought: a plain
+    ``KeyError`` in :func:`deep_dive_which_build.compute_masks` (B1) became
+    one WARNING and shipped the merge's flagship section as ABSENT on 4 of
+    13 sampled Great League pages and 3 of 17 Ultra League ones, with the
+    dive exiting 0 and the chain printing SUCCESS. A code bug must stop the
+    dive; only a missing input or a failed guard may be rendered around.
     """
     blob_path = state.get('replay_blob_path')
     if not blob_path:
@@ -3575,8 +3583,9 @@ def _which_build_sections(state):
     per_file = (1 if (state['split_movesets']
                       and len(state['moveset_data']) > 1)
                 else len(state['moveset_data']))
+    import deep_dive_which_build as which_build
+    from deep_dive_brief import GuardError
     try:
-        import deep_dive_which_build as which_build
         all_facts = which_build.prepare(state, blob_path)
         html = {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
                                               page_movesets=per_file)
@@ -3588,7 +3597,7 @@ def _which_build_sections(state):
                                              all_facts[arm].get('_builds'))
                  for arm in range(len(all_facts))}
         return html, presets, cards
-    except Exception as e:
+    except (GuardError, FileNotFoundError) as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
         return {}, {}, {}
