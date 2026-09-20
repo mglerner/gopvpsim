@@ -357,10 +357,16 @@ names the template tests to copy):
 
 Commands:
 
-- `python -m pytest tests -q -m "not slow"` — the fast tier (~36s);
-  this is what the `verify_tests.py` ship gate runs
+- `python -m pytest tests -q -m "not slow"` — the fast tier, **~7 min**
+  (397 s measured 2026-09-20 on an idle 18-core machine; 549 s under
+  load). This is what the `verify_tests.py` ship gate runs, and it is
+  gate 1 of every publish path AND the tail of the overnight chain, so
+  budget ~7-9 min at each. It was "~36s" here until 2026-09-20; the
+  wotb-v4 merge's `tests/test_which_build_section.py` is most of the
+  difference.
 - `python -m pytest tests -q` — full suite incl. the slow gamemaster
-  sweep (~80s)
+  sweep and the blob-backed render tests, **~18 min** (1,042 s measured
+  2026-09-20). Was "~80s" here until the same date.
 - `python -m pytest tests/test_battle.py -q` — battle tests only (243
   passed + 13 strict xfails as of 2026-08-09)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/

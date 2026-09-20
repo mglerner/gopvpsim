@@ -360,7 +360,17 @@ def _showcases_html(pages):
         for n, (league, opp, scen, blurb) in enumerate(SHOWCASES, 1))
 
 
-def build():
+def build(out_dir=OUT_DIR):
+    """Render the article into ``out_dir`` (default: the live site path).
+
+    ``--out`` exists so the post-bake re-render can be REHEARSED into a
+    scratch directory. The Cramorant post-bake runbook calls for exactly
+    that, and until 2026-09-20 this script had no argparse at all: the only
+    way to run it was straight onto
+    userdata/website/articles/cramorant-pogodives-strategy/, i.e. the live
+    page, which is not a thing to find out mid-bake.
+    """
+    out_dir = Path(out_dir)
     data_gl, sc_gl, _ = _page_tensors('great')
     data_ul, sc_ul, _ = _page_tensors('ultra')
     n_gl = len(data_gl['opponents'])
@@ -926,9 +936,9 @@ mkAtkPlot('hump-22-ul', 8, 'UL 2-2 delta vs attack', DU);
 </body>
 </html>
 """
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / 'index.html').write_text(html)
-    (OUT_DIR / 'meta.toml').write_text(
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / 'index.html').write_text(html)
+    (out_dir / 'meta.toml').write_text(
         'title       = "Playing Cramorant: The PoGoDives Strategy"\n'
         'description = "AI + human (drafted by the lab AI under the '
         'developer\'s direction and editorial guidance, 2026-08-26). The '
@@ -939,8 +949,20 @@ mkAtkPlot('hump-22-ul', 8, 'UL 2-2 delta vs attack', DU);
         'time."\n'
         'authorship  = "both"\n'
         'landing     = "index.html"\n')
-    print(f'wrote {OUT_DIR}/index.html ({len(html):,} chars) + meta.toml')
+    print(f'wrote {out_dir}/index.html ({len(html):,} chars) + meta.toml')
+
+
+def main(argv=None):
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
+    ap.add_argument('--out', default=str(OUT_DIR), metavar='PATH',
+                    help='directory to write index.html + meta.toml into '
+                         '(default: the live site path, %(default)s). Point '
+                         'it at a scratch dir to rehearse the re-render '
+                         'without touching the published page.')
+    args = ap.parse_args(argv)
+    build(args.out)
 
 
 if __name__ == '__main__':
-    build()
+    main()
