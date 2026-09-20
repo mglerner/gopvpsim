@@ -716,7 +716,18 @@ def compute_masks(state, arm, facts, mode='pvpoke', level='l50'):
     alt = facts.get('alternative')
     alt_mask = None
     if alt is not None and not alt['too_wide']:
-        flags = (dfn >= alt['def_cut']) & (hp >= alt['hp_cut'])
+        # Read the rectangle off its OWN axes. ``def_cut`` / ``hp_cut`` are
+        # back-compat aliases that deep_dive_brief attaches only when the
+        # pair really is (Def, HP) -- deliberately, because an attack-paired
+        # rectangle has no Def-and-HP reading. Reading them unconditionally
+        # raised KeyError on every attack-paired arm, which the caller's
+        # broad ``except`` turned into one log line and a page with no
+        # section at all (2026-09-20 pre-dive grid, B1: 4 of 13 sampled GL
+        # blobs and 3 of 17 UL). This reduces to the old expression when
+        # ``axes == ('def', 'hp')``; the count cross-check below is the
+        # guard against a wrong generalisation.
+        a0, a1 = alt['axes']
+        flags = (planes[a0] >= alt['cut_a']) & (planes[a1] >= alt['cut_b'])
         got = int(flags.sum())
         if got != int(alt['n']):
             raise ValueError(

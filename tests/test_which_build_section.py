@@ -6049,3 +6049,174 @@ def test_a_variant_keeps_the_pages_own_short_name_and_says_when_it_is_identical(
     assert 'differ from it by 2 to 6 decision matchups' in out3
     # and no variants is no sentence
     assert W.notable_variants_sentence(bl, {'variants': []}) == ''
+
+
+# ---------------------------------------------------------------------------
+# 12. B1 -- the alternative rectangle's mask is read off its OWN axes
+#     (2026-09-20 pre-dive grid, docs/validations/2026-09-20_predive_grid_wotb_v4.md)
+# ---------------------------------------------------------------------------
+
+# Blobs whose alternative rectangle is ATTACK-paired, i.e. the shape that
+# made compute_masks raise. The probe blob the grid report names comes
+# first; the 2026-09-13 bake blobs behind it are the durable fallbacks, so
+# this test does not go dark the moment the probe blob is pruned.
+_ATTACK_PAIRED_BLOBS = [
+    '20260920_093803_Oinkologne_Female_great.replay.pkl.gz',
+    '20260913_071040_Cradily_great.replay.pkl.gz',
+    '20260913_020826_Mandibuzz_great.replay.pkl.gz',
+    '20260913_063703_Morpeko_Full_Belly_great.replay.pkl.gz',
+]
+
+
+def _first_present(names):
+    for name in names:
+        for d in _replay_dirs():
+            if (d / name).exists():
+                return d / name
+    pytest.skip("no attack-paired replay blob on this machine")
+
+
+def _decode_mask(packed, n):
+    import base64
+    import numpy as np
+    raw = np.frombuffer(base64.b64decode(packed), dtype=np.uint8)
+    return np.unpackbits(raw, bitorder='little')[:n].astype(bool)
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_prepare_survives_an_attack_paired_alternative_rectangle():
+    """An attack-paired rectangle must not cost the page its section.
+
+    PRE-FIX (measured 2026-09-20): ``compute_masks`` read
+    ``alt['def_cut']`` / ``alt['hp_cut']`` unconditionally, but
+    ``deep_dive_brief._alt_facts`` attaches those back-compat aliases ONLY
+    when the pair is (Def, HP) -- deliberately, because a (HP, Atk) or
+    (Def, Atk) rectangle has no Def-and-HP reading. So ``prepare()`` raised
+    ``KeyError: 'def_cut'`` here, ``deep_dive._which_build_sections``
+    swallowed it, and the page shipped with NO "Which one to build?"
+    section at all. On the grid report's samples that was 4 of 13 Great
+    League blobs and 3 of 17 Ultra League ones.
+
+    On the Oinkologne (Female) probe blob the pre-fix run raised; post-fix
+    arm 0 is ``axes=['hp', 'atk']`` with 302 members and a packed mask.
+    """
+    import numpy as np
+    path = _first_present(_ATTACK_PAIRED_BLOBS)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))          # pre-fix: KeyError
+    attack_paired = [f for f in all_facts
+                     if (f.get('alternative') or {}).get('axes')
+                     and 'atk' in f['alternative']['axes']]
+    assert attack_paired, (
+        f"{path.name} no longer carries an attack-paired rectangle; this "
+        "test needs one to mean anything")
+    for facts in attack_paired:
+        alt = facts['alternative']
+        # the exact pre-fix failure, pinned: the aliases are absent
+        assert 'def_cut' not in alt and 'hp_cut' not in alt
+        if alt['too_wide']:
+            continue
+        packed = facts['_masks']['alt']
+        assert packed, "an in-scope rectangle must ship a mask"
+        _scores, meta = B.arm_view(state, all_facts.index(facts), 'pvpoke')
+        flags = _decode_mask(packed, len(meta))
+        assert int(flags.sum()) == int(alt['n'])
+        a0, a1 = alt['axes']
+        expect = ((meta[:, B.AXIS_META_COL[a0]] >= alt['cut_a'])
+                  & (meta[:, B.AXIS_META_COL[a1]] >= alt['cut_b']))
+        assert np.array_equal(flags, expect)
+
+
+def _synthetic_meta(n=64):
+    import numpy as np
+    meta = np.zeros((n, 8), dtype=float)
+    meta[:, 0] = np.arange(n) % 16              # atk IV
+    meta[:, 1] = (np.arange(n) // 4) % 16       # def IV
+    meta[:, 2] = (np.arange(n) // 2) % 16       # hp IV
+    meta[:, 3] = 40.0
+    meta[:, 4] = 1500.0
+    meta[:, 5] = 100.0 + meta[:, 0] * 1.5       # atk
+    meta[:, 6] = 90.0 + meta[:, 1] * 1.25       # def
+    meta[:, 7] = 120.0 + meta[:, 2]             # hp
+    return meta
+
+
+@pytest.mark.parametrize('axes,search', [
+    (('def', 'hp'), ('hp', 'def')),
+    (('hp', 'atk'), ('hp', 'atk')),
+    (('def', 'atk'), ('def', 'atk')),
+])
+def test_the_alt_mask_is_right_for_every_axis_pairing(axes, search):
+    """All three rectangle shapes the brief can emit, end to end, no blob.
+
+    The alt dict is built by ``deep_dive_brief._alt_facts`` itself, so the
+    back-compat-alias rule under test is the real one and not a fixture's
+    imitation: only (Def, HP) carries ``def_cut``/``hp_cut``, which is
+    precisely why the pre-fix ``(dfn >= alt['def_cut']) & (hp >=
+    alt['hp_cut'])`` raised ``KeyError`` on the other two.
+    """
+    import numpy as np
+    n = 64
+    meta = _synthetic_meta(n)
+    state = {'opponent_names': ['A', 'B'],
+             'shield_scenarios': [(0, 0), (1, 1)],
+             'moveset_data': [{'meta': meta,
+                               'scores': {'pvpoke':
+                                          np.full((n, 2, 2), 500, np.int32)}}]}
+    win = np.zeros((n, 2, 2), dtype=bool)
+    all_cuts = {'atk': 112.0, 'def': 101.0, 'hp': 127.0}
+    cuts = {a: all_cuts[a] for a in axes}
+    mask = np.ones(n, dtype=bool)
+    for a in axes:
+        mask &= meta[:, B.AXIS_META_COL[a]] >= cuts[a]
+    alt = B._alt_facts({'mask': mask, 'axes': axes, 'search_axes': search,
+                        'cuts': cuts, 'n': int(mask.sum()), 'guaranteed': [],
+                        'exclusive': [], 'given_up': []},
+                       state, meta, win, n)
+    assert ('def_cut' in alt) is (set(axes) == {'def', 'hp'})
+    assert not alt['too_wide'], "the fixture must stay in scope for a mask"
+    facts = {'floor': {'axis': 'atk', 'T': 112.0,
+                       'n_above': int((meta[:, 5] >= 112.0).sum()),
+                       'printed': '112.00'},
+             'alternative': alt}
+    out = W.compute_masks(state, 0, facts, 'pvpoke', 'l50')  # pre-fix: KeyError
+    assert np.array_equal(_decode_mask(out['alt'], n), mask)
+    assert int(mask.sum()) == int(alt['n'])
+
+
+def test_a_code_bug_in_the_section_stops_the_dive():
+    """``_which_build_sections`` degrades on no-verdict, crashes on bugs.
+
+    PRE-FIX the handler was ``except Exception``, so the B1 ``KeyError``
+    above became one WARNING line, the dive exited 0, and the page shipped
+    without the merge's flagship section. Only two outcomes are legitimate
+    no-verdicts -- a failed brief guard, and a blob that is not on disk --
+    and those still degrade.
+    """
+    import deep_dive
+    from deep_dive_brief import GuardError
+    state = {'replay_blob_path': '/nonexistent/x.replay.pkl.gz',
+             'split_movesets': False, 'moveset_data': [{}]}
+
+    def raising(exc):
+        def _p(_state, _blob):
+            raise exc
+        return _p
+
+    for exc in (GuardError('G-caveat: field=all'),
+                FileNotFoundError('blob is gone')):
+        W_prepare = W.prepare
+        W.prepare = raising(exc)
+        try:
+            assert deep_dive._which_build_sections(state) == ({}, {}, {})
+        finally:
+            W.prepare = W_prepare
+    for exc in (KeyError('def_cut'), ValueError('mask covers 0 spreads')):
+        W_prepare = W.prepare
+        W.prepare = raising(exc)
+        try:
+            with pytest.raises(type(exc)):
+                deep_dive._which_build_sections(state)
+        finally:
+            W.prepare = W_prepare
