@@ -60,7 +60,7 @@ from gopvpsim.data import (  # noqa: E402
 # per-species top_movesets, which dives use hand-authored thresholds) lives
 # in dive_registry.DIVE_OVERRIDES / EXTRA_DIVES / SLUG_EXCEPTIONS.
 from dive_registry import (DEFAULT_TOP_MOVESETS, all_dives as _all_dives,
-                           pair_partner)
+                           check_override_keys, pair_partner)
 
 DIVES = _all_dives()
 
@@ -239,6 +239,10 @@ def check_opponent_pools(*, allow_stale=False):
 
 def main():
     check_cup_slugs(DIVES)
+    # A DIVE_OVERRIDES key that names no dive drops that dive's moveset pin /
+    # reference / policy / thresholds silently -- hours of sim against a
+    # moveset nobody chose. Fail in seconds instead.
+    check_override_keys(DIVES)
 
     parser = argparse.ArgumentParser(
         description=__doc__,
