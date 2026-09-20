@@ -150,6 +150,27 @@ CATCH_TARGETS = (0.50, 0.75)      # D7
 CAVEAT_SPECIES = ('Aegislash',)
 CAVEAT_MARK = ' (engine divergence vs PvPoke)'
 
+
+def cell_label_with_caveat(label):
+    """A printed cell label, carrying CAVEAT_MARK when it names a caveat species.
+
+    ONE spelling for every print site. :func:`gate_caveat` fails any rendered
+    string that names a caveat species without the divergence wording; until
+    2026-09-20 only the two cost tables appended the mark, so a caveat
+    opponent reached through ANY other cell list -- field 8's "Gives up", a
+    build's guarantee rows, a card's cells -- took the whole block down
+    instead of being marked. Idempotent: a label that already carries the
+    wording comes back unchanged, so it is safe to apply to a composed label
+    whose parts went through it too.
+    """
+    label = str(label)
+    if 'divergence' in label:
+        return label
+    if any(sp in label for sp in CAVEAT_SPECIES):
+        return label + CAVEAT_MARK
+    return label
+
+
 # D7 acquisition classes. The encounter count is only ever a UNIFORM-IV model;
 # what changes per class is the source it is a model OF, and whether that
 # source is known to restrict IVs. This table is deliberately short and is NOT
@@ -3404,7 +3425,8 @@ def _alt_facts(alt, state, meta, win, n_iv, ranks=None, triage=None,
                 tags.append(f"rank {int(rank)}")
             if triage is not None and triage['degenerate'].get(si):
                 tags.append('degenerate scenario')
-            out.append(f"{label} ({'; '.join(tags)})")
+            out.append(cell_label_with_caveat(
+                f"{label} ({'; '.join(tags)})"))
         return out
 
     axes = tuple(alt['axes'])
@@ -3857,7 +3879,7 @@ def _cell_names(row, with_rank=False):
     decision.
     """
     if not with_rank:
-        out = list(row['names'])
+        out = [cell_label_with_caveat(n) for n in row['names']]
     else:
         out = []
         for i, name in enumerate(row['names']):
@@ -3867,7 +3889,7 @@ def _cell_names(row, with_rank=False):
                        if '(Mega' in name else 'unranked')
             else:
                 tag = f"rank {int(rank)}"
-            out.append(f"{name} ({tag})")
+            out.append(cell_label_with_caveat(f"{name} ({tag})"))
     if row['omitted']:
         out.append(f"+{row['omitted']} more cells")
     return ', '.join(out)
@@ -3934,11 +3956,12 @@ def _matchup(label, rank=None):
     """
     scen, name = label.split(' ', 1)
     if rank is None:
-        return f"the {scen} against {name}"
+        return cell_label_with_caveat(f"the {scen} against {name}")
     # A name that already ends in a parenthesis ("Snorlax (Shadow)") would
     # otherwise collect a second one, which reads as a typo.
     sep = ', rank {}' if name.endswith(')') else ' (rank {})'
-    return f"the {scen} against {name}" + sep.format(int(rank))
+    return cell_label_with_caveat(
+        f"the {scen} against {name}" + sep.format(int(rank)))
 
 
 def _and_list(items):
@@ -4107,7 +4130,8 @@ def _matchup_list(names, omitted=0):
                 break
         else:
             groups.append((name, [scen]))
-    bits = [f"the {_and_list(scens)} against {name}" for name, scens in groups]
+    bits = [cell_label_with_caveat(f"the {_and_list(scens)} against {name}")
+            for name, scens in groups]
     if omitted:
         bits.append(f"{_n(omitted)} more")
     return _and_list(bits)
@@ -4379,8 +4403,9 @@ def build_headline(facts, same_as=None):
 
 def _merged_cell_names(m):
     return ', '.join(
-        f"{c['label']} (rank {int(c['rank'])})" if c['rank'] is not None
-        else f"{c['label']} (unranked)" for c in m['cells'])
+        cell_label_with_caveat(
+            f"{c['label']} (rank {int(c['rank'])})" if c['rank'] is not None
+            else f"{c['label']} (unranked)") for c in m['cells'])
 
 
 def _ivs(t):
@@ -4735,7 +4760,8 @@ def build_strip(facts):
                 f"[{strip_badge(fl)}] -- "
                 f"{_n(fl['n_pass'])} of {_n(h['n_iv'])} spreads "
                 f"({pct(fl['pool_share'])})")
-        decides = f"{fl['cell']}, rank {fl['rank']}"
+        decides = cell_label_with_caveat(
+            f"{fl['cell']}, rank {fl['rank']}")
         rank1 = (f"{_ivs(r1['ivs'])} -- clears it"
                  if r1['clears_floor'] else
                  f"{_ivs(r1['ivs'])} -- "
@@ -4754,7 +4780,8 @@ def build_strip(facts):
         d_value = (_n(d['printed']) if d['axis'] == 'hp'
                    else headline_value(d['printed'], d['dp']))
         closest = (f"{axis_word} >= {d_value} "
-                   f"-- {d['cell']}, rank {d['rank']}, "
+                   f"-- {cell_label_with_caveat(d['cell'])}, "
+                   f"rank {d['rank']}, "
                    f"{_plural(d['n_wrong'], 'spread')} of {_n(h['n_iv'])} on "
                    f"the wrong side")
     else:
@@ -4884,7 +4911,7 @@ def _f2_floor(facts):
         if facts['dirty_thresholds']:
             lines.append("The closest dirty thresholds on this dive, printed "
                          "as evidence and not as lines:")
-        rows = [[d['cell'], f"rank {d['rank']}",
+        rows = [[cell_label_with_caveat(d['cell']), f"rank {d['rank']}",
                  stat_threshold_str(d['axis'], d['printed'], d['dp']),
                  _n(d['n_wrong']), _n(d['constant_wrong']),
                  f"{_n(d['n_win_above'])} of {_n(d['n_above'])}",
@@ -4922,8 +4949,8 @@ def _f2_floor(facts):
         f"{_n(h['n_iv'])} spreads ({pct(fl['pool_share'])}).",
         _primitive_sentence(fl, h['n_iv']),
         _mech_sentence(fl['mech'], h['shadow'], fl['cell'].split(' ', 1)[1]),
-        f"{'Owns' if fl['kind'] == 'exact' else 'Decides'}: {fl['cell']} "
-        f"(rank {fl['rank']}).",
+        f"{'Owns' if fl['kind'] == 'exact' else 'Decides'}: "
+        f"{cell_label_with_caveat(fl['cell'])} (rank {fl['rank']}).",
     ]
     if fl.get('genre') and fl['genre']['n_extra']:
         # E8, on the printed line. Silent when the one-decimal reading selects
@@ -5157,8 +5184,9 @@ def _f16_other_axis(facts):
                        f"pool inside [{pct(DECISION_BAND[0], 0)}, "
                        f"{pct(DECISION_BAND[1], 0)}] of the grid."])
     rows = [[stat_threshold_str(r['axis'], r['printed'], r['dp']),
-             f"{r['cell']} (rank {r['rank']})" if r['rank'] is not None
-             else f"{r['cell']} (unranked)",
+             cell_label_with_caveat(
+                 f"{r['cell']} (rank {r['rank']})" if r['rank'] is not None
+                 else f"{r['cell']} (unranked)"),
              PRIMITIVE_BADGE[r['kind']]
              + (f" ({r['gate_side']})"
                 if r['kind'] == 'gate' and r['gate_side'] else ''),
@@ -5370,7 +5398,8 @@ def _f4_rank1(facts):
     if lm:
         lines.append(
             f"The lowest material rung it misses is "
-            f"{fmt(lm['printed'], lm['dp'])} ({lm['cell']}).")
+            f"{fmt(lm['printed'], lm['dp'])} "
+            f"({cell_label_with_caveat(lm['cell'])}).")
     # Only when there IS one: v2 printed "It is not a member of the
     # Alternative target below" beside a field 6 that says no alternative
     # target exists, and v3's bulk lines doubled how often that pair appears.
@@ -5424,14 +5453,16 @@ def _f5_rungs_above(facts):
         for c in r['cogates'][:COGATE_ROW_CAP]:
             cogate_rows.append([stat_threshold_str(axis, r['printed'],
                                                    r['dp']),
-                                cogate_str(c), c['cell'],
+                                cogate_str(c),
+                                cell_label_with_caveat(c['cell']),
                                 f"rank {c['rank']}" if c['rank'] else 'unranked',
                                 _n(c['n']), pct(c['rate_outside'])])
         omitted_cg += max(0, len(r['cogates']) - COGATE_ROW_CAP)
     for d in facts.get('rungs_dropped') or []:
         lines.append(
             f"Dropped from the ladder: {fmt(d['printed'], d['dp'])} "
-            f"({d['cell']}, rank {d['rank']}, {pct(d['pool_share'])} of the "
+            f"({cell_label_with_caveat(d['cell'])}, rank {d['rank']}, "
+            f"{pct(d['pool_share'])} of the "
             f"grid) holds in {_n(d['modes_ok'])} of {_n(d['modes_total'])} "
             f"opponent-IV settings.")
     if cogate_rows:
@@ -5534,7 +5565,8 @@ def _f7_bulk(facts):
                 "wins the cell; the rate outside it is printed beside): "
                 + '; '.join(
                     f"{cogate_str(c)} ({_n(c['n'])} clearers) wins "
-                    f"{c['cell']} rank {c['rank']}, "
+                    f"{cell_label_with_caveat(c['cell'])} "
+                    f"rank {c['rank']}, "
                     f"against {pct(c['rate_outside'])} without it"
                     for c in b['cogates']) + ". These are sufficient "
                 "conditions, never necessary ones.")
@@ -5680,6 +5712,7 @@ def _f8_alternative(facts):
 
 def _cap_list(names, cap=LIST_CAP):
     """Comma list, truncated with an exact remainder count (G-names)."""
+    names = [cell_label_with_caveat(n) for n in names]
     if len(names) <= cap:
         return ', '.join(names)
     return ', '.join(names[:cap]) + f", and {len(names) - cap} more"
@@ -5769,12 +5802,14 @@ def _f10_cost(facts):
     top_gain = [r for r in d['gained'] if r['rank'] and r['rank'] <= 20]
     if top_lost:
         lines.append("Lost, top-20 opponents: "
-                     + ', '.join(f"{r['cell']} (rank {r['rank']})"
-                                 for r in top_lost) + ".")
+                     + ', '.join(cell_label_with_caveat(
+                         f"{r['cell']} (rank {r['rank']})")
+                         for r in top_lost) + ".")
     if top_gain:
         lines.append("Gained, top-20 opponents: "
-                     + ', '.join(f"{r['cell']} (rank {r['rank']})"
-                                 for r in top_gain) + ".")
+                     + ', '.join(cell_label_with_caveat(
+                         f"{r['cell']} (rank {r['rank']})")
+                         for r in top_gain) + ".")
     return _field(10, 'Cost', lines)
 
 
@@ -5821,7 +5856,7 @@ def _f12_score_only(facts):
     # (stage 10). The first build led this table with the Aegislash cell that
     # field 10 excludes from the cost diff as an open engine divergence.
     rows = [[f"Atk >= {fmt(r['printed'], r['dp'])}",
-             r['cell'] + (CAVEAT_MARK if r.get('caveat') else ''),
+             cell_label_with_caveat(r['cell']),
              f"rank {r['rank']}" if r['rank'] else 'unranked',
              f"{_n(r['below'])} -> {_n(r['above'])}",
              _n(r['to_win']) + (' (closing)' if r['toward_win']
@@ -5872,7 +5907,7 @@ def _f13_not_claimed(facts):
     ranked = sorted(by_species.values(),
                     key=lambda r: (abs(r['rate_inside_floor'] - 0.5), r['rank']))
     top = ranked[:NOT_CLAIMED_ROW_CAP]
-    rows = [[r['cell'] + (CAVEAT_MARK if r['caveat'] else ''),
+    rows = [[cell_label_with_caveat(r['cell']),
              f"rank {r['rank']}", pct(r['rate_inside_floor']),
              ('a clean rule exists but is excluded; engine divergence'
               if r['has_excluded_cut'] else
@@ -6126,15 +6161,28 @@ def gate_voice(blocks, ctx):
 
 
 def gate_caveat(blocks, ctx):
-    """G-caveat, at render time: a caveat species is never named bare.
+    """G-caveat, at render time: a caveat CELL is never named bare.
 
     Field 10 says the Aegislash cells are excluded from the cost diff as an
     open engine divergence; the first build then led field 12's table with
     one of them and carried no marker across. Any string naming a caveat
     species must also carry the divergence wording.
+
+    The FOCAL species is exempt (``ctx['focal']``, 2026-09-20). A dive about
+    Aegislash names Aegislash in its headline, its lead and its provenance,
+    and the caveat is about Aegislash as an OPPONENT cell, not about the
+    subject of the page: without the exemption every Aegislash page lost its
+    whole "Which one to build?" section to its own title, unconditionally.
+    The gate keeps its meaning on those pages through
+    :func:`cell_label_with_caveat`, which marks a caveat cell wherever it is
+    printed -- the mirror cell on an Aegislash page included. A caller that
+    passes no focal (the tests, and any block set that is not one page's)
+    gets the strict gate.
     """
+    focal = str(ctx.get('focal') or '')
+    watched = [sp for sp in CAVEAT_SPECIES if sp not in focal]
     for block in blocks:
-        for species in CAVEAT_SPECIES:
+        for species in watched:
             if species in block and 'divergence' not in block:
                 guard_fail('G-caveat', 'all', species, block.strip()[:80],
                            'named with no engine-divergence marker', ctx)
@@ -7044,13 +7092,15 @@ def _primitive_audit_sentence(facts):
             why = (', '.join(r['failed']) if r['failed'] else 'no gate')
             bits.append(f"{label} -> "
                         f"{stat_threshold_str(r.get('axis', 'atk'), r['printed'], r['dp'])} "
-                        f"({r['cell']}, {pct(r['pool_share'])}) rejected on "
+                        f"({cell_label_with_caveat(r['cell'])}, "
+                        f"{pct(r['pool_share'])}) rejected on "
                         f"{why} ({_n(r['modes_ok'])} of "
                         f"{_n(r['modes_total'])} settings)")
         else:
             bits.append(f"{label} -> "
                         f"{stat_threshold_str(p.get('axis', 'atk'), p['printed'], p['dp'])} "
-                        f"({p['cell']}, {pct(p['pool_share'])})")
+                        f"({cell_label_with_caveat(p['cell'])}, "
+                        f"{pct(p['pool_share'])})")
     fl = facts['floor']
     axis = facts.get('floor_axis', 'atk')
     chosen = ('no floor' if fl is None else
@@ -7133,7 +7183,8 @@ def build_evidence(facts):
         rows.append([f"[{pct(s['band'][0], 0)}, {pct(s['band'][1], 0)}]",
                      fmt(s['printed'], s['dp']) if s['T'] is not None
                      else 'no floor',
-                     s['cell'] or '-'])
+                     cell_label_with_caveat(s['cell']) if s['cell']
+                     else '-'])
     if facts.get('cmp_near_misses'):
         lines.append(
             f"G-cmp-fresh (WARN, not a failure): {_n(len(facts['cmp_near_misses']))} "
@@ -7161,7 +7212,7 @@ def build_evidence(facts):
     if facts['dirty_thresholds']:
         lines.append(
             "Closest dirty thresholds on cells with no clean rule: "
-            + '; '.join(f"{d['cell']} "
+            + '; '.join(f"{cell_label_with_caveat(d['cell'])} "
                         f"{stat_threshold_str(d['axis'], d['printed'], d['dp'])} "
                         f"({_plural(d['n_wrong'], 'spread')} on the wrong "
                         f"side)"
@@ -7311,7 +7362,8 @@ def lead_block(all_facts):
         fl = f['floor']
         if fl is not None:
             outcome = (f"{stat_threshold_str(fl['axis'], fl['printed'], fl['dp'])} "
-                       f"({pct(fl['pool_share'])} of the grid, {fl['cell']}, "
+                       f"({pct(fl['pool_share'])} of the grid, "
+                       f"{cell_label_with_caveat(fl['cell'])}, "
                        f"{strip_badge(fl)})")
             with_floor.append(
                 (h['arm'] + 1,
@@ -7414,7 +7466,8 @@ def render_parts(state, arm, blob_path, facts, mode='pvpoke', level='l50',
     Every gate below still runs exactly once per rendered section, in the
     order the plan fixes; the standalone brief page is unchanged.
     """
-    ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
+    ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode,
+           'focal': focal_name(facts['header'])}
     gate_recompute(state, arm, blob_path, mode, level, facts, ctx)
     gate_names(facts, ctx)
     headline = build_headline(facts, same_as=same_as)
@@ -7495,7 +7548,8 @@ def run_blob(path, out_dir, arms='all', mode='pvpoke', level='l50'):
                 f"L{50 if level == 'l50' else 51}. "
                 f"{len(sections)} of {n_arms} moveset arms.")
     lead_html, lead_strings = lead_block(all_facts)
-    ctx = {'blob': os.path.basename(path), 'arm': '-', 'mode': mode}
+    ctx = {'blob': os.path.basename(path), 'arm': '-', 'mode': mode,
+           'focal': focal_name(h)}
     gate_words([title, subtitle] + lead_strings, ctx)
     gate_caveat([title, subtitle] + lead_strings, ctx)
     doc = document_html(title, subtitle, [lead_html] + sections)
