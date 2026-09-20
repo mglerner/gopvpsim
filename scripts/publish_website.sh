@@ -83,7 +83,17 @@ import sys; sys.path.insert(0, 'scripts')
 from dive_registry import all_dives
 print(len(all_dives()))
 " 2>/dev/null || echo 0)
-ACTUAL_DIVES=$(find "$SRC" -mindepth 2 -maxdepth 2 -name index.html 2>/dev/null | wc -l | tr -d ' ')
+# Count REGISTRY dive pages, not every depth-2 index.html: guides/,
+# matchups/ and matchups-ultra/ are depth-2 pages that are not dives, and
+# counting them pads the numerator against a denominator that is dives only
+# (2026-09-20: 135 counted vs 132 real dive pages, hiding 3 unbaked dives).
+ACTUAL_DIVES=$(cd "$REPO_ROOT" && SITE="$SRC" python -c "
+import os, sys; sys.path.insert(0, 'scripts')
+from dive_registry import all_dives
+site = os.environ['SITE']
+print(sum(1 for d in all_dives()
+          if os.path.isfile(os.path.join(site, d['slug'], d['html_base']))))
+" 2>/dev/null || echo 0)
 if [ "$SKIP_VERIFY" = false ] && [ "$EXPECTED_DIVES" -gt 0 ]; then
   MIN_DIVES=$(( EXPECTED_DIVES * 9 / 10 ))
   if [ "$PARTIAL" = true ]; then
@@ -95,8 +105,10 @@ if [ "$SKIP_VERIFY" = false ] && [ "$EXPECTED_DIVES" -gt 0 ]; then
     echo "  rsync runs with --delete, so publishing now would REMOVE the" >&2
     echo "  missing pages from pogodives.com." >&2
     echo "  fix:    finish the bake (scripts/run_website_dives.py)" >&2
-    echo "  bypass: --partial (safe, pulls live content down first)" >&2
-    echo "          --skip-verify (UNSAFE mid-bake: mirrors as-is)" >&2
+    echo "  bypass: --partial (relaxes THIS gate only -- rsync still runs" >&2
+    echo "          with --delete, so pages the bake has not reached yet" >&2
+    echo "          ARE removed from the live site)" >&2
+    echo "          --skip-verify (mirrors as-is, no gates at all)" >&2
     exit 1
   fi
 fi
