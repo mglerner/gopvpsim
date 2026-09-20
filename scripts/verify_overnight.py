@@ -16,7 +16,11 @@ the 2026-06-12 morning where they were done by hand):
    RSLV rather than staying red forever. Also scans the same log for
    "[WARN] narrative patch failed" lines (see scan_narrative_warnings):
    run_website_dives patches the species narrative WARN-not-FAIL, so a
-   failed patch would otherwise pass the gate silently.
+   failed patch would otherwise pass the gate silently. Same for
+   "Which one to build?: omitted/skipped" lines (see
+   scan_which_build_omissions): deep_dive degrades that section to a
+   WARNING and still exits 0, so the flagship section can vanish from a
+   whole bake with nothing red anywhere.
 2. freshness — every dive dir under userdata/website/ must have its
    index*.html either all newer than the chain start (re-dived) or all
    older (not in this chain). Mixed vintages mean stale split-file
@@ -99,6 +103,24 @@ def scan_narrative_warnings(log_text: str) -> list[str]:
     return [f'narrative patch warned: {ln.strip()}'
             for ln in log_text.splitlines()
             if 'WARN] narrative patch failed' in ln]
+
+
+def scan_which_build_omissions(log_text: str) -> list[str]:
+    """Return one error string per omitted/skipped "Which one to build?" line.
+
+    deep_dive._which_build_sections wraps the whole section render in a bare
+    ``except Exception`` and degrades to a single WARNING line -- the dive
+    still exits 0, the page still renders, and the chain still prints
+    SUCCESS. So the flagship section can be missing from any number of pages
+    with nothing red anywhere. Same silent-incompleteness shape as the
+    narrative-patch WARN above; same treatment.
+    """
+    out = []
+    for ln in log_text.splitlines():
+        if ('Which one to build?: omitted' in ln
+                or 'Which one to build?: skipped' in ln):
+            out.append(f'which-one-to-build section missing: {ln.strip()}')
+    return out
 
 
 def load_resolutions() -> list[dict]:
@@ -275,6 +297,12 @@ def main() -> int:
             print(f'  ERR {ln}')
         if not narr:
             print('  OK  no narrative-patch WARN lines')
+        wb = scan_which_build_omissions(log_text)
+        for ln in wb:
+            errors.append(ln)
+            print(f'  ERR {ln}')
+        if not wb:
+            print('  OK  no which-one-to-build omission lines')
 
     # 2. Freshness ----------------------------------------------------
     # Cover league dives (`*-league`) AND limited-cup dives (`*-cup`) so a cup
