@@ -86,6 +86,14 @@ class Spread:
     is_sp1: bool = False        # this spread IS the stat-product #1
     is_pvpoke: bool = False     # this spread IS the PvPoke default
     flip_has_bait: bool = False
+    # "Which one to build?" facts for this spread (2026-09-16 review item
+    # 6). ``guarantee`` is one authored sentence -- "guarantees 55 of 87
+    # decision matchups (Build 1); ..." -- and ``cells`` the rarest few
+    # guaranteed matchups, each {'text', 'rate', 'word'}, rendered with the
+    # section's own outside-rate emphasis. Empty on a card built from the
+    # old pole path (a dive with no builds, or a synthetic test ctx).
+    guarantee: str = ''
+    cells: list = field(default_factory=list)
 
 
 @dataclass
@@ -125,6 +133,10 @@ class CardModel:
     # flip rendering (old ctxs / synthetic tests without flips_sp).
     flip_ref_sp1: str | None = None      # stat-product #1 spread
     flip_ref_pvpoke: str | None = None   # PvPoke default spread
+    # The builds behind the spreads were computed on another grid (the
+    # best-buddy card reuses the league-cap builds, because the section is
+    # rendered once, at the cap). Prints one line in the foot saying so.
+    builds_pinned: bool = False
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -180,6 +192,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         moveset = pretty_moveset(moveset)
 
     rec_candidates = card_ctx.get('rec_candidates') or []
+    card_extras = card_ctx.get('card_extras') or {}
     flips = card_ctx.get('flips') or {}
     has_bait = card_ctx.get('has_bait_axis', False)
     iv_efficient = data_obj.get('ivEfficient') or []
@@ -219,6 +232,8 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             is_pvpoke=(pvp_idx is not None and pvp_idx >= 0 and iv == pvp_idx),
             flip_has_bait=has_bait,
             is_efficient=bool(iv_efficient[iv]) if iv < len(iv_efficient) else False,
+            guarantee=(card_extras.get(iv) or {}).get('guarantee', ''),
+            cells=list((card_extras.get(iv) or {}).get('cells') or []),
         ))
 
     # Item 5: base-form label for the "N newly guaranteed vs base form" line.
@@ -264,6 +279,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         base_form_display=base_form_display,
         sibling_trade=card_ctx.get('sibling_trade'),
         has_author_notes=bool(has_author_notes),
+        builds_pinned=bool(card_ctx.get('builds_pinned')),
         cup_label=data_obj.get('cupLabel'),
         cup_snapshot=data_obj.get('rankSnapshot') if data_obj.get('cupLabel') else None,
     )
@@ -312,10 +328,12 @@ def _flip_html(s, link_opps, ref_sp1=None, ref_pvpoke=None):
     same = ref_sp1 is not None and ref_sp1 == ref_pvpoke
     lines = []
     if ref_sp1 is not None:
-        label = (f'vs stat-product #1 = PvPoke default ({ref_sp1})' if same
-                 else f'vs stat-product #1 ({ref_sp1})')
+        # "SP1", the spelling the section defines and uses; the foot's key
+        # says what it is, for a card that ships standalone (round 6 review).
+        label = (f'vs SP1 = PvPoke default ({ref_sp1})' if same
+                 else f'vs SP1 ({ref_sp1})')
         if s.is_sp1:
-            body = 'this spread IS the stat-product #1'
+            body = 'this spread IS SP1'
         else:
             fd = s.flip_fd if same else s.flip_fd_sp
             body = (_flip_prose(fd, s.flip_has_bait, link_opps, 'fcardsp')
@@ -366,6 +384,15 @@ CARD_CSS = """
 .ddcard-spread .cover { font-size:0.74rem; color:var(--energy); margin-top:4px; }
 .ddcard-spread .cover b { color:var(--text); font-weight:700; }
 .ddcard-spread .cover .cover-count { color:var(--text); font-weight:700; }
+/* "Which one to build?" facts, in the section's own outside-rate emphasis:
+   the lower the rate, the rarer the guarantee and the heavier the type. */
+.ddcard-spread .ddcard-guar { font-size:0.74rem; color:var(--text-muted);
+  margin-top:4px; }
+.ddcard-spread .ddcard-guar.cells { color:var(--text); }
+.ddcard-o1 { font-weight:700; }
+.ddcard-o2 { font-weight:700; text-decoration:underline; }
+.ddcard-o3 { font-weight:700; text-decoration:underline; font-style:italic; }
+.ddcard-o0 { color:var(--text-muted); opacity:0.75; }
 /* The .cover-toggle/.cover-rest/.cover-more rules live in deep_dive_rendering.
    COVER_TOGGLE_CSS (page-global on the dive page; added to the standalone style
    below) so they appear exactly once per page. */
@@ -670,6 +697,64 @@ def _cover_html(s: Spread, link_opps=False, base_form_display=None,
     return ''.join(lines)
 
 
+# Outside-rate emphasis bands, the same three the section uses. Copied as
+# literals rather than imported so the STANDALONE card (which carries no
+# section, no payload and no deep_dive_which_build import) styles its cells
+# identically; tests/test_which_build_section.py pins the two to each other.
+_EMPH_BANDS = ((0.10, 'ddcard-o3'), (0.25, 'ddcard-o2'), (0.50, 'ddcard-o1'))
+_EMPH_NEAR_FREE = 0.90
+
+
+# The card carries the section's three typefaces and two different rates,
+# and it SHIPS STANDALONE (--card-out), where there is no section to read
+# the key from. So the key rides in the foot whenever a Rarest line is
+# present (2026-09-16 round-3 review).
+GUARANTEE_KEY = (
+    ' Rarest = the guaranteed matchups the fewest other spreads win '
+    '(outside N% = the share of the spreads outside that build; grid N% = '
+    'the share of all the spreads on the grid); bold = fewer than half, '
+    'underlined = fewer than a quarter, italic = fewer than a tenth.')
+# Said out loud rather than left to be noticed: the best-buddy card shows
+# the league-cap builds' spreads with best-buddy stats.
+PINNED_NOTE = (
+    ' The builds behind these spreads -- and the guarantee counts -- are '
+    'computed at the league cap, which is the level the "Which one to '
+    'build?" section itself is pinned to; only the stats on this card '
+    'follow the Best Buddy level.')
+
+
+def _emph_class(rate):
+    for bar, cls in _EMPH_BANDS:
+        if rate <= bar:
+            return cls
+    return 'ddcard-o0' if rate > _EMPH_NEAR_FREE else ''
+
+
+def _guarantee_html(s: Spread) -> str:
+    """The card's "Which one to build?" block: what this spread guarantees.
+
+    One authored sentence from the section (never re-worded here) plus its
+    rarest few guaranteed matchups in the section's own emphasis. The card
+    and the section are rendered from ONE set of build facts, so a reader
+    comparing the two reads the same numbers.
+    """
+    if not s.guarantee and not s.cells:
+        return ''
+    out = [f'<div class="ddcard-guar">{html.escape(s.guarantee)}</div>']
+    if s.cells:
+        bits = []
+        for c in s.cells:
+            rate = float(c.get('rate', 1.0))
+            cls = _emph_class(rate)
+            body = (f"{html.escape(str(c.get('text', '')))} "
+                    f"({html.escape(str(c.get('word', 'outside')))} "
+                    f"{int(rate * 100 + 0.5)}%)")
+            bits.append(f'<span class="{cls}">{body}</span>' if cls else body)
+        out.append('<div class="ddcard-guar cells">Rarest: '
+                   + ', '.join(bits) + '</div>')
+    return ''.join(out)
+
+
 def _spread_html(s: Spread, link_opps=False, base_form_display=None,
                  shadow=False, ref_sp1=None, ref_pvpoke=None):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
@@ -683,7 +768,8 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}{crown}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
-            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
+            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>'
+            f'{_guarantee_html(s)}{cover}{flips}</div>')
 
 
 def _mcol(title, items, cls):
@@ -718,6 +804,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     prov = (f'<span class="ddcard-prov" title="{html.escape(_prov_tip)}">'
             f'{html.escape(_prov_label)}</span>')
     wr = _wr_line(m.single_iv, m.robust)
+    _guar_key = (html.escape(GUARANTEE_KEY)
+                 if any(sp.cells for sp in m.spreads) else '')
+    _pinned = html.escape(PINNED_NOTE) if m.builds_pinned else ''
     sib_bar = _sibling_trade_html(m.sibling_trade, shadow=m.shadow,
                                   link_opps=not standalone)
     spreads = ''.join(_spread_html(s, link_opps=not standalone,
@@ -763,7 +852,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
   <div class="ddcard-foot">Win rate = shield-scenario matchups won (&gt;500),
-  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).</div>
+  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).
+  SP #N = stat-product rank N; SP1 = rank 1, the spread most IV tools list
+  first.{_guar_key}{_pinned}</div>
 </section>"""
 
     if not standalone:

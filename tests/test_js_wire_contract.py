@@ -560,20 +560,35 @@ console.log(JSON.stringify([_mcHeadline(pay, '1v1'), _mcHeadline(pay, '0v0'),
     assert got[2] == ""                   # unknown label
 
 
-def test_mini_grid_title_is_gated_on_the_same_predicate_as_its_colors():
-    """B3: `_mcLabelsApply()` guards the COLORS and the TITLE together.
+def test_the_cluster_coloured_minis_read_the_clusters_payload_only():
+    """Round 9 replaced the clusters section's own nine-mini grid with a
+    colour mode of the section's one grid, so the B3 gate it carried
+    (``_mcLabelsApply()`` guarding the mini TITLE as well as its colours)
+    went with the titles: the merged mini is titled by its shield scenario
+    and nothing else, and it claims no K / silhouette / split over data the
+    baked labels may not describe.
 
-    state.oppIvMode is composed from the Opponent IVs and Bait dropdowns, so
-    one click off either default makes the baked labels not describe the
-    displayed grid. The colors always fell back to neutral there; the title
-    kept asserting "K=2, silhouette 0.65, split atk 148.06" over data those
-    labels do not describe.
+    Pre-fix this asserted three lines of ``renderAllScenarios``:
+    ``var mApply = _mcLabelsApply();``,
+    ``var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;``
+    and ``var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';``. What
+    survives is the property that made the gate necessary: the colours come
+    from the clusters payload and from nowhere else, and a scenario it did
+    not cluster gets no invented groups.
     """
     raw = _js()
-    assert "var mApply = _mcLabelsApply();" in raw
-    assert "var mSc = (mPay && mPay.scens && mApply) ? mPay.scens[mLbl] : null;" \
-        in raw
-    assert "var mHead = mApply ? _mcHeadline(mPay, mLbl) : '';" in raw
+    assert 'function renderAllScenarios(' not in raw
+    body = _js_fn(raw, '_wbClusterMiniTraces')
+    assert '_mcPayloadPage()' in body
+    assert 'if (!sc || !sc.labels) return null;' in body
+    # ...and the caller falls back to the build colouring rather than drawing
+    # an uncoloured grid under a cluster legend.
+    caller = _js_fn(raw, '_wbAllScen')
+    assert "if (cMode === 'cluster') traces = _wbClusterMiniTraces" in caller
+    assert 'if (!traces) {' in caller
+    # positive control: the headline helper the old gate protected is still
+    # here for the stat-plane panels that do print it.
+    assert 'function _mcHeadline(' in raw
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
@@ -605,3 +620,290 @@ def test_js_maps_the_avg_shields_state_to_the_combined_clusters():
     # only hard-coded fallback
     assert "mcPay.allKey || 'all'" in raw
     assert clusters.ALL_SCEN_KEY == "all"
+
+
+# ---------------------------------------------------------------------------
+# 5. The Build criteria preset (v4 "Which one to build?")
+# ---------------------------------------------------------------------------
+# Three keys, one table. They key the section's payload, the clusters
+# section's per-preset combined partitions and the scatter's weighted Shields
+# entry, and every one of those fails SILENTLY on a drift: the section falls
+# back to its default preset, the clusters option re-labels itself with a
+# partition it is not drawing, and the scatter quietly averages all nine.
+
+sys.path.insert(0, str(_SCRIPTS))
+import deep_dive_builds as builds  # noqa: E402
+import deep_dive_which_build as which_build  # noqa: E402
+
+
+def test_the_three_preset_keys_have_one_definition():
+    """deep_dive_builds.PRESETS is the table; nothing re-types the keys."""
+    keys = [p[0] for p in builds.PRESETS]
+    assert keys == ['flat', 'even', 'one_one']
+    assert builds.PRESET_SCENS['flat'] is None            # every scenario
+    assert builds.PRESET_SCENS['even'] == ('0v0', '1v1', '2v2')
+    assert builds.PRESET_SCENS['one_one'] == ('1v1',)
+    # The dropdown, the clusters call and the section all read that table.
+    py = _PY.read_text()
+    assert 'import deep_dive_builds' in py
+    assert "_build_presets()" in py
+    # the dropdown builder walks that table rather than re-typing it, and
+    # the labels it emits are the table's own
+    import deep_dive
+    opts = deep_dive._build_criteria_select(list(builds.PRESET_KEYS))
+    for key, label, _s, _t in builds.PRESETS:
+        assert f'<option value="{key}">{label}</option>' in opts, key
+    render = (_SCRIPTS / 'deep_dive_lib' / 'render.py').read_text()
+    assert '_builds.PRESETS' in render
+    # ... and no file writes the three strings out again.
+    for path in (_JS, _SCRIPTS / 'deep_dive_matchup_clusters.py'):
+        text = path.read_text()
+        assert "'one_one'" not in text, path.name
+        assert '"one_one"' not in text, path.name
+
+
+def test_the_knob_id_is_the_same_string_on_both_sides():
+    js = _js()
+    assert "var WB_PRESET_SEL = 'build-criteria-sel';" in js
+    assert 'id="build-criteria-sel"' in _PY.read_text()
+    # onchange calls the one entry point
+    assert 'onchange="wbSetPreset(this.value)"' in _PY.read_text()
+    assert 'function wbSetPreset(' in js
+
+
+def test_the_shields_dropdown_carries_both_all_entries():
+    """'avg' is renamed and never changes; 'wbavg' is the weighted one.
+
+    Pinned on the MARKUP the page gets, not on a source line: the emitted
+    option was split across two Python string literals, so the old
+    source-literal assertion pinned an indentation level instead of an
+    option (2026-09-16 review), and its first alternative could never match.
+    """
+    import deep_dive
+    assert (deep_dive._wbavg_option(['flat'])
+            == '    <option value="wbavg">All (by build criteria)</option>\n')
+    # no section, no weighted entry -- it would average a preset the page
+    # cannot switch to
+    assert deep_dive._wbavg_option([]) == ''
+    py = _PY.read_text()
+    assert "<option value=\"avg\">All (equal weight)</option>" in py
+    js = _js()
+    # the weighted entry resolves to the preset's scenarios, and 'avg' still
+    # means every scenario
+    body = _js_fn(js, 'getActiveScenarioIndices')
+    assert "state.scenarioMode === 'avg'" in body
+    assert "state.scenarioMode === 'wbavg'" in body
+    assert 'wbPresetScenIndices()' in body
+
+
+def test_the_knob_note_names_exactly_the_three_surfaces_it_drives():
+    import deep_dive
+    note = deep_dive._build_criteria_note(['flat'])
+    for surface in ('Which one to build?', 'all-scenarios clusters',
+                    'All (by build criteria)'):
+        assert surface in note, surface
+    # NOT "every other section counts all nine equally": Threats, Rank
+    # Volatility and Matchup clusters each have their own per-scenario
+    # views, so the only true claim is about re-weighting (2026-09-16).
+    assert 'Nothing else on this page is re-weighted by it.' in note
+    assert 'counts all nine shield scenarios equally' not in note
+    assert deep_dive._build_criteria_note([]) == ''
+
+
+def test_the_knob_lists_only_the_presets_this_page_built():
+    """A dive that baked no 1v1 must not offer the 1v1-only preset.
+
+    That preset weights nothing there, so compute_builds drops it from the
+    payload; an option for it left wbApplyPreset returning early (the
+    previous block and summary still on screen), the clusters view falling
+    back to all nine scenarios and the Shields entry averaging everything
+    while its label still read "All (by build criteria)".
+    """
+    import deep_dive
+    import deep_dive_builds as B
+    # the end of the chain that produces the live list
+    assert not B.preset_is_live(B.PRESET_ONE, ['0v0', '2v2'])
+    assert B.preset_is_live(B.PRESET_EVEN, ['0v0', '2v2'])
+    live = [k for k in B.PRESET_KEYS if B.preset_is_live(k, ['0v0', '2v2'])]
+    html = deep_dive._build_criteria_select(live)
+    assert '<option value="flat">' in html
+    assert '<option value="even">' in html
+    assert 'one_one' not in html
+    assert '1v1 only' not in html
+    # positive control: with every preset live all three are offered, so an
+    # always-empty select could not pass this
+    full = deep_dive._build_criteria_select(list(B.PRESET_KEYS))
+    assert full.count('<option ') == 3
+    # and no section at all means no knob
+    assert deep_dive._build_criteria_select([]) == ''
+
+
+def test_the_weighted_shields_entry_labels_its_own_axis():
+    """The scatter's y-axis title says WHICH scenarios it is averaging.
+
+    Under "All (by build criteria)" the values average a subset and the axis
+    used to read "Avg Battle Score", identical to "All (equal weight)"; the
+    only signal was the muted line in the controls strip, scrolled off by
+    the time a reader is looking at the chart (2026-09-16 review).
+    """
+    js = _js()
+    body = _js_fn(js, 'yAxisTitle')
+    assert "state.scenarioMode !== 'wbavg'" in body
+    assert 'return currentYLabel' in body
+    assert 'wbPresetScenLabel()' in body
+    # the plot reads the title through that function, not through the raw
+    # label (which also names the hover line and a table column)
+    assert 'yaxis: {title:yAxisTitle(),' in js
+    # and the label itself comes from the preset's own scenario list
+    lbl = _js_fn(js, 'wbPresetScenLabel')
+    assert 'presets[key].scens' in lbl.replace(' ', '')
+    assert 'shield scenarios' in lbl and 'shields' in lbl
+
+
+def test_the_more_control_and_its_hidden_rows_are_one_contract():
+    """Each reveal is a button over rows the server already shipped hidden.
+
+    v5 (2026-09-16 review item 4) gives a scenario group TWO reveals -- the
+    capped tail (``wb-hid``) and the near-free tail (``wb-hidfree``) -- so
+    the button names the class it owns in ``data-reveal`` and the JS reads
+    it. Pre-fix the JS hard-coded ``li.wb-hid`` and one button revealed both
+    tails; this asserts the class now comes from the attribute AND that the
+    producer emits both classes with a matching ``data-reveal``.
+    """
+    js = _js()
+    assert 'function wbMoreRows(' in js
+    assert 'window.wbMoreRows = wbMoreRows;' in js
+    body = _js_fn(js, 'wbMoreRows')
+    assert "getAttribute('data-reveal')" in body
+    # Round 9: the same reveal serves the guarantee lists' hidden <li> rows
+    # AND the notable entries' inline "+N" <span>s, so the selector is the
+    # class alone and the scope is the nearest list or the button's parent.
+    assert "'.' + cls" in body
+    assert "btn.closest('ul') || btn.parentElement" in body
+    # the default is the class the pre-v5 control hard-coded, so an older
+    # button with no attribute still reveals its own rows
+    assert "|| 'wb-hid'" in body
+    assert 'hidden = false' in body
+    py = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    # the producing side emits exactly those things
+    assert 'wbMoreRows(this)' in py
+    assert "'wb-hidfree' if free else 'wb-hid'" in py
+    for cls in ('wb-hid', 'wb-hidfree'):
+        assert f'data-reveal="{cls}"' in py, cls
+
+
+def test_the_section_payload_carries_every_builds_field_the_js_reads():
+    """Both halves, for real: the BUILDER's output and the JS that reads it.
+
+    The round-1 version only grepped the JS twice and claimed in its
+    docstring to check the producer, so renaming e.g. ``nGw`` in
+    builds_payload passed while the plot silently broke (2026-09-16 review).
+    The producer half runs on the synthetic cube in tests/
+    test_deep_dive_builds.py, so this stays a fast, blob-free test.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_deep_dive_builds import synthetic_res
+    pay = builds.builds_payload(synthetic_res(), 0)
+    top = ('presets', 'regions', 'default', 'rank1', 'gridBest',
+           'nDecision', 'cells', 'presetKeys', 'scenLabels')
+    for field in top:
+        assert field in pay, field
+    block = pay['presets'][pay['default']]
+    for field in ('lattice', 'cols', 'builds', 'weights', 'scens', 'nDecW',
+                  'tie', 'objectives'):
+        assert field in block, field
+    for field in ('nG', 'nGw', 'nGmat', 'memb', 'combo', 'size', 'role', 'r'):
+        assert field in block['cols'][0], field
+    for field in ('mostWinning', 'desc', 'region', 'nG', 'nGw', 'rank1In'):
+        assert field in block['builds'][0], field
+    for field in ('size', 'nG', 'nGmat', 'bits'):
+        assert field in pay['regions'][0], field
+
+    js = _js()
+    for field in ('bp.presets', 'bp.regions', 'bp.default', 'bp.rank1',
+                  'bp.gridBest', 'bp.nDecision', 'bp.topN', 'bp.colors'):
+        assert field in js, field
+    for field in ('.mostWinning', '.nGmat', '.nGw', '.memb', '.nDecW',
+                  '.lattice', '.cols', '.builds', '.weights', '.scens',
+                  '.summary', '.desc', '.region', '.bits'):
+        assert field in js, field
+    # the payload's own summary/lead sentences are merged in by the renderer
+    # (prose is authored and word-gated in Python), so they are absent here
+    assert 'summary' not in block
+
+
+def test_the_clusters_payload_carries_one_all_scenarios_key_per_preset():
+    pay = _mc_payload_fixture()
+    # the fixture above renders without presets, so the map is absent or
+    # empty; the keyed render is the one under test
+    n_opp, block = 8, 40
+    n_iv = block * (n_opp + 1)
+    arr = np.full((n_iv, 9, n_opp), 200, dtype=np.int32)
+    for si in (4, 8):
+        for i in range(n_opp + 1):
+            arr[i * block:(i + 1) * block, si, :i] = 800
+    arr[n_iv // 2:, 0, :2] = 800
+    atk = np.linspace(100, 110, n_iv)
+    html = clusters.render_section(
+        arr.ravel().tolist(), n_iv, 9, n_opp,
+        [(a, b) for a in range(3) for b in range(3)],
+        [f"Opp{i}" for i in range(n_opp)],
+        {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+         "ivHp": np.full(n_iv, 135.0).tolist()},
+        "rank-1", "FAST / CM1, CM2", [],
+        presets=[(k, tag, scens) for k, _lbl, scens, tag in builds.PRESETS])
+    m = re.search(r'<script type="application/json" class="dd-mc-data">'
+                  r'(.*?)</script>', html, re.S)
+    keyed = json.loads(m.group(1))
+    assert set(keyed['allByPreset']) == {p[0] for p in builds.PRESETS}
+    assert keyed['allByPreset']['flat'] == clusters.ALL_SCEN_KEY
+    # every mapped key is either a real partition or None, never a dangling
+    # name the JS would look up and miss
+    for key, mapped in keyed['allByPreset'].items():
+        assert mapped is None or mapped in keyed['scens'], (key, mapped)
+    # Round 10 deleted ``allLabelByPreset`` with the <option> it re-labelled
+    # (pre-fix: this asserted keyed['allLabelByPreset'][key] for every mapped
+    # preset and that clusters.ALL_SCEN_KEY appeared among the <option>
+    # values). The clusters body has no <select> of its own now; the
+    # section's one Shield-scenario control drives it.
+    assert 'allLabelByPreset' not in keyed
+    assert re.findall(r'<option value="([^"]+)"', html) == []
+    # the JS still reads the map that DID keep a reader (D5)
+    js = _js()
+    assert 'payload.allByPreset' in js or 'pay.allByPreset' in js
+    assert 'allLabelByPreset' not in js
+
+
+def test_the_section_view_ids_are_the_same_on_both_sides():
+    js = _js()
+    assert which_build.VIEW_BUILDS[0] == 'builds'
+    assert "view === 'builds'" in js
+    for vid, _label in which_build.VIEWS_FLOOR + which_build.VIEWS_NO_FLOOR:
+        assert f"view === '{vid}'" in js or f"'{vid}'" in js, vid
+
+
+def test_a_blank_manual_entry_level_means_the_fitted_under_cap_level():
+    """Michael, 2026-09-17: the manual-entry form prefilled Level 50, so every
+    entry on a Great League page arrived as "current level 50" and the row
+    degraded to CP 0 / OVER. Pre-fix: the input carried value="50" and
+    readManualForm rejected a blank level (parseFloat('') is NaN). Now a
+    blank level is null -- current level unknown -- and the pipeline uses the
+    best under-cap level it fits, which is what the page assumes for every
+    grid spread; a typed level still trips the over-cap check.
+
+    strip_js blanks string literals, so the pins below match the stripped
+    shapes (an empty literal leaves whitespace behind)."""
+    text = strip_js(_js())
+    i = text.index('function readManualForm()')
+    body = text[i:text.index('function renderManualList', i)]
+    assert re.search(r"String\(levelRaw\)\.trim\(\) ===\s*\)\s*\? null : parseFloat\(levelRaw\)", body)
+    assert "level != null && (!isFinite(level)" in body
+    # the entries chip prints a level only when one was given
+    assert re.search(r"\(m\.level != null \?\s+\+ m\.level :\s*\)", text)
+    # the markup: no prefilled 50, a placeholder instead (positive control:
+    # the input itself is still emitted)
+    py = (_SCRIPTS / 'deep_dive.py').read_text()
+    k = py.index('id="manual-level"')
+    tag = py[k:k + 400]
+    assert 'placeholder="current"' in tag
+    assert 'value="50"' not in tag

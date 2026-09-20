@@ -33,8 +33,11 @@ def _synthetic():
         'ivHp': [140, 138], 'ivCp': [1498, 1499], 'spRanks': [1, 57],
     }
     ctx = {
-        'rec_candidates': [{'iv': 0, 'style': 'Max Bulk'},
-                           {'iv': 1, 'style': 'Attack Weight'}],
+        # Pre-2026-09-17 these styles were the retired pole labels
+        # ('Max Bulk' / 'Attack Weight'); a card's style string is now its
+        # build title, or "Top pick #N" on a page with no builds.
+        'rec_candidates': [{'iv': 0, 'style': 'Top pick #1'},
+                           {'iv': 1, 'style': 'Top pick #2'}],
         'rec_idx': 0, 'flips': {}, 'flip_map': {}, 'has_bait_axis': False,
         'opp_label': 'PvPoke default',
         'key_wins': [('Azumarill', 612.0), ('Stunfisk (Galarian)', 540.0)],
@@ -56,7 +59,7 @@ def test_build_card_model_fields():
     assert m.moveset == 'Sand Attack / Air Cutter, Payback'
     # three (here two) spreads pulled in rec order, with the right IVs/stats
     assert [s.iv_str for s in m.spreads] == ['0/15/14', '1/13/11']
-    assert m.spreads[0].style == 'Max Bulk'
+    assert m.spreads[0].style == 'Top pick #1'
     assert m.spreads[0].sp_rank == 1
     assert abs(m.spreads[0].def_ - 132.1) < 1e-6
     # win-rate percentages round to whole numbers
@@ -369,7 +372,10 @@ def test_flip_lines_label_both_references():
     assert m.flip_ref_sp1 == '1/13/11'
     assert m.flip_ref_pvpoke == '4/15/9'
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 (1/13/11): no matchup flips' in html_out
+    # round 6: the card writes SP1, the spelling the section defines
+    # (pre-fix: 'vs stat-product #1 (1/13/11): no matchup flips')
+    assert 'vs SP1 (1/13/11): no matchup flips' in html_out
+    assert 'SP1 = rank 1' in html_out       # the foot defines it
     assert 'vs PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
 
 
@@ -380,7 +386,7 @@ def test_flip_line_sp1_candidate_says_so():
     sp1_spread = [s for s in m.spreads if s.iv_str == '1/13/11'][0]
     assert sp1_spread.is_sp1
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'this spread IS the stat-product #1' in html_out
+    assert 'this spread IS SP1' in html_out   # pre-fix: 'the stat-product #1'
 
 
 def test_flip_lines_collapse_when_refs_identical():
@@ -389,7 +395,7 @@ def test_flip_lines_collapse_when_refs_identical():
     ctx['sp1_idx'] = 2                      # same spread as pvpokeRefIvIdx
     m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 = PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
+    assert 'vs SP1 = PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
     assert 'vs PvPoke default (' not in html_out  # no separate second line
 
 
@@ -405,6 +411,7 @@ def test_flip_line_legacy_ctx_has_no_reference_claim():
     html_out = dc.render_card_html(m, standalone=True)
     assert 'gains Azumarill 1v1' in html_out
     assert 'vs stat-product #1' not in html_out
+    assert 'vs SP1' not in html_out
     assert 'vs PvPoke default' not in html_out
 
 
@@ -439,5 +446,149 @@ def test_flip_line_pvpoke_default_candidate_gets_sp_line():
     pv = [s for s in m.spreads if s.iv_str == '4/15/9'][0]
     assert pv.is_pvpoke and not pv.is_sp1
     html_out = dc.render_card_html(m, standalone=True)
-    assert 'vs stat-product #1 (1/13/11): gains Lickitung 0v1' in html_out
+    assert 'vs SP1 (1/13/11): gains Lickitung 0v1' in html_out
     assert 'vs PvPoke default (4/15/9): this spread IS the PvPoke default' in html_out
+
+
+def test_card_carries_the_build_guarantee_and_its_rarest_cells():
+    """v5 (2026-09-16 review item 6): the card's spreads come from the
+    "Which one to build?" builds, and each one carries that build's
+    guarantee sentence plus its rarest guaranteed matchups in the section's
+    own outside-rate emphasis.
+
+    Pre-fix the card had no builds content at all: its three spreads were
+    stat-extreme POLES ("MATCHUP HUNTER", "MAX BULK") chosen by a rule no
+    other surface on the page uses, and the card named different spreads
+    than the section three inches below it.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'},
+        {'iv': 1, 'style': 'Highest battle score'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': [{'text': '1v2 Feraligatr (rank 30)', 'rate': 0.0999,
+                       'word': 'outside'},
+                      {'text': '0v1 Empoleon (rank 23)', 'rate': 0.2002,
+                       'word': 'outside'},
+                      {'text': '0v0 Furret (rank 43)', 'rate': 0.93,
+                       'word': 'outside'}]},
+        1: {'guarantee': 'wins 62 of 87 decision matchups; it is in none of '
+                         'the builds',
+            'cells': [{'text': '1v2 Electrode (Hisuian) (rank 34)',
+                       'rate': 0.08, 'word': 'grid'}]}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    assert m.spreads[0].guarantee.startswith('guarantees 55 of 87')
+    assert len(m.spreads[0].cells) == 3
+    html = dc.render_card_html(m, standalone=False)
+    assert 'guarantees 55 of 87 decision matchups (Build 1)' in html
+    assert 'wins 62 of 87 decision matchups' in html
+    # the three bands, on the three rates above: 10% -> o3, 20% -> o2,
+    # 93% -> o0 (the near-free tail, dimmed rather than dropped)
+    assert ('<span class="ddcard-o3">1v2 Feraligatr (rank 30) '
+            '(outside 10%)</span>' in html)
+    assert ('<span class="ddcard-o2">0v1 Empoleon (rank 23) '
+            '(outside 20%)</span>' in html)
+    assert ('<span class="ddcard-o0">0v0 Furret (rank 43) '
+            '(outside 93%)</span>' in html)
+    # a standout card quotes the GRID rate: "outside" has no meaning for one
+    # spread, and printing it as one would be a number about a region
+    assert '(grid 8%)' in html
+    # the role label is the build's name + its rule, uppercased by the CSS
+    assert '<div class="role">Build 1: Def &gt;= 132.00 and HP &gt;= 140</div>' in html
+    # the standalone export carries the same block and its own CSS rules
+    solo = dc.render_card_html(m, standalone=True)
+    assert 'guarantees 55 of 87 decision matchups (Build 1)' in solo
+    assert '.ddcard-o3 {' in solo
+
+
+def test_card_carries_the_guarantee_key_in_its_own_foot():
+    """The card ships STANDALONE (--card-out), where there is no section to
+    read the emphasis key from -- and it prints two different rates
+    ("outside N%" on a build card, "grid N%" on a standout) in three
+    typefaces. Pre-fix the foot said only "Win rate = shield-scenario
+    matchups won (>500) ...", so an underlined italic cell on the exported
+    card meant nothing.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': [{'text': '1v2 Feraligatr (rank 30)', 'rate': 0.0999,
+                       'word': 'outside'}]}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    for html_out in (dc.render_card_html(m, standalone=False),
+                     dc.render_card_html(m, standalone=True)):
+        assert 'Rarest = the guaranteed matchups' in html_out
+        assert 'outside N% = the share of the spreads outside that build' \
+            in html_out
+        assert 'grid N% = the share of all the spreads on the grid' in html_out
+        assert 'bold = fewer than half' in html_out
+    # a card with no guarantee cells carries no key
+    ctx['card_extras'] = {0: {'guarantee': '', 'cells': []}}
+    plain = dc.render_card_html(
+        dc.build_card_model(data_obj, ctx, types=['steel']), standalone=False)
+    assert 'Rarest = the guaranteed matchups' not in plain
+
+
+def test_a_pinned_card_says_its_builds_come_from_another_level():
+    """The best-buddy (L51) card reuses the LEAGUE-CAP builds, because the
+    "Which one to build?" section itself is rendered once, at the cap.
+
+    Pre-fix the best-buddy pass got no builds at all, so toggling Best
+    Buddy replaced the four build cards with the RETIRED stat-extreme poles
+    ("Matchup Hunter", "Max Bulk") and dropped every guarantee line, with
+    nothing on the card saying why it differed from the section below it.
+    """
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'] = [
+        {'iv': 0, 'style': 'Build 1: Def >= 132.00 and HP >= 140'}]
+    ctx['card_extras'] = {
+        0: {'guarantee': 'guarantees 55 of 87 decision matchups (Build 1)',
+            'cells': []}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel'])
+    assert m.builds_pinned is False
+    assert dc.PINNED_NOTE not in dc.render_card_html(m, standalone=False)
+    ctx['builds_pinned'] = True
+    m2 = dc.build_card_model(data_obj, ctx, types=['steel'])
+    assert m2.builds_pinned is True
+    out = dc.render_card_html(m2, standalone=False)
+    assert 'computed at the league cap' in out
+    assert 'only the stats on this card follow the Best Buddy level' in out
+
+
+def test_both_level_passes_hand_the_card_the_same_builds():
+    """The producing half of the fix above, in deep_dive.py: the L51 pass
+    must get ``card_builds`` too. Pre-fix the argument was gated on
+    ``write_card_out``, which is true only for the level-default pass:
+
+        card_builds=(which_build_cards if write_card_out else None)
+    """
+    src = (Path(dc.__file__).resolve().parent / 'deep_dive.py').read_text()
+    assert 'card_builds=(which_build_cards if write_card_out else None)' \
+        not in src
+    assert 'card_builds=which_build_cards' in src
+    assert 'card_builds_pinned=builds_pinned' in src
+    assert 'builds_pinned=True' in src
+    # positive control: the scan is reading the module that renders both
+    # passes, so a moved helper cannot make the absence pin vacuous
+    assert 'def _render_level_body(' in src
+    assert 'write_card_out=True' in src and 'write_card_out=False' in src
+
+
+def test_card_without_builds_keeps_the_old_spread_block():
+    """A dive with no builds (no replay blob, or compute_builds failed) gets
+    the plain spread block -- no empty guarantee row, no stray label.
+
+    Pre-2026-09-17 the fallback was the stat-extreme POLE card, and this
+    asserted ``<div class="role">Max Bulk</div>``; the poles are retired, so
+    the fallback spreads are the composite-score top picks and the role line
+    is their rank.
+    """
+    data_obj, ctx = _synthetic()
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])
+    assert m.spreads[0].guarantee == '' and m.spreads[0].cells == []
+    html = dc.render_card_html(m, standalone=False)
+    assert 'ddcard-guar' not in html
+    assert '<div class="role">Top pick #1</div>' in html

@@ -56,7 +56,6 @@ class AnalysisContext:
     flips: dict
     flip_summary: list
     flip_map: dict
-    rec_candidates: list
     hp_list: list
     anchor_flip_records: list
     all_matchup_boundaries: list
@@ -264,6 +263,12 @@ DEEP_DIVE_CSS = """
 .dd-h3 { color: var(--accent); font-size: 1rem; margin: 14px 0 8px 0; }
 .dd-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 0.82rem; width: 100%; }
 .dd-table.dd-narrow { width: auto; }
+/* The three clusters tables are wider than the column they sit in --
+   2,034 px inside 1,140 px on the shadow page -- and since round 9 put
+   that body inside "Which one to build?" their overflow made the whole
+   section scroll sideways. Each scrolls in its own box instead
+   (CLAUDE.md's table convention; 2026-09-19 round-10 review). */
+.dd-mc-wide { overflow-x: auto; max-width: 100%; }
 .dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
 .dd-table th { background: var(--surface-2); color: var(--accent); font-weight: 600; }
 .dd-table td { background: var(--surface-2); }
@@ -3333,61 +3338,22 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 """
 
 
-def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
-                               ref_iv, ref_atk, ref_def, opp_info_cache,
-                               focal_moves, focal_types, has_bait_axis=False):
-    """Render the top-3 IV recommendation cards as an HTML fragment.
-
-    Returned HTML is injected into the Notable IVs & Recommendations
-    section by ``render_results_section``.
-    """
-    if not rec_candidates:
-        return ''
-    parts = []
-    parts.append('<h4 class="dd-h3" style="margin-top:18px">Top Picks</h4>\n')
-    parts.append(
-        f'<p class="dd-small">Top candidates by average score, matchup flips, '
-        f'and rank stability vs {opp_label} opponents.</p>\n')
-    parts.append('<div class="dd-rec-grid">\n')
-    for rc in rec_candidates[:3]:
-        iv = rc['iv']
-        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
-        fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis,
-                                   expandable=True, id_prefix='frec')
-        parts.append('<div class="dd-rec-card">\n')
-        style_color = 'var(--accent)' if rc['style'] == 'Bait Robust' else 'var(--title)'
-        parts.append(f'<h4 style="color:{style_color}">{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
-        parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
-        parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
-        parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
-        parts.append(f'<p class="dd-prose">{prose}</p>\n')
-        focal_atk_rc = data_obj['ivAtk'][iv]
-        focal_def_rc = data_obj['ivDef'][iv]
-        focal_hp_rc = data_obj['ivHp'][iv]
-        ref_hp_val = data_obj['ivHp'][ref_iv]
-        bp_lines = []
-        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
-            for e in entries:
-                opp_name = e['opponent']
-                if opp_name in opp_info_cache and focal_moves:
-                    oi = opp_info_cache[opp_name]
-                    narr = analysis.narrate_flip(
-                        focal_atk_rc, focal_def_rc, focal_hp_rc,
-                        ref_atk, ref_def, ref_hp_val,
-                        oi['atk'], oi['def_'], opp_name,
-                        focal_moves, oi['moves'],
-                        focal_types, oi['types'],
-                        is_gain=is_gain,
-                    )
-                    if narr:
-                        bp_lines.append(narr)
-        if bp_lines:
-            parts.append(f'<p class="dd-small"><b style="color:var(--accent)">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
-        parts.append('</div>\n')
-    parts.append('</div>\n')
-    return ''.join(parts)
-
+# ---------------------------------------------------------------------------
+# RETIRED 2026-09-17 (round 8 item 2): the composite-score "Top Picks" cards.
+# ---------------------------------------------------------------------------
+# ``_render_iv_recommendations`` printed the top three of a composite of
+# average-score rank, matchup flips and rank stability -- the one selection
+# rule on the page that no other surface used. It named single spreads while
+# the "Which one to build?" section two inches below named regions, the two
+# lists routinely disagreed (all three picks reading "in no build" beside a
+# section recommending builds), and the page had to carry a paragraph
+# explaining why. Michael's call, 2026-09-17: one Notable spreads list
+# replaces both, in that section, built from the spreads the page already has
+# a reason to name (``deep_dive_which_build.notable_html``).
+#
+# The composite ranking itself is NOT gone from render.py: ``rec_candidates``
+# still resolves the page's lead spread and backs ``_ensure_rc`` for the dive
+# card. What is gone is its ranking reaching the reader as a ranking.
 
 # ---------------------------------------------------------------------------
 # Opponent-centric view ("Threats where your IV matters")
@@ -3470,10 +3436,23 @@ _OPP_THREATS_JS = (
     'else document.addEventListener("DOMContentLoaded",o);})();</script>\n')
 
 
+def _card_pinned_note():
+    """The dive card's own "these builds are the league cap's" sentence.
+
+    Imported lazily (deep_dive_card imports this module for ``opp_slug``, so a
+    module-level import would be circular) and quoted rather than re-worded:
+    the card and the threat rows show the same pinned spreads on the
+    best-buddy pass, and two spellings of one caveat is how they drift.
+    """
+    import deep_dive_card
+    return deep_dive_card.PINNED_NOTE
+
+
 def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                                     scenarios, opponents, nS, nO, data_obj,
                                     opp_label, has_bait_axis=False,
-                                    spread_ivs=None, win_threshold=WIN_RATING):
+                                    spread_ivs=None, win_threshold=WIN_RATING,
+                                    builds_pinned=False):
     """Opponent-centric "Threats where your build choice matters" section.
 
     For each opponent, computes whether each recommended spread (``spread_ivs``
@@ -3483,9 +3462,17 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     choice decides the result; the row shows a win/loss chip per build, a "build
     X" hint, and an expander with the exact stat cutoffs + a per-spread x
     9-shield grid. Opponents every build wins (or every build loses) hoist into
-    two one-line callouts. Subsumes the flat boundary dump. ``spread_ivs`` /
-    ``recStyles`` default to ``data_obj``. No new simulation. Returns '' when
-    there is nothing to show.
+    two one-line callouts. Subsumes the flat boundary dump. No new simulation.
+    Returns '' when there is nothing to show.
+
+    The spreads and their names are the DIVE CARD's -- the "Which one to
+    build?" builds plus the standouts (``data_obj['recIvs']`` /
+    ``['recNames']``, both fed by ``deep_dive_which_build.card_specs``), so a
+    chip here names the same spread the card headlines. Before 2026-09-17
+    they were the three stat-extreme poles and their style taxonomy
+    ("Matchup Hunter", "Max Bulk"), which named spreads no other surface on
+    the page showed. ``builds_pinned`` is the best-buddy (L51) pass, whose
+    builds are the league cap's: it adds the card's own pinned note.
     """
     if spread_ivs is None:
         spread_ivs = list(data_obj.get('recIvs') or [])
@@ -3502,11 +3489,26 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     for b in all_matchup_boundaries or []:
         by_opp.setdefault(b['opponent'], []).append(b)
 
-    spread_styles = data_obj.get('recStyles') or []
+    spread_names = data_obj.get('recNames') or []
 
     def _style(i):
-        s = spread_styles[i] if i < len(spread_styles) else ''
+        s = spread_names[i] if i < len(spread_names) else ''
         return s or _ivstr(spread_ivs[i])
+
+    def _steal_subject(name):
+        """One spread as the SUBJECT of a sentence.
+
+        "Build 1 steals 1v0" is a sentence; "Most matchups won steals 1v0" is
+        a fragment, so a standout's noun-phrase name takes an article.
+        """
+        esc = _html.escape(name)
+        if esc.startswith('Build ') or '/' in esc:
+            return esc
+        return f'the {esc[:1].lower()}{esc[1:]} spread'
+
+    def _all_word(n):
+        return {2: 'both spreads', 3: 'all three spreads',
+                4: 'all four spreads'}.get(n, f'all {n} spreads')
 
     def _overall_win(siv, oi):
         # This build wins the matchup OVERALL == a majority of the 9 shields.
@@ -3567,7 +3569,10 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         f'{opp_label} opponents, so your build choice decides the result. The '
         'chips show which recommended build wins the matchup overall (a majority '
         f'of the {nS} shields); expand a row for the per-shield grid and the '
-        'exact stat cutoffs.</p>\n')
+        'exact stat cutoffs. The spreads are the ones the dive card names -- '
+        'one per build from "Which one to build?", plus the standouts.'
+        + (_html.escape(_card_pinned_note()) if builds_pinned else '')
+        + '</p>\n')
     parts.append(
         '<p class="dd-small" style="color:var(--text-muted)">'
         f'<b>Flips at</b>: {_html.escape(BOUNDARY_RULE_TIP)}</p>\n')
@@ -3619,9 +3624,19 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                 b = min(bnds, key=lambda b: b['threshold'])
                 _sl = 'Atk' if b.get('stat') == 'atk' else 'Def'
                 cut_str = f' ({_sl} &ge; {b["threshold"]:.2f})'
-            steal_bits = '; '.join(
-                f'{_html.escape(_style(i))} steals {", ".join(shs)}'
-                for i, shs in steals)
+            # One bullet, not the same sentence four times: when every
+            # recommended spread steals the same shields the bullet says so
+            # once, and a spread whose name is a noun phrase ("Most matchups
+            # won") gets the article that makes it a sentence (2026-09-17
+            # round 6 review).
+            shield_sets = {tuple(shs) for _i, shs in steals}
+            if len(steals) == len(spread_ivs) > 1 and len(shield_sets) == 1:
+                steal_bits = (f'{_all_word(len(steals))} steal '
+                              f'{", ".join(steals[0][1])}')
+            else:
+                steal_bits = '; '.join(
+                    f'{_steal_subject(_style(i))} steals {", ".join(shs)}'
+                    for i, shs in steals)
             parts.append(
                 f'<li{opp_anchor_id(name)}>{_opp_b(name)} - '
                 f'{steal_bits}{cut_str}</li>\n')
@@ -3656,6 +3671,9 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                 f'<span class="dd-opp-chip {cls}">{mark} '
                 f'{_html.escape(_style(i))} '
                 f'<span class="dd-small">{_ivstr(siv)}</span></span>')
+        # "won by Build 1 or Build 2", not "build Build 1 or Build 2": the
+        # spreads carry the card's own names now, and the builds among them
+        # already have "Build" in the name (2026-09-17 round 5, item 1a).
         winners = ' or '.join(_html.escape(_style(i))
                               for i in range(len(spread_ivs)) if outs[i])
         # id="opp-<slug>" preserves the deep-link contract the article's Matchup
@@ -3666,7 +3684,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
             '<summary style="cursor:pointer">'
             f'<span class="dd-opp-name">{_opp_b(name)}</span> '
             f'{"".join(chips)}'
-            f'<span class="dd-opp-build">&rarr; build {winners}</span>'
+            f'<span class="dd-opp-build">&rarr; won by {winners}</span>'
             '</summary>\n')
         parts.append('<div class="dd-opp-detail">\n')
         bnds = sorted(by_opp.get(name, []),
@@ -3701,17 +3719,21 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            effective_tiers, anchor_flip_records,
                            all_matchup_boundaries, score_arrays,
                            moveset_idx, flips, flip_map, avg_ranks,
-                           avg_scores, rec_candidates, slayer_iter_result,
+                           avg_scores, slayer_iter_result,
                            opp_info_cache, focal_moves, focal_types,
                            ref_atk, ref_def, ref_iv, opp_iv_mode,
                            scores_flat, nS, nO, scenarios, opponents,
                            anchor_passing_sink, has_toml_tiers, ranked,
-                           hp_list, nIvs, has_bait_axis=False):
+                           hp_list, nIvs, has_bait_axis=False,
+                           builds_pinned=False):
     """Render the always-visible Deep Dive Results section.
 
     Returns an HTML string. Computation (anchor aggregation, tier
     derivation, matchup boundaries) is done by the caller; this function
     only assembles HTML from pre-computed data.
+
+    ``builds_pinned`` is the best-buddy (L51) pass, whose builds are the
+    league cap's.
     """
     parts = []
 
@@ -3843,10 +3865,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append(sim_tier_cards)
 
     # -- IV Recommendations (rendered first, injected into Notable IVs) --
-    rec_html = _render_iv_recommendations(
-        rec_candidates, flips, opp_label, data_obj, ref_iv, ref_atk,
-        ref_def, opp_info_cache, focal_moves, focal_types,
-        has_bait_axis=has_bait_axis)
+    # The Top Picks cards are retired (round 8 item 2); the section's
+    # Notable spreads block is the page's one list of single spreads.
+    rec_html = ''
 
     # -- Notable IVs & Recommendations --
     from deep_dive import build_iv_categories
@@ -3993,7 +4014,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # dump: each boundary record is now reached per-opponent via its row).
     opp_threats_html = render_opponent_threats_section(
         all_matchup_boundaries, scores_flat, scenarios, opponents,
-        nS, nO, data_obj, opp_label, has_bait_axis=has_bait_axis)
+        nS, nO, data_obj, opp_label, has_bait_axis=has_bait_axis,
+        builds_pinned=builds_pinned)
     if opp_threats_html:
         parts.append(opp_threats_html)
 
