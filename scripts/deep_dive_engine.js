@@ -258,8 +258,16 @@ function _initBestBuddy() {
   _bbInitHost('dd-bb-prose-host', 'dd-bb-prose-tmpl');
   _bbInitHost('dd-bb-card-host', 'dd-bb-card-tmpl');
   // Round 7: the Matchup clusters section moved out of the prose block to
-  // the top of the page, so it needs a host/template pair of its own.
+  // the top of the page, so it needs a host/template pair of its own. It is
+  // only EMITTED on a page with no "Which one to build?" section, where the
+  // clusters render as a sibling; when the section exists the clusters are
+  // nested inside it and ride the section's pair instead.
   _bbInitHost('dd-bb-clusters-host', 'dd-bb-clusters-tmpl');
+  // 2026-09-20: the whole section, not just the clusters inside it. Before
+  // this the toggle left the headline, the answer strip, the table and the
+  // figures at the league cap while the clusters nested inside them swapped
+  // to L51 -- one block, two levels.
+  _bbInitHost('dd-bb-wb-host', 'dd-bb-wb-tmpl');
   var dd = String((DATA.bestBuddy && DATA.bestBuddy.defaultDisplay) || 50);
   if (dd === '51') {
     var chk = document.getElementById('dd-bb-toggle');
@@ -298,6 +306,56 @@ function _bbReopen(ids) {
   }
 }
 
+// ---- "Which one to build?" state across a best-buddy swap ----
+// The host swap replaces the section's whole DOM with the other level's
+// server-rendered markup, which comes back in its FIRST-RENDER state: every
+// figure on its default tab, every Shield-scenario select on "all". The
+// <details> open set is carried for every host by _bbOpenIn/_bbReopen; these
+// two carry the rest, so a reader who narrowed the figure to 1v1 on the
+// "Builds" tab is still there after ticking Best Buddy.
+//
+// The Build-criteria preset is deliberately NOT snapshotted: it lives in the
+// page's controls strip, which the swap never touches. It is re-APPLIED to
+// the fresh markup instead (wbApplyPreset picks which server-rendered
+// .wb-preset block is visible and which summary sentence the collapsed line
+// carries) -- read from the one place that holds it, not copied.
+function _wbSnapshot() {
+  var root = _wbRoot();
+  if (!root) return null;
+  var sel = root.querySelector('select.wb-scen');
+  var views = {};
+  root.querySelectorAll('.wb-plotbox').forEach(function(b) {
+    views[b.getAttribute('data-group') || ''] = _wbBoxView(b);
+  });
+  return { scen: sel ? sel.value : null, views: views };
+}
+
+// Re-apply it to whatever is in the host NOW. Draws nothing: the caller
+// reopens the <details> straight after, and that toggle is what renders --
+// so the panels are built once, already on the right tab and scenario.
+function _wbRestore(snap) {
+  var root = _wbRoot();
+  if (!root || !snap) return;
+  root.querySelectorAll('.wb-plotbox').forEach(function(box) {
+    var want = snap.views[box.getAttribute('data-group') || ''];
+    if (!want || want === _wbBoxView(box)) return;
+    var tabs = box.querySelectorAll('.wb-tab');
+    var hit = null;
+    for (var i = 0; i < tabs.length; i++) {
+      if (tabs[i].getAttribute('data-view') === want) hit = tabs[i];
+    }
+    // A view this level's section does not offer leaves the box on its
+    // default tab rather than on a tab with no figure behind it.
+    if (!hit) return;
+    box.setAttribute('data-wb-view', want);
+    for (var j = 0; j < tabs.length; j++) {
+      tabs[j].setAttribute('aria-selected', tabs[j] === hit ? 'true' : 'false');
+    }
+  });
+  if (snap.scen) _wbSyncScen(root, snap.scen);
+  wbApplyPreset(root);
+}
+
 function setBestBuddyLevel(mode) {
   if (!DATA.ivL51 || !_bbL50) return;
   var src = (mode === '51') ? DATA.ivL51 : _bbL50;
@@ -310,7 +368,11 @@ function setBestBuddyLevel(mode) {
     var host = document.getElementById(hid);
     if (!host || _bbHostHTML[hid][mode] == null) continue;
     var wasOpen = _bbOpenIn(host);
+    var wbSnap = (hid === 'dd-bb-wb-host') ? _wbSnapshot() : null;
     host.innerHTML = _bbHostHTML[hid][mode];
+    // Before the reopen, so the toggle that reopen fires draws each panel
+    // once, on the tab and scenario the reader left it on.
+    if (wbSnap) _wbRestore(wbSnap);
     _bbReopen(wasOpen);
   }
   // Re-hydrate title= from DATA.tooltips on whatever we just swapped in. The
@@ -4494,13 +4556,19 @@ function _wbPayload(root) {
   try { return JSON.parse(s.textContent); } catch (e) { return null; }
 }
 
-// The league-cap (L50) per-IV arrays. setBestBuddyLevel rebinds DATA.iv* to
-// the L51 grid; this section must keep reading the level its line was derived
-// at, or the threshold would be compared against stats it never saw.
+// The per-IV arrays this section's numbers are about. Since 2026-09-20 the
+// section is rendered ONCE PER LEVEL and swapped by setBestBuddyLevel, so
+// the copy on screen was derived at whatever level DATA.iv* currently holds
+// -- which is exactly what a threshold must be compared against. (It used to
+// pin itself to the stashed L50 arrays, because only one L50 copy existed
+// and the toggle would otherwise have compared an L50 line to L51 stats.)
 function wbLevelArrays() {
-  return (DATA.ivL51 && _bbL50) ? _bbL50 : DATA;
+  return DATA;
 }
 
+// Keyed on the LEVEL as well as (moveset, mode, scenario): the two levels
+// are different score grids, and a cache that could not tell them apart
+// would serve the league cap's win counts to the best-buddy section.
 var _wbWinsCache = {};
 // Matchups won, per IV, at the league cap: over ALL baked scenarios and ALL
 // opponents (the brief's own denominator, its `total_cells`) when `si` is
@@ -4511,10 +4579,10 @@ var _wbWinsCache = {};
 // scenario loop's bounds move, so there is one decoding on the page and not
 // two that can drift.
 function wbWins(mi, mode, si) {
-  var key = mi + SCORE_KEY_SEP + mode + SCORE_KEY_SEP +
+  var key = getScoreKey(mi, mode) + SCORE_KEY_SEP +
             (si == null ? 'all' : si);
   if (_wbWinsCache[key]) return _wbWinsCache[key];
-  var g = SCORES[mi + SCORE_KEY_SEP + mode];
+  var g = getScores(mi, mode);
   if (!g) return null;
   var nO = DATA.nOpponents, nS = DATA.nScenarios, n = DATA.nIvs;
   var lo = (si == null) ? 0 : si, hi = (si == null) ? nS : si + 1;

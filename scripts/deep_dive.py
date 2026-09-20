@@ -1364,6 +1364,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               which_build_html=None,
                               which_build_presets=None,
                               which_build_cards=None,
+                              which_build_html_l51=None,
+                              which_build_cards_l51=None,
                               ):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
@@ -1396,6 +1398,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         Spreads" overlay and the opponent-threat chips. None (or []) falls
         back to the composite-score top picks (the stat-extreme POLES this
         used to fall back to were retired 2026-09-17).
+
+    which_build_html_l51 / which_build_cards_l51: the same two, computed at
+        the best-buddy cap. When present the section is emitted as a
+        ``#dd-bb-wb-host`` + ``<template id="dd-bb-wb-tmpl">`` pair and the
+        toggle swaps the whole block; the L51 card then shows ITS level's
+        build spreads instead of the league cap's, so the card's "pinned"
+        note is not printed. Both None on a dive with no best-buddy grid,
+        and on one whose L51 brief failed a guard.
 
     """
     opp_iv_modes = opp_iv_modes or ['pvpoke']
@@ -2303,7 +2313,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Michael's 2026-09-13 decision). Pre-rendered by the caller because the
     # brief is computed from the replay blob, which this function never sees.
     if which_build_html:
-        html += which_build_html
+        # A marker, not the section: when best buddy is active the section is
+        # rendered at BOTH levels and the pair is assembled farther down,
+        # beside the level bodies that supply each half's clusters.
+        html += '<!-- WHICH_BUILD_SLOT -->'
 
     # "Matchup clusters" -- round 9 (Michael's 2026-09-19 decision (b)): no
     # longer a section of its own. The slot it fills is emitted INSIDE the
@@ -2718,7 +2731,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     import deep_dive_card as _ddcard
 
     def _render_level_body(dobj, sarr, *, write_card_out, robust_max_level,
-                           base_scores, base_info, builds_pinned=False):
+                           base_scores, base_info, builds_pinned=False,
+                           card_builds=None):
         """Render one level's prose sections + dive card from
         (data_obj, score_arrays). Mutates ``dobj`` (narrative flavors / tier
         renames, pops _cardCtx). Returns
@@ -2745,15 +2759,19 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             anchor_passing_sink=sink, threshold_registry=threshold_registry,
             moveset0_flavors_for_rename=ms0_flavors, focal_shadow=shadow,
             scores_base_arrays=base_scores, base_form_info=base_info,
-            # BOTH passes get the same spreads. The builds -- and the
-            # "Which one to build?" section itself -- are computed once, at
-            # the LEAGUE CAP; the best-buddy card shows the same build
-            # spreads with L51 stats and says on the card that the builds
-            # are pinned to the cap. Passing None here instead left the
-            # RETIRED stat-extreme poles ("MATCHUP HUNTER" / "MAX BULK") as
-            # the best-buddy card, above an L50 builds section, with none of
-            # the guarantee lines (2026-09-16 round-3 review).
-            card_builds=which_build_cards,
+            # Each pass gets ITS OWN level's spreads, because each pass now
+            # renders its own level's "Which one to build?" section (the
+            # 2026-09-20 pre-dive grid, lens 5: a toggled page used to show
+            # L51 clusters under an L50 headline). ``builds_pinned`` prints
+            # the card's "pinned to the league cap" note and is therefore
+            # only set when the L51 section did NOT compute -- the card must
+            # never quietly show spreads from a level the section below it
+            # is not about. Passing None here instead left the RETIRED
+            # stat-extreme poles ("MATCHUP HUNTER" / "MAX BULK") as the
+            # best-buddy card, above an L50 builds section, with none of the
+            # guarantee lines (2026-09-16 round-3 review).
+            card_builds=(which_build_cards if card_builds is None
+                         else card_builds),
             card_builds_pinned=builds_pinned,
             # Round 7: the Matchup clusters section comes back HERE instead
             # of inside an_html, so this function's caller can drop it into
@@ -2887,7 +2905,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
          _clusters51) = _render_level_body(
             _dobj51, _sarr51, write_card_out=False,
             robust_max_level=best_buddy.get('alt_cap'),
-            base_scores=None, base_info=None, builds_pinned=True)
+            base_scores=None, base_info=None,
+            builds_pinned=which_build_cards_l51 is None,
+            card_builds=which_build_cards_l51)
 
     # ---- Dive card injection (host + optional L51 template for the toggle) ----
     if _card50_html:
@@ -2905,13 +2925,34 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # comment ships.
     html = html.replace('<!-- DIVE_CARD_SLOT -->', '', 1)
 
-    # ---- Matchup clusters injection (round 7) ----
+    # ---- "Which one to build?" + Matchup clusters injection ----
     # Same host/<template> shape the prose and the card use, for the same
-    # reason: the L51 pass renders a second copy of the section, with its own
-    # element ids, and only one of the two is ever in the document. The pair
-    # is registered in deep_dive_engine.js (_bbInitHost), which is where
+    # reason: the L51 pass renders a second copy, with its own element ids,
+    # and only one of the two is ever in the document. The pair is registered
+    # in deep_dive_engine.js (_bbInitHost), which is where
     # tests/test_dive_dom_ids.py reads the host list from.
-    if _clusters50:
+    #
+    # The clusters sit INSIDE the section (deep_dive_which_build.CLUSTERS_SLOT)
+    # when there is one, so the SECTION is what gets the host/template pair
+    # and each half is filled with its own level's clusters. Until 2026-09-20
+    # only the clusters swapped, which left a toggled page showing L51
+    # clusters under an L50 headline, an L50 answer strip and an L50 table.
+    # The clusters keep their own pair for the blob-free fallback, where they
+    # render as a sibling above the scatter and there is no section to carry
+    # them.
+    if which_build_html:
+        _wb50 = which_build_html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->',
+                                         _clusters50 or '', 1)
+        if _bb_active and which_build_html_l51:
+            _wb51 = which_build_html_l51.replace(
+                '<!-- MATCHUP_CLUSTERS_SLOT -->', _clusters51 or '', 1)
+            _wb_block = (
+                f'<div id="dd-bb-wb-host" class="dd-bb-host">{_wb50}</div>'
+                f'<template id="dd-bb-wb-tmpl">{_wb51}</template>')
+        else:
+            _wb_block = _wb50
+        html = html.replace('<!-- WHICH_BUILD_SLOT -->', _wb_block, 1)
+    elif _clusters50:
         if _bb_active:
             _mc_block = (
                 f'<div id="dd-bb-clusters-host" class="dd-bb-host">'
@@ -2920,6 +2961,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         else:
             _mc_block = _clusters50
         html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', _mc_block, 1)
+    html = html.replace('<!-- WHICH_BUILD_SLOT -->', '', 1)
     html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', '', 1)
 
     # Results section is always visible; analysis is behind a toggle. When the
@@ -3531,11 +3573,39 @@ def _build_criteria_note(live_presets):
             'on this page is re-weighted by it.</span>\n')
 
 
+def _bb_section_active(state):
+    """True when this dive renders a second, best-buddy (L51) section.
+
+    ``generate_interactive_html``'s ``_bb_active`` (the toggle is on for this
+    species/league AND the blob carries the L51 grid), MINUS the no-op case.
+    Duplicated rather than imported because the section is pre-rendered one
+    layer up, before that function is called at all.
+
+    The extra ``noop`` condition is this function's own. When best buddy is
+    provably a no-op for a species -- every IV already CP-capped below the
+    alt level, which the nav's own hint says out loud -- the L51 grid is the
+    L50 grid, so the second section would be a byte-identical copy: a wasted
+    ``prepare()`` (seconds per arm, on every arm) and ~140 KB per file, for
+    a swap that cannot change a character. The card, prose and clusters still
+    duplicate on a no-op dive; they are cheap and the pairs predate this.
+    """
+    bb = state.get('best_buddy')
+    md = state.get('moveset_data') or []
+    return bool(bb and bb.get('active') and not bb.get('noop')
+                and md and md[0].get('meta_l51'))
+
+
 def _which_build_sections(state):
     """Pre-render the "Which one to build?" section for every moveset.
 
     Returns ``({arm index: html}, {arm index: [live preset key]},
-    {arm index: [card spec]})``. The fourth map -- every build's membership,
+    {arm index: [card spec]}, {arm index: L51 html}, {arm index: L51 card
+    spec})``. The last two are empty for a dive with no best-buddy grid;
+    when they are populated the caller puts the L50 section in a
+    ``#dd-bb-wb-host`` and the L51 one in the matching ``<template>``, so
+    the toggle swaps the WHOLE section -- headline, answer strip, table,
+    figures and the clusters nested inside it -- and not just the clusters
+    (2026-09-20 pre-dive grid, lens 5). The third map -- every build's membership,
     for the retired "Top Picks" cards' "in Build 1" / "in no build" label --
     went with those cards on 2026-09-17 (round 8 item 2). The preset keys are
     what the controls
@@ -3575,7 +3645,7 @@ def _which_build_sections(state):
     if not blob_path:
         logger.info("  Which one to build?: skipped (no replay blob path on "
                     "this render; the brief is computed from the blob)")
-        return {}, {}, {}
+        return {}, {}, {}, {}, {}
     # How many movesets each FILE will embed. Split mode gives every file
     # exactly one; a single-file dive embeds them all behind a Moveset
     # dropdown this section does not follow, and the note under the panel
@@ -3585,22 +3655,97 @@ def _which_build_sections(state):
                 else len(state['moveset_data']))
     import deep_dive_which_build as which_build
     from deep_dive_brief import GuardError
-    try:
-        all_facts = which_build.prepare(state, blob_path)
-        html = {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
+
+    def _pass(level):
+        facts = which_build.prepare(state, blob_path, level=level)
+        html = {arm: which_build.section_html(facts, arm, moveset_idx=0,
                                               page_movesets=per_file)
-                for arm in range(len(all_facts))}
+                for arm in range(len(facts))}
+        cards = {arm: which_build.card_specs(facts[arm],
+                                             facts[arm].get('_builds'))
+                 for arm in range(len(facts))}
+        return facts, html, cards
+
+    try:
+        all_facts, html, cards = _pass('l50')
         presets = {arm: list((all_facts[arm].get('_builds') or {})
                              .get('presets', {}))
                    for arm in range(len(all_facts))}
-        cards = {arm: which_build.card_specs(all_facts[arm],
-                                             all_facts[arm].get('_builds'))
-                 for arm in range(len(all_facts))}
-        return html, presets, cards
     except (GuardError, FileNotFoundError) as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
-        return {}, {}, {}
+        return {}, {}, {}, {}, {}
+    if not _bb_section_active(state):
+        return html, presets, cards, {}, {}
+    # The best-buddy half. It is NOT allowed to take the whole section down
+    # with it: a page whose L51 brief fails a guard still ships its L50
+    # section (and its toggle then leaves the section at L50, which the card
+    # says out loud via the pinned note), because losing the flagship block
+    # on both levels is strictly worse than losing the swap on one.
+    try:
+        _facts51, html51, cards51 = _pass('l51')
+    except (GuardError, FileNotFoundError) as e:
+        logger.warning(f"  Which one to build?: best-buddy (L51) half "
+                       f"omitted, section stays at the league cap "
+                       f"({type(e).__name__}: {e})")
+        return html, presets, cards, {}, {}
+    return html, presets, cards, html51, cards51
+
+
+VINTAGE_FILE = 'vintage.toml'
+
+
+def write_vintage_stamp(html_path, league, cup=None):
+    """Record WHICH DATA this page was rendered against, beside the page.
+
+    Nothing used to. A dive's scores come frozen out of the replay blob, but
+    the render reads the LIVE gamemaster and the LIVE rankings every time
+    (deep_dive_brief.build_opp_meta_ranks -> data.get_rankings_for), and a
+    24h-TTL refetch part-way through a multi-day bake changes opponent ranks
+    -- and therefore VERDICTS -- between one page and the next with no sim
+    change at all. That happened on 2026-09-12. The TTL keeper in
+    overnight_redive.sh prevents it; this is what NOTICES when the keeper was
+    not in the loop, because nothing else can: the pages themselves look
+    fine. ``verify_overnight.py`` asserts one distinct value of each across
+    the dirs a chain wrote.
+
+    Its own file, NOT ``meta.toml``. meta.toml is the site index's authored
+    channel (build_website_index.py requires title/description/landing there
+    and treats a dir that has one as CURATED); dive dirs deliberately carry
+    none and are titled from their slug. Writing one to carry a build stamp
+    would either break the index (missing required keys) or silently change
+    how every dive renders on it. Like meta.toml, this file is local-only --
+    publish_website.sh excludes it.
+
+    Best-effort: a dive that renders is worth more than a dive that dies
+    stamping itself, so a failure logs and returns rather than raising.
+    """
+    import datetime
+    try:
+        import sweep_cache
+        from gopvpsim.data import rankings_cache_path
+        out = Path(html_path).parent / VINTAGE_FILE
+        rk = rankings_cache_path(league, cup)
+        lines = [
+            '# Written by deep_dive.py at render time; read by',
+            '# scripts/verify_overnight.py, which goes red when one bake',
+            '# wrote more than one distinct engine or gamemaster hash.',
+            '# Not published (publish_website.sh excludes it) and not part',
+            '# of the meta.toml site-index schema.',
+            f'engine_hash     = "{sweep_cache.engine_hash()}"',
+            f'gamemaster_hash = "{sweep_cache.gamemaster_hash()}"',
+            f'rankings_file   = "{rk.name}"',
+            # The rankings blob has no hash of its own anywhere in the
+            # codebase; its cache file's mtime IS the documented vintage
+            # handle (data.rankings_cache_path). -1 when it has never been
+            # fetched, which is itself worth seeing.
+            f'rankings_mtime  = {int(rk.stat().st_mtime) if rk.exists() else -1}',
+            f'rendered_at     = "{datetime.datetime.now().isoformat(timespec="seconds")}"',
+        ]
+        out.write_text('\n'.join(lines) + '\n')
+    except Exception as e:                                    # noqa: BLE001
+        logger.warning(f"  vintage stamp not written "
+                       f"({type(e).__name__}: {e})")
 
 
 def render_dive_html(state):
@@ -3617,8 +3762,8 @@ def render_dive_html(state):
             state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
-    (which_build, which_build_presets,
-     which_build_cards) = _which_build_sections(state)
+    (which_build, which_build_presets, which_build_cards,
+     which_build_l51, which_build_cards_l51) = _which_build_sections(state)
     if state['split_movesets'] and len(moveset_data) > 1:
         # Per-moveset split: emit N files, one per moveset. The
         # filesystem plan is computed up-front so every file
@@ -3672,9 +3817,13 @@ def render_dive_html(state):
                 which_build_html=which_build.get(mi),
                 which_build_presets=which_build_presets.get(mi),
                 which_build_cards=which_build_cards.get(mi),
+                which_build_html_l51=which_build_l51.get(mi),
+                which_build_cards_l51=which_build_cards_l51.get(mi),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
+        write_vintage_stamp(state['html_path'], state['league'],
+                            state.get('cup'))
     else:
         if state['split_movesets']:
             logger.warning("--split-movesets: only one moveset surviving - "
@@ -3708,7 +3857,11 @@ def render_dive_html(state):
             which_build_html=which_build.get(0),
             which_build_presets=which_build_presets.get(0),
             which_build_cards=which_build_cards.get(0),
+            which_build_html_l51=which_build_l51.get(0),
+            which_build_cards_l51=which_build_cards_l51.get(0),
         )
+        write_vintage_stamp(state['html_path'], state['league'],
+                            state.get('cup'))
 
 
 def main():

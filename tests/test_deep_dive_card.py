@@ -558,19 +558,28 @@ def test_a_pinned_card_says_its_builds_come_from_another_level():
     assert 'only the stats on this card follow the Best Buddy level' in out
 
 
-def test_both_level_passes_hand_the_card_the_same_builds():
-    """The producing half of the fix above, in deep_dive.py: the L51 pass
-    must get ``card_builds`` too. Pre-fix the argument was gated on
-    ``write_card_out``, which is true only for the level-default pass:
+def test_both_level_passes_hand_the_card_builds_of_their_own_level():
+    """Each pass gets card builds, and the pinned note follows whose.
+
+    Pre-2026-09-16 the argument was gated on ``write_card_out``, which is
+    true only for the level-default pass, so the L51 card fell back to the
+    retired stat-extreme poles:
 
         card_builds=(which_build_cards if write_card_out else None)
+
+    Pre-2026-09-20 both passes got the LEAGUE CAP's builds and the L51 card
+    said so via ``builds_pinned=True``, because the "Which one to build?"
+    section existed only at the league cap. It is now rendered per level and
+    swapped whole, so the L51 pass gets the L51 builds and the pinned note
+    is printed only when that half did not compute.
     """
     src = (Path(dc.__file__).resolve().parent / 'deep_dive.py').read_text()
     assert 'card_builds=(which_build_cards if write_card_out else None)' \
         not in src
-    assert 'card_builds=which_build_cards' in src
+    assert 'card_builds=which_build_cards_l51' in src
     assert 'card_builds_pinned=builds_pinned' in src
-    assert 'builds_pinned=True' in src
+    assert 'builds_pinned=True' not in src        # pre-2026-09-20: present
+    assert 'builds_pinned=which_build_cards_l51 is None' in src
     # positive control: the scan is reading the module that renders both
     # passes, so a moved helper cannot make the absence pin vacuous
     assert 'def _render_level_body(' in src
