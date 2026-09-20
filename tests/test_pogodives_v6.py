@@ -12,6 +12,12 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+# ... and tests/, because this module imports test_battle helpers. Without
+# it the file only ran when some EARLIER test had already put tests/ on the
+# path -- so it was 2/4 red standalone, which is exactly how the Cramorant
+# post-bake runbook says to run it. Same form as
+# tests/test_deep_dive_builds.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import gopvpsim.battle as B  # noqa: E402
 from gopvpsim.battle import pogodives_dp, pvpoke_dp, simulate  # noqa: E402

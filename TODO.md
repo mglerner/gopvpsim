@@ -145,11 +145,28 @@ re-sims exactly those and serves everything else warm.
 **Verification after the re-dive:** `verify_overnight.py` + the ship gates,
 then `python scripts/cramorant_certify.py --league both --selftest 5`
 (must print 0 bar failures, 0 exemption violations, selftest all exact) and
-`python scripts/cramorant_mini_sweep.py ... --check-tensor` on the two v6
-cells in `tests/test_pogodives_v6.py` (the Blade contamination is gone, so
---check-tensor is a full integer-exact gate again). Then re-render the
-strategy article (`render_pogodives_strategy_article.py`; the showcase gate
-re-picks and page-verifies) and run `tests/test_pogodives_article_showcases.py`.
+`cramorant_mini_sweep.py --check-tensor` on the two v6 cells in
+`tests/test_pogodives_v6.py` (the Blade contamination is gone, so
+--check-tensor is a full integer-exact gate again). `--league` and
+`--scenario` are REQUIRED, so the bare `... --check-tensor` form that used
+to stand here could not be run at all; both argv were verified against the
+current pages 2026-09-20:
+
+    python scripts/cramorant_mini_sweep.py --league great \
+        --page index_m4_peck_hydro_pump_surf.html --scenario 2v2 \
+        --opp-ivs pvpoke --bait nobait --cap 50 --stride 1 --check-tensor
+    python scripts/cramorant_mini_sweep.py --league ultra \
+        --page index.html --scenario 1v0 \
+        --opp-ivs rank1 --bait bait --cap 51 --stride 1 --check-tensor
+
+`--page` names a file in `userdata/website/cramorant-<league>-league/`, and
+the `index_mN_*` numbering comes from the bake's moveset SCREEN -- re-check
+the filenames after the re-dive (`index.html` is the landing, PECK / DIVE,
+FLY in both leagues; the GL v6 cell is the Peck / Hydro Pump + Surf page,
+the UL one is the landing). Then re-render the strategy article
+(`render_pogodives_strategy_article.py`; rehearse it with `--out <scratch>`
+first -- the showcase gate re-picks and page-verifies) and run
+`tests/test_pogodives_article_showcases.py`.
 
 **Michael's three open decisions** (leave as-is until answered):
 
@@ -638,6 +655,11 @@ Because the test is in the fast tier, `verify_tests` fails, so the ship
 gates and every publish path are blocked until this is addressed. That
 is correct behaviour, not a bug.
 
+GREEN as of 2026-09-20 (re-measured by the pre-dive grid, 9/9):
+`test_pvpoke_engine_matches_last_vetted_commit` passes -- the re-vet and
+the re-pin happened. The paragraph above is kept as the record of WHY the
+pin exists and what re-pinning costs; it no longer describes a live red.
+
 Headlines (these resolve BOTH open caveats in the
 `project_mega_league_sims` memory -- what was "unverified" now has an
 upstream implementation to read):
@@ -909,11 +931,12 @@ Sequence once the chain is green (ETA ~15:30 2026-09-12 incl. the ML tail):
    Sableye: both pages must now list SC/DP+FP and SC/FP+PG.
 5. Publish only on Michael's explicit go.
 
-Known pre-existing red in the fast tier (not from this branch):
+Known pre-existing red in the fast tier (not from this branch) --
+RESOLVED, GREEN as of 2026-09-20 (re-measured by the pre-dive grid):
 `tests/test_ship_gate_roster.py::test_entry_points_route_through_the_roster`
-fails on main too, tripped by the `verify_article_links.py --ship` line that
-`publish_website.sh --partial` (986cc01) added outside the roster. The other
-session owns that change.
+used to fail on main too, tripped by the `verify_article_links.py --ship`
+line that `publish_website.sh --partial` (986cc01) added outside the
+roster. The other session's change landed; the roster covers it.
 
 Dead registry entries noticed while doing this (left alone, pre-existing):
 `DIVE_OVERRIDES['forretress-shadow-volt-switch-great-league']` and the

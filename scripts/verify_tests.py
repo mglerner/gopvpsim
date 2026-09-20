@@ -12,8 +12,17 @@ Two checks in one gate:
    5,400+ LOC of shipped JS with zero coverage (review finding F4).
    The per-test skipifs stay (dev machines without node still get a
    green local run); the GATE is where absence must be loud.
-2. ``pytest tests -q -m 'not slow'`` -- the ~44s tier. The ``slow``
-   marker holds the full gamemaster sweep; everything else runs.
+2. ``pytest tests -q -m 'not slow'`` -- the fast tier. The ``slow``
+   marker holds the full gamemaster sweep and the blob-backed render
+   tests; everything else runs.
+
+   BUDGET ~7 MINUTES, not the "~44s" this said until 2026-09-20 (397 s
+   measured that day on an idle 18-core machine, 549 s under load).
+   This gate runs twice around a bake -- once at the launch keyboard on
+   every publish path, once as the overnight chain's own last step --
+   so the stale number was ~10 minutes of unexplained wait, twice. If
+   it needs to come down, `@pytest.mark.render` on the newer
+   real-render tests is the lever.
 
 Exit 0 iff both pass.
 """
