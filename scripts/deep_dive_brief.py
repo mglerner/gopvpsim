@@ -177,12 +177,13 @@ BANNED_WORDS = (
     'reliable', 'consistent', 'worth', 'great', 'good', 'bad', 'should',
 )
 BANNED_EXEMPT_PHRASES = ('Great League', 'Ultra League', 'Master League')
-SHOULD_ALLOWED_PHRASE = 'most builds should clear'
-# The second allowed "should": the expert-dive opening sentence. Both are
-# scrubbed before the banned-word scan, and between them they may appear at
-# most once in a rendered section.
-SHOULD_ALLOWED_PATTERNS = (re.escape(SHOULD_ALLOWED_PHRASE),
-                           r'most\s+[^.;:]{1,140}?should have at least')
+# The one allowed "should": the expert-dive opening sentence. It is scrubbed
+# before the banned-word scan and may appear at most once in a rendered
+# section. The field-6 header's "what most builds should clear already" was
+# the second one until 2026-09-16 round 3, where it collided with the named
+# Builds three blocks above it ("does Build 2 clear it?") and was reworded to
+# the descriptive voice the rest of the page now uses.
+SHOULD_ALLOWED_PATTERNS = (r'most\s+[^.;:]{1,140}?should have at least',)
 
 # The three floor primitives, strongest first. A threshold is one of exactly
 # these: an EXACT clean cut (nothing below wins, everything at or above does),
@@ -4693,9 +4694,13 @@ def strip_badge(fl):
     return PRIMITIVE_HEADLINE_BADGE[fl['kind']]
 
 
-STRIP_LABELS_FLOOR = ('Line', 'Decides', 'Rank-1', 'Alternative',
+# 'SP1', not 'Rank-1': the strip is the FIRST place the section names the
+# stat-product rank-1 spread, and the which-build renderer marks the first
+# occurrence with the glossary definition, so the short form is defined
+# where a reader meets it (2026-09-17 round 6 review).
+STRIP_LABELS_FLOOR = ('Line', 'Decides', 'SP1', 'Alternative',
                       'Not claimed')
-STRIP_LABELS_NONE = ('Line', 'Closest', 'Rank-1', 'Alternative',
+STRIP_LABELS_NONE = ('Line', 'Closest', 'SP1', 'Alternative',
                      'Decision width')
 
 
@@ -5476,8 +5481,8 @@ def _f6_rungs_below(facts):
     # says which is which; the header no longer claims.
     lines = [f"Clean cuts holding between {pct(MATERIAL_LO, 0)} and "
              f"{pct(MATERIAL_HI, 0)} of the grid, ascending. The widest of "
-             f"them are what {SHOULD_ALLOWED_PHRASE} already; the narrow ones "
-             f"at the bottom of the table are not."]
+             f"them sit under nearly every spread on the grid; the narrow "
+             f"ones at the bottom of the table do not."]
     axis = (facts['floor']['axis'] if has_floor
             else facts.get('floor_axis', 'atk'))
     rows = [[stat_threshold_str(axis, r['printed'], r['dp']),
@@ -5980,8 +5985,12 @@ def _f14_how_sure(facts):
         # It names its SOURCE and its RELATION to the printed line: the same
         # sentence under agreement and disagreement would leave the reader
         # no cue which one they are looking at.
-        src = (f"the dive page's Matchup clusters section, which partitions "
-               f"this same grid by whole win/loss fingerprint across all "
+        # Named by where it is on the page, not by a section that no
+        # longer exists at the top level: the clusters are a subsection of
+        # "Which one to build?" now (2026-09-19 round-10 review).
+        src = (f"the dive page's matchup clusters, under \"Why these "
+               f"regions\", which partition this same grid by whole "
+               f"win/loss fingerprint across all "
                f"{_n(cc['n_scens'])} non-degenerate shield scenarios")
         if fl is None:
             lines.append(
@@ -5994,7 +6003,7 @@ def _f14_how_sure(facts):
             lines.append(
                 f"Independent check: {src}, also splits it on "
                 f"{AXIS_WORD[cc['stat']]} -- at {fmt(cc['value'])}, "
-                f"{fmt(gap)} {where} the line printed here "
+                f"{fmt(gap)} {where} the single-stat line "
                 f"(K={_n(cc['k'])}, silhouette {fmt(cc['sil'])}).")
         else:
             lines.append(

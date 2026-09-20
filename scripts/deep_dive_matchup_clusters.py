@@ -125,6 +125,25 @@ DEGEN_MIN_PATTERNS = 8
 # collide with an '{a}v{b}' label.
 ALL_SCEN_KEY = "all"
 ALL_SCEN_DISPLAY = "all scenarios"
+# One combined entry per Build-criteria preset (2026-09-16): the knob's
+# "all scenarios" partition is concatenated over the scenarios that preset
+# WEIGHTS, not over every non-degenerate one. The default preset keeps the
+# bare ALL_SCEN_KEY -- its partition is unchanged, byte for byte -- and the
+# others get a suffixed key in the same keyspace. '__' cannot appear in an
+# '{a}v{b}' label, so nothing can collide.
+ALL_SCEN_PRESET_SEP = "__"
+
+
+def all_scen_key(preset=None):
+    """The `scens` key holding the combined partition for one preset."""
+    if not preset or preset == 'flat':
+        return ALL_SCEN_KEY
+    return f"{ALL_SCEN_KEY}{ALL_SCEN_PRESET_SEP}{preset}"
+
+
+def is_all_scen_key(label):
+    return label == ALL_SCEN_KEY or label.startswith(
+        ALL_SCEN_KEY + ALL_SCEN_PRESET_SEP)
 
 # Decimal places the PAGE's stat arrays carry: deep_dive.py builds
 # DATA.ivAtk / ivDef as ``round(m[5], 2)``, and this section's tree is fitted
@@ -807,8 +826,8 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
     the explanation that follows it, not the headline.
     """
     finding = degenerate_finding(wins_lo, wins_hi, nO)
-    subj = ("opponent is a sharp marginal" if n_sharp == 1
-            else "opponents are sharp marginals")
+    subj = ("opponent is contested" if n_sharp == 1
+            else "opponents are contested")
     pat = "pattern" if n_patterns == 1 else "patterns"
     return (f"{finding}. Only {n_sharp} {subj} ({n_patterns} distinct win "
             f"{pat}), below the {DEGEN_MIN_SHARP}-opponent / "
@@ -818,7 +837,7 @@ def degenerate_reason(n_sharp, n_patterns, wins_lo, wins_hi, nO):
 
 
 def fragmented_reason(n_sharp, n_patterns, min_cluster_ivs,
-                      what="sharp marginal opponents"):
+                      what="contested opponents"):
     """The other honest no-clusters outcome: enough marginals, no partition.
 
     Distinct from ``degenerate_reason`` on purpose (Feraligatr UL 0v0: 12
@@ -930,7 +949,7 @@ def _scenario_entry(W, sharp, wr, atk, def_, hp, sp_rank, stats, is_named):
 
 def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                              atk, def_, hp, is_named,
-                             scen_pairs=None):
+                             scen_pairs=None, presets=None):
     """Run the full pipeline for EVERY shield scenario the dive baked, in
     grid order, plus a combined "all scenarios" entry.
 
@@ -1016,6 +1035,56 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
     # order the 113-bit reading is K=3 / 0.395 / atk < 148.68 / 0.961, which
     # is the same geometry under a different linkage tie-break and is why
     # that order is not left to chance.)
+    combined_entry = _combined(wins_by_scen, atk, def_, hp, sp_rank, stats,
+                               is_named, min_cluster_ivs, len(pairs))
+    if combined_entry is not None:
+        out[ALL_SCEN_KEY] = combined_entry
+    # ---- one more combined entry per Build-criteria preset ----
+    # ``presets`` is [(key, tag, scenario labels or None)] from the caller's
+    # own preset table (scripts/deep_dive_builds.PRESETS); the default preset
+    # is skipped because ALL_SCEN_KEY above already IS its partition. A
+    # preset weighting a single scenario has no combination to make -- the
+    # caller resolves it to that scenario's own entry, see
+    # :func:`resolve_all_scen_keys`.
+    for key, tag, want in (presets or []):
+        if all_scen_key(key) == ALL_SCEN_KEY:
+            continue
+        subset = [(lbl, W) for lbl, W in wins_by_scen if lbl in (want or ())]
+        if len(subset) < 2:
+            continue
+        entry = _combined(subset, atk, def_, hp, sp_rank, stats, is_named,
+                          min_cluster_ivs, len(subset))
+        if entry is not None:
+            out[all_scen_key(key)] = entry
+    return out
+
+
+def resolve_all_scen_keys(computed, presets):
+    """preset key -> the `scens` key its "all scenarios" view should draw.
+
+    A preset that weights two or more scenarios has its own combined entry.
+    One that weights exactly one (the 1v1-only preset) has no combination to
+    make, so its "all scenarios" view IS that scenario's own partition, and
+    the dropdown says so rather than drawing the nine-scenario partition
+    under a label claiming one.
+    """
+    out = {}
+    for key, _tag, want in presets:
+        k = all_scen_key(key)
+        if k in computed and 'res' in computed[k]:
+            out[key] = k
+            continue
+        live = [lbl for lbl in (want or []) if lbl in computed]
+        if len(live) == 1 and 'res' in computed[live[0]]:
+            out[key] = live[0]
+            continue
+        out[key] = ALL_SCEN_KEY if ALL_SCEN_KEY in computed else None
+    return out
+
+
+def _combined(wins_by_scen, atk, def_, hp, sp_rank, stats, is_named,
+              min_cluster_ivs, n_total):
+    """The concatenated-fingerprint entry over a set of scenarios."""
     cf = concat_fingerprint(wins_by_scen)
     if cf["W"] is not None:
         W_all = cf["W"]
@@ -1031,18 +1100,17 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                 "excluded": list(cf["excluded"]),
                 "n_bits": n_bits,
                 "bit_scen": list(cf["bit_scen"]), "bit_opp": list(bit_opp),
-                "n_total": len(pairs)}
+                "n_total": n_total}
         if entry is None:
-            out[ALL_SCEN_KEY] = {
+            return {
                 "reason": fragmented_reason(
                     n_bits, n_patterns_all, min_cluster_ivs,
-                    what="concatenated marginal-matchup bits"),
+                    what="concatenated contested-matchup bits"),
                 "degenerate": False, "combined": meta,
                 "n_sharp": n_bits, "n_patterns": n_patterns_all}
-        else:
-            entry["combined"] = meta
-            out[ALL_SCEN_KEY] = entry
-    return out
+        entry["combined"] = meta
+        return entry
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1058,6 +1126,33 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
 # the best-buddy L51 pass renders this section into an inert <template>, and
 # carrying the payload inside the section keeps the L50/L51 variants
 # self-contained across the innerHTML swap.
+
+# 2026-09-19 round 9 (Michael): this content is a SUBSECTION of "Which one
+# to build?" -- it renders into that section's "Why these regions" expander,
+# which supplies the heading and the collapsible. Round 7's own top-level
+# <details id="dd-matchup-clusters-section">, its summary note and its
+# opening nine-mini figure are gone: the figure was the same nine scenarios
+# on the same x axis as the section's own grid directly above it, and the two
+# are one grid now (deep_dive_engine.js `_wbAllScen`). `.dd-mc-root` is still
+# the root the engine's lazy-render hook looks for, unchanged.
+SECTION_TITLE = "Matchup clusters"
+SECTION_SUMMARY_BASE = "IVs grouped by which contested matchups they win"
+
+
+def _section_open(grid_nS):
+    """The clusters body, open.
+
+    Round 9 (Michael's 2026-09-19 decision (b)): this is a SUBSECTION of
+    "Which one to build?" -- it renders inside that section's "Why these
+    regions" expander, which supplies the heading, the collapsible and the
+    summary line. So no ``<details>``, no ``dd-h2`` and no summary note here;
+    ``grid_nS`` is kept in the signature because the caller still passes the
+    dive's baked scenario count, and dropping it would be a second edit in
+    every call site for no gain.
+    """
+    return (f'<div class="dd-section dd-mc-root" id="dd-matchup-clusters">'
+            f'<!-- matchup-clusters:v1 -->')
+
 
 def _esc(s):
     return _html.escape(str(s), quote=True)
@@ -1121,13 +1216,31 @@ def _swatch(c):
             f'margin-right:4px"></span>')
 
 
-def _scen_display(label):
+def preset_tags(presets):
+    """preset key -> the words its display label carries ("even shields").
+
+    Passed down explicitly rather than stashed on the module: label text
+    that depended on process-global state seeded by an earlier call made
+    :func:`_scen_display` return a different string depending on call order
+    (2026-09-16 review; the test had to prime the table before asserting).
+    """
+    return {k: tag for k, tag, _want in (presets or [])}
+
+
+def _scen_display(label, tags=None):
     """Dropdown / headline text for a scenario key.
 
     One definition for both surfaces, so the selector and the block it
     selects cannot spell the same scenario two ways.
     """
-    return ALL_SCEN_DISPLAY if label == ALL_SCEN_KEY else f'{label} shields'
+    if label == ALL_SCEN_KEY:
+        return ALL_SCEN_DISPLAY
+    if is_all_scen_key(label):
+        key = label.split(ALL_SCEN_PRESET_SEP, 1)[1]
+        return f'{ALL_SCEN_DISPLAY} ({(tags or {}).get(key, key)})'
+    return f'{label} shields'
+
+
 
 
 def _scen_short_note(entry):
@@ -1143,27 +1256,13 @@ def _scen_short_note(entry):
     if entry.get("combined"):
         unit = "bit" if n == 1 else "bits"
     else:
-        unit = "marginal" if n == 1 else "marginals"
+        unit = "contested" if n == 1 else "contested"
     pat = "pattern" if p == 1 else "patterns"
     if entry.get("degenerate"):
         return f'degenerate ({n} {unit} / {p} {pat})'
     return f'no clusters ({n} {unit} / {p} {pat}, too fragmented)'
 
 
-def _scen_option_note(entry):
-    """What a dropdown option carries after the scenario name.
-
-    A clustered scenario carries its QUALITY (K and silhouette), so the list
-    itself is the one-glance "where is the structure on this page" view --
-    the section's default is the combined entry, which is routinely the
-    least separated partition on the page, and without this a reader has no
-    signal that a single scenario separates twice as cleanly one click away.
-    A scenario with no clusters carries its counts instead.
-    """
-    if "res" in entry:
-        return (f' (K={entry["res"]["k"]}, silhouette '
-                f'{entry["res"]["silhouette"]:.2f})')
-    return f' - {_scen_short_note(entry)}'
 
 
 def _entry_opp_names(entry, disp):
@@ -1182,8 +1281,8 @@ def _entry_opp_names(entry, disp):
             for o, lbl in zip(comb["bit_opp"], comb["bit_scen"])]
 
 
-def _scen_headline(label, entry, nO):
-    disp = _scen_display(label)
+def _scen_headline(label, entry, nO, tags=None):
+    disp = _scen_display(label, tags)
     if "reason" in entry:
         # Every reason string is a finding-first sentence carrying its own
         # counts (see degenerate_reason / fragmented_reason), so nothing is
@@ -1195,7 +1294,7 @@ def _scen_headline(label, entry, nO):
     if comb:
         excl = (' (' + _esc(', '.join(comb["excluded"])) +
                 ' excluded as degenerate)') if comb["excluded"] else ''
-        head = (f'{comb["n_bits"]} win/loss bits (one per sharp marginal '
+        head = (f'{comb["n_bits"]} win/loss bits (one per contested '
                 f'opponent per scenario) concatenated across '
                 f'{len(comb["scens"])} of {comb["n_total"]} shield '
                 f'scenarios{excl}')
@@ -1203,7 +1302,7 @@ def _scen_headline(label, entry, nO):
         wr = entry["wr"]
         n_win = int((wr == 1.0).sum())
         n_loss = int((wr == 0.0).sum())
-        head = (f'{len(res["sharp"])} sharp marginal opponents '
+        head = (f'{len(res["sharp"])} contested opponents '
                 f'of {nO} ({n_win} always-win / {n_loss} always-lose at '
                 f'every IV)')
     sil = res["silhouette"]
@@ -1227,7 +1326,7 @@ def _scen_headline(label, entry, nO):
             f'K={res["k"]} clusters ({sil_txt}){root_txt}.</p>')
 
 
-def _sharpest_signpost(computed):
+def _sharpest_signpost(computed, tags=None):
     """Point the reader at the sharpest SINGLE scenarios, from the combined block.
 
     The combined view is the section's default and is routinely the LEAST
@@ -1255,9 +1354,9 @@ def _sharpest_signpost(computed):
     for sil, lbl, e in ranked[:2]:
         split = e.get("root_split")
         n = len(e["res"]["sharp"])
-        bits.append(f'{_esc(_scen_display(lbl))} (K={e["res"]["k"]}, '
-                    f'silhouette {sil:.2f} over {n} sharp '
-                    f'{"marginal" if n == 1 else "marginals"}'
+        bits.append(f'{_esc(_scen_display(lbl, tags))} (K={e["res"]["k"]}, '
+                    f'silhouette {sil:.2f} over {n} contested '
+                    f'{"opponent" if n == 1 else "opponents"}'
                     + (f', split {_esc(split)}' if split else '') + ')')
     return (f'<p style="font-size:12px;color:var(--text-muted)">Sharpest '
             f'single scenarios on this page: {" and ".join(bits)} -- pick '
@@ -1290,11 +1389,11 @@ def _cluster_table(entry, opp_names):
             f'<td style="text-align:right">{c["mean_marginal_wins"]:.1f}</td>'
             f'<td>{gtxt}</td></tr>')
     return (
-        '<table class="dd-table dd-narrow"><thead><tr>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead><tr>'
         '<th>Cluster</th><th>IVs</th><th>atk (mean)</th><th>def (mean)</th>'
-        '<th>hp (mean)</th><th>SP rank</th><th>marginal wins (mean)</th>'
+        '<th>hp (mean)</th><th>SP rank</th><th>contested wins (mean)</th>'
         '<th>gains vs previous cluster</th>'
-        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>")
 
 
 def _winrate_grid(entry, opp_names):
@@ -1310,12 +1409,12 @@ def _winrate_grid(entry, opp_names):
         rows.append(f"<tr><td>{_esc(opp_names[o])}</td>{cells}</tr>")
     return (
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
-        'font-size:13px">Per-cluster win rates vs each marginal opponent'
+        'font-size:13px">Per-cluster win rates vs each contested opponent'
         '</summary>'
-        '<table class="dd-table dd-narrow"><thead>'
-        f'<tr><th>Marginal opponent</th>{head}</tr></thead><tbody>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead>'
+        f'<tr><th>Contested opponent</th>{head}</tr></thead><tbody>'
         + "".join(rows) +
-        '</tbody></table>'
+        '</tbody></table></div>'
         '<p style="font-size:12px;color:var(--text-muted)">Green tint = the '
         'cluster mostly wins that matchup, red tint = mostly loses; the '
         'percentage is the share of the cluster\'s IVs that win.</p>'
@@ -1379,18 +1478,18 @@ def _flip_table_html(entry, opp_names, has_anchors):
         '</summary>'
         '<p style="font-size:12px;color:var(--text-muted)">'
         f'{_esc(BEST_RULE_TIP)}</p>'
-        '<table class="dd-table dd-narrow"><thead><tr>'
-        '<th>Marginal opponent</th><th>Win rate</th>'
+        '<div class="dd-mc-wide"><table class="dd-table dd-narrow"><thead><tr>'
+        '<th>Contested opponent</th><th>Win rate</th>'
         f'<th title="{_esc(BEST_RULE_TIP)}">Best single-stat rule</th>'
         '<th>Rule accuracy</th><th>Named anchor?</th>'
-        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>"
         f'<p style="font-size:12px;color:var(--text-muted)">{foot}</p>'
         '</details>')
 
 
 def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
                    data_obj, opp_label, moveset_label, resolved_anchors,
-                   bait_label='bait-selective'):
+                   bait_label='bait-selective', presets=None):
     """Render the Matchup clusters section (HTML string).
 
     Replaces the retired experimental banding/gap-cluster block as the first
@@ -1422,16 +1521,21 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
 
     computed = compute_matchup_clusters(
         scores_flat, nIvs, nS, nO, scenarios,
-        data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named)
+        data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named,
+        presets=presets)
     if not computed:
-        return ('<div class="dd-section" id="dd-matchup-clusters">'
-                '<!-- matchup-clusters:v1 -->'
-                '<h2 class="dd-h2">Matchup clusters</h2>'
-                '<p style="font-size:13px;color:var(--text-muted)">Not '
+        return (_section_open(0)
+                + '<p style="font-size:13px;color:var(--text-muted)">Not '
                 'available: this dive baked no shield scenarios to cluster.'
                 '</p></div>\n')
 
+    _tags = preset_tags(presets)
     scen_labels = list(computed.keys())
+    # Every per-preset combined entry gets its own server-side block, because
+    # the tables under the panels have to be the tables for the partition on
+    # screen; which one is shown follows the section's one Shield-scenario
+    # control through ``_wbSyncScen`` -> ``mcSetScenario``.
+    all_by_preset = resolve_all_scen_keys(computed, presets or [])
     # Default view: the combined entry when it clustered (it is the
     # section's own question -- which fights do you win across every shield
     # state -- asked once), then 1v1 (the status quo default, and the
@@ -1451,9 +1555,13 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # in `degenerate` so the mini-grid can title them honestly without the
     # overlay ever finding a labelless entry.
     payload = {"palette": CLUSTER_PALETTE, "default": default_scen,
-               "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {}}
+               "allKey": ALL_SCEN_KEY, "scens": {}, "degenerate": {},
+               # preset key -> the `scens` key its "all scenarios" view
+               # draws. ``allLabelByPreset`` went with the <option> it
+               # re-labelled (round 10: one scenario control per section).
+               "allByPreset": all_by_preset}
     for lbl, entry in computed.items():
-        disp_lbl = _scen_display(lbl)
+        disp_lbl = _scen_display(lbl, _tags)
         if "res" not in entry:
             payload["degenerate"][lbl] = {
                 "display": disp_lbl, "reason": entry["reason"],
@@ -1483,47 +1591,15 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             "display": disp_lbl,
         }
 
-    parts = ['<div class="dd-section dd-mc-root" id="dd-matchup-clusters">',
-             '<!-- matchup-clusters:v1 -->',
-             '<h2 class="dd-h2">Matchup clusters</h2>']
-    parts.append(
-        '<p style="font-size:13px">IVs grouped by <b>which marginal '
-        'matchups they win</b> (their win/loss fingerprint over the '
-        'opponents that some IVs beat and others don\'t), instead of by '
-        'average score. Clusters largely correspond to stat-threshold '
-        'regions (see each scenario\'s stat-rules accuracy below): '
-        'crossing a breakpoint or bulkpoint typically moves an IV to the '
-        'next cluster, gaining a named set of matchups and sometimes '
-        'trading others away.</p>')
-    parts.append(
-        '<p style="font-size:13px">Every shield scenario the dive baked is '
-        'clustered separately -- including the lopsided ones, which are '
-        'often the sharpest partition on the page; compare the silhouettes '
-        'in the dropdown below -- plus an '
-        f'<b>{ALL_SCEN_DISPLAY}</b> view that concatenates every '
-        'non-degenerate scenario\'s marginal-matchup bits into one '
-        'fingerprint. That combined view is not an average of scores: it is '
-        '"which fights do you win across every shield state", asked once. '
-        'Scenarios with too little structure to cluster are listed with '
-        'their counts rather than hidden.</p>')
-    parts.append(
-        f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
-        f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
-        f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
-        f'play, over the full opponent pool; this section does not follow '
-        f'the scatter\'s moveset / opponent-IV / bait dropdowns or the '
-        f'opponent filter.</p>')
-
-    # scenario selector (server-side blocks + client panels both follow it)
-    opts = "".join(
-        f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
-        f'{_esc(_scen_display(lbl))}'
-        f'{_esc(_scen_option_note(computed[lbl]))}</option>'
-        for lbl in scen_labels)
-    parts.append(
-        '<label style="font-size:13px">Shield scenario: '
-        '<select class="dd-mc-scen" onchange="if(window.mcSelectScenario)'
-        'mcSelectScenario(this)">' + opts + '</select></label>')
+    parts = [_section_open(nS if nS > 1 else 0)]
+    # No intro paragraphs, no dropdown, no provenance line HERE. Round 9
+    # moved this body inside "Which one to build?" -> "Why these regions",
+    # whose own lead is the one sentence that says what the clusters are;
+    # round 8's ~150-word intro then stood between that lead and the first
+    # panel (2026-09-19 round-10 review, major 6). The second "Shield
+    # scenario:" <select> went with them: the section has ONE scenario
+    # control (``select.wb-scen``), and ``_wbSyncScen`` drives these blocks
+    # from it. The provenance sentence is emitted LAST, under the tables.
 
     # three stat-plane panels (client-rendered)
     parts.append(
@@ -1565,25 +1641,55 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
     # per-scenario server-side blocks
     for lbl, entry in computed.items():
         vis = "block" if lbl == default_scen else "none"
+        # A per-preset combined block prints its OWN clusters and its OWN
+        # stat rules -- the two things that describe the partition on screen
+        # -- and stops there. Its per-bit win-rate grid and flip table would
+        # be ~36 KB of a page that already carries the default combined
+        # view's, twice (the best-buddy pass re-parents the section into an
+        # inert <template>), for a second reading of the same bits under a
+        # different grouping. The note below says what is not printed and
+        # where the full tables are; nothing here is shown for a partition
+        # it does not belong to.
+        short_form = lbl != ALL_SCEN_KEY and is_all_scen_key(lbl)
         parts.append(f'<div class="dd-mc-scen-block" data-scen="{lbl}" '
                      f'style="display:{vis}">')
-        parts.append(_scen_headline(lbl, entry, nO))
+        parts.append(_scen_headline(lbl, entry, nO, _tags))
         if lbl == ALL_SCEN_KEY:
-            parts.append(_sharpest_signpost(computed))
+            parts.append(_sharpest_signpost(computed, _tags))
         if "res" in entry:
             names = _entry_opp_names(entry, disp)
             parts.append(_cluster_table(entry, names))
-            parts.append(_winrate_grid(entry, names))
-            parts.append(_rules_block(entry))
-            parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
+            if short_form:
+                parts.append(_rules_block(entry))
+                parts.append(
+                    '<p style="font-size:12px;color:var(--text-muted)">'
+                    'This is the Build criteria setting\'s own combined '
+                    'partition: the clusters and the stat rules above are '
+                    'its own. The per-matchup win-rate grid and the flip '
+                    f'table are printed for the {_esc(ALL_SCEN_DISPLAY)} '
+                    'view, over every non-degenerate scenario\'s bits -- a '
+                    'different set of columns from this one, which is why '
+                    'they are not repeated here.</p>')
+            else:
+                parts.append(_winrate_grid(entry, names))
+                parts.append(_rules_block(entry))
+                parts.append(_flip_table_html(entry, names, bool(anchor_opps)))
         parts.append('</div>')
+
+    parts.append(
+        f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
+        f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
+        f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
+        f'play, over the full opponent pool; this does not follow '
+        f'the scatter\'s moveset / opponent-IV / bait dropdowns or the '
+        f'opponent filter.</p>')
 
     knobs = cluster_params()   # every number quoted below comes from them
     parts.append(
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
         'font-size:13px">How this works</summary>'
         '<p style="font-size:12px;color:var(--text-muted)">'
-        'Per shield scenario: an opponent is a <b>sharp marginal</b> when '
+        'Per shield scenario: an opponent is <b>contested</b> when '
         f'between {knobs["sharp_lo_pct"]}% and {knobs["sharp_hi_pct"]}% of '
         'this dive\'s IV spreads beat it (everyone '
         'else is settled and can\'t distinguish IVs). Each IV\'s '
@@ -1600,12 +1706,12 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         f'{knobs["sil_epsilon"]} of the best silhouette wins). Silhouettes '
         'are comparable between the scenarios on this page, not between '
         'species. Clusters are ordered weakest to '
-        'strongest by mean marginal wins. The scatter panels project the '
+        'strongest by mean contested wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
         'that overlap completely in score separate cleanly there. A '
         'scenario is reported as <b>degenerate</b> (no clustering '
         'attempted) when it has fewer than '
-        f'{knobs["degen_min_sharp"]} sharp marginals or fewer than '
+        f'{knobs["degen_min_sharp"]} contested opponents or fewer than '
         f'{knobs["degen_min_patterns"]} distinct win patterns -- on that '
         'little data every candidate K scores near-perfectly, which is a '
         'measurement artifact and not structure -- and its bits are left '

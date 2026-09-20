@@ -608,10 +608,7 @@ DEFAULT_CARD_ROBUST_K = 512
 
 # Moved to deep_dive_lib/render.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
-REC_DISTINCTNESS_MIN_SYMDIFF = render.REC_DISTINCTNESS_MIN_SYMDIFF
 REC_MAX_SPREADS = render.REC_MAX_SPREADS
-REC_STRONG_POOL_N = render.REC_STRONG_POOL_N
-REC_NOTABLE_MAX_CLEAR_FRAC = render.REC_NOTABLE_MAX_CLEAR_FRAC
 REC_TWO_ONES_MIN_WINRATE_GAP = render.REC_TWO_ONES_MIN_WINRATE_GAP
 
 # Moved to deep_dive_lib/robustness.py (Worlds 2026 robustness split,
@@ -1364,7 +1361,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               opp_movesets=None, mechanics='legacy',
                               best_buddy=None, slayer_iter_result_l51=None,
                               cup=None, cup_label=None,
-                              which_build_html=None):
+                              which_build_html=None,
+                              which_build_presets=None,
+                              which_build_cards=None,
+                              ):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -1388,6 +1388,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         is computed from; emitted verbatim just above the scatter controls.
         None = the section is omitted, which is what a dive with no replay
         blob path gets.
+
+    which_build_cards: optional list of dive-card spreads taken from THIS
+        moveset's builds (scripts/deep_dive_which_build.card_specs). When
+        present the card headlines one spread per named build plus the two
+        standouts, and the same spreads drive the scatter's "Spec Card
+        Spreads" overlay and the opponent-threat chips. None (or []) falls
+        back to the composite-score top picks (the stat-extreme POLES this
+        used to fall back to were retired 2026-09-17).
+
     """
     opp_iv_modes = opp_iv_modes or ['pvpoke']
     shield_scenarios = shield_scenarios or [(1, 1)]
@@ -2296,7 +2305,23 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if which_build_html:
         html += which_build_html
 
+    # "Matchup clusters" -- round 9 (Michael's 2026-09-19 decision (b)): no
+    # longer a section of its own. The slot it fills is emitted INSIDE the
+    # "Which one to build?" section, in its "Why these regions" expander
+    # (deep_dive_which_build.CLUSTERS_SLOT), so the content lands there and
+    # the page's top level carries one collapsible instead of two. The
+    # fallback below keeps a page with no build brief (no replay blob) from
+    # losing the clusters entirely.
+    if not which_build_html:
+        html += '<!-- MATCHUP_CLUSTERS_SLOT -->'
+
     # Controls
+    # The Build-criteria presets this page's section actually produced, in
+    # the preset table's own order. Empty when there is no section, or when
+    # the section rendered but compute_builds failed: the knob and the
+    # weighted Shields entry both hang off this, never off "a section exists".
+    _live_presets = [k for k, _l, _s, _t in _build_presets()
+                     if k in set(which_build_presets or ())]
     html += '<div class="controls" id="dd-scatter">\n'
     if split_info is not None:
         # URL-navigating dropdown: onchange jumps to a sibling HTML file
@@ -2326,12 +2351,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     if n_scenarios > 1:
         html += '  <label>Shields: <select id="scenario-sel" onchange="updateView()">\n'
-        html += '    <option value="avg">All (avg)</option>\n'
+        # 'avg' is the unchanged all-nine-equal entry, renamed so the second
+        # entry below cannot be read as the same thing: the weighted one
+        # follows the page's Build criteria preset, this one never moves.
+        html += '    <option value="avg">All (equal weight)</option>\n'
+        html += _wbavg_option(_live_presets)
         for si, scen in enumerate(shield_scenarios):
             sel = ' selected' if n_scenarios == 1 else ''
             html += (f'    <option value="{si}"{sel}>'
                      f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
+        html += _build_criteria_select(_live_presets)
 
     if len(opp_iv_modes) > 1:
         _base_modes = list(dict.fromkeys(
@@ -2402,6 +2432,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # back up to the control strip to pin a specific IV.)
     # (Top-IVs table controls live next to the table itself - see the
     # control strip rendered just before <div id="summary"> below.)
+    html += _build_criteria_note(_live_presets)
     if thresholds:
         html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
@@ -2486,7 +2517,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '        <label>HP <input id="manual-hp" type="number" '
             'min="0" max="15" value="15" style="width:48px"></label>\n'
             '        <label>Level <input id="manual-level" type="number" '
-            'min="1" max="51" step="0.5" value="50" style="width:60px"></label>\n'
+            'min="1" max="51" step="0.5" placeholder="current" '
+            'title="Current level, optional. Blank = the highest level under '
+            'this league\'s cap, which is what the page assumes." '
+            'style="width:64px"></label>\n'
             '        <label><input id="manual-shadow" type="checkbox"> '
             'Shadow</label>\n'
             '        <button id="manual-add-btn" type="button">Add</button>\n'
@@ -2561,20 +2595,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'style="display:flex;justify-content:flex-end;align-items:center;'
         'gap:4px;margin:6px 20px 0 0;font-size:12px;color:var(--text)">\n'
     )
-    # All-scenarios small-multiples toggle (Michael 2026-08-25): a
-    # lazily-rendered 3x3 grid of simplified per-scenario scatters built
-    # from the ALREADY-EMBEDDED score arrays -- no page re-render, no
-    # state change; the panel matching the Shields dropdown gets a
-    # highlight, and clicking a panel selects it. Lives left-aligned in
-    # the strip under the plot (before Highlight IVs), with the grid
-    # container BELOW the strip so the checkbox doesn't jump when the
-    # grid opens.
-    if n_scenarios > 1:
-        html += ('  <label class="dd-allscen" style="display:flex;'
-                 'align-items:center;gap:4px;margin-right:auto">'
-                 '<input type="checkbox" id="allscen-toggle" '
-                 'onchange="toggleAllScenarios()"> '
-                 'Show all shield scenarios</label>\n')
+    # (The all-scenarios small-multiples toggle used to live here, left-
+    # aligned in this strip, with its 3x3 grid below it. Round 7 moved it
+    # into the Matchup clusters section; round 9 merged that grid with the
+    # "Which one to build?" section's own into ONE grid, which is now the
+    # third tab of that section's one figure --
+    # deep_dive_which_build.plotbox_html + deep_dive_engine.js `_wbAllScen`,
+    # parameterised by a Y mode and a colour mode. The old ids
+    # (#allscen-toggle, #allscen-grid), the checkbox and
+    # `_allscen_figure` are all deleted.)
     html += (
         '  <label style="display:flex;align-items:center;gap:4px">'
         'Highlight IVs: '
@@ -2592,24 +2621,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>\n'
         '</div>\n'
     )
-    if n_scenarios > 1:
-        # Caption first, then the grid. The minis plot the AVERAGED score on
-        # y (that is what this strip has always shown) while their colors
-        # come from the Matchup clusters section, whose bands are horizontal
-        # only on a win-count axis -- so the caption says where to look for
-        # the bands rather than letting the smear read as the clustering.
-        html += ('<p id="allscen-note" style="display:none;font-size:11px;'
-                 'color:var(--text-muted);margin:6px 0 0 0">Each mini plots '
-                 'average score against stat-product rank, colored by that '
-                 'scenario\'s own matchup clusters (title: K, silhouette '
-                 'and the first stat split). On this y-axis the clusters '
-                 'smear rather than band -- the Matchup clusters section '
-                 'below, and the main plot on a win-count y-axis, show them '
-                 'as bands. Click a mini to select that shield scenario.'
-                 '</p>\n')
-        html += ('<div id="allscen-grid" style="display:none;'
-                 'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
-                 '</div>\n')
     # Top-IVs table controls. Sit immediately above the table they
     # affect (the #summary div). The "Sort by" UX is column-header
     # clicks (see _summarySortClick in deep_dive_engine.js); only the
@@ -2707,7 +2718,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     import deep_dive_card as _ddcard
 
     def _render_level_body(dobj, sarr, *, write_card_out, robust_max_level,
-                           base_scores, base_info):
+                           base_scores, base_info, builds_pinned=False):
         """Render one level's prose sections + dive card from
         (data_obj, score_arrays). Mutates ``dobj`` (narrative flavors / tier
         renames, pops _cardCtx). Returns
@@ -2727,12 +2738,27 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
                     f"{_time.time() - _n0:.1f}s")
         sink = {}
+        mc_sink = {}
         a_css, r_html, an_html = generate_analysis_sections(
             dobj, sarr, 0, opp_iv_modes[0], shield_scenarios, opponent_names,
             slayer_iter_result=slayer_iter_result, has_toml_tiers=has_toml_tiers,
             anchor_passing_sink=sink, threshold_registry=threshold_registry,
             moveset0_flavors_for_rename=ms0_flavors, focal_shadow=shadow,
-            scores_base_arrays=base_scores, base_form_info=base_info)
+            scores_base_arrays=base_scores, base_form_info=base_info,
+            # BOTH passes get the same spreads. The builds -- and the
+            # "Which one to build?" section itself -- are computed once, at
+            # the LEAGUE CAP; the best-buddy card shows the same build
+            # spreads with L51 stats and says on the card that the builds
+            # are pinned to the cap. Passing None here instead left the
+            # RETIRED stat-extreme poles ("MATCHUP HUNTER" / "MAX BULK") as
+            # the best-buddy card, above an L50 builds section, with none of
+            # the guarantee lines (2026-09-16 round-3 review).
+            card_builds=which_build_cards,
+            card_builds_pinned=builds_pinned,
+            # Round 7: the Matchup clusters section comes back HERE instead
+            # of inside an_html, so this function's caller can drop it into
+            # the slot above the scatter controls.
+            clusters_sink=mc_sink)
         if split_info is not None:
             _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
             assert _expected in r_html, (
@@ -2815,7 +2841,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 except OSError as _e:  # noqa: BLE001
                     logger.warning(f"  dive card: could not write "
                                    f"{card_out_path}: {_e}")
-        return r_html, an_html, card_section, a_css, sink
+        return (r_html, an_html, card_section, a_css, sink,
+                mc_sink.get('html', ''))
 
     # Snapshot a CLEAN L51 data_obj + score arrays BEFORE the level-default
     # pass mutates data_obj (tier renames, pasteTiers, _cardCtx). Done here so
@@ -2834,7 +2861,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                    for mode in opp_iv_modes if mode in md['scores_l51']}
 
     # ---- Level-default pass: drives the embedded DATA + scatter ----
-    results_html, analysis_html, _card50_html, analysis_css, _sink50 = \
+    (results_html, analysis_html, _card50_html, analysis_css, _sink50,
+     _clusters50) = \
         _render_level_body(
             data_obj, score_arrays, write_card_out=True, robust_max_level=None,
             base_scores=scores_base_arrays, base_info=base_form_info)
@@ -2855,10 +2883,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # #dd-bb-prose-host / #dd-bb-prose-tmpl, never at document level, so
         # each guard view still sees exactly one copy per slug.
         rendering.reset_opp_anchor_registry()
-        _results51, _analysis51, _card51_html, _, _ = _render_level_body(
+        (_results51, _analysis51, _card51_html, _, _,
+         _clusters51) = _render_level_body(
             _dobj51, _sarr51, write_card_out=False,
             robust_max_level=best_buddy.get('alt_cap'),
-            base_scores=None, base_info=None)
+            base_scores=None, base_info=None, builds_pinned=True)
 
     # ---- Dive card injection (host + optional L51 template for the toggle) ----
     if _card50_html:
@@ -2875,6 +2904,23 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Drop the marker if no card was injected (card disabled) so no stray
     # comment ships.
     html = html.replace('<!-- DIVE_CARD_SLOT -->', '', 1)
+
+    # ---- Matchup clusters injection (round 7) ----
+    # Same host/<template> shape the prose and the card use, for the same
+    # reason: the L51 pass renders a second copy of the section, with its own
+    # element ids, and only one of the two is ever in the document. The pair
+    # is registered in deep_dive_engine.js (_bbInitHost), which is where
+    # tests/test_dive_dom_ids.py reads the host list from.
+    if _clusters50:
+        if _bb_active:
+            _mc_block = (
+                f'<div id="dd-bb-clusters-host" class="dd-bb-host">'
+                f'{_clusters50}</div>'
+                f'<template id="dd-bb-clusters-tmpl">{_clusters51}</template>')
+        else:
+            _mc_block = _clusters50
+        html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', _mc_block, 1)
+    html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', '', 1)
 
     # Results section is always visible; analysis is behind a toggle. When the
     # best-buddy toggle is active the L50 prose is live and the L51 prose rides
@@ -3424,10 +3470,83 @@ def article_slug_from_thresholds(species, shadow=False, thresholds_dir=None):
     return _raw.get(_key, {}).get('article', {}).get('slug', '')
 
 
+def _build_presets():
+    """The three Build-criteria presets, from their one definition.
+
+    ``scripts/deep_dive_builds.PRESETS`` owns the table -- the section ranks
+    builds with it, the clusters section bakes one combined partition per
+    entry, and this dropdown lists it. A literal list here would be a fourth
+    copy of the same three strings.
+    """
+    import deep_dive_builds
+    return deep_dive_builds.PRESETS
+
+
+def _bc_esc(s):
+    from html import escape
+    return escape(str(s), quote=True)
+
+
+# The three Build-criteria surfaces in the controls strip, as functions of
+# the presets THIS PAGE'S section actually built. Split out of
+# generate_interactive_html so the emitted markup is testable without a full
+# dive render: the 2026-09-16 review found the knob offering presets the
+# payload had dropped, which left the section, the clusters view and the
+# Shields entry in three different states with nothing on the page saying so.
+
+def _wbavg_option(live_presets):
+    """The Shields dropdown's weighted entry. 'avg' above it never moves."""
+    if not live_presets:
+        return ''
+    return '    <option value="wbavg">All (by build criteria)</option>\n'
+
+
+def _build_criteria_select(live_presets):
+    """The knob, listing only the presets this page can actually switch to."""
+    if not live_presets:
+        return ''
+    out = ('  <label>Build criteria: <select id="build-criteria-sel" '
+           'onchange="wbSetPreset(this.value)">\n')
+    for key, label, _scens, _tag in _build_presets():
+        if key not in live_presets:
+            continue
+        out += f'    <option value="{key}">{_bc_esc(label)}</option>\n'
+    return out + '  </select></label>\n'
+
+
+def _build_criteria_note(live_presets):
+    """What the knob drives, in one line, right where the knob is.
+
+    The closing sentence used to read "every other section counts all nine
+    shield scenarios equally", which is not true of Threats / Rank Volatility
+    / Matchup clusters -- each has its own per-scenario views. What IS true
+    is that nothing else re-weights by this knob.
+    """
+    if not live_presets:
+        return ''
+    return ('  <span style="font-size:11px;color:var(--text-muted);'
+            'margin-left:8px;flex-basis:100%">Build criteria weights '
+            'shield scenarios in: Which one to build?, the all-scenarios '
+            'clusters, and Shields = All (by build criteria). Nothing else '
+            'on this page is re-weighted by it.</span>\n')
+
+
 def _which_build_sections(state):
     """Pre-render the "Which one to build?" section for every moveset.
 
-    Returns ``{arm index: html}``. The brief is computed from the replay
+    Returns ``({arm index: html}, {arm index: [live preset key]},
+    {arm index: [card spec]})``. The fourth map -- every build's membership,
+    for the retired "Top Picks" cards' "in Build 1" / "in no build" label --
+    went with those cards on 2026-09-17 (round 8 item 2). The preset keys are
+    what the controls
+    strip's Build-criteria dropdown offers: a preset that weights no
+    scenario this dive baked never reaches the payload, so an option for it
+    would leave three surfaces in a state nothing on the page explains. The
+    card specs are the dive card's spreads, taken from the same builds the
+    section prints (2026-09-16 review item 6), so the card at the top of the
+    page and the section below it cannot name different spreads.
+
+    The brief is computed from the replay
     BLOB (scripts/deep_dive_brief.py reads the whole score cube out of it),
     so this is the only layer that can build it: ``generate_interactive_html``
     sees one file's slice of the moveset data and never the blob.
@@ -3448,7 +3567,7 @@ def _which_build_sections(state):
     if not blob_path:
         logger.info("  Which one to build?: skipped (no replay blob path on "
                     "this render; the brief is computed from the blob)")
-        return {}
+        return {}, {}, {}
     # How many movesets each FILE will embed. Split mode gives every file
     # exactly one; a single-file dive embeds them all behind a Moveset
     # dropdown this section does not follow, and the note under the panel
@@ -3459,13 +3578,20 @@ def _which_build_sections(state):
     try:
         import deep_dive_which_build as which_build
         all_facts = which_build.prepare(state, blob_path)
-        return {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
+        html = {arm: which_build.section_html(all_facts, arm, moveset_idx=0,
                                               page_movesets=per_file)
                 for arm in range(len(all_facts))}
+        presets = {arm: list((all_facts[arm].get('_builds') or {})
+                             .get('presets', {}))
+                   for arm in range(len(all_facts))}
+        cards = {arm: which_build.card_specs(all_facts[arm],
+                                             all_facts[arm].get('_builds'))
+                 for arm in range(len(all_facts))}
+        return html, presets, cards
     except Exception as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
-        return {}
+        return {}, {}, {}
 
 
 def render_dive_html(state):
@@ -3482,7 +3608,8 @@ def render_dive_html(state):
             state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
-    which_build = _which_build_sections(state)
+    (which_build, which_build_presets,
+     which_build_cards) = _which_build_sections(state)
     if state['split_movesets'] and len(moveset_data) > 1:
         # Per-moveset split: emit N files, one per moveset. The
         # filesystem plan is computed up-front so every file
@@ -3534,6 +3661,8 @@ def render_dive_html(state):
                 cup=state.get('cup'),
                 cup_label=state.get('cup_label'),
                 which_build_html=which_build.get(mi),
+                which_build_presets=which_build_presets.get(mi),
+                which_build_cards=which_build_cards.get(mi),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -3568,6 +3697,8 @@ def render_dive_html(state):
             cup=state.get('cup'),
             cup_label=state.get('cup_label'),
             which_build_html=which_build.get(0),
+            which_build_presets=which_build_presets.get(0),
+            which_build_cards=which_build_cards.get(0),
         )
 
 

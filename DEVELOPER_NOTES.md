@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2654<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2825<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -1286,6 +1286,275 @@ moveset-0's). The cache is removed; a tripwire assertion in
 subheader names that file's moveset. Split dives published before the
 fix carry moveset-0 analysis on their non-landing pages and need a
 re-render to correct.
+
+## Dive-card spreads: the poles are retired (2026-09-17)
+
+Four surfaces used to name "the spreads this page is about", and they did
+not agree:
+
+| Surface                                   | Chose its spreads by                          |
+| ----------------------------------------- | --------------------------------------------- |
+| the dive card                             | the "Which one to build?" builds (2026-09-16) |
+| the scatter overlay "Spec Card Spreads"   | three stat-extreme POLES                      |
+| "Threats where your build choice matters" | the same three poles, plus their style names  |
+| "Top Picks"                               | composite score, headlined with a pole style  |
+
+The poles were a balanced lead (battle-score #1), an attack pole (max
+effective attack) and a bulk pole (max effective defense), labelled by a
+style classifier ("Attack Weight", "High Defense", "High HP", "Matchup
+Hunter", "Generalist", "Balanced", "Bait Robust", "Max Bulk"). On Shadow
+Sableye GL the overlay marked 9/6/13, 0/15/13 and 15/15/0 while the card
+showed 8/7/5, 2/11/13, 9/6/13 and 7/2/14 -- a live disagreement on one page,
+and the threat chips named two different spreads "Max Bulk".
+
+All of it is gone. `deep_dive_which_build.card_specs` is now the ONLY
+spread-selection rule on the page:
+
+- `data_obj['recIvs']` (the scatter overlay) = the card's spreads.
+- `data_obj['recNames']` (the threat chips) = the card titles' short forms
+  (`short` on each spec: "Build 1", "Build 2", "Highest avg battle score",
+  "Most matchups won"). This replaces `recStyles`, which is deleted.
+- The threat rows' hint reads "-> won by Build 1 or Build 2" (it used to be
+  "-> build <style>", which with the new names would have read "build Build
+  1").
+- RETIRED 2026-09-17 (round 8 item 2): "Top Picks" kept its own selection
+  (top three by composite score) headlined "7/2/12 -- in Build 1" /
+  "-- in no build", from `deep_dive_which_build.card_build_membership`
+  (every member of every build, threaded through
+  `generate_analysis_sections(card_build_membership=)` as `build_of`). The
+  block, the membership map and the hand-off are all deleted; one Notable
+  spreads list in the section is the page's only ranking of single spreads.
+- The best-buddy (L51) pass reuses the league-cap spreads, as the card does,
+  and the threat rows quote the card's own `PINNED_NOTE`.
+
+**Fallback when a page has no builds** (a moveset with no decision cells, an
+old blob, or a dive with no replay blob): the card, the overlay and the chips
+all fall back to the composite-score top picks -- `rec_candidates`, filtered
+by the same `efficient_frontier` strict-dominance guard the extra card
+spreads always carried, capped at `REC_MAX_SPREADS`, and labelled "Top pick
+#N". Never a pole. `REC_STRONG_POOL_N`, `REC_NOTABLE_MAX_CLEAR_FRAC` and
+`REC_DISTINCTNESS_MIN_SYMDIFF` tuned the retired selection and are deleted
+with it.
+
+`tests/test_card_pole_tiebreak.py` now pins the RETIREMENT (its old content,
+the 810f53c attack tie-break tripwires, is quoted in the module docstring):
+a pole that came back would silently re-open the 2026-06-24 UL Mimikyu
+dominated-spread bug, whose tie-break lives nowhere now.
+
+### SP1, and the standouts' two matchup lists
+
+- The section defines "stat-product rank-1 (SP1)" once per surface -- the
+  builds lead and the collapsed summary line -- and writes SP1 everywhere
+  else (paragraphs, table column header, compare prefill). The glossary
+  tooltip matches either spelling, so the first one a reader meets carries
+  the definition. The panel legend entry is "Stat-product rank-1 (SP1)".
+- Each standout now prints the two matchup LISTS behind its counts, not just
+  the counts: the cells it wins that its nearest build does not guarantee
+  (each with the share of that build's members that win the same cell,
+  ascending; cells above `MEMBER_SHARE_TAIL` = 25% go to a counted tail), and
+  the cells that build guarantees to every member and this spread loses.
+  `deep_dive_builds.standout_block` computes them as `beyond_cells` /
+  `lost_cells`.
+- The fixed note under the block prints the page's OWN two thresholds -- the
+  brief's line and the primary build's attack rung -- and only when every
+  outside standout actually sits between them. Round 6 makes the window
+  COUNTED rather than "a few spreads wide", and prints the bulk cuts the
+  count was taken at (the standouts' own def and HP, TRUNCATED to the two
+  places the page prints -- a rounded 96.3469 prints 96.35, and the count
+  taken at 96.35 excludes the very spread the sentence is about). It also
+  drops the cryptic "sits at the top of this grid on the axis that named it"
+  for Michael's "if you already have one, build it", and says a build is a
+  region whose members "all win a common core of matchups" -- they do not
+  all win the SAME matchups, which is what the note claimed.
+- Each standout paragraph now also carries the measured version of the
+  note's claim: `n_profile_peers` (`standout_block`) counts the OTHER
+  spreads on the grid that win every decision matchup this one wins -- 0 for
+  Shadow Sableye's 7/2/14, 2 for 9/6/13. "No region reproduces this profile"
+  is a statement about regions; this is the stronger one about spreads.
+- The "Its rarest wins" sentence is printed only for a standout INSIDE a
+  build. Outside, the two lists above already name every cell with its grid
+  rate, and it repeated three of them.
+
+### One name per standout, one spelling for SP1
+
+The two standouts carried three names each (section head / card title /
+chip), and the shortest dropped the word that says the score is an AVERAGE.
+There is now one canonical short name per standout -- "Most matchups won"
+and "Highest avg battle score" -- and every surface LEADS with it: the
+section head adds its qualifier after it ("Most matchups won (all nine
+shield scenarios)"), the card title adds "(outside the builds)", and the
+chips, the scatter overlay names and the stealable bullets use the short
+form alone. `CARD_SHORT` and `STANDOUT_KIND` are the two dicts.
+
+SP1 spellings, all deliberate:
+
+- The at-a-glance strip's third row is labelled `SP1` (it is the first place
+  the section names the spread, and the section's term marker attaches the
+  glossary definition to the first occurrence, wherever it falls).
+- The section's prose writes SP1 everywhere, including the brief's own
+  headline sentences, which the renderer passes through
+  `deep_dive_which_build.sp1_prose` ("The stat-product rank-1 spread,
+  0/15/15, misses it by 6.35 attack" -> "SP1, 0/15/15, ...").
+- The glossary's definition-list heading is "stat-product rank-1 (SP1)"
+  (`glossary.DISPLAY`), so a reader scanning the terms for SP1 finds it.
+- The CARD writes "SP #817" for a stat-product RANK and "SP1" for rank 1,
+  and its foot defines both -- the card ships standalone with `--card-out`
+  and has no section to read a key from.
+- The "Rank-1 check" evidence field keeps its audit name (it prints as
+  field 5 in the reader's order). It is a guard report, not reader prose.
+
+### The nested wide build
+
+`deep_dive_builds.wide_build` surfaces at most one region of the same
+lattice that
+
+1. holds EVERY member of the primary,
+2. is at least `WIDE_MIN_FACTOR` (2x) its size, and
+3. carries a rule at the fidelity the table prints
+   (`region_rule` = `pick_descriptions(describe(...))['d95']`),
+
+ranked among those on
+
+1. how many of the preset's OUTSIDE standouts (the ones with `in_build is
+   None`) the region holds, 2 > 1 > 0; then
+2. preset-weighted guaranteed cells; then
+3. size, ties to the larger region.
+
+The constructed bulk box is excluded, and it is computed for the PRIMARY
+only. The rule is fitted lazily, best candidate first, so `describe()` runs
+on one or two regions per preset rather than on all of them.
+
+The FILTER clauses 1 and 3 are the 2026-09-17 round-6 correction. The
+original rule was "holds >= 90% of the primary's members" with no rule
+requirement, and ranked on cells alone; on Shadow Sableye GL arm 0 that
+picked D,F,G -- 157 spreads, 51 guaranteed cells, holding 59 of Build 1's
+61, and fitted by no two- or three-stat rule. A row headed "Build 1 wide"
+that drops two of Build 1's own spreads is not wide around Build 1, and one
+printed as "a list of 157 spreads that no rule fits" is not a target anybody
+can aim at. Both reviews of the round-5 render landed on the same fix: make
+containment and describability FILTERS, then rank inside them.
+
+The standout clause of the RANKING key is round 6b (2026-09-17), and it is
+the region's stated purpose finally entering its selection: Michael's reason
+for surfacing the region at all is "the standouts as ordinary members of
+Build 1 wide". Round 6 kept ranking inside the filters on cells alone, and
+on Shadow Sableye GL arm 0 that picked E,F (292 spreads, 49 cells) over
+three describable supersets that hold both standouts -- so the page's own
+paragraph had to end "it holds neither standout below, so it is not a route
+to them", on the one row that exists to be a route to them. Where a preset
+has no outside standout the key is exactly the round-6 one (plain Sableye
+and Melmetal are unchanged under all three presets).
+
+It is deliberately NOT in `bl['builds']`: it lives at `bl['wide']`, so the
+objectives line, the card set, the standouts' nearest-build search and the
+UpSet columns all go on seeing two or three builds. The surfaces that opt in
+are the table (one row directly under Build 1, carrying its payload index),
+the paragraphs (one directly under Build 1's), the collapsed summary (a
+clause, not a build slot), the standouts' membership, and the panel -- where
+it travels LAST in the payload's `builds` array with `col: null`, so
+`_wbBuildOf` lets every real build claim its members first, and draws in a
+tinted Build 1 colour underneath Build 1.
+
+**On Shadow Sableye GL arm 0 the rule picks D,H** -- 644 spreads, 43
+guaranteed cells, `roughly Atk >= 148.70 and Def + 1.7*HP >= 301.928`, and
+it holds BOTH outside standouts (7/2/14 and 9/6/13). Both of them sit below
+Build 1's 150.24 attack rung, so only a region dropping that rung reaches
+them; D,H is the best-guaranteeing one that does and its rule fits. Every
+superset of Build 1 here that holds a standout, plus the round-6 pick, in
+the order the round-6b key ranks them:
+
+| combo | spreads | cells | standouts held |
+| ----- | ------- | ----- | -------------- |
+| D,H   | 644     | 43    | both           |
+| D     | 838     | 39    | both           |
+| H     | 1656    | 34    | both           |
+| D,E,H | 369     | 48    | 9/6/13 only    |
+| D,E   | 533     | 43    | 9/6/13 only    |
+| E,H   | 738     | 42    | 9/6/13 only    |
+| E     | 935     | 38    | 9/6/13 only    |
+| E,F   | 292     | 49    | neither        |
+
+(Rows below the winner are ranked but never described: the rule is fitted
+lazily, so on this page `describe()` ran on D,H alone and the
+describability of the rest is untested.) E,F was the round-6 pick (cells
+alone) and D,H is the round-6b one. The
+"holds neither standout below, so it is not a route to them" branch stays in
+the renderer for pages where it is still true; on this page the paragraph now
+ends "It holds both standouts below." and the collapsed line gains "and holds
+both standouts".
+
+What the wide surfaces print, after round 6:
+
+- The paragraph opens on what the region is FOR ("the looser target around
+  Build 1, for a reader who cannot hit Build 1 exactly"), then its RULE --
+  with the set difference as a gloss, not instead of the rule. Round 5
+  printed "Build 1 without 1v0 Azumarill staircase" for a region that was
+  simply `Atk >= 150.24`: an internal lattice-set alias the page defines
+  nowhere, in place of a one-stat rule.
+- Every count it prints is a RETENTION on the preset's own scale: "keeps 49
+  of Build 1's 55 guaranteed matchups" (narrow presets carry both scales, as
+  the builds do). The wide region contains all of Build 1, so every cell it
+  guarantees is one of Build 1's; round 5 printed a bare all-scenario count
+  after a clause that said "guarantees 43", which read as 33 MORE.
+- It names the guarantees it gives up out there (rarest first, three plus a
+  count).
+- When every spread it holds is already in a build its plot trace has no
+  points of its own. The paragraph says so, and the JS emits the empty trace
+  anyway with a legend entry that says it ("all N already in a build"),
+  instead of letting Plotly drop a named region off the legend silently. A
+  non-empty wide trace's legend reads "N of SIZE not already in a build",
+  because the trace carries only the spreads no build claims while the table
+  row gives the region's full size. Round 6's live example of `_own` = 0 was
+  Shadow Sableye under the Even preset (E,H, 249 spreads); round 6b's
+  standout clause moved that preset to E (838 spreads, `_own` = 589) and no
+  preset of the three preview pages now has `_own` = 0, so the branch is
+  covered by a unit test on a faked block rather than by a rendered page.
+- The table row prints `--` for its most-winning member: the plot draws it
+  no triangle and "Compare these spreads" does not offer it, both because it
+  is not a build to build, so a cell naming one pointed at a spread the
+  reader could find on neither interactive surface.
+- RETIRED 2026-09-17 (round 8 item 2): `card_build_membership` included the
+  wide region LAST, under the name "Build 1 wide only", so a Top Pick that
+  no build held but the wide region did was labelled instead of reading "in
+  no build" on a page whose builds table named the same spread; Top Picks
+  also carried one sentence saying the two rankings answered different
+  questions. The Notable spreads list says where every entry sits (build /
+  wide / family / none) in the entry itself, so there is no second map.
+- The wide region's combo is excluded from the UpSet panel's extra candidate
+  columns: it took no column of its own (`col: null`) but could come back as
+  an anonymous unselected column for the region the table above names.
+
+### Section-plot legend geometry (two Plotly facts, both measured)
+
+The section scatter owns a full-width row with its legend UNDER the plot
+(round 8 item 4), so the panel's height has to hold a legend whose height
+nobody can predict from the trace count. Two Plotly 2.35.2 behaviours decide
+how `_wbFitLegend` is written; both were measured in headless Chrome on
+2026-09-17 and neither is documented:
+
+- **A horizontal legend's DRAWN height is capped at half the graph height**
+  and the overflow becomes a scroll box. So `rect.bg`'s height reports the
+  CAP, not what the keys need (303px inside a 608px graph whose keys wanted
+  342), and a layout sized from the rect converges on the cap. The uncapped
+  content height is `gd._fullLayout.legend._height`, and it does NOT move
+  when the panel grows (342 at graph heights 608, 900 and 1000). Measure
+  that.
+- **`Plotly.react` does not re-read the graph div's height.** Setting
+  `style.height` from 685 to 900 left `_fullLayout.height` at 608 through a
+  react AND a tick. A `window` resize event picks it up (that is what
+  `responsive: true` listens to), `Plotly.Plots.resize` picks it up but is
+  debounced ~100ms, and `Plotly.relayout(gd, {autosize: true})` picks it up
+  SYNCHRONOUSLY while leaving responsive width alone. Use the relayout;
+  setting `layout.height` outright would work too but turns autosize off for
+  BOTH dimensions and kills responsive width.
+
+Sizing the legend's room from `ceil(nTraces / 3) * 18px` instead cost the
+round-7b render six clipped legend keys at a 900px viewport -- clipped by the
+plot svg's own `overflow: hidden`, so `elementFromPoint` missed them and
+legend-hover isolation was dead for both standouts, both most-winning members
+and SP1 -- while Plotly's automargin squeezed the plot area from 324px to
+186px. The invariant to hold is the PLOT AREA (322-324px at every width and
+both views); the panel's height is what moves.
 
 ## Article lifecycle
 

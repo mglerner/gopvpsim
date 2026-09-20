@@ -271,8 +271,11 @@ def test_rendered_scenario_blocks_use_the_canonical_labels():
     # is NOT an '{a}v{b}' label, and every other key must still be one.
     assert got == {rendering.scenario_label(p) for p in SCENARIOS9} | {'all'}
     assert all(re.fullmatch(r'\dv\d', g) for g in got - {'all'})
-    # and the selector options agree with the blocks
-    assert set(re.findall(r'<option value="([^"]+)"', html)) == got
+    # Round 10: there is no <select> in this body -- the section's own
+    # Shield-scenario control switches these blocks through
+    # ``_wbSyncScen`` -> ``mcSetScenario``, keyed on exactly these values.
+    # Pre-fix: set(re.findall(r'<option value="([^"]+)"', html)) == got.
+    assert re.findall(r'<option value="([^"]+)"', html) == []
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +332,9 @@ def test_threats_section_carries_the_boundary_label():
         'ivA': [0, 5, 10, 15], 'ivD': [15] * 4, 'ivS': [15] * 4,
         'ivAtk': [100.0, 105.0, 110.0, 115.0],
         'ivDef': [100.0] * 4, 'ivHp': [135] * 4,
-        'recIvs': [0, 3], 'recStyles': ['bulk', 'atk'],
+        # The card's spreads and their short names (pre-2026-09-17
+        # this key was ``recStyles`` and carried pole labels).
+        'recIvs': [0, 3], 'recNames': ['Build 1', 'Build 2'],
     }
     html = rendering.render_opponent_threats_section(
         [{'opponent': 'Medicham', 'stat': 'atk', 'threshold': 105.0,

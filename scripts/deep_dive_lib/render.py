@@ -50,41 +50,15 @@ parse_energy = rendering.parse_energy
 score_key = rendering.score_key
 
 
-# Dive-card recommendation-spread selection (Phase A v2): pick a variable 2-6
-# set. When named anchors resolved, selection is a greedy set-cover over the
-# specific opponent break/bulkpoints the lead reference misses (see the
-# selection block in generate_analysis_sections). On --no-mirror-slayer dives
-# there are no named anchors, so we fall back to DISTINCTNESS over each IV's
-# WON-SET (the (scenario, opponent) matchups it wins, score > 500; 500 = tie): a candidate
-# joins only if its won-set differs from every already-chosen spread by at least
-# REC_DISTINCTNESS_MIN_SYMDIFF cells (symmetric difference). Symmetric
-# difference, not net-new wins, is what collapses near-twins -- twins trade one
-# matchup for another, so they add ~0 net-new wins but differ by only a cell or
-# two. The two poles (rank-1 stat-product lead + attack/CMP pole) are always
-# seeded, giving a floor of 2.
-REC_DISTINCTNESS_MIN_SYMDIFF = 3
+# Dive-card spread selection. The card names the "Which one to build?"
+# section's own builds (deep_dive_which_build.card_specs) -- one spread per
+# named build, then the standouts -- and this cap is the hard ceiling on how
+# many it renders. The Phase-A pole seeding + greedy named-coverage fill it
+# replaced (and the REC_STRONG_POOL_N / REC_NOTABLE_MAX_CLEAR_FRAC /
+# REC_DISTINCTNESS_MIN_SYMDIFF knobs that tuned it) were retired on
+# 2026-09-17: a stat-extreme rule no other surface on the page used.
 REC_MAX_SPREADS = 6
 
-# Phase A.1 dive-card coverage tuning (Dragapult-Sim "OPTIMAL IVS" style).
-#   REC_STRONG_POOL_N  -- battle-ranked top-N used as the "strong pool" for the
-#                         rarity gate. It must be wide enough to include the
-#                         deeply-bulky IVs the bulk pole sits on (those trade
-#                         away too much battle score to reach the top ~50), so
-#                         the high def-side bulkpoint tiers are present in the
-#                         tier universe and counted honestly. Capped to nIvs.
-#   REC_NOTABLE_MAX_CLEAR_FRAC -- a named (opponent, kind, threshold) tier is
-#                         "notable" only if at most this fraction of the strong
-#                         pool clears it. The Level-3 *_blkp_any anchors expand
-#                         into a near-continuum of tiers per opponent, so a bulky
-#                         IV clears every opponent's trivial LOWEST tier; without
-#                         the gate the bulk pole "covers" everyone and
-#                         differentiates nothing. Tuned on Tinkaton GL to surface
-#                         the hard meta bulkpoints (Azumarill 143.03, G-Corsola
-#                         143.04, Medicham 141.66) on the bulk pole and the hard
-#                         breakpoints (Jellicent, Annihilape) on the attack pole,
-#                         while the broad battle-#1 lead keeps no notable tier.
-REC_STRONG_POOL_N = 512
-REC_NOTABLE_MAX_CLEAR_FRAC = 0.25
 # The "Why this IV?" two-#1s blurb only earns card space when the rank-1 stat
 # product IV wins MEANINGFULLY MORE matchups than our battle-score #1 (the
 # counterintuitive "why not the hundo?" case). Below this win-rate gap the two
@@ -512,12 +486,42 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                moveset0_flavors_for_rename=None,
                                focal_shadow=False,
                                scores_base_arrays=None,
-                               base_form_info=None):
+                               base_form_info=None,
+                               card_builds=None,
+                               card_builds_pinned=False,
+                               clusters_sink=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
     results_html is always visible ("Deep Dive Results").
     analysis_html goes behind the toggle ("Deep Dive Analysis").
+
+    ``clusters_sink``, when a dict, receives the rendered "Matchup clusters"
+    section under ``'html'`` INSTEAD of it being appended to analysis_html.
+    Michael's 2026-09-17 round-7 decision moved that section to the top of
+    the page (directly under "Which one to build?"), and the caller owns the
+    placement because the slot it fills is emitted long before this pass
+    runs. With no sink the section stays where it was, first inside the
+    Dive Analysis collapsible.
+
+    ``card_builds`` is the dive card's spread list taken from the "Which one
+    to build?" builds (``deep_dive_which_build.card_specs``): one entry per
+    named build plus the standouts, each with its title, its guarantee
+    sentence, its rarest guaranteed cells and its short name. It is the ONLY
+    spread-selection rule on the page: it feeds the card, the scatter's "Spec
+    Card Spreads" overlay (``data_obj['recIvs']``) and the opponent-threat
+    chips (``data_obj['recNames']``) alike, so all three name the same
+    spreads for the same reasons. The three stat-extreme POLES it replaced --
+    and the style taxonomy that labelled them -- were retired on 2026-09-17.
+    When it is empty (a moveset with no decision cells, an old blob, or a
+    dive with no replay blob) all three fall back to the composite-score top
+    picks, labelled "Top pick #N" -- never to a pole.
+
+    ``card_builds_pinned`` says the builds were computed on a DIFFERENT
+    grid than the one this pass renders (the best-buddy L51 pass reuses the
+    league-cap builds, because the section itself is rendered once, at the
+    cap). The card then prints one line saying so, rather than silently
+    disagreeing with the section below it.
 
     When ``anchor_passing_sink`` is a dict, it gets populated with
     ``{anchor_id: [passing_iv_idx, ...]}`` for every anchor-flip bullet
@@ -689,76 +693,29 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                 'gains': g, 'losses': l, 'net': net, 'range': rng, 'score': score})
     rec_candidates.sort(key=lambda x: x['score'], reverse=True)
 
-    # Assign descriptive tier names based on stat profile
-    for rc in rec_candidates:
-        iv = rc['iv']
-        atk, def_, hp = data_obj['ivAtk'][iv], data_obj['ivDef'][iv], data_obj['ivHp'][iv]
-        pop_atk = sum(data_obj['ivAtk'][i] for i in ranked[:20]) / 20
-        pop_def = sum(data_obj['ivDef'][i] for i in ranked[:20]) / 20
-        pop_hp = sum(data_obj['ivHp'][i] for i in ranked[:20]) / 20
-        # "Bait Robust" - all flips fire in both bait modes and net is positive
-        if has_bait_axis and iv in flips and rc['net'] > 0:
-            fd = flips[iv]
-            all_entries = fd.get('gains', []) + fd.get('losses', [])
-            if all_entries and all(len(e.get('bait_modes', set())) > 1 for e in all_entries):
-                rc['style'] = 'Bait Robust'
-                continue
-        if atk > pop_atk + 0.5:
-            rc['style'] = 'Attack Weight'
-        elif def_ > pop_def + 2:
-            rc['style'] = 'High Defense'
-        elif hp > pop_hp + 2:
-            rc['style'] = 'High HP'
-        elif rc['net'] > 5:
-            rc['style'] = 'Matchup Hunter'
-        elif rc['range'] < 500:
-            rc['style'] = 'Generalist'
-        else:
-            rc['style'] = 'Balanced'
-
-    # ---- Coverage selection: 3 poles + greedy fill of NAMED spreads ----------
-    # Phase A.1 (Dragapult-Sim "OPTIMAL IVS" style). We seed THREE poles --
-    # balanced lead (battle-score #1), attack pole (max effective atk), and bulk
-    # pole (max effective DEF) -- then greedily fill extra spreads that clear a
-    # notable named opponent tier no chosen spread covers yet. Each chosen spread
-    # is LABELED with the NOTABLE named opponent tiers it ABSOLUTELY clears (not
-    # differential vs the lead), so the card reads "Bulkpoints Azumarill,
-    # Medicham, G-Corsola" on the bulk pole and "Breakpoints Jellicent,
-    # Annihilape" on the attack pole, while the broad lead keeps few/none.
+    # ---- The spreads the card, the scatter overlay and the threat chips
+    # name. ------------------------------------------------------------------
+    # They are the "Which one to build?" section's own builds (``card_builds``
+    # = deep_dive_which_build.card_specs: one spread per named build, then the
+    # standouts). Resolved further down, once the census helpers exist.
     #
-    # Signature granularity (root-cause fix): per IV we record the set of
-    # (opponent_display, kind, round(threshold_value, 2)) tiers it clears, read
-    # straight off resolved_anchors_top via ResolvedAnchor.passes(). The
-    # threshold component is load-bearing -- the Level-3 *_blkp_any anchors
-    # expand into a near-continuum of tiers per opponent, so a HIGH bulkpoint
-    # must differ from a LOW one or a bulky IV "covers" every opponent through
-    # each one's trivial lowest tier.
-    #
-    # Rarity gate: a tier is "notable" only if at most REC_NOTABLE_MAX_CLEAR_FRAC
-    # of the strong pool (ranked[:REC_STRONG_POOL_N]) clears it. The strong pool
-    # is WIDE on purpose -- the bulk pole sits on deeply-bulky IVs that never
-    # reach the top ~50, so a narrow pool would omit the high def-side tiers from
-    # the universe entirely.
-    #
-    # CMP/mirror anchors have opponent=None; they name no opponent, so they are
-    # the attack pole's story (seeded by atk_iv), not named coverage. On
-    # --no-mirror-slayer dives resolved_anchors_top is empty: the named universe
-    # is empty, no notable tiers exist, and we fall back to the v1 won-set
-    # symdiff distinctness with generic labels (no crash, no named bullets).
+    # This RETIRES the three stat-extreme POLES -- balanced lead, max-effective
+    # -attack, max-effective-defense -- and the style taxonomy that labelled
+    # them ("Attack Weight", "High Defense", "High HP", "Matchup Hunter",
+    # "Generalist", "Balanced", "Bait Robust", "Max Bulk"). They were a
+    # selection rule no other surface on the page used, so the card and the
+    # section named different spreads for different reasons, and the scatter's
+    # "Spec Card Spreads" overlay marked spreads the card did not show
+    # (2026-09-17 round 5, item 1).
     _anchor_mode = bool(resolved_anchors_top)
 
     by_iv = {rc['iv']: rc for rc in rec_candidates}
 
-    # The bulk pole is usually a deeply-bulky IV that trades away too much battle
-    # score to rank in the top-50 strong pool (rec_candidates), so it lacks an rc
-    # dict. Those IVs ARE simulated -- data_obj['ivAtk'/'ivDef'/'ivHp'] span the
-    # full valid grid (range(nIvs)). _ensure_rc fabricates a minimal rc (style,
-    # flip counts, composite score) so any pole IV flows into chosen_recs / the
-    # card uniformly.
-    _pop_atk20 = sum(data_obj['ivAtk'][i] for i in ranked[:20]) / 20
-    _pop_def20 = sum(data_obj['ivDef'][i] for i in ranked[:20]) / 20
-    _pop_hp20 = sum(data_obj['ivHp'][i] for i in ranked[:20]) / 20
-
+    # A build spread can sit outside the top-50 strong pool (rec_candidates) --
+    # the bulk side routinely does -- and then has no rc dict. Those IVs ARE
+    # simulated (data_obj['ivAtk'/'ivDef'/'ivHp'] span the full valid grid), so
+    # _ensure_rc fabricates a minimal rc (flip counts, composite score) and any
+    # spread flows into the card uniformly.
     def _ensure_rc(iv):
         rc = by_iv.get(iv)
         if rc is not None:
@@ -767,22 +724,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         rng = (max(scene_ranks[si][iv] for si in range(nS))
                - min(scene_ranks[si][iv] for si in range(nS)))
         score = -avg_ranks[iv] + net * 3 - rng * 0.001
-        atk, def_, hp = (data_obj['ivAtk'][iv], data_obj['ivDef'][iv],
-                         data_obj['ivHp'][iv])
-        # Pole IVs are stat extremes; label by the stat that most exceeds the
-        # top-20 population mean (largest relative excess wins) so the max-def
-        # bulk pole reads "Max Bulk" rather than tripping the atk check first.
-        _exc = {'Attack Weight': atk - _pop_atk20,
-                'Max Bulk': def_ - _pop_def20,
-                'High HP': hp - _pop_hp20}
-        _style, _ex = max(_exc.items(), key=lambda kv: kv[1])
-        if _ex <= 0.5:
-            style = 'Generalist' if rng < 500 else 'Balanced'
-        else:
-            style = _style
         rc = {'iv': iv, 'avg_rank': avg_ranks[iv], 'avg_score': avg_scores[iv],
               'gains': g, 'losses': l, 'net': net, 'range': rng,
-              'score': score, 'style': style}
+              'score': score}
         by_iv[iv] = rc
         return rc
 
@@ -790,38 +734,22 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # metric. Decision (Michael 2026-06-22): we pitch battle score as a better
     # metric than stat product, so our "#1" must BE the battle-score #1, not the
     # rank-1 stat-product IV. Fall back to the top composite candidate if
-    # (defensively) ranked[0] is outside the strong pool.
+    # (defensively) ranked[0] is outside the strong pool. It is NOT a card
+    # spread any more (the builds name those); it stays the page's reference
+    # spread for the two-#1s blurb and the single-IV win rate below.
     _spranks = data_obj.get('spRanks') or []  # used by the two-#1s blurb below
     lead_iv = ranked[0] if ranked and ranked[0] in by_iv else rec_candidates[0]['iv']
-
-    # Finer per-IV coverage signature: the set of (opponent_display, kind,
-    # threshold) tiers this IV clears. Only NAMED-opponent kinds
-    # (damage_breakpoint / bulkpoint) enter the signature; cmp/mirror anchors
-    # (opponent=None) are excluded. Reads the full ivAtk/ivDef arrays, so it
-    # works for ANY iv index (the bulk pole may be outside rec_candidates).
-    # Defined BEFORE pole selection so the poles can count NOTABLE-only coverage.
-    _cov_cache: dict = {}
-
-    def _named_cover(iv):
-        c = _cov_cache.get(iv)
-        if c is None:
-            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
-            c = _cov_cache[iv] = frozenset(
-                (pretty_species(a.opponent), a.kind, round(a.threshold_value, 2))
-                for a in resolved_anchors_top
-                if a.opponent and a.passes(atk, dfn))
-        return c
 
     # CENSUS coverage source for the card labels: the full set of matchup-flip
     # boundaries (atk sweep -> breakpoints, def sweep -> bulkpoints) across the
     # WHOLE opponent pool, not just the curated resolved anchors. The resolved
-    # anchors (_named_cover) are a small TOML/mirror-slayer set (~3 breakpoint
-    # opponents for Corviknight); the card census wants EVERY opponent a spread
-    # clears a guaranteed break/bulkpoint against (cf. Dragapult-Sim's "18
-    # guaranteed breakpoints"). Computed once here, deduped per (opponent, stat,
+    # anchors are a small TOML/mirror-slayer set (~3 breakpoint opponents for
+    # Corviknight); the card census wants EVERY opponent a spread clears a
+    # guaranteed break/bulkpoint against (cf. Dragapult-Sim's "18 guaranteed
+    # breakpoints"). Computed once here, deduped per (opponent, stat,
     # threshold); _census_cover(iv) then asks, per spread, which opponents that
-    # spread's atk/def clears. Selection above stays anchor/notable-based; only
-    # these LABELS go census.
+    # spread's atk/def clears. The card's spreads come from the builds; only
+    # these LABELS are census.
     _census_boundaries = []
     _cb_seen = set()
     for _mode in all_modes:
@@ -915,191 +843,68 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     c = _base_census_cache[iv] = (sorted(bp), sorted(blk))
                 return c
 
-    # Rarity-gated NOTABLE tiers: built over the WIDE strong pool so the bulk
-    # pole's high def-side tiers are present and counted. A tier is notable iff
-    # at most REC_NOTABLE_MAX_CLEAR_FRAC of the strong pool clears it. Reused for
-    # the pole coverage (atk/bulk poles count NOTABLE-only), the greedy fill
-    # universe AND the absolute per-spread labels below.
-    notable_tiers: set = set()
-    _tier_clearers: dict = {}
-    if _anchor_mode:
-        _strong = ranked[:min(REC_STRONG_POOL_N, nIvs)]
-        for siv in _strong:
-            for t in _named_cover(siv):
-                _tier_clearers[t] = _tier_clearers.get(t, 0) + 1
-        _gate = REC_NOTABLE_MAX_CLEAR_FRAC * len(_strong)
-        notable_tiers = {t for t, c in _tier_clearers.items() if c <= _gate}
+    # ---- the card's spreads, from the builds (2026-09-16 item 6; the only
+    # selection rule after the 2026-09-17 pole retirement) --------------------
+    # Each spec names an IV TRIPLE; the index is resolved against THIS page's
+    # own arrays, so a card spread is always a spread this file embeds (the
+    # best-buddy pass resolves the league-cap triples against its own L51
+    # grid, which is what pins the two passes to the same spreads). Every
+    # spread gets the same rc dict shape (_ensure_rc fabricates one for an IV
+    # outside the top-50 strong pool) plus the census coverage, so the card's
+    # breakpoint / bulkpoint / shadow-boost lines are computed as before.
+    _triple_idx = {}
+    for _i in range(nIvs):
+        _triple_idx.setdefault(
+            (data_obj['ivA'][_i], data_obj['ivD'][_i], data_obj['ivS'][_i]),
+            _i)
+    _card_recs, _card_extras, _card_names = [], {}, []
+    for _spec in (card_builds or []):
+        _iv = _triple_idx.get(tuple(int(x) for x in _spec['iv']))
+        if _iv is None:
+            logger.warning(
+                f"  dive card: build spread {_spec['iv']} is not on this "
+                f"page's grid; that card is omitted")
+            continue
+        _rc = dict(_ensure_rc(_iv))
+        _rc['style'] = _spec['title']
+        _card_recs.append(_rc)
+        _card_names.append(_spec.get('short') or _spec['title'])
+        _card_extras[_iv] = {'guarantee': _spec.get('guarantee', ''),
+                             'cells': list(_spec.get('cells') or [])}
 
-    if _anchor_mode:
-        # Attack pole = max BREAKPOINT COVERAGE, tie-broken by BULK (def then hp)
-        # -- the "Focused" attack spread (cf. Dragapult-Sim's "Ninetales Focused"
-        # 11/12/5: a buildable line that still hits the key breakpoints, NOT a
-        # max-atk glass cannon). Symmetric to the bulk pole: don't atk-max PAST
-        # the hardest breakpoint; among IVs clearing the same breakpoint tiers,
-        # prefer the bulkier one. The meta breakpoints sit just above the top-50
-        # atk ceiling, so coverage is computed over the FULL grid. Falls back to
-        # raw max-atk when no breakpoints resolve. Coverage counts only NOTABLE
-        # breakpoint tiers (the rarity-gated hard ones), so the pole stops
-        # atk-maxing once the MEANINGFUL breakpoints are cleared and banks
-        # def/HP from there -- a truer buildable "Focused" spread where the
-        # notable breakpoints sit below the atk ceiling, while staying glassy
-        # where they sit near max atk.
-        def _atk_cover(iv):
-            return sum(1 for (_opp, kind, _thr) in (_named_cover(iv) & notable_tiers)
-                       if kind == 'damage_breakpoint')
-        # Use the coverage selection only when NOTABLE breakpoints exist; with
-        # none, _atk_cover is uniformly 0 and would collapse to max-def, so fall
-        # through to the plain max-atk pole instead.
-        if any(t[1] == 'damage_breakpoint' for t in notable_tiers):
-            # Final tie-break on atk so we never headline a strictly-dominated
-            # spread: among IVs tied on (breakpoint-coverage, def, hp) -- e.g. a
-            # below-cap species where 0/15/15 and 1/15/15 share def+hp at max
-            # level -- prefer the higher-atk one (the crowned, efficient-frontier
-            # member). breakpoint-coverage is monotonic in atk, so this can only
-            # raise atk among equals, never trade away a breakpoint.
-            atk_iv = max(range(nIvs),
-                         key=lambda iv: (_atk_cover(iv), data_obj['ivDef'][iv],
-                                         data_obj['ivHp'][iv], data_obj['ivAtk'][iv]))
-        else:
-            atk_iv = max(range(nIvs), key=lambda iv: (data_obj['ivAtk'][iv],
-                                                      data_obj['ivDef'][iv],
-                                                      data_obj['ivHp'][iv]))
-        # Bulk pole = max BULKPOINT COVERAGE, tie-broken by HP (Michael's
-        # refinement, 2026-06-22). Don't def-max PAST the hardest bulkpoint:
-        # among IVs that clear the same set of bulkpoint tiers, prefer the
-        # higher-HP one, so the pole isn't a needless 0-HP glass spread unless
-        # that exact def is REQUIRED to clear a bulkpoint. (HP raises CP -> lowers
-        # level -> lowers def, so banking HP costs def; we bank it only up to the
-        # point it would drop a bulkpoint.) Def is the bulkpoint-bearing stat; HP
-        # has no bulkpoint mechanic, so it's free to maximize once coverage is
-        # fixed. Falls back to raw max-def when no bulkpoints resolve. _ensure_rc
-        # gives each pole an rc dict.
-        # Coverage counts only NOTABLE bulkpoint tiers (rarity-gated), so the
-        # pole banks HP once the meaningful bulkpoints are cleared.
-        def _bulk_cover(iv):
-            return sum(1 for (_opp, kind, _thr) in (_named_cover(iv) & notable_tiers)
-                       if kind == 'bulkpoint')
-        # Coverage selection only when NOTABLE bulkpoints exist; else max-def.
-        if any(t[1] == 'bulkpoint' for t in notable_tiers):
-            # Final tie-break on atk (same rationale as the attack pole above):
-            # without it, a below-cap species ties 0/15/15 and 1/15/15 on
-            # (bulkpoint-coverage, hp, def) and max() returns the first by index
-            # -- the lower-atk, strictly-dominated, un-crowned spread (the
-            # 2026-06-24 UL Mimikyu card bug). bulkpoint-coverage is monotonic in
-            # def/hp, so adding atk last only breaks pure ties, never costs a
-            # bulkpoint.
-            bulk_iv = max(range(nIvs),
-                          key=lambda iv: (_bulk_cover(iv), data_obj['ivHp'][iv],
-                                          data_obj['ivDef'][iv], data_obj['ivAtk'][iv]))
-        else:
-            bulk_iv = max(range(nIvs),
-                          key=lambda iv: (data_obj['ivDef'][iv],
-                                          data_obj['ivHp'][iv],
-                                          data_obj['ivAtk'][iv]))
-        _ensure_rc(atk_iv)
-        _ensure_rc(bulk_iv)
-    else:
-        # No-anchor fallback: no named meta to reach for, so keep the prior
-        # behavior -- the atk pole stays the highest-atk IV in the strong pool
-        # (always has an rc), no bulk pole, generic labels.
-        atk_iv = max(by_iv, key=lambda iv: (data_obj['ivAtk'][iv],
-                                            by_iv[iv]['score']))
-        bulk_iv = None
-
-    # Won-set fallback signature (drives selection only when no anchors).
-    _won_cache: dict = {}
-
-    def _won_set(iv):
-        w = _won_cache.get(iv)
-        if w is None:
-            base = iv * nS * nO
-            w = _won_cache[iv] = frozenset(
-                (si, oi) for si in range(nS) for oi in range(nO)
-                if scores_flat[base + si * nO + oi] > 500)  # 500=tie (PvPoke)
-        return w
-
-    chosen_ivs = []
-
-    def _admit(iv):
-        if iv not in chosen_ivs:
-            chosen_ivs.append(iv)
-
-    # Seed three poles unconditionally (floor >= 2 after collapsing coincident
-    # poles). Each pole is a distinct teambuilding choice; they bypass every
-    # gate. The bulk pole only fires in anchor mode (it has no named story
-    # otherwise).
-    _admit(lead_iv)
-    _admit(atk_iv)
-    if _anchor_mode:
-        _admit(bulk_iv)
-
-    # Strict-dominance guard for the EXTRA-spread fill below: never admit a
-    # spread that another reachable IV weakly-dominates on (atk, def, hp) -- it
-    # would headline a wasted-IV target (e.g. Aegislash (Shield)'s 'Bait Robust'
-    # 0/9/14, dominated by 0/9/15). Same Pareto test as the crown marker
-    # (efficiency.efficient_frontier), so an extra spread is admitted only if it
-    # would be crowned. The three poles above are EXEMPT: they are seeded
-    # unconditionally as distinct teambuilding extremes, and their atk tie-break
-    # already keeps them on the frontier.
+    # Fallback for a page with NO builds (a moveset with no decision cells, an
+    # old blob, or a dive with no replay blob at all): the composite-score top
+    # picks, filtered by the same strict-dominance guard the extra card
+    # spreads always carried -- never a stat-extreme pole, which is what this
+    # path used to be. They are labelled by their composite rank, because the
+    # style taxonomy that named them is retired.
     _eff_mask = efficient_frontier(
         list(zip(data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'])))
-
-    if _anchor_mode:
-        # Greedy fill of EXTRA spreads (beyond the 3 poles) over the notable-tier
-        # universe not yet covered by the chosen set. Tie-breaks: prefer the
-        # candidate whose new tiers are HARDEST (fewest strong-pool clearers),
-        # then higher composite score. Near-twins fall out for free (same tiers
-        # -> zero marginal gain). Stops on cap, full coverage, or zero gain.
-        covered: set = set()
-        for iv in chosen_ivs:
-            covered |= (_named_cover(iv) & notable_tiers)
-        while len(chosen_ivs) < REC_MAX_SPREADS and (notable_tiers - covered):
-            best = None  # ((gain, -hardness, score), iv, new_tiers)
-            for rc in rec_candidates:
-                iv = rc['iv']
-                if iv in chosen_ivs:
-                    continue
-                if not _eff_mask[iv]:
-                    continue  # strictly dominated -> never headline it
-                new_tiers = (_named_cover(iv) & notable_tiers) - covered
-                if not new_tiers:
-                    continue
-                hardness = sum(_tier_clearers[t] for t in new_tiers)
-                key = (len(new_tiers), -hardness, rc['score'])
-                if best is None or key > best[0]:
-                    best = (key, iv, new_tiers)
-            if best is None:
-                break  # nothing left adds a notable tier -> saturated
-            _admit(best[1])
-            covered |= best[2]
+    if _card_recs:
+        chosen_recs, chosen_names = _card_recs, _card_names
     else:
-        # No anchors: v1-style won-set symdiff distinctness, generic labels.
+        chosen_recs, chosen_names = [], []
         for rc in rec_candidates:
-            if len(chosen_ivs) >= REC_MAX_SPREADS:
+            if len(chosen_recs) >= REC_MAX_SPREADS:
                 break
-            iv = rc['iv']
-            if iv in chosen_ivs:
-                continue
-            if not _eff_mask[iv]:
-                continue  # strictly dominated -> never headline it
-            if min(len(_won_set(iv) ^ _won_set(c)) for c in chosen_ivs) \
-                    >= REC_DISTINCTNESS_MIN_SYMDIFF:
-                _admit(iv)
+            if not _eff_mask[rc['iv']]:
+                continue          # strictly dominated -> never headline it
+            rc = dict(rc)
+            rc['style'] = f"Top pick #{len(chosen_recs) + 1}"
+            chosen_recs.append(rc)
+            chosen_names.append(rc['style'])
 
     # Attach ABSOLUTE, CENSUS per-spread coverage for the card:
     # cover_breakpoints / cover_bulkpoints list EVERY distinct opponent (per
     # kind) for which this spread clears a guaranteed break/bulkpoint -- the
     # full matchup-boundary census (cf. Dragapult-Sim's "18 guaranteed
-    # breakpoints" line), NOT the small curated resolved-anchor set and NOT
-    # rarity-gated. Selection above stays anchor/notable-based (the poles bank
-    # def/HP off the rarity-hard tiers); only these card LABELS go census.
+    # breakpoints" line), NOT the small curated resolved-anchor set.
     # n_breakpoint_opps / n_bulkpoint_opps are the headline census counts.
-    # Absolute (not differential vs the lead), so each pole's own coverage shows
-    # in full.
+    # Absolute (not differential vs any reference), so each spread's own
+    # coverage shows in full.
     if _anchor_mode:
-        for iv in chosen_ivs:
-            bp, blk = _census_cover(iv)
-            rc = by_iv[iv]
+        for rc in chosen_recs:
+            bp, blk = _census_cover(rc['iv'])
             rc['cover_breakpoints'] = bp
             rc['cover_bulkpoints'] = blk
             rc['n_breakpoint_opps'] = len(bp)
@@ -1108,25 +913,22 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             # spread clears a breakpoint against as a shadow/variant but NOT as
             # the base form. set difference of display-name sets (per spread).
             if _base_census_cover is not None:
-                base_bp, _ = _base_census_cover(iv)
+                base_bp, _ = _base_census_cover(rc['iv'])
                 rc['n_breakpoint_newly'] = len(set(bp) - set(base_bp))
-
-    # Reorder chosen rc dicts so the lead (rank-1 battle-score) spread leads
-    # (card headline / _rec_idx read chosen_recs[0]), then by composite score.
-    chosen_recs = [by_iv[lead_iv]] + sorted(
-        (by_iv[iv] for iv in chosen_ivs if iv != lead_iv),
-        key=lambda rc: rc['score'], reverse=True)
     # NOTE: do NOT rebind rec_candidates -- it stays the full composite-sorted
     # list so the dive-page "Top Picks" HTML (render_results_section) and the
-    # headline-mon default keep their pre-Phase-A behavior. Only the two
-    # card/scatter sinks below read the chosen 2-6 set.
+    # headline-mon default keep their pre-Phase-A behavior.
 
-    # Store the chosen recommended IV indices so the JS engine can render them
-    # as a distinct overlay trace on the scatter plot.
+    # Store the chosen IV indices so the JS engine can render them as a
+    # distinct overlay trace ("Spec Card Spreads") on the scatter plot. Fed by
+    # the card's own spreads, so the red points and the card agree -- before
+    # the pole retirement the overlay marked the poles while the card showed
+    # the builds (2026-09-17 round 5, item 1b).
     data_obj['recIvs'] = [rc['iv'] for rc in chosen_recs]
-    # Role labels (Balanced / Max Bulk / Attack Weight / ...) parallel to recIvs,
-    # for the opponent-threats "which build wins" chips.
-    data_obj['recStyles'] = [rc.get('style', '') for rc in chosen_recs]
+    # The card titles' short forms ("Build 1", "Most matchups won", ...),
+    # parallel to recIvs, for the opponent-threats "which build wins" chips.
+    # Replaces the retired ``recStyles`` (the pole taxonomy).
+    data_obj['recNames'] = list(chosen_names)
 
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
@@ -1310,7 +1112,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         all_matchup_boundaries=all_matchup_boundaries,
         score_arrays=score_arrays, moveset_idx=moveset_idx,
         flips=flips, flip_map=flip_map, avg_ranks=avg_ranks,
-        avg_scores=avg_scores, rec_candidates=rec_candidates,
+        avg_scores=avg_scores,
         slayer_iter_result=slayer_iter_result,
         opp_info_cache=opp_info_cache, focal_moves=focal_moves,
         focal_types=focal_types, ref_atk=ref_atk, ref_def=ref_def,
@@ -1320,6 +1122,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         has_toml_tiers=has_toml_tiers, ranked=ranked,
         hp_list=hp_list, nIvs=nIvs,
         has_bait_axis=has_bait_axis,
+        builds_pinned=bool(card_builds_pinned and _card_recs),
     )
     logger.info(f"  Results section rendered in "
                 f"{_time.time() - _rr_start:.1f}s")
@@ -1359,10 +1162,21 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # score-gap cluster block, 2026-07; see deep_dive_matchup_clusters.py) --
     _mc_bait = ('no-bait' if parse_mode(opp_iv_mode)[1] == 'nobait'
                 else 'bait-selective')
-    analysis_parts.append(matchup_clusters.render_section(
+    # The Build-criteria presets, so the section can carry one combined
+    # "all scenarios" partition per preset (2026-09-16). The table itself
+    # lives with the builds module -- one definition of the three presets on
+    # the page -- and is passed in rather than imported there, which would
+    # make the clusters module depend on the module that depends on IT.
+    import deep_dive_builds as _builds
+    _mc_presets = [(k, tag, scens) for k, _lbl, scens, tag in _builds.PRESETS]
+    _mc_html = matchup_clusters.render_section(
         scores_flat, nIvs, nS, nO, scenarios, opponents, data_obj,
         opp_label, moveset_label, resolved_anchors_top,
-        bait_label=_mc_bait))
+        bait_label=_mc_bait, presets=_mc_presets)
+    if clusters_sink is None:
+        analysis_parts.append(_mc_html)
+    else:
+        clusters_sink['html'] = _mc_html
 
     analysis_parts.append(rendering.render_analysis_volatility_html(
         data_obj, nIvs, nS, scenarios, scene_ranks, avg_ranks, ranked,
@@ -1387,8 +1201,12 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # single-IV win-rate and best/worst matchups (both need the scores_flat
     # layout, which lives here). The caller MUST pop '_cardCtx' before the
     # DATA blob is JSON-serialized -- flips carry sets (bait_modes).
-    _rec_idx = (chosen_recs[0]['iv'] if chosen_recs
-                else (ranked[0] if ranked else 0))
+    # The page's REFERENCE spread: the battle-score #1 (``lead_iv``). It used
+    # to be read off chosen_recs[0], which WAS the battle-score #1 while the
+    # card was pole-seeded; after the pole retirement chosen_recs[0] is Build
+    # 1's most-winning member, so the reference is named directly rather than
+    # silently following the card's first spread (2026-09-17 round 5).
+    _rec_idx = lead_iv if rec_candidates else (ranked[0] if ranked else 0)
     # Card win-rates span ALL shield scenarios (incl. asymmetric 0-1/1-2/2-1
     # etc.) -- the asymmetric matchups are the whole point of this card
     # style. The single-IV number here and the opponent-IV robustness number
@@ -1411,7 +1229,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                  for oi in reversed(_order) if _opp_avg[oi] > 500][:3]
 
     # Two-#1s explainer (Michael 2026-06-22): our headline metric is BATTLE
-    # SCORE, so the lead/headline IV (_rec_idx == chosen_recs[0] == ranked[0]) is
+    # SCORE, so the page's reference IV (_rec_idx == lead_iv == ranked[0]) is
     # the rank-1 battle-score spread. When the rank-1 STAT PRODUCT IV is a
     # *different* spread -- and especially the notable case where it wins MORE
     # matchups than our battle-score #1 -- we owe the reader an explanation, since
@@ -1493,6 +1311,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         'two_number_ones': _two_ones,
         'sibling_trade': _sibling_trade,
         'rec_candidates': chosen_recs,
+        'card_extras': _card_extras,
+        'builds_pinned': bool(card_builds_pinned and _card_recs),
         'rec_idx': _rec_idx,
         'flips': flips,
         'flips_sp': flips_sp,

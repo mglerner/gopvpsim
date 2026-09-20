@@ -5,6 +5,7 @@ floor, single-stat flip directions, tree rule extraction, degenerate inputs.
 """
 import ast
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -376,7 +377,8 @@ def test_degeneracy_floor_reports_counts_and_leaves_the_bits_out_of_all():
     # the FINDING (what the shield state does) rather than the floor
     assert d["reason"].startswith("every spread wins ")
     assert f"of {nO} opponents here" in d["reason"]
-    assert "Only 2 opponents are sharp marginals" in d["reason"]
+    # Pre-fix: "Only 2 opponents are sharp marginals" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "Only 2 opponents are contested" in d["reason"]
     assert "2 distinct win patterns" in d["reason"]
     assert (f"below the {mc.DEGEN_MIN_SHARP}-opponent / "
             f"{mc.DEGEN_MIN_PATTERNS}-pattern floor") in d["reason"]
@@ -419,7 +421,8 @@ def test_fragmented_reason_is_distinct_from_degenerate():
     assert "too fragmented" in e["reason"]
     # and it says the opposite of the degenerate reason about the bits
     assert f"still count toward the {mc.ALL_SCEN_DISPLAY}" in e["reason"]
-    assert "7 sharp marginal opponents" in e["reason"]
+    # Pre-fix: "7 sharp marginal opponents" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "7 contested opponents" in e["reason"]
     assert "9 distinct win patterns" in e["reason"]
     assert str(mc._small_pop_floor(mc.MIN_CLUSTER_IVS, nIvs)) in e["reason"]
 
@@ -1014,7 +1017,8 @@ def test_shadow_sableye_gl_reference_values():
     assert two_v_zero["degenerate"] is True
     assert two_v_zero["n_sharp"] == 1
     assert f"of {nO} opponents here" in two_v_zero["reason"]
-    assert "1 opponent is a sharp marginal" in two_v_zero["reason"]
+    # Pre-fix: "1 opponent is a sharp marginal" (round 10: the clusters body speaks the section's own vocabulary).
+    assert "1 opponent is contested" in two_v_zero["reason"]
     zero_v_two = out["0v2"]
     assert zero_v_two["degenerate"] is True
     assert (zero_v_two["n_sharp"], zero_v_two["n_patterns"]) == (5, 16)
@@ -1126,8 +1130,9 @@ def test_signpost_names_the_sharpest_single_scenarios_with_their_size():
     # ... with K, the silhouette and the count it was measured over
     top = computed[ranked[0][1]]
     assert f'K={top["res"]["k"]}' in line
+    # Pre-fix: '... sharp marginal' (round 10: the clusters body speaks the section's own vocabulary).
     assert f'silhouette {ranked[0][0]:.2f} over {len(top["res"]["sharp"])} ' \
-        'sharp marginal' in line
+        'contested opponent' in line
     # and it only appears in the combined block
     html = mc.render_section(
         arr.ravel().tolist(), nIvs, 9, nO, SCENARIOS9,
@@ -1189,3 +1194,285 @@ def test_section_stat_dp_matches_what_the_page_actually_bakes():
         m = re.search(r"%s\s*=\s*\[\s*round\([^,]+,\s*(\d+)\s*\)" % stat, src)
         assert m, f"{stat} is no longer a rounded comprehension; re-pin this"
         assert int(m.group(1)) == dp, (stat, m.group(1), dp)
+
+
+# ---------------------------------------------------------------------------
+# Per-preset combined partitions (2026-09-16, the Build criteria knob)
+# ---------------------------------------------------------------------------
+
+_PRESETS = [('flat', 'all shields, equal', None),
+            ('even', 'even shields', ('0v0', '1v1', '2v2')),
+            ('one_one', '1v1 only', ('1v1',))]
+
+
+def _render_with_presets():
+    flat, nIvs, nO = staircase_scores(n_opp=len(OPP_NAMES))
+    atk = np.linspace(100, 110, nIvs)
+    data_obj = {"ivAtk": atk.tolist(), "ivDef": atk.tolist(),
+                "ivHp": np.full(nIvs, 135.0).tolist()}
+    return mc.render_section(
+        flat, nIvs, 9, nO, SCENARIOS9, OPP_NAMES, data_obj,
+        "rank-1", "Shadow Claw/Foul Play+Power Gem", [], presets=_PRESETS)
+
+
+def test_a_preset_partition_gets_its_own_key_and_display_name():
+    assert mc.all_scen_key() == mc.ALL_SCEN_KEY
+    assert mc.all_scen_key('flat') == mc.ALL_SCEN_KEY
+    assert mc.all_scen_key('even') == 'all__even'
+    assert mc.is_all_scen_key('all__even') and mc.is_all_scen_key('all')
+    assert not mc.is_all_scen_key('1v1')
+    # Label text is a pure function of its arguments: BEFORE the 2026-09-16
+    # review it read a module-global table that only a prior
+    # compute_matchup_clusters call filled, so this same call returned the
+    # raw key 'even' when it ran first. No render has happened in this test.
+    tags = mc.preset_tags(_PRESETS)
+    assert tags == {'flat': 'all shields, equal', 'even': 'even shields',
+                    'one_one': '1v1 only'}
+    assert mc._scen_display('all__even', tags) == 'all scenarios (even shields)'
+    # and it stays that way after a render, in either call order
+    _render_with_presets()
+    assert mc._scen_display('all__even', tags) == 'all scenarios (even shields)'
+    assert mc._scen_display('all__even') == 'all scenarios (even)'
+
+
+def test_a_single_scenario_preset_resolves_to_that_scenarios_partition():
+    """The 1v1-only preset has nothing to combine, so its "all scenarios"
+    view IS the 1v1 partition -- never the nine-scenario one under a label
+    claiming otherwise."""
+    html = _render_with_presets()
+    pay = json.loads(re.search(
+        r'<script type="application/json" class="dd-mc-data">(.*?)</script>',
+        html, re.S).group(1))
+    assert pay['allByPreset']['flat'] == mc.ALL_SCEN_KEY
+    assert pay['allByPreset']['even'] == 'all__even'
+    assert pay['allByPreset']['one_one'] == '1v1'
+    # ``allLabelByPreset`` is GONE (round 10). It existed to re-label the
+    # clusters' own "all scenarios" <option>, and that <select> is deleted:
+    # the section has ONE Shield-scenario control, which drives these blocks
+    # through ``_wbSyncScen`` -> ``mcSetScenario``. Pre-fix this asserted
+    # pay['allLabelByPreset']['one_one'] == 'all scenarios = 1v1 shields
+    # here', ['flat'] == 'all scenarios' and ['even'] == 'all scenarios
+    # (even shields)'.
+    assert 'allLabelByPreset' not in pay
+    for key, mapped in pay['allByPreset'].items():
+        assert mapped in pay['scens'], (key, mapped)
+
+
+def test_a_preset_block_prints_its_own_clusters_and_says_what_it_omits():
+    """The short form is a size decision, so the omission must be stated.
+
+    Printing the default view's per-bit win-rate grid under a different
+    partition's clusters would be the dishonest way to save the bytes; this
+    pins that the block carries its own cluster table and its own rules, and
+    a sentence saying where the omitted tables are.
+    """
+    html = _render_with_presets()
+
+    def _block(scen):
+        i = html.index(f'<div class="dd-mc-scen-block" data-scen="{scen}" ')
+        nxt = html.find('<div class="dd-mc-scen-block"', i + 10)
+        end = nxt if nxt > 0 else html.index('How this works', i)
+        return html[i:end]
+
+    block = _block('all__even')
+    assert 'Cluster' in block            # its own cluster table
+    assert 'Depth-3 decision tree' in block      # its own stat rules
+    # Pre-fix: "preset's own" -- the one "preset" that survived in reader
+    # text (2026-09-19 round-10 review).
+    assert "Build criteria setting's own combined partition" in block
+    assert 'are not repeated here' in block
+    # the two heavy tables are NOT in it
+    assert 'Matchup flip thresholds' not in block
+    assert 'Green tint = the cluster mostly wins' not in block
+    # positive control: the DEFAULT combined block still carries both
+    full = _block('all')
+    assert 'Matchup flip thresholds' in full
+    assert 'Green tint = the cluster mostly wins' in full
+
+
+def test_preset_partitions_do_not_become_dropdown_options():
+    """There is no dropdown here at all any more (round 10).
+
+    Pre-fix the clusters body carried its own ``select.dd-mc-scen`` and this
+    asserted ``mc.ALL_SCEN_KEY in opts`` and ``'all__even' not in opts``.
+    The per-preset combined partition still gets its own server-side block,
+    which is what the section's one control switches to.
+    """
+    html = _render_with_presets()
+    assert re.findall(r'<option value="([^"]+)"', html) == []
+    assert 'class="dd-mc-scen"' not in html
+    assert 'data-scen="all__even"' in html
+    assert f'data-scen="{mc.ALL_SCEN_KEY}"' in html
+
+
+# ---------------------------------------------------------------------------
+# Round 7 (2026-09-17): the section is second on the page, collapsed, and it
+# OPENS with the all-scenarios mini-grid that used to live 3 MB above it.
+# ---------------------------------------------------------------------------
+
+_SCRIPTS = REPO_ROOT / "scripts"
+
+
+def test_the_section_is_a_subsection_of_which_one_to_build():
+    """Round 9: the content renders into "Which one to build?", not beside it.
+
+    Michael's 2026-09-19 decision (b). ``.dd-mc-root`` is still the inner div
+    every engine guard looks for -- the lazy-render hook is a capturing
+    ``toggle`` listener that looks for ``.dd-mc-root`` INSIDE the toggled
+    element, and it now finds it inside the section's "Why these regions"
+    expander instead of inside a ``<details>`` of its own.
+
+    Pre-fix the render opened with ``<details class="dd-collapsible
+    dd-mc-collapse" id="dd-matchup-clusters-section">`` carrying a
+    ``<summary class="dd-h2">Matchup clusters ...</summary>`` and closed with
+    ``</div></details>``.
+    """
+    html = _render([])
+    assert html.startswith('<div class="dd-section dd-mc-root" '
+                           'id="dd-matchup-clusters">')
+    assert '<details class="dd-collapsible dd-mc-collapse"' not in html
+    assert 'id="dd-matchup-clusters-section"' not in html
+    assert '<summary class="dd-h2"' not in html
+    assert html.rstrip().endswith('</div>')
+    assert not hasattr(mc, 'SECTION_DETAILS_ID')
+    # positive control: the body itself is unchanged -- the prose, the
+    # scenario selector and the payload are all still here
+    # Round 10: the round-8 intro paragraphs and the second Shield-scenario
+    # <select> went with the move into "Why these regions", whose own lead is
+    # the one sentence that says what the clusters are. Pre-fix both
+    # 'IVs grouped by <b>which marginal' and 'class="dd-mc-scen"' were here.
+    assert 'IVs grouped by <b>which marginal' not in html
+    assert 'class="dd-mc-scen"' not in html
+    assert 'class="dd-mc-panel"' in html        # positive control: the panels
+    assert 'class="dd-mc-data"' in html
+
+
+def test_the_clusters_section_no_longer_carries_a_mini_grid():
+    """Its nine-mini grid merged into the section's one grid (round 9).
+
+    Pre-fix ``_allscen_figure(9)`` emitted ``id="allscen-toggle" checked``,
+    ``id="allscen-note"`` and ``id="allscen-grid"`` as the section's opening
+    figure -- the same nine shield scenarios on the same x axis as the
+    "Which one to build?" grid directly above it.
+    """
+    html = _render([])
+    for dead in ('allscen-toggle', 'allscen-note', 'allscen-grid'):
+        assert dead not in html, dead
+    assert not hasattr(mc, '_allscen_figure')
+    src = (_SCRIPTS / 'deep_dive_matchup_clusters.py').read_text()
+    assert 'id="allscen-grid"' not in src
+    # positive control: the one grid that replaced it is emitted by the
+    # section renderer, behind the figure's third tab
+    wb = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    assert 'wb-allscen-grid' in wb
+    assert "VIEW_ALLSCEN = ('allscen'" in wb
+
+
+def test_the_section_open_helper_is_just_the_body_div():
+    """No collapsed line to keep honest any more: the section it is inside
+    carries the summary.
+
+    Pre-fix ``_section_open(9)`` returned a ``<details>`` whose summary read
+    "... opens with all 9 shield scenarios side by side", ``_section_open(3)``
+    said 3 and ``_section_open(1)`` promised no figure.
+    """
+    for n in (9, 3, 1, 0):
+        out = mc._section_open(n)
+        assert out.startswith('<div class="dd-section dd-mc-root"')
+        assert 'side by side' not in out
+        assert '<details' not in out
+    # the title constant survives for the expander that names it
+    assert mc.SECTION_TITLE == 'Matchup clusters'
+
+
+def test_the_scatter_control_strip_no_longer_owns_the_mini_grid():
+    """Source scan of the emitter the markup moved OUT of. Absence pins with
+    a positive control: the strip must still be the strip."""
+    src = (_SCRIPTS / "deep_dive.py").read_text()
+    assert 'id="allscen-toggle"' not in src
+    assert 'id="allscen-grid"' not in src
+    assert 'id="allscen-note"' not in src
+    # positive controls: the strip and its neighbour are still emitted here
+    assert 'id="highlight-input"' in src
+    assert '<div class="highlight-strip" ' in src
+    # ...and the slot this file FILLS is emitted by the section renderer
+    # now (round 9), with a fallback here for a page that has no section.
+    # A floor, not an equality: one more mention of the marker (a comment, a
+    # second placement guard) is not a regression.
+    assert src.count('<!-- MATCHUP_CLUSTERS_SLOT -->') >= 2
+    assert "if not which_build_html:" in src
+    wb = (_SCRIPTS / 'deep_dive_which_build.py').read_text()
+    assert "CLUSTERS_SLOT = '<!-- MATCHUP_CLUSTERS_SLOT -->'" in wb
+
+
+@pytest.mark.render
+def test_the_rendered_page_puts_the_clusters_section_above_the_scatter(
+        small_dive_html):
+    """The order pin, on the artifact rather than the producing source.
+
+    Pre-round-7 order: ... #dd-scatter ... #allscen-grid ... #dd-slayer-builds
+    ... #dd-matchup-clusters ... (the section sat inside the Dive Analysis
+    collapsible, below everything). Now the section and its grid come FIRST.
+    """
+    h = small_dive_html
+    sect = h.index('id="dd-matchup-clusters"')
+    scatter = h.index('id="dd-scatter"')
+    recs = h.index('id="dd-recommendations"')
+    # Round 9: the clusters body renders INSIDE "Which one to build?" when
+    # the page has one, and at the slot's fallback position -- still above
+    # the scatter -- when it does not. This fixture is a blob-free dive, so
+    # it takes the fallback; the section case is pinned on the real preview
+    # by tests/test_which_build_section.py. Pre-fix the order was
+    # #dd-matchup-clusters-section then #allscen-grid then #dd-scatter.
+    if 'id="dd-which-build"' in h:
+        assert h.index('id="dd-which-build"') < sect
+    assert sect < scatter < recs
+    assert 'id="dd-matchup-clusters-section"' not in h
+    # the section is no longer the first block of the Dive Analysis details
+    analysis = h.index('id="dd-analysis"')
+    assert sect < analysis
+    # the best-buddy duplication survives the move: one live copy in a host,
+    # one inert copy in the template the toggle swaps in
+    assert h.count('id="dd-matchup-clusters"') == 2
+    assert 'id="dd-bb-clusters-host"' in h
+    assert 'id="dd-bb-clusters-tmpl"' in h
+    assert (h.index('id="dd-bb-clusters-host"')
+            < h.index('id="dd-matchup-clusters"')
+            < h.index('id="dd-bb-clusters-tmpl"'))
+    # ...and the engine registers the pair, which is where the duplicate-id
+    # guard in tests/test_dive_dom_ids.py reads its host list from
+    js = (_SCRIPTS / "deep_dive_engine.js").read_text()
+    assert ("_bbInitHost('dd-bb-clusters-host', 'dd-bb-clusters-tmpl');"
+            in js)
+    # no stray marker shipped
+    assert 'MATCHUP_CLUSTERS_SLOT' not in h
+
+
+def test_the_section_only_draws_once_it_is_open():
+    """The guards the move needs.
+
+    The load-bearing one is ``_inClosedDetails``: measured in headless
+    Chrome on the round-7 preview, a CLOSED ``<details>`` is not
+    display:none in current Chrome -- #allscen-grid reported
+    ``offsetParent`` BODY and ``clientWidth`` 661 with its section closed,
+    and the minis inside it drew 212px wide. So every "is it on screen"
+    guard on the page passes inside a closed section, and deferring nine
+    4096-point panels until the reader opens it has to ask the <details>.
+    The offsetParent test stays beside it for UAs that DO use display:none.
+
+    The second guard is the best-buddy swap, which leaves a live but EMPTY
+    grid div whose cache key still matches.
+    """
+    js = (_SCRIPTS / "deep_dive_engine.js").read_text()
+    assert 'function _inClosedDetails(el) {' in js
+    # Round 9: the guard moved to the section's own box renderer, which is
+    # what defers the figures inside a closed expander. Pre-fix the two
+    # pinned lines were ``if (_inClosedDetails(grid) || grid.offsetParent ===
+    # null) {`` and ``if (key !== _allscenKey || !grid.children.length) {``
+    # in refreshAllScenarios, and the toggle hook read
+    # ``if (det.querySelector('#allscen-grid')) refreshAllScenarios();``.
+    assert 'if (_inClosedDetails(boxes[i])) continue;' in js
+    assert "if (!force && key === _wbAllScenKey && grid.children.length)" in js
+    # and the swap redraws the section it just replaced
+    assert 'function mcRenderPending() {' in js
+    assert js.count('mcRenderPending();') >= 2
