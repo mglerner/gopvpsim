@@ -123,6 +123,74 @@ def scan_which_build_omissions(log_text: str) -> list[str]:
     return out
 
 
+VINTAGE_FILE = 'vintage.toml'
+
+
+def read_vintage(d: Path) -> dict | None:
+    """The engine / gamemaster / rankings stamp deep_dive.py left in ``d``.
+
+    None when the dir carries no stamp at all -- a dive rendered before the
+    stamp existed, or one whose stamping failed. That is reported as its own
+    line rather than silently folded into "consistent", because "no evidence"
+    and "evidence of one vintage" are different answers.
+    """
+    f = d / VINTAGE_FILE
+    if not f.exists():
+        return None
+    try:
+        with open(f, 'rb') as fh:
+            return tomllib.load(fh)
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
+def vintage_errors(dirs) -> list[str]:
+    """One error per MIXED build stamp across the dirs a chain wrote.
+
+    A dive's scores come frozen out of its replay blob, but the render reads
+    the live gamemaster and the live rankings, so a TTL refetch part-way
+    through a multi-day bake silently changes opponent ranks -- and therefore
+    the verdicts a page prints -- between one page and the next. Before this
+    check NOTHING would have caught that after the fact: the pages look fine,
+    every gate passed, and the only protection was remembering to launch
+    through overnight_redive.sh (whose keeper is what prevents it). The
+    2026-09-12 bake is the recorded instance.
+
+    ``dirs`` are the dive dirs this chain refreshed. Takes the dirs rather
+    than globbing so a dive the chain did NOT touch cannot report a stale
+    stamp as a mixed bake.
+    """
+    seen: dict[str, dict[str, list[str]]] = {
+        'engine_hash': {}, 'gamemaster_hash': {}}
+    unstamped: list[str] = []
+    for d in dirs:
+        v = read_vintage(Path(d))
+        if not v:
+            unstamped.append(Path(d).name)
+            continue
+        for key in seen:
+            seen[key].setdefault(str(v.get(key)), []).append(Path(d).name)
+    out = []
+    for key, groups in seen.items():
+        if len(groups) <= 1:
+            continue
+        # Name the MINORITY dirs: on a bake that rolled mid-run, those are
+        # the pages to look at, and printing all 136 helps nobody.
+        ranked = sorted(groups.items(), key=lambda kv: -len(kv[1]))
+        bits = []
+        for value, names in ranked:
+            shown = ', '.join(sorted(names)[:8])
+            more = f' (+{len(names) - 8} more)' if len(names) > 8 else ''
+            bits.append(f'{value} x{len(names)} [{shown}{more}]')
+        out.append(f'MIXED {key} across this bake: ' + ' | '.join(bits))
+    if unstamped:
+        shown = ', '.join(sorted(unstamped)[:8])
+        more = (f' (+{len(unstamped) - 8} more)' if len(unstamped) > 8 else '')
+        out.append(f'no {VINTAGE_FILE} in {len(unstamped)} fresh dive dirs: '
+                   f'{shown}{more}')
+    return out
+
+
 def load_resolutions() -> list[dict]:
     """Chain failures that were diagnosed, fixed, and re-verified by hand.
 
@@ -330,6 +398,16 @@ def main() -> int:
             skipped += 1
     print(f'  OK  {len(fresh_dirs)} dirs fully fresh, '
           f'{skipped} not in this chain')
+
+    # 2b. Build vintage -------------------------------------------------
+    # mtimes above prove the FILES are of one run; these prove the DATA
+    # behind them is of one vintage, which mtimes cannot see.
+    vin = vintage_errors(fresh_dirs)
+    for ln in vin:
+        errors.append(ln)
+        print(f'  ERR {ln}')
+    if not vin and fresh_dirs:
+        print('  OK  one engine + gamemaster vintage across all fresh dirs')
 
     # 3. Pool sanity --------------------------------------------------
     print('[3/5] pool sanity (markers: ' + ', '.join(args.markers) + ')')

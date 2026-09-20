@@ -16,9 +16,10 @@
 #      --delete-excluded, so anything removed locally -- or matching an
 #      exclude pattern -- is also removed on the server.
 #
-# Excluded from the publish: meta.toml (site-index build metadata, not
-# user-facing). Server-side copies are removed on next push via
-# --delete-excluded.
+# Excluded from the publish: meta.toml (site-index build metadata) and
+# vintage.toml (per-dive engine/gamemaster/rankings stamp written by
+# deep_dive.py and read by verify_overnight.py). Neither is user-facing.
+# Server-side copies are removed on next push via --delete-excluded.
 #
 # Default is dry-run. Pass --push to actually send the files.
 #
@@ -209,7 +210,7 @@ else
   echo
 fi
 
-RSYNC_EXCLUDES=(--exclude='meta.toml')
+RSYNC_EXCLUDES=(--exclude='meta.toml' --exclude='vintage.toml')
 
 if [ "$PUSH" = true ]; then
   echo "Pushing ${SRC} -> ${DEST}"
