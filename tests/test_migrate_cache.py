@@ -583,3 +583,29 @@ def test_slayer_flag_routes_gamemaster_mode(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert 'SLAYER GAMEMASTER' in out
     assert 'blessed (unaffected, served warm): 1' in out
+
+
+def test_no_shadow_either_side_20260920_predicate():
+    """The cmp_atk 1-ULP fix: affected iff EITHER side is shadow.
+
+    Both-shadow must be AFFECTED, which is exactly where this differs from
+    the older ``shadow_xor``: the old ``fl(fl(x * 6/5) / (6/5))`` round trip
+    can map two distinct raw attacks onto one float, so it can manufacture a
+    CMP tie between two shadows that the carried ``raw_atk`` does not have.
+    Blessing a both-shadow column (as ``shadow_xor`` would) is unsound here.
+    """
+    p = migrate_cache.PREDICATES['no_shadow_either_side_20260920']
+    plain = {'species': 'Azumarill', 'shadow': False}
+    other = {'species': 'Lickitung', 'shadow': False}
+    shade = {'species': 'Quagsire', 'shadow': True}
+    assert p(plain, other) is False                 # the only blessed shape
+    assert p(shade, plain) is True
+    assert p(plain, shade) is True
+    assert p(shade, {'species': 'Quagsire', 'shadow': True}) is True
+    # ... and that last one is where shadow_xor disagrees:
+    assert migrate_cache.PREDICATES['shadow_xor'](shade, shade) is False
+    # Fail-safe: never bless blind.
+    assert p(None, plain) is True
+    assert p(plain, None) is True
+    assert p({}, plain) is True
+    assert p(plain, {'species': 'Quagsire'}) is True   # no 'shadow' field

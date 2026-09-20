@@ -2636,6 +2636,15 @@ class BattlePokemon:
     shields:         int = 2
     initial_energy:  int = 0     # energy at battle start (0–100)
     shadow:          bool = False    # CMP uses the unboosted attack (see cmp_atk)
+    # Attack BEFORE the shadow multiplier -- the number CMP compares. Set by
+    # every construction path that HAS it (from_pokemon, the dive workers'
+    # _build_side, apply_form_change), because it cannot be recovered from
+    # ``atk`` afterwards: fl(fl(x * 6/5) / (6/5)) is one ULP low for some x
+    # (Quagsire 0/15/14 is the measured case), which loses the shadow side
+    # an exact CMP tie. Left None by a caller that does not have it, and
+    # __post_init__ then falls back to the old division -- exact for every
+    # non-shadow mon, and no worse than before for a shadow one.
+    raw_atk:         "float | None" = None
     # Stat stages present at battle START (native form buffs, e.g. Mimikyu
     # (Busted)'s permanent -1 def). 0/0 for everything else. Persisted as
     # init fields so reset_for_battle can restore them across the
@@ -2742,6 +2751,9 @@ class BattlePokemon:
         self._queued_fast      = None
         self.atk_stage         = self.initial_atk_stage
         self.def_stage         = self.initial_def_stage
+        if self.raw_atk is None:
+            self.raw_atk = (self.atk / SHADOW_ATK_BONUS if self.shadow
+                            else self.atk)
         self._buff_apply_meters = {}
         # Damage cache starts invalid (opp id -1 never matches any real id).
         self._dmg_cache_opp       = None
@@ -2796,13 +2808,18 @@ class BattlePokemon:
     def cmp_atk(self) -> float:
         """Attack used for CMP / charge-move priority. Shadow's x1.2
         boosts damage but NOT priority (live-game behavior; PvPoke
-        compares shadow-free stats.atk), so strip it here.
+        compares shadow-free stats.atk), so CMP reads the pre-shadow value.
 
-        This is the inverse of the atk half of ``pokemon.effective_stats``,
-        so it divides by that same constant instead of a re-typed 1.2 --
-        SHADOW_ATK_BONUS is 6/5, bit-identical to the literal it replaced
-        (DRY review 2026-08-05 entry 13 / L15)."""
-        return self.atk / SHADOW_ATK_BONUS if self.shadow else self.atk
+        It is now CARRIED (``raw_atk``) rather than reconstructed. Until
+        2026-09-20 this divided ``atk`` by ``SHADOW_ATK_BONUS``, and that
+        round trip is not exact: ``fl(fl(x * 6/5) / (6/5))`` comes back one
+        ULP low for Quagsire 0/15/14 (and any x like it), so a shadow mon
+        that should TIE a plain one on CMP lost the tie -- and CMP decides
+        who throws first, which is winner-affecting at those cells. The
+        float fact itself is unchanged and still pinned by
+        ``tests/test_worlds_tier0.py``; what changed is that it no longer
+        reaches this comparison."""
+        return self.raw_atk
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
@@ -2825,6 +2842,7 @@ class BattlePokemon:
             species        = pokemon.species,
             types          = types,
             atk            = pokemon.atk,
+            raw_atk        = pokemon.raw_atk,
             shadow         = pokemon.shadow,
             def_           = pokemon.def_,
             max_hp         = pokemon.hp,

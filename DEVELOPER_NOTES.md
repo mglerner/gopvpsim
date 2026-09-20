@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2850<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2866<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -388,6 +388,22 @@ and skip the migration when batching with a broad, boundary-scattered fix
 one-shot, pinned to a `from_engine` hash, non-interacting — no maintenance
 burden, so add them on demand rather than pre-building. Full policy +
 rationale: CLAUDE.md "Before a cold re-dive, check for a tractable migration".
+
+**Engine-hash bumps, most recent first** (the `--from-engine` value a
+migration needs is the OLD hash of its row):
+
+| date       | old            | new            | change                                   | predicate                          |
+| ---------- | -------------- | -------------- | ---------------------------------------- | ---------------------------------- |
+| 2026-09-20 | `36037e51a2ee` | `9ac12a2754a1` | cmp_atk carries the pre-shadow attack    | `no_shadow_either_side_20260920`   |
+| 2026-09-15 | `1436a17ffbb2` | `36037e51a2ee` | Cramorant pogodives sheet v6             | `pogodives_sheet_v6_20260912`      |
+| 2026-09-15 | `e4d380ec3e5e` | `1436a17ffbb2` | Aegislash reuse leak                     | `form_change_either_side_20260912` |
+
+The 2026-09-20 bump is a lone localized fix, as the one-fix-per-bump rule
+requires: the whole hashed delta is `raw_atk` (a new `Pokemon` property, a
+new `FormData` field + its three builders and `apply_form_change`, and the
+`BattlePokemon` field + `__post_init__` fallback + `cmp_atk`). Nothing else
+reads `raw_atk`, so the only score that can move is one CMP decided, and a
+battle with no shadow on either side has `raw_atk == atk` bit for bit.
 
 Operational notes:
 

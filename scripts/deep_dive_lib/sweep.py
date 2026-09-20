@@ -365,6 +365,10 @@ class BattleSide(NamedTuple):
     def_: float
     hp: int
     shadow: bool
+    # ``raw_atk`` is not carried here: it is re-derived in _build_side from
+    # the IVs, level and gamemaster entry this tuple already holds, with the
+    # same expression pokemon.Pokemon.raw_atk uses, so the two agree bit for
+    # bit and no producer of a BattleSide has to learn a new field.
     fm_template: dict
     cms_template: list
     mon: dict               # gamemaster entry (form-change ingredients)
@@ -374,9 +378,15 @@ class BattleSide(NamedTuple):
 
 
 def _build_side(side, league_cp):
+    # Pre-shadow attack, for CMP. Recovering it from side.atk by dividing
+    # out SHADOW_ATK_BONUS is one ULP low for some spreads and loses the
+    # shadow side an exact CMP tie (battle.BattlePokemon.cmp_atk), so it is
+    # computed from the same ingredients the effective stat was.
+    raw_atk = (side.mon['baseStats']['atk'] + side.ivs[0]) * CPM[side.level]
     bp = BattlePokemon(
         species=side.species, types=side.types,
         atk=side.atk, def_=side.def_, max_hp=side.hp,
+        raw_atk=raw_atk,
         shadow=side.shadow,
         # Move dicts are PRIVATE per BattlePokemon (review section G,
         # invariant 1) -- copy the templates, never share them.

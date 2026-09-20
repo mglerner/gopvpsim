@@ -31,6 +31,8 @@ class FormData:
     types: tuple              # immutable type tuple
     atk: float                # effective attack stat
     def_: float               # effective defense stat
+    raw_atk: float            # attack BEFORE the shadow multiplier (CMP reads
+                              # this; see battle.BattlePokemon.cmp_atk)
     fast_move: dict           # move dict
     charged_moves: tuple      # tuple of move dicts
     trigger: str | None       # what triggers change FROM this form
@@ -236,7 +238,8 @@ def _build_variable_form_change(mon_entry, fc, atk_iv, def_iv, level, shadow,
 
     def _fd(entry, trigger, move_id, move_ids, target_idx):
         base = entry['baseStats']
-        atk, def_ = effective_stats((base['atk'] + atk_iv) * cpm,
+        raw_atk = (base['atk'] + atk_iv) * cpm
+        atk, def_ = effective_stats(raw_atk,
                                     (base['def'] + def_iv) * cpm, shadow)
         raw = entry.get('nativeStatBuffs')
         native = tuple(raw) if raw and any(b != 0 for b in raw) else None
@@ -246,6 +249,7 @@ def _build_variable_form_change(mon_entry, fc, atk_iv, def_iv, level, shadow,
             types=tuple(parse_types(entry)),
             atk=atk,
             def_=def_,
+            raw_atk=raw_atk,
             fast_move=fast_move,
             charged_moves=cm_tuple,
             trigger=trigger,
@@ -352,7 +356,8 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         alt_level = max(1.0, alt_level)
 
     alt_cpm = CPM[alt_level]
-    alt_atk, alt_def = effective_stats((alt_base['atk'] + atk_iv) * alt_cpm,
+    alt_raw_atk = (alt_base['atk'] + atk_iv) * alt_cpm
+    alt_atk, alt_def = effective_stats(alt_raw_atk,
                                        (alt_base['def'] + def_iv) * alt_cpm,
                                        shadow)
 
@@ -369,8 +374,9 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         alt_charged_moves = _swap_charged_move(charged_moves, _MORPEKO_CHARGED_MOVE_MAP)
 
     # Build FormData for both forms
+    default_raw_atk = (mon_entry['baseStats']['atk'] + atk_iv) * CPM[level]
     default_atk, default_def = effective_stats(
-        (mon_entry['baseStats']['atk'] + atk_iv) * CPM[level],
+        default_raw_atk,
         (mon_entry['baseStats']['def'] + def_iv) * CPM[level],
         shadow)
     default_fd = FormData(
@@ -379,6 +385,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         types=default_types,
         atk=default_atk,
         def_=default_def,
+        raw_atk=default_raw_atk,
         fast_move=fast_move,
         charged_moves=tuple(charged_moves),
         trigger=trigger,
@@ -400,6 +407,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         types=alt_types,
         atk=alt_atk,
         def_=alt_def,
+        raw_atk=alt_raw_atk,
         fast_move=alt_fast_move,
         charged_moves=alt_charged_moves,
         trigger=alt_trigger if alt_trigger != 'none' else None,
@@ -505,6 +513,7 @@ def apply_form_change(bp, opponent, target_idx=None):
     bp.species = fd.species
     bp.types = list(fd.types)
     bp.atk = fd.atk
+    bp.raw_atk = fd.raw_atk
     bp.def_ = fd.def_
     bp.fast_move = fd.fast_move
     # Ensure _turns is set on the new fast move (normally set in simulate() setup)

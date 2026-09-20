@@ -83,13 +83,18 @@ def test_matches_move_semantics():
     """FormData.matches_move: ANY wildcard, exact id, and plural moveIDs
     membership (the three arms of PvPoke Battle.js:1609-1610)."""
     fd = FormData(species='X', species_id='x', types=('normal',), atk=1.0,
-                  def_=1.0, fast_move={}, charged_moves=(),
+                  def_=1.0, raw_atk=1.0, fast_move={}, charged_moves=(),
                   trigger='charged_move', move_id=None,
                   native_stat_buffs=None, move_ids=('DIVE', 'SURF'))
     assert fd.matches_move('DIVE') and fd.matches_move('SURF')
     assert not fd.matches_move('FLY')
+    # ``raw_atk`` (the pre-shadow attack CMP reads) is deliberately
+    # REQUIRED, not defaulted: a new form builder that forgets it must fail
+    # here rather than ship a form whose CMP silently reads the shadow-
+    # boosted number.
     any_fd = FormData(species='X', species_id='x', types=('normal',),
-                      atk=1.0, def_=1.0, fast_move={}, charged_moves=(),
+                      atk=1.0, def_=1.0, raw_atk=1.0, fast_move={},
+                      charged_moves=(),
                       trigger='charged_move', move_id='ANY',
                       native_stat_buffs=None)
     assert any_fd.matches_move('WHATEVER')

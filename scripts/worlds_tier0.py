@@ -268,9 +268,20 @@ def guarantee_cutoff(fast, charged, n_fast, n_charged,
 
 def cmp_threshold(opp_cmp_atk, focal_shadow, bracket=ATK_BRACKET):
     """Focal effective-atk thresholds for the CMP comparison vs a fixed
-    opponent ``cmp_atk`` (battle.py cmp_atk: ``atk / SHADOW_ATK_BONUS``
-    when shadow, else ``atk``; the division is walked, NOT inverted
-    algebraically -- ``fl(fl(x*1.2)/1.2) != x`` for ~1/3 of spreads).
+    opponent ``cmp_atk``, as the engine computed it WHEN THE WORLDS PLANES
+    WERE BAKED: ``atk / SHADOW_ATK_BONUS`` when shadow, else ``atk``, with
+    the division walked rather than inverted algebraically (``fl(fl(x*1.2)
+    /1.2) != x`` for ~1/3 of spreads).
+
+    DELIBERATELY STALE, as of 2026-09-20. ``battle.BattlePokemon.cmp_atk``
+    no longer divides -- it reads a carried pre-shadow ``raw_atk``, which
+    restores the ~30 exact shadow-twin ties this division broke. This
+    function keeps the old arithmetic because its only job is to describe
+    the frozen Worlds planes, which were baked under the pre-fix engine;
+    switching it would make the CMP board contradict the artifact it
+    annotates. If the Worlds surface is ever re-baked, this must change
+    with it: the shadow branch becomes the carried raw attack, and the tie
+    band moves by one ULP.
 
     Returns ``{'win_above': a, 'tie_min': t0|None, 'tie_max': t1|None}``:
     focal cmp_atk > opponent's iff ``atk >= win_above``; the tie band
@@ -281,10 +292,10 @@ def cmp_threshold(opp_cmp_atk, focal_shadow, bracket=ATK_BRACKET):
     priority entirely (``use_priority`` False), both charged moves
     resolve in player-index order (PROP-1), and in-game it is a coin
     flip. Callers must never render the tie band as "focal wins CMP".
-    NB our shadow division breaks ~30 of PvPoke's exact shadow-twin ties
-    by 1 ULP (2026-08-10 audit; engine-side fix is a pending decision)
-    -- this function matches OUR engine so the CMP board can never
-    contradict the baked planes.
+    NB the shadow division here breaks ~30 of PvPoke's exact shadow-twin
+    ties by 1 ULP (2026-08-10 audit). The ENGINE's copy of that defect was
+    fixed on 2026-09-20; this one stays, per the paragraph above, so the
+    CMP board cannot contradict the planes it annotates.
     """
     def cmp_of(a):
         return a / SHADOW_ATK_BONUS if focal_shadow else a
