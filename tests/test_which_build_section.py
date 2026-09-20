@@ -748,12 +748,22 @@ def test_section_panel_reads_the_page_arrays_and_embeds_no_second_grid():
     # Wins are counted from the embedded score grid, over every scenario and
     # every opponent -- the brief's own denominator.
     wins = src[src.index('function wbWins('):src.index('function _wbColors(')]
-    assert 'SCORES[mi + SCORE_KEY_SEP + mode]' in wins
+    # Through the page's ONE score-key grammar, so the level suffix the
+    # best-buddy toggle flips comes along. Pre-2026-09-20 this read the bare
+    # L50 key `SCORES[mi + SCORE_KEY_SEP + mode]`, because the section only
+    # ever existed at the league cap.
+    assert 'getScores(mi, mode)' in wins
+    assert 'getScoreKey(mi, mode)' in wins
+    assert 'SCORES[mi + SCORE_KEY_SEP + mode]' not in wins
     assert 'DATA.nScenarios' in wins and 'DATA.nOpponents' in wins
     assert 'isWin(' in wins
-    # Stats come from the league-cap arrays, not whatever best-buddy swapped in.
-    assert '_bbL50' in src[src.index('function wbLevelArrays('):
-                           src.index('var _wbWinsCache')]
+    # Stats come from the level the section on screen was RENDERED at, which
+    # since 2026-09-20 is whatever DATA.iv* currently holds: the section is
+    # emitted once per level and swapped whole. Pre-fix it pinned itself to
+    # the stashed `_bbL50` arrays, because one L50 copy was all there was.
+    lvl = src[src.index('function wbLevelArrays('):
+              src.index('var _wbWinsCache')]
+    assert 'return DATA;' in lvl and '_bbL50' not in lvl
     # Cluster labels are the clusters section's, never re-derived here, and
     # they are drawn only when the section baked them for THIS panel's
     # moveset and opponent-IV mode.
@@ -870,6 +880,15 @@ def test_collection_overlay_refreshes_the_section_panel():
 _GROUP_HARNESS = r"""// Node harness: exercise the section's grouping logic in isolation.
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[2], 'utf8');
+// The score-key grammar lives ABOVE _wbRoot, and wbWins goes through it so
+// the best-buddy level suffix comes along. Sliced out of the real source
+// rather than re-typed here: a harness copy of the key grammar is exactly
+// the drift tests/test_js_score_key_parity.py exists to prevent.
+const keyStart = src.indexOf('function getScoreKeyAt(');
+const keyEnd = src.indexOf('// ---- Composite mode grammar');
+if (keyStart < 0 || keyEnd < 0) { console.error('KEY MARKERS'); process.exit(2); }
+const keyBlock = src.slice(keyStart, keyEnd);
+const SCORE_KEY_L51 = '@51';
 const start = src.indexOf('function _wbRoot()');
 const end = src.indexOf('// ---- Re-theme the canvases');
 if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
@@ -906,7 +925,7 @@ const Plotly = { react: () => {}, restyle: () => {}, Plots: { resize: () => {} }
 const getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 let out;
-eval(block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit, _wbOwnedTrace, _wbClusterSides, _wbScen, _wbActiveLine, _wbSideAt, _wbOn};');
+eval(keyBlock + block + '\nout = {wbWins, _wbGroups, wbLevelArrays, _wbIvIdx, _wbHover, _wbMask, _wbBit, _wbOwnedTrace, _wbClusterSides, _wbScen, _wbActiveLine, _wbSideAt, _wbOn};');
 
 // Masks are LSB-first per byte, exactly as deep_dive_which_build.mask_b64
 // packs them: 'PA==' = 0b00111100 = spreads 2..5, 'MA==' = spreads 4..5,
@@ -1118,6 +1137,15 @@ def test_section_grouping_logic_runs(tmp_path):
 _BUILDS_HARNESS = r"""// Node harness: the builds view's grouping + the weighted win count.
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[2], 'utf8');
+// The score-key grammar lives ABOVE _wbRoot, and wbWins goes through it so
+// the best-buddy level suffix comes along. Sliced out of the real source
+// rather than re-typed here: a harness copy of the key grammar is exactly
+// the drift tests/test_js_score_key_parity.py exists to prevent.
+const keyStart = src.indexOf('function getScoreKeyAt(');
+const keyEnd = src.indexOf('// ---- Composite mode grammar');
+if (keyStart < 0 || keyEnd < 0) { console.error('KEY MARKERS'); process.exit(2); }
+const keyBlock = src.slice(keyStart, keyEnd);
+const SCORE_KEY_L51 = '@51';
 const start = src.indexOf('function _wbRoot()');
 const end = src.indexOf('// ---- Re-theme the canvases');
 if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
@@ -1155,7 +1183,7 @@ const Plotly = { react: () => {}, restyle: () => {}, Plots: { resize: () => {} }
 const getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 let out;
-eval(block + '\nout = {wbWinsWeighted, wbWeightedDen, _wbBuildOf, _wbBuildSide,' +
+eval(keyBlock + block + '\nout = {wbWinsWeighted, wbWeightedDen, _wbBuildOf, _wbBuildSide,' +
      ' _wbGuaranteedInScen, _wbBuildGroups, _wbBuildName, wbPresetBlock,' +
      ' wbLevelArrays, wbWins};');
 
@@ -1277,8 +1305,18 @@ def test_section_is_emitted_above_the_scatter_controls():
     src = (SCRIPTS_DIR / 'deep_dive.py').read_text()
     controls = '\'<div class="controls" id="dd-scatter">\\n\''
     assert src.count(controls) == 1, 'the scatter controls anchor moved'
-    assert src.count('html += which_build_html') == 1
-    assert src.index('html += which_build_html') < src.index(controls)
+    # A MARKER since 2026-09-20, not the section itself: on a best-buddy dive
+    # the section is rendered at both levels and the host/<template> pair is
+    # assembled farther down, beside the level bodies that supply each half's
+    # clusters. Placement is unchanged -- the marker sits where the section
+    # used to be emitted, and is replaced in place. Pre-fix this line read
+    # `html += which_build_html`.
+    slot = "'<!-- WHICH_BUILD_SLOT -->'"
+    assert src.count("html += " + slot) == 1
+    assert src.index("html += " + slot) < src.index(controls)
+    # ...and the marker is really consumed, in both the paired and the
+    # unpaired case, with the belt-and-braces cleanup after it.
+    assert src.count("html.replace('<!-- WHICH_BUILD_SLOT -->'") == 2
 
 
 def test_section_is_omitted_without_a_blob_path():
@@ -1290,12 +1328,14 @@ def test_section_is_omitted_without_a_blob_path():
     # Three maps now: the rendered sections, the presets each arm's section
     # actually built, and the card spreads taken from those builds (v5 --
     # the card no longer picks its own poles). Pre-v5 this was ``({}, {})``.
-    # Three maps: the rendered sections, the live presets, and the card
-    # spreads taken from those builds. The fourth -- every build's MEMBERSHIP
-    # -- went out with the Top Picks cards it labelled (round 8 item 2);
-    # pre-round-8 this was ``({}, {}, {}, {})``, pre-round-5 ``({}, {}, {})``
-    # and pre-v5 ``({}, {})``.
-    assert deep_dive._which_build_sections({}) == ({}, {}, {})
+    # FIVE maps since 2026-09-20: the rendered sections, the live presets,
+    # the card spreads taken from those builds, and then the best-buddy
+    # (L51) section + its card spreads, which the caller puts in the
+    # <template> the toggle swaps in. Pre-fix this was ``({}, {}, {})``;
+    # before that ``({}, {}, {}, {})`` (round 8 dropped the membership map
+    # with the Top Picks cards it labelled), ``({}, {}, {})`` pre-round-5
+    # and ``({}, {})`` pre-v5.
+    assert deep_dive._which_build_sections({}) == ({}, {}, {}, {}, {})
 
 
 # ---------------------------------------------------------------------------
@@ -4818,6 +4858,15 @@ _RING_HARNESS = r"""
 // Same slice and same globals as _BUILDS_HARNESS above.
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[2], 'utf8');
+// The score-key grammar lives ABOVE _wbRoot, and wbWins goes through it so
+// the best-buddy level suffix comes along. Sliced out of the real source
+// rather than re-typed here: a harness copy of the key grammar is exactly
+// the drift tests/test_js_score_key_parity.py exists to prevent.
+const keyStart = src.indexOf('function getScoreKeyAt(');
+const keyEnd = src.indexOf('// ---- Composite mode grammar');
+if (keyStart < 0 || keyEnd < 0) { console.error('KEY MARKERS'); process.exit(2); }
+const keyBlock = src.slice(keyStart, keyEnd);
+const SCORE_KEY_L51 = '@51';
 const start = src.indexOf('function _wbRoot()');
 const end = src.indexOf('// ---- Re-theme the canvases');
 if (start < 0 || end < 0 || end <= start) { console.error('MARKERS'); process.exit(2); }
@@ -4856,7 +4905,7 @@ let out;
 // The export list is TOLERANT so this one file runs on both sides of the
 // fix: _wbBuildMarks and _wbMiniShrink do not exist before it, and a bare
 // {_wbMiniShrink} in the eval is a ReferenceError rather than a reading.
-eval(block + '\nout = {_wbBuildGroups, wbPresetBlock, wbLevelArrays, ' +
+eval(keyBlock + block + '\nout = {_wbBuildGroups, wbPresetBlock, wbLevelArrays, ' +
      'wbWins, _wbBuildOf,' +
      ' _wbBuildMarks: (typeof _wbBuildMarks === "function")' +
      '   ? _wbBuildMarks : null,' +
@@ -6200,7 +6249,7 @@ def test_a_code_bug_in_the_section_stops_the_dive():
              'split_movesets': False, 'moveset_data': [{}]}
 
     def raising(exc):
-        def _p(_state, _blob):
+        def _p(_state, _blob, **_kw):
             raise exc
         return _p
 
@@ -6209,7 +6258,8 @@ def test_a_code_bug_in_the_section_stops_the_dive():
         W_prepare = W.prepare
         W.prepare = raising(exc)
         try:
-            assert deep_dive._which_build_sections(state) == ({}, {}, {})
+            assert deep_dive._which_build_sections(state) == ({}, {}, {},
+                                                              {}, {})
         finally:
             W.prepare = W_prepare
     for exc in (KeyError('def_cut'), ValueError('mask covers 0 spreads')):
@@ -6220,3 +6270,185 @@ def test_a_code_bug_in_the_section_stops_the_dive():
                 deep_dive._which_build_sections(state)
         finally:
             W.prepare = W_prepare
+
+
+# ---------------------------------------------------------------------------
+# 13. The best-buddy swap covers the WHOLE section
+#     (2026-09-20 pre-dive grid, lens 5)
+# ---------------------------------------------------------------------------
+
+def _engine_js():
+    return (SCRIPTS_DIR / 'deep_dive_engine.js').read_text()
+
+
+def _js_region(name, until):
+    """(raw, code) slices of one JS region, cut at the SAME offsets.
+
+    ``strip_js`` blanks comments and string literals to spaces without
+    moving anything, so one pair of indices addresses both views: the
+    stripped half proves a call is real code, the raw half is the only
+    place a string literal still exists to be read.
+    """
+    raw = _engine_js()
+    code = strip_js(raw)
+    i = code.index(name)
+    j = code.index(until, i)
+    return raw[i:j], code[i:j]
+
+
+def test_the_section_is_registered_as_a_best_buddy_host_pair():
+    """The section gets its own host/template pair, like the card and prose.
+
+    PRE-FIX only `dd-bb-card-*`, `dd-bb-prose-*` and `dd-bb-clusters-*` were
+    registered, and the clusters live INSIDE the section -- so ticking Best
+    Buddy swapped L51 clusters into an L50 headline, an L50 answer strip and
+    an L50 builds table.
+    """
+    raw, code = _js_region('function _initBestBuddy', 'function _bbOpenIn')
+    assert "_bbInitHost('dd-bb-wb-host', 'dd-bb-wb-tmpl')" in raw
+    # positive control: the pre-existing pairs read the same way, so a change
+    # to the registration syntax fails here rather than silently emptying
+    # this assertion; and the calls are code, not a comment.
+    assert "_bbInitHost('dd-bb-card-host', 'dd-bb-card-tmpl')" in raw
+    assert code.count('_bbInitHost(') == 4
+
+
+def test_the_swap_carries_the_sections_tab_scenario_and_preset():
+    """A toggle must not reset what the reader set inside the section.
+
+    `<details>` open state is carried for every host by _bbOpenIn/_bbReopen.
+    These three are the section's own: the figure tabs, its Shield-scenario
+    control, and the Build-criteria preset (re-applied from the controls
+    strip rather than copied, since the swap never touches that strip).
+    """
+    raw, code = _js_region('function setBestBuddyLevel',
+                           'window.setBestBuddyLevel')
+    assert '_wbSnapshot()' in code
+    assert '_wbRestore(' in code
+    assert "'dd-bb-wb-host'" in raw
+    raw_r, code_r = _js_region('function _wbRestore',
+                               'function setBestBuddyLevel')
+    assert 'data-wb-view' in raw_r            # the tab
+    assert '_wbSyncScen(' in code_r           # the Shield-scenario control
+    assert 'wbApplyPreset(' in code_r         # the Build-criteria preset
+
+
+def test_the_section_reads_the_level_it_is_showing():
+    """`wbLevelArrays` must follow the displayed level, not pin to L50.
+
+    It pinned to the stashed L50 arrays because only one L50 copy of the
+    section existed; with a per-level copy, the copy on screen was derived
+    at whatever level DATA.iv* holds, which is what its thresholds must be
+    compared against. `wbWins` likewise goes through `getScoreKey`, whose
+    L51 suffix follows `state.levelMode`, and its cache is keyed on that.
+    """
+    js = strip_js(_engine_js())
+    fn = js[js.index('function wbLevelArrays'):]
+    fn = fn[:fn.index('function wbWins')]
+    assert '_bbL50' not in fn, fn          # pre-fix: `return ... ? _bbL50 : DATA`
+    assert 'return DATA;' in fn
+    wins = js[js.index('function wbWins'):]
+    wins = wins[:wins.index('_wbWinsCache[key] = out')]
+    assert 'getScoreKey(mi, mode)' in wins
+    assert 'getScores(mi, mode)' in wins
+
+
+def test_a_no_op_best_buddy_dive_renders_one_section():
+    """No second copy when the two levels are provably the same grid.
+
+    A species whose every IV is already CP-capped below the alt level has
+    an L51 grid identical to its L50 one, so a second section would be a
+    byte-identical ~140 KB duplicate and a wasted `prepare()` per arm.
+    """
+    import deep_dive
+    base = {'moveset_data': [{'meta_l51': [[0]]}]}
+    assert deep_dive._bb_section_active(
+        dict(base, best_buddy={'active': True, 'noop': False})) is True
+    assert deep_dive._bb_section_active(
+        dict(base, best_buddy={'active': True, 'noop': True})) is False
+    assert deep_dive._bb_section_active(
+        dict(base, best_buddy={'active': False})) is False
+    assert deep_dive._bb_section_active({'moveset_data': [{}],
+                                         'best_buddy': {'active': True}}) is False
+    assert deep_dive._bb_section_active({}) is False
+
+
+# A dive whose best buddy is NOT a no-op, so the two levels really differ.
+SABLEYE_PLAIN_BB = '20260911_051621_Sableye_great.replay.pkl.gz'
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_the_l51_section_says_something_different():
+    """The whole point: the two halves are not the same bytes.
+
+    On plain Sableye GL the line moves 123.419 -> 123.41 between the levels,
+    so the headline, the summary the collapsed row carries and the section's
+    length all differ. PRE-FIX there was no L51 section at all to compare --
+    the L50 one was the only copy, and the toggle left it in place.
+    """
+    path = require_blob(SABLEYE_PLAIN_BB)
+    state = B.load_blob(str(path))
+    out = {}
+    for level in ('l50', 'l51'):
+        facts = W.prepare(state, str(path), level=level)
+        out[level] = (W.section_html(facts, 0, moveset_idx=0, page_movesets=1),
+                      facts[0]['floor']['printed'])
+    assert out['l50'][1] != out['l51'][1], out
+    assert out['l50'][0] != out['l51'][0]
+    # and the difference is visible in the collapsed line, not only deep in
+    # a payload a reader never opens
+    def _summary(html):
+        i = html.index('<span class="wb-head">')
+        return html[i:html.index('</span>', i)]
+    assert _summary(out['l50'][0]) != _summary(out['l51'][0])
+
+
+# Non-no-op best-buddy dives with a section, smallest first.
+_BB_SECTION_BLOBS = [
+    '20260911_153453_Mimikyu_ultra.replay.pkl.gz',
+    '20260911_051621_Sableye_great.replay.pkl.gz',
+    '20260911_071541_Medicham_great.replay.pkl.gz',
+]
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_a_rendered_best_buddy_page_carries_one_live_section_and_one_inert(
+        tmp_path):
+    """Exactly one `.wb-root` in the document, exactly one in the template.
+
+    PRE-FIX the page had ONE `.wb-root` full stop, and `dd-bb-clusters-host`
+    sat inside it -- so the toggle replaced the clusters under an L50
+    headline. Now the section itself is the host/template pair and the
+    clusters ride inside each half, which is why `dd-bb-clusters-host` is
+    absent from a page that HAS a section (it stays for the blob-free
+    fallback, where the clusters render as a sibling).
+    """
+    import re
+    from tests.conftest import load_deep_dive
+    dd = load_deep_dive()
+    path = _first_present(_BB_SECTION_BLOBS)
+    state = dd.load_replay_state(str(path))
+    state['html_path'] = str(tmp_path / 'index.html')
+    state['card_path'] = None
+    state['replay_blob_path'] = str(path)
+    dd.render_dive_html(state)
+    html = (tmp_path / 'index.html').read_text()
+    assert html.count('id="dd-bb-wb-host"') == 1
+    assert html.count('id="dd-bb-wb-tmpl"') == 1
+    assert html.count('class="wb-root"') == 2        # pre-fix: 1
+    assert html.count('id="dd-which-build"') == 2    # pre-fix: 1
+    # one clusters body per section half, and no sibling pair of their own
+    assert html.count('id="dd-matchup-clusters"') == 2
+    assert 'id="dd-bb-clusters-host"' not in html    # pre-fix: present
+    # the template really is the second copy, and it really is inert
+    tmpl = html[html.index('id="dd-bb-wb-tmpl"'):]
+    tmpl = tmpl[:tmpl.index('</template>')]
+    assert 'class="wb-root"' in tmpl
+    assert 'id="dd-matchup-clusters"' in tmpl
+    live = re.sub(r'<template\b.*?</template>', '', html, flags=re.S)
+    assert live.count('class="wb-root"') == 1
+    # no stray assembly markers shipped
+    assert 'WHICH_BUILD_SLOT' not in html
+    assert 'MATCHUP_CLUSTERS_SLOT' not in html

@@ -1531,9 +1531,13 @@ def build_payload(facts, fields, moveset_idx, mode='pvpoke',
     if pay['nScenRamp']:
         pay['scenColors'] = rung_ramp(pay['nScenRamp'], 'light')
     # ---- v4: the builds half ---------------------------------------------
-    # One nested object rather than a second <script> block: the section is
-    # re-parented wholesale into an inert <template> by the best-buddy L51
-    # pass, and one payload per section is what survives that unchanged.
+    # One nested object rather than a second <script> block: on a best-buddy
+    # dive the section is rendered TWICE (once per level) and the L51 copy
+    # rides in an inert <template> until the toggle swaps it in, so one
+    # payload per section is what survives that unchanged. (Until 2026-09-20
+    # this comment claimed the L51 pass re-parented the L50 section wholesale
+    # -- it did not: only the clusters nested inside it had a host/template
+    # pair, so a toggled page showed L51 clusters under an L50 headline.)
     if has_builds:
         pay['bp'] = builds.builds_payload(
             arm_builds, moveset_idx, mode=mode,
