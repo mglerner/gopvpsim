@@ -127,6 +127,20 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios):
 # Iterative slayer discovery (mirror match Nash-style iteration)
 # ---------------------------------------------------------------------------
 
+# The turn-resolution model a caller that names none gets. It must track
+# ``gopvpsim.battle.simulate``'s own default, which went 'legacy' -> 'new'
+# on 2026-09-09 (7e6a82b) while these three defaults stayed behind. Every
+# product caller (deep_dive.py's two --mirror-slayer sites) passes
+# ``args.mechanics`` explicitly and always has, so nothing shipped ran on
+# the wrong clock -- but a caller that omitted it got a legacy mirror while
+# every sim beside it ran on the new one, which is how
+# ``test_slayer_worker_matches_from_pokemon_mirror`` came to compare a
+# legacy worker against a new-clock reference and pass on coincidence.
+# Pinned to battle.simulate's own default by
+# tests/test_dive_worker_form_change.py::
+# test_the_slayer_default_mechanics_tracks_the_engine.
+SLAYER_DEFAULT_MECHANICS = 'new'
+
 # Worker state for slayer iteration multiprocessing
 _slayer_state = {}
 
@@ -134,7 +148,7 @@ _slayer_state = {}
 def slayer_worker_init(species, focal_types,
                          max_cp, shadow, fm_template, cms_template,
                          shield_scenarios, log_path=None, verbose=False,
-                         focal_mon=None, mechanics='legacy'):
+                         focal_mon=None, mechanics=SLAYER_DEFAULT_MECHANICS):
     worker_log_setup(log_path, verbose=verbose)
     _slayer_state['species'] = species
     _slayer_state['focal_types'] = focal_types
@@ -166,7 +180,7 @@ def slayer_iter_worker(args):
     focal_mon = ws['focal_mon']
     league_cp = ws['max_cp']
     shadow = ws['shadow']
-    mechanics = ws.get('mechanics', 'legacy')
+    mechanics = ws.get('mechanics', SLAYER_DEFAULT_MECHANICS)
 
     results = {}
     for profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv in focal_profile_chunk:
@@ -249,7 +263,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 metric='all', iv_floor=None,
                                 log_path=None, verbose=False,
                                 reserve_cpus=0, focal_max_level=None,
-                                mechanics='legacy'):
+                                mechanics=SLAYER_DEFAULT_MECHANICS):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.

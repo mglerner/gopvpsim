@@ -257,3 +257,94 @@ def test_slayer_worker_matches_from_pokemon_mirror():
             assert scores[si] == expected, (
                 f"mirror IV {ivs} vs {opp_ivs} {s_focal}v{s_opp}: "
                 f"worker={scores[si]}, from_pokemon={expected}")
+
+
+# ---------------------------------------------------------------------------
+# The slayer's turn-mechanics default (2026-09-20 pre-dive grid, L6 item 3)
+# ---------------------------------------------------------------------------
+
+REGI_SPECIES = 'Registeel'
+REGI_FAST = 'LOCK_ON'
+REGI_CHARGED = ['FLASH_CANNON', 'FOCUS_BLAST']
+
+
+def _registeel_mirror_scores(mechanics=None):
+    """One slayer round, 0/15/15 vs 15/15/15 Registeel mirror, 3 scenarios."""
+    gm = load_gamemaster()
+    mon = next(m for m in gm['pokemon'] if m['speciesName'] == REGI_SPECIES)
+    fast_db, charged_db = get_moves()
+    kw = {} if mechanics is None else {'mechanics': mechanics}
+    deep_dive_slayer.slayer_worker_init(
+        REGI_SPECIES, parse_types(mon), LEAGUE_CAPS[LEAGUE], False,
+        dict(fast_db[REGI_FAST]),
+        [dict(charged_db[c]) for c in REGI_CHARGED],
+        SCENARIOS, focal_mon=mon, **kw)
+
+    def prof(ivs):
+        a, d, s = ivs
+        p = Pokemon.at_best_level(REGI_SPECIES, a, d, s, league=LEAGUE)
+        pk = (round(p.atk, 4), round(p.def_, 4), int(p.hp), a, d, s, p.level)
+        return (pk, p.atk, p.def_, p.hp, a, d, s, p.level)
+
+    focal, opp = prof((0, 15, 15)), prof((15, 15, 15))
+    out = deep_dive_slayer.slayer_iter_worker(([focal], [(0, opp[1:])]))
+    return out[(focal[0], 0)]
+
+
+def test_the_slayer_default_mechanics_tracks_the_engine():
+    """The slayer's fallback clock is battle.simulate's own default.
+
+    PRE-FIX all three slayer defaults read ``'legacy'`` --
+    ``slayer_worker_init``'s kwarg, ``slayer_iter_worker``'s
+    ``ws.get('mechanics', ...)`` and ``iterative_slayer_discovery``'s kwarg
+    -- while ``simulate``'s default had been ``'new'`` since 2026-09-09
+    (7e6a82b). Both product call sites pass ``args.mechanics``, so no
+    shipped page ran on the wrong clock; a caller that omitted it did.
+    """
+    import inspect
+    engine_default = simulate.__kwdefaults__['mechanics']
+    assert engine_default == 'new'                      # positive control
+    assert deep_dive_slayer.SLAYER_DEFAULT_MECHANICS == engine_default
+    for fn in (deep_dive_slayer.slayer_worker_init,
+               deep_dive_slayer.iterative_slayer_discovery):
+        got = inspect.signature(fn).parameters['mechanics'].default
+        assert got == engine_default, (fn.__name__, got)  # pre-fix: 'legacy'
+
+
+def test_a_slayer_round_runs_on_the_clock_it_is_given():
+    """The flag reaches simulate() and moves the scores it produces.
+
+    Registeel mirror, LOCK_ON / Flash Cannon + Focus Blast, focal 0/15/15
+    against opponent 15/15/15. The 2v2 cell is where the two turn systems
+    part: legacy 825, new 723. PRE-FIX a caller that named no mechanics got
+    the legacy triple ``(428, 492, 825)``; it now gets the new one.
+    """
+    legacy = _registeel_mirror_scores('legacy')
+    new = _registeel_mirror_scores('new')
+    assert legacy == (428, 492, 825), legacy
+    assert new == (428, 492, 723), new
+    assert legacy != new, "this pair no longer discriminates the two clocks"
+    assert _registeel_mirror_scores() == new          # pre-fix: == legacy
+
+
+def test_deep_dive_hands_its_mechanics_to_every_slayer_call():
+    """--mechanics must reach BOTH --mirror-slayer sites, not just the first.
+
+    Scanned with ast rather than a regex so a call spanning lines, or one
+    added later, cannot slip past. The second site is the best-buddy L51
+    re-convergence, which is exactly the kind of call a reader forgets.
+    """
+    import ast
+    src = (REPO_ROOT / 'scripts' / 'deep_dive.py').read_text()
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name)
+             and n.func.id == 'iterative_slayer_discovery']
+    assert len(calls) >= 2, f"expected both slayer call sites, found {len(calls)}"
+    for call in calls:
+        kw = {k.arg: k.value for k in call.keywords}
+        assert 'mechanics' in kw, f"line {call.lineno} passes no mechanics"
+        val = kw['mechanics']
+        assert (isinstance(val, ast.Attribute) and val.attr == 'mechanics'
+                and isinstance(val.value, ast.Name) and val.value.id == 'args'), \
+            f"line {call.lineno} does not pass args.mechanics"

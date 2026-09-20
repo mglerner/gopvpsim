@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2836<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2850<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -194,10 +194,36 @@ post-ship — full writeup, the specific cases, the resume harness
 GL-only / focal-subset coverage gaps are in
 `docs/validations/new_mechanics_decision_layer_2026_06_24.md`.
 
-**Not threaded:** `scripts/deep_dive_slayer.py` has no `--mechanics`
-flag; its `simulate(...)` calls use the legacy default. Adding `new`
-there is a separate task (it needs its own argparse flag + worker
-initargs thread).
+**Threaded, and the default now tracks the engine (corrected
+2026-09-20).** The paragraph here used to say `deep_dive_slayer.py` was
+"not threaded" and simmed on the legacy clock. That went stale at
+`37344e6`, which threaded `mechanics` through
+`iterative_slayer_discovery` -> the pool `initargs` -> `_slayer_state`
+-> every `simulate(...)` call, and `deep_dive.py` has passed
+`mechanics=args.mechanics` at BOTH `--mirror-slayer` sites (the main
+round and the best-buddy L51 re-convergence) ever since. So no shipped
+mirror section ever ran on the wrong clock.
+
+What WAS wrong until 2026-09-20: the three fallback defaults in that
+module still read `'legacy'` while `battle.simulate`'s default went
+`'new'` on 2026-09-09 (`7e6a82b`), so a caller that named no mechanics
+got a legacy mirror beside new-clock sims. They now read
+`deep_dive_slayer.SLAYER_DEFAULT_MECHANICS`, pinned to the engine's own
+default by `tests/test_dive_worker_form_change.py::
+test_the_slayer_default_mechanics_tracks_the_engine`. The module has no
+CLI of its own (no `main()`, no argparse), so there is no flag to add;
+`deep_dive.py --mechanics` is the only entry point.
+
+**Slayer cache identity.** `slayer_cache.compute_cache_key` already
+hashes `mechanics` into the column key (2026-09-02), so legacy and new
+mirrors can never be served for one another. `slayer_cache`'s engine
+stamp is `sweep_cache.engine_hash()`, which hashes the five
+`gopvpsim/` engine files plus `scripts/deep_dive_signature.py` and
+**not** `scripts/deep_dive_slayer.py` -- a change to the slayer
+worker's own sim logic is therefore invisible to the slayer cache.
+That gap is real but pre-existing and orthogonal to this fix (nothing
+here changes slayer output); closing it means invalidating the slayer
+cache, so it is a post-bake item.
 
 ## Performance baseline (regression gate)
 
