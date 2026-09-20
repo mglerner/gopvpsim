@@ -106,6 +106,13 @@ EXTRA_DIVES = [
 #   thresholds    -- True where hand-authored thresholds/*.toml apply; the old
 #                    literal spelled this as no_thresholds=True on 90 of 95
 #                    entries, i.e. thresholds are the EXCEPTION, not the rule
+#
+# Keys are checked against the emitted slugs by check_override_keys() below;
+# the bake refuses to start on an orphan. Three were live and unreported on
+# 2026-09-20: 'dewgong-great-league' (Dewgong left the GL pool) and
+# 'mimikyu-busted-{great,ultra}-league' (the Busted pages were dropped in the
+# pool-derived rewrite; their pins were copied here by the equivalence gate
+# and never removed). Removed with that check.
 DIVE_OVERRIDES = {'aegislash-blade-great-league': {'extra_args': ['--fast',
                                                  'PSYCHO_CUT',
                                                  '--charged',
@@ -123,7 +130,6 @@ DIVE_OVERRIDES = {'aegislash-blade-great-league': {'extra_args': ['--fast',
                           'reference': 'ACID,GRASS_KNOT,ROCK_TOMB'},
  'cramorant-great-league': {'policy': 'both'},
  'cramorant-ultra-league': {'policy': 'both'},
- 'dewgong-great-league': {'thresholds': True},
  'fearow-great-league': {'reference': 'PECK,DRILL_PECK,DRILL_RUN'},
  'forretress-shadow-volt-switch-great-league': {'extra_args': ['--fast',
                                                                'VOLT_SWITCH',
@@ -135,16 +141,6 @@ DIVE_OVERRIDES = {'aegislash-blade-great-league': {'extra_args': ['--fast',
                                                         '--charged',
                                                         'SAND_TOMB,ROCK_TOMB'],
                                          'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB'},
- 'mimikyu-busted-great-league': {'extra_args': ['--fast',
-                                                'SHADOW_CLAW',
-                                                '--charged',
-                                                'SHADOW_SNEAK,PLAY_ROUGH'],
-                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH'},
- 'mimikyu-busted-ultra-league': {'extra_args': ['--fast',
-                                                'SHADOW_CLAW',
-                                                '--charged',
-                                                'SHADOW_SNEAK,PLAY_ROUGH'],
-                                 'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH'},
  'oinkologne-female-great-league': {'extra_args': ['--charged', 'BODY_SLAM,TRAILBLAZE'],
                                     'reference': 'MUD_SLAP,BODY_SLAM,TRAILBLAZE',
                                     'thresholds': True},
@@ -158,6 +154,33 @@ DIVE_OVERRIDES = {'aegislash-blade-great-league': {'extra_args': ['--fast',
 # Rule 1: one moveset count for every dive (deep_dive.py's own default is 5;
 # named here so the chain and the tests read one number).
 DEFAULT_TOP_MOVESETS = 5
+
+
+def check_override_keys(dives, overrides=None):
+    """Preflight: every DIVE_OVERRIDES key must name a dive we emit.
+
+    The table is keyed by SLUG but the slugs are DERIVED from the opponent
+    pools, so a pool regeneration that drops a species -- or a change to the
+    slug rule -- silently strips that dive's editorial content (moveset pin,
+    reference line, policy, hand-authored thresholds). The bake still runs
+    and the page still renders; it just renders against a moveset nobody
+    chose. That is the same class of miss as the cup-slug typo
+    check_cup_slugs catches, so it fails the same way: loudly, in seconds,
+    before any dive runs.
+
+    Raises ValueError listing every key that matches no slug.
+    """
+    table = DIVE_OVERRIDES if overrides is None else overrides
+    slugs = {d['slug'] for d in dives}
+    orphans = sorted(k for k in table if k not in slugs)
+    if orphans:
+        raise ValueError(
+            "DIVE_OVERRIDES preflight failed: these keys name no dive in the "
+            "registry, so their editorial content is silently dropped:\n  "
+            + "\n  ".join(orphans)
+            + "\n\nEither rename the key to the slug the registry now emits "
+              "(dive_slug / SLUG_EXCEPTIONS), or delete the entry if the "
+              "dive is gone for good.")
 
 
 def _pin(dive, flag):
