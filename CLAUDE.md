@@ -365,8 +365,8 @@ Commands:
   wotb-v4 merge's `tests/test_which_build_section.py` is most of the
   difference.
 - `python -m pytest tests -q` — full suite incl. the slow gamemaster
-  sweep and the blob-backed render tests, **~18 min** (1,042 s measured
-  2026-09-20). Was "~80s" here until the same date.
+  sweep and the blob-backed render tests, **~16-18 min** (two runs on
+  2026-09-20: 960 s and 1,042 s). Was "~80s" here until the same date.
 - `python -m pytest tests/test_battle.py -q` — battle tests only (243
   passed + 13 strict xfails as of 2026-08-09)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/

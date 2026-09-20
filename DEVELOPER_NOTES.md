@@ -392,11 +392,11 @@ rationale: CLAUDE.md "Before a cold re-dive, check for a tractable migration".
 **Engine-hash bumps, most recent first** (the `--from-engine` value a
 migration needs is the OLD hash of its row):
 
-| date       | old            | new            | change                                   | predicate                          |
-| ---------- | -------------- | -------------- | ---------------------------------------- | ---------------------------------- |
-| 2026-09-20 | `36037e51a2ee` | `9ac12a2754a1` | cmp_atk carries the pre-shadow attack    | `no_shadow_either_side_20260920`   |
-| 2026-09-15 | `1436a17ffbb2` | `36037e51a2ee` | Cramorant pogodives sheet v6             | `pogodives_sheet_v6_20260912`      |
-| 2026-09-15 | `e4d380ec3e5e` | `1436a17ffbb2` | Aegislash reuse leak                     | `form_change_either_side_20260912` |
+| date       | old            | new            | change                                | predicate                          |
+| ---------- | -------------- | -------------- | ------------------------------------- | ---------------------------------- |
+| 2026-09-20 | `36037e51a2ee` | `9ac12a2754a1` | cmp_atk carries the pre-shadow attack | `no_shadow_either_side_20260920`   |
+| 2026-09-15 | `1436a17ffbb2` | `36037e51a2ee` | Cramorant pogodives sheet v6          | `pogodives_sheet_v6_20260912`      |
+| 2026-09-15 | `e4d380ec3e5e` | `1436a17ffbb2` | Aegislash reuse leak                  | `form_change_either_side_20260912` |
 
 The 2026-09-20 bump is a lone localized fix, as the one-fix-per-bump rule
 requires: the whole hashed delta is `raw_atk` (a new `Pokemon` property, a

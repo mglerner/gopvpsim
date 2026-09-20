@@ -6,10 +6,10 @@ dives are ever re-added to the dive list.
 
 ## Removed 2026-09-12 (Twilight Trails dive-list rebuild)
 
-| TOML                             | missing source dive                          |
-| -------------------------------- | -------------------------------------------- |
-| `forretress-fast-move-shadow`    | `forretress-shadow-volt-switch-great-league` |
-| `jumpluff-regular-vs-shadow`     | `shadow-jumpluff-great-league`               |
+| TOML                          | missing source dive                          |
+| ----------------------------- | -------------------------------------------- |
+| `forretress-fast-move-shadow` | `forretress-shadow-volt-switch-great-league` |
+| `jumpluff-regular-vs-shadow`  | `shadow-jumpluff-great-league`               |
 
 Both dives were dropped from `scripts/dive_registry.py` when the opponent
 pools were rebuilt for the Twilight Trails season, so `compare_loadouts.py`
