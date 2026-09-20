@@ -76,7 +76,13 @@ caffeinate -is -w $$ &
 # unchanged, and userdata/_preserved/gamemaster_vintages/ holds the blob this
 # bake runs against if a mixed-vintage recovery is ever needed.
 CACHE_DIR_PATH="$HOME/Documents/gopvpsim_cache"
-CACHE_TOUCH_POLL="${CACHE_TOUCH_POLL:-300}"          # re-check every 5 min
+# Pin the data cache for the whole chain (2026-09-20): gopvpsim.data serves
+# an existing cache file whatever its age while this is set, so a closed lid
+# -- clamshell sleep, during which the age-based keeper below cannot tick --
+# can no longer let a file cross CACHE_TTL and refetch mid-bake. The keeper
+# stays as belt-and-braces for tools that read the files without data.py.
+export GOPVPSIM_PIN_DATA_CACHE=1
+CACHE_TOUCH_POLL="${CACHE_TOUCH_POLL:-60}"           # re-check every minute
 CACHE_TOUCH_MAX_AGE="${CACHE_TOUCH_MAX_AGE:-21600}"  # touch once older than 6h
 
 touch_data_cache() { touch "$CACHE_DIR_PATH/"*.json 2>/dev/null || true; }
