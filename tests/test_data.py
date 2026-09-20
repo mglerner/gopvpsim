@@ -4,6 +4,9 @@ Tests for gopvpsim.data — fetch and cache layer.
 All tests here require network access (or a warm cache) and are marked
 'integration'. Run with: pytest -m integration
 """
+import os
+import time
+
 import pytest
 from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset, NoDataError
 
@@ -230,3 +233,32 @@ def test_corrupt_stale_cache_with_no_network_raises_nodata(monkeypatch, tmp_path
     (tmp_path / 'testkey3.json').write_text('{"truncated": ')
     with pytest.raises(data.NoDataError):
         data._fetch_json('testkey3', url='https://example.invalid/x.json')
+
+
+def test_pin_env_serves_a_stale_cache_file_without_fetching(tmp_path, monkeypatch):
+    """GOPVPSIM_PIN_DATA_CACHE=1 makes _fetch_json return an existing cache
+    file whatever its age, and never touch the network. Pre-fix (2026-09-20):
+    a file older than CACHE_TTL always went to urlopen, so a bake that slept
+    through the TTL refetched mid-run (the 2026-08-06 mixed-vintage bake).
+    Positive control: with the pin unset, the same stale file DOES fetch."""
+    import urllib.request
+    from gopvpsim import data as d
+    monkeypatch.setattr(d, 'CACHE_DIR', tmp_path)
+    monkeypatch.setattr(d, 'CACHE_TTL', 10)
+    f = tmp_path / 'probe.json'
+    f.write_text('{"pinned": true}')
+    old = time.time() - 3600
+    os.utime(f, (old, old))
+    calls = []
+    def boom(*a, **k):
+        calls.append(a)
+        raise AssertionError('network reached')
+    monkeypatch.setattr(urllib.request, 'urlopen', boom)
+    monkeypatch.setenv('GOPVPSIM_PIN_DATA_CACHE', '1')
+    assert d._fetch_json('probe', url='https://example.invalid/x') == {'pinned': True}
+    assert calls == []
+    monkeypatch.delenv('GOPVPSIM_PIN_DATA_CACHE')
+    # positive control: unpinned, the stale file goes to the network (which
+    # fails here) and falls back to the stale copy -- so urlopen IS called
+    assert d._fetch_json('probe', url='https://example.invalid/x') == {'pinned': True}
+    assert len(calls) == 1

@@ -213,7 +213,12 @@ def _fetch_json(key, url=None):
 
     if cache_file.exists():
         age = time.time() - cache_file.stat().st_mtime
-        if age < CACHE_TTL:
+        # GOPVPSIM_PIN_DATA_CACHE=1 serves an existing cache file whatever
+        # its age. The overnight chain sets it for the whole bake so a
+        # closed lid (system sleep, during which no mtime keeper can run)
+        # cannot let a file age past CACHE_TTL and refetch mid-bake -- the
+        # mixed-vintage bake of 2026-08-06. A missing file still fetches.
+        if age < CACHE_TTL or os.environ.get('GOPVPSIM_PIN_DATA_CACHE'):
             try:
                 return json.loads(cache_file.read_text())
             except (json.JSONDecodeError, OSError) as e:
