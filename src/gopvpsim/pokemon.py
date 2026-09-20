@@ -373,6 +373,19 @@ class Pokemon:
                                self.shadow)
 
     @property
+    def raw_atk(self):
+        """Attack BEFORE the shadow multiplier -- what CMP compares.
+
+        ``atk / SHADOW_ATK_BONUS`` does not recover this: the round trip
+        ``fl(fl(x * 6/5) / (6/5))`` is one ULP low for e.g. Quagsire
+        0/15/14, which turns an exact CMP tie between a shadow and a plain
+        mon into a loss for the shadow. Carrying the pre-shadow value is
+        the only exact answer, so this is what ``BattlePokemon.raw_atk``
+        is built from.
+        """
+        return (self.base_atk + self.atk_iv) * CPM[self.level]
+
+    @property
     def atk(self):
         return self._effective_stats()[0]
 

@@ -133,6 +133,7 @@ def make_bp(spec: Spec, league: str, shields: int,
     return BattlePokemon(
         species=spec.species_name, types=types,
         atk=poke.atk, def_=poke.def_, max_hp=poke.hp,
+        raw_atk=poke.raw_atk,
         fast_move=fm, charged_moves=cms, shields=shields,
     )
 

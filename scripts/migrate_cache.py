@@ -23,6 +23,16 @@ Two migration modes:
 
 Engine predicates (PROVEN, not guessed):
 
+  no_shadow_either_side_20260920 — the cmp_atk 1-ULP shadow-tie fix
+                (--from-engine 36037e51a2ee). CMP now reads a CARRIED
+                pre-shadow attack instead of `atk / SHADOW_ATK_BONUS`, whose
+                round trip is one ULP low for some spreads. A column with no
+                shadow on either side is bit-identical (effective_stats
+                returns a non-shadow pair unchanged, so raw_atk == atk);
+                anything with a shadow on either side can move, INCLUDING
+                both-shadow, so shadow_xor is not a substitute here. Full
+                delta proof in the predicate's docstring.
+
   shadow_xor  — bug #1 (the fire_now CMP gate using cmp_atk instead of
                 shadow-boosted atk). A matchup's score changes ONLY when
                 exactly one side is shadow. both-non-shadow: cmp_atk == atk
@@ -236,9 +246,63 @@ def _form_change_either_side(f, c):
     return _hit(f) or _hit(c)
 
 
+def _no_shadow_either_side_20260920(f, c):
+    """cmp_atk 1-ULP shadow-tie fix (pin --from-engine 36037e51a2ee).
+
+    The hashed delta at this bump is exactly three edits, and all three are
+    about ONE number: the pre-shadow attack that charge-move priority reads.
+      (1) ``pokemon.Pokemon.raw_atk`` -- a NEW property. Nothing else reads
+          it; no existing expression changed.
+      (2) ``formchange`` -- ``FormData`` gains ``raw_atk``, the three
+          builders name the raw attack they were already passing INTO
+          ``effective_stats`` as its first argument (an extracted local,
+          not a new computation), and ``apply_form_change`` copies it onto
+          the BattlePokemon beside the ``atk`` it already copied.
+      (3) ``battle.BattlePokemon`` -- a new ``raw_atk`` init field, a
+          ``__post_init__`` fallback, and ``cmp_atk`` returning that field
+          instead of ``self.atk / SHADOW_ATK_BONUS``.
+
+    Where can a score move? Only through ``cmp_atk``, and only when the two
+    expressions disagree:
+      * NEITHER side shadow: ``cmp_atk`` was ``self.atk`` before and is
+        ``raw_atk`` now, and ``effective_stats`` returns a non-shadow pair
+        UNCHANGED, so ``raw_atk == atk`` bit for bit on both sides. Every
+        comparison, every DP table, every damage number is identical.
+        BLESSED.
+      * EITHER side shadow: the old value was ``fl(fl(x * 6/5) / (6/5))``,
+        which is one ULP low for some x (Quagsire 0/15/14 is the measured
+        case). A one-sided shadow can therefore lose an exact CMP tie it
+        should hold; a TWO-sided shadow can gain a false tie, because the
+        round trip can map two distinct raw attacks onto one float. Both
+        directions flip who throws first, which is winner-affecting.
+        AFFECTED. (This is why the pre-existing ``shadow_xor`` predicate is
+        NOT reusable here: it blesses both-shadow columns, which this delta
+        can move.)
+
+    Nothing else in the delta is reachable: ``raw_atk`` has exactly one
+    consumer, and a mon built by a path that does not supply it gets the
+    old division back from ``__post_init__``, so the blessing is if
+    anything conservative.
+
+    Fail-safe: missing side metadata -> AFFECTED, never bless what we
+    cannot read. One-shot; never re-run against another --from-engine hash.
+    Pinned by tests/test_migrate_cache.py and the engine tests in
+    tests/test_fire_now_cmp_shadow.py.
+    """
+    for side in (f, c):
+        if not side:
+            return True
+        if 'shadow' not in side:
+            return True
+        if side.get('shadow'):
+            return True
+    return False
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
+    'no_shadow_either_side_20260920': _no_shadow_either_side_20260920,
     'form_change_either_side_20260912': _form_change_either_side,
     # 2026-09-12 sheet v6 (pin --from-engine 1436a17ffbb2, the engine AFTER
     # the Aegislash fix): (1,0) 'lead_ready_ko' and (2,2) 'lead_ready_chip'

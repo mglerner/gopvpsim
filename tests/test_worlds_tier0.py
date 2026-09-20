@@ -248,19 +248,48 @@ def test_cmp_threshold_nonshadow_and_shadow():
     assert rs['win_above'] == math.nextafter(rs['tie_max'], math.inf)
 
 
-def test_cmp_shadow_roundtrip_artifact_is_real():
-    """Pins the 2026-08-10 audit finding the cmp_threshold docstring
-    cites: reconstructing raw atk by division breaks some exact shadow
-    ties -- fl(fl(x * 6/5) / (6/5)) != x for Quagsire 0/15/14 (1 ULP
-    low). If an engine-side fix ever lands (pending decision, TODO.md),
-    this flips and the tier0 docs must be updated with it."""
-    from gopvpsim.pokemon import SHADOW_ATK_BONUS
+def test_cmp_shadow_roundtrip_artifact_no_longer_reaches_cmp():
+    """The float artifact is still real; the ENGINE no longer walks into it.
+
+    Two halves, and both matter:
+
+    1. The arithmetic fact the 2026-08-10 audit found is unchanged and
+       still pinned here -- ``fl(fl(x * 6/5) / (6/5))`` comes back one ULP
+       LOW for Quagsire 0/15/14. Any future code that reconstructs a raw
+       attack by division is still wrong.
+    2. ``BattlePokemon.cmp_atk`` stopped doing that on 2026-09-20. It reads
+       the carried ``raw_atk`` instead, so a shadow mon and its plain twin
+       now compare EQUAL on CMP. PRE-FIX the shadow side's ``cmp_atk`` was
+       ``math.nextafter(x, -inf)`` and it lost the tie, which flipped
+       winners at those cells (tests/test_fire_now_cmp_shadow.py).
+
+    ``scripts/worlds_tier0.cmp_threshold`` deliberately still models the
+    division -- see its docstring: it must agree with the Worlds planes,
+    which are frozen artifacts baked under the pre-fix engine.
+    """
+    from gopvpsim.pokemon import SHADOW_ATK_BONUS, Pokemon
+    from gopvpsim.battle import BattlePokemon
     entry = next(e for e in iv_rank('Quagsire', league='great', shadow=False)
                  if (e['atk_iv'], e['def_iv'], e['sta_iv']) == (0, 15, 14))
     x = entry['atk']
+    # 1. the float fact
     assert (x * SHADOW_ATK_BONUS) / SHADOW_ATK_BONUS != x
     assert (x * SHADOW_ATK_BONUS) / SHADOW_ATK_BONUS == \
         math.nextafter(x, -math.inf)
+    # 2. the engine does not use it
+    shadow = Pokemon.at_best_level('Quagsire', 0, 15, 14, league='great',
+                                   shadow=True)
+    plain = Pokemon.at_best_level('Quagsire', 0, 15, 14, league='great')
+    assert shadow.raw_atk == plain.atk == x
+    bp = BattlePokemon(species='Quagsire', types=['water', 'ground'],
+                       atk=shadow.atk, def_=shadow.def_, max_hp=shadow.hp,
+                       raw_atk=shadow.raw_atk, shadow=True,
+                       fast_move={'moveId': 'MUD_SHOT', 'power': 5,
+                                  'energyGain': 9, 'cooldown': 1000,
+                                  'type': 'ground'},
+                       charged_moves=[])
+    assert bp.cmp_atk == x                       # pre-fix: nextafter(x, -inf)
+    assert bp.cmp_atk != bp.atk / SHADOW_ATK_BONUS
 
 
 def test_movable_stage_axes_matches_meta_movesets():
