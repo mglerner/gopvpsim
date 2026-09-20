@@ -1105,7 +1105,8 @@ def scen_line_label(scen, row, short=False):
     if short:
         name = _VARIANT_PAREN.sub('', name)
     more = row['n_cells'] - 1
-    return f"{head} ({name}{f' +{more}' if more > 0 else ''})"
+    return brief.cell_label_with_caveat(
+        f"{head} ({name}{f' +{more}' if more > 0 else ''})")
 
 
 def _decides_sentence(scen, row, where=None):
@@ -1114,7 +1115,7 @@ def _decides_sentence(scen, row, where=None):
     ``where`` drops the "in 0v0 shields" phrase (pass ``''``) for a caller
     that has just named the shield state in the clause before it.
     """
-    who = _cell_name(scen, row['names'][0])
+    who = brief.cell_label_with_caveat(_cell_name(scen, row['names'][0]))
     v = _axis_words(row)
     w = f" in {scen} shields" if where is None else where
     if row['kind'] == 'exact':
@@ -2411,7 +2412,8 @@ def _cell_phrase(r, rate_key='outside_wr', word='outside'):
     """One named cell with its rate, carrying the emphasis class."""
     rate = r[rate_key]
     cls = emph_class(rate)
-    body = (f'{_esc(r["cell"])} ({_esc(word)} {_esc(_pct(rate))})')
+    body = (f'{_esc(brief.cell_label_with_caveat(r["cell"]))} '
+            f'({_esc(word)} {_esc(_pct(rate))})')
     return f'<span class="{cls}">{body}</span>' if cls else body
 
 
@@ -2424,7 +2426,8 @@ def _share_cell_phrase(r):
     cannot see is the failure the emphasis key exists to prevent.
     """
     cls = emph_class(r['grid_wr'])
-    body = (f'{_esc(r["cell"])} (grid {_esc(_pct(r["grid_wr"]))}; '
+    body = (f'{_esc(brief.cell_label_with_caveat(r["cell"]))} '
+            f'(grid {_esc(_pct(r["grid_wr"]))}; '
             f'{_esc(_pct(r["share"]))} of members)')
     return f'<span class="{cls}">{body}</span>' if cls else body
 
@@ -2434,7 +2437,8 @@ def _short_cells(rows, n=TOP_CELLS):
     rows = list(rows or [])
     if not rows:
         return ''
-    named = ', '.join(r['cell'] for r in rows[:n])
+    named = ', '.join(brief.cell_label_with_caveat(r['cell'])
+                      for r in rows[:n])
     more = ('' if len(rows) <= n
             else f" and {brief._n(len(rows) - n)} more")
     return f" ({named}{more})"
@@ -3006,7 +3010,8 @@ def card_specs(facts, arm_builds, preset=None):
                 f"{_guarantee_phrase(arm_builds, bl, b, article=False)} "
                 f"({role_short(b, i)}); this is that build's most-winning "
                 f"member, {mw['wins']} of {mw['denominator']}"),
-            'cells': [{'text': f"{r['cell']} (rank {r['rank']})",
+            'cells': [{'text': brief.cell_label_with_caveat(
+                           f"{r['cell']} (rank {r['rank']})"),
                        'rate': float(r['outside_wr']), 'word': 'outside'}
                       for r in b['guaranteed'][:TOP_CELLS]],
         })
@@ -3068,7 +3073,8 @@ def card_specs(facts, arm_builds, preset=None):
             'short': CARD_SHORT.get(t['kind'], title),
             'guarantee': (f"{score}{wins}, and {own} of {n_all} decision "
                           f"matchups; {where}"),
-            'cells': [{'text': f"{r['cell']} (rank {r['rank']})",
+            'cells': [{'text': brief.cell_label_with_caveat(
+                           f"{r['cell']} (rank {r['rank']})"),
                        'rate': float(r['grid_wr']), 'word': 'grid'}
                       for r in rows[:TOP_CELLS]],
         })
@@ -3259,7 +3265,8 @@ def _g_row_html(r, n_modes, hidden=False, free=False):
         cls.append('wb-hidfree' if free else 'wb-hid')
     cls = ' '.join(c for c in cls if c)
     attrs = (f' class="{cls}"' if cls else '') + (' hidden' if hidden else '')
-    return (f'<li{attrs}>{_esc(r["cell"])} (rank {r["rank"]}) -- outside '
+    return (f'<li{attrs}>{_esc(brief.cell_label_with_caveat(r["cell"]))} '
+            f'(rank {r["rank"]}) -- outside '
             f'{_esc(_pct(r["outside_wr"]))}{_esc(tail)}</li>')
 
 
@@ -3332,7 +3339,8 @@ def _gives_up_text(b):
     # ranks is one row expander away. Round 9 printed three names each with
     # "(rank N)", which wrapped to 13 lines at 900 px and made this the
     # tallest column in the table (2026-09-19 round-10 review).
-    names = [r['cell'] for r in b['gives_up'][:2]]
+    names = [brief.cell_label_with_caveat(r['cell'])
+             for r in b['gives_up'][:2]]
     tail = ('' if len(b['gives_up']) <= 2
             else f", +{len(b['gives_up']) - 2} more")
     return f"{len(b['gives_up'])}: " + ', '.join(names) + tail
@@ -3406,7 +3414,7 @@ def line_status_sentence(facts):
         return NO_LINE_STATUS
     axis = brief.AXIS_WORD[fl['axis']]
     axis = axis if axis == 'HP' else axis.capitalize()
-    cell = (fl.get('cell') or '').strip()
+    cell = brief.cell_label_with_caveat((fl.get('cell') or '').strip())
     # ``_axis_value``, not ``printed_value``: the latter adds the proven
     # selector in parentheses ("123.42 (123.419)"), which is the headline's
     # own precision note and reads as a typo in a one-sentence verdict
@@ -4197,7 +4205,8 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # headline's own opening sentence (gated per arm above) is the other
     # instance of that fixed phrase. Gating a restatement of an already-
     # gated sentence would fail on the duplicate, not on a defect.
-    ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode}
+    ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode,
+           'focal': brief.focal_name(all_facts[0]['header'])}
     own = [CLUSTERS_FALLBACK_CAPTION, BUILDS_CAPTION.format(fam=''),
            BUILDS_CAPTION.format(fam=BUILDS_CAPTION_FAMILY),
            WEIGHTING_NOTE,

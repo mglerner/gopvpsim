@@ -57,6 +57,9 @@ SCRIPTS_DIR = REPO_ROOT / 'scripts'
 GUIDES_DIR = REPO_ROOT / 'guides'
 ENGINE_JS = SCRIPTS_DIR / 'deep_dive_engine.js'
 SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
+# The 2026-09-13 Aegislash (Shield) bake: the focal IS the G-caveat species,
+# which is what took the section off every Aegislash page before 2026-09-20.
+AEGISLASH_SHIELD = '20260913_062354_Aegislash_Shield_great.replay.pkl.gz'
 # A real blob whose arms 1, 2 and 4 carry NO line -- the negative page, which
 # neither Sableye blob reaches.
 MELMETAL = '20260910_190103_Melmetal_great.replay.pkl.gz'
@@ -6452,3 +6455,36 @@ def test_a_rendered_best_buddy_page_carries_one_live_section_and_one_inert(
     # no stray assembly markers shipped
     assert 'WHICH_BUILD_SLOT' not in html
     assert 'MATCHUP_CLUSTERS_SLOT' not in html
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_the_aegislash_page_still_gets_a_section():
+    """G-caveat's focal exemption, on the blob that lost the section to it.
+
+    Pre-fix (2026-09-20) ``prepare()`` on this blob raised ``G-caveat:
+    field=all cell=Aegislash printed='No attack, defense or HP threshold
+    decides a matchup for Aegislash (Shield) runn' recomputed=named with no
+    engine-divergence marker``, so ``deep_dive.py`` logged one WARNING and
+    shipped the flagship section ABSENT on every Aegislash page. The gate is
+    NOT off here: a caveat cell inside the page still has to carry the mark,
+    which is what ``cell_label_with_caveat`` guarantees.
+    """
+    path = require_blob(AEGISLASH_SHIELD)
+    state = B.load_blob(str(path))
+    all_facts = W.prepare(state, str(path))
+    assert all_facts, 'prepare returned no arms'
+    html = W.section_html(all_facts, 0)
+    # Non-trivial output, not an empty string that would pass every scan.
+    assert len(html) > 5000, len(html)
+    assert 'Aegislash' in html
+    # The focal's own NAME is exempt; an Aegislash CELL -- which on this page
+    # means the mirror -- still carries the marker. Checked on the plain
+    # text, since the markup between the name and the mark is what a naive
+    # scan trips on.
+    txt = W.gate_text(html)
+    cells = list(re.finditer(r'\dv\d Aegislash', txt))
+    assert cells, 'no Aegislash cell on the page: the marker check is vacuous'
+    for m in cells:
+        window = txt[m.start():m.start() + 100]
+        assert 'divergence' in window, window

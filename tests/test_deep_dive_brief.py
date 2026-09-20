@@ -570,6 +570,51 @@ def test_caveat_mark_carries_the_word_the_gate_looks_for():
     assert B.CAVEAT_SPECIES, "an empty caveat list would disable the gate"
 
 
+def test_gate_caveat_exempts_the_page_its_own_focal_species():
+    """A dive ABOUT Aegislash may name Aegislash in its own headline.
+
+    Pre-fix (2026-09-20) the gate carried no focal, so the Aegislash
+    (Shield) Great League page failed on its own opening sentence --
+    ``G-caveat: field=all cell=Aegislash printed='No attack, defense or HP
+    threshold decides a matchup for Aegislash (Shield) runn'`` -- and EVERY
+    Aegislash dive shipped without its "Which one to build?" section,
+    unconditionally. The caveat is about Aegislash as an OPPONENT cell; a
+    cell still carries the mark, through
+    :func:`cell_label_with_caveat`.
+    """
+    headline = ("No attack, defense or HP threshold decides a matchup for "
+                "Aegislash (Shield) running Air Slash on this grid.")
+    B.gate_caveat([headline], dict(CTX, focal='Aegislash (Shield)'))
+    with pytest.raises(B.GuardError) as exc:       # the pre-fix behaviour
+        B.gate_caveat([headline], CTX)
+    assert 'G-caveat' in str(exc.value)
+    # Only the focal is exempt: the same sentence on any other page still
+    # fails, so the exemption cannot be read as "the gate was turned off".
+    with pytest.raises(B.GuardError):
+        B.gate_caveat([headline], dict(CTX, focal='Turtonator'))
+
+
+def test_a_caveat_cell_printed_through_the_helper_passes_the_gate():
+    """ONE decorator for every print site (the 2026-09-20 fix, part b).
+
+    Pre-fix only the two cost tables appended ``CAVEAT_MARK`` by hand, so an
+    Aegislash cell reaching any OTHER cell list failed the gate instead of
+    being marked: the Turtonator arm-1 section died on ``Gives up 3 cells
+    the floor guarantees: 0v1 Aegislash (Blade) (unranked), 0v2 Aeg``.
+    """
+    bare = '0v1 Aegislash (Blade) (unranked)'
+    marked = B.cell_label_with_caveat(bare)
+    assert marked == bare + B.CAVEAT_MARK
+    assert B.cell_label_with_caveat(marked) == marked      # idempotent
+    # A non-caveat cell is returned untouched (positive control: the helper
+    # is a decorator, not a suffix).
+    assert B.cell_label_with_caveat('0v1 Feraligatr') == '0v1 Feraligatr'
+    sentence = "Gives up 3 cells the floor guarantees: {}."
+    with pytest.raises(B.GuardError):                      # pre-fix value
+        B.gate_caveat([sentence.format(bare)], CTX)
+    B.gate_caveat([sentence.format(marked)], CTX)
+
+
 # ---------------------------------------------------------------------------
 # Oracle pins on the worked Shadow Sableye case
 # ---------------------------------------------------------------------------
