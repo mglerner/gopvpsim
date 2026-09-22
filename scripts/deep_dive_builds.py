@@ -2254,7 +2254,15 @@ def _build_mirror_row(ctx, b, cmp_rows, rate, mcells):
 
 
 def mirror_facts(ctx, frame, block, level='l50', surface=None):
-    """Everything the section's mirror block prints, or None.
+    """Everything the section's mirror paragraph reads, or None.
+
+    A SUPERSET of what is rendered. ``cells``, ``rate_med`` (per build),
+    ``rate_med_grid``, ``rate_max_grid`` and ``spearman`` were printed by the
+    block this became on 2026-09-22 and are not printed by the two sentences
+    that replaced it (see the header comment in deep_dive_which_build.py).
+    They stay computed and pinned: they are the inputs the population version
+    renders (TODO.md "NEXT BAKE: mirror population"), and none of them costs
+    a sweep.
 
     None -- and therefore no block at all -- unless all three hold:
 
@@ -2303,12 +2311,13 @@ def mirror_facts(ctx, frame, block, level='l50', surface=None):
         tilt = 'bulk'
     rate = surf['rate']
     finite = np.isfinite(rate)
-    # How well the mirror cells this page already draws -- the focal at
-    # PvPoke's default spread -- track the cohort. Measured per blob and
-    # printed, because it is nil on Melmetal GL (-0.045), NEGATIVE on Shadow
-    # Sableye (-0.195, -0.462 on the 1v1 alone) and strong on Melmetal UL
-    # (+0.662): a page that implied either reading stands in for the other
-    # would be wrong on two of the four blobs the prototype measured.
+    # How well the mirror cells the page already draws -- the focal at
+    # PvPoke's default spread -- track the cohort. NOT RENDERED since
+    # 2026-09-22 (the block that printed it is two sentences now); kept
+    # because the population version needs it and because it is the number
+    # that says the two readings are not interchangeable: nil on Melmetal GL
+    # (+0.08 here, -0.045 in the prototype), weak on Shadow Sableye and
+    # strong on Melmetal UL (+0.67).
     ois = [m['oi'] for m in opps]
     n_opp = ctx['n_opp']
     ks = [si * n_opp + oi for si in range(ctx['n_sc']) for oi in ois]

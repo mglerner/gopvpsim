@@ -744,9 +744,11 @@ Michael, 2026-09-22 (after the four previews on branch `mirror-line`,
 d66a78d): the cohort version is NOT rendered site-wide. Its content
 reduces to "pick the highest attack you have inside the build you chose"
 plus what that attack buys (Melmetal GL and Azumarill: nothing; Melmetal
-UL: the fork clears both cuts with every member). Cut the block to those
-two sentences; keep the code (mirror_surface, the block, the trace, the
-glossary terms), which the population version reuses. The population
+UL: the fork clears both cuts with every member). DONE on `mirror-line`:
+the block is two sentences under the builds table, and everything behind
+it is kept and still pinned for the population version to reuse --
+mirror_surface, the decision cells / cohort-rate / Spearman facts (now
+computed and NOT rendered), the trace, the glossary terms. The population
 version earns the block because it compares ACROSS builds ("Build 3 wins
 the 1v1 mirror against 40% of common Melmetals; Build 2 against 85% and
 gives up these four matchups").

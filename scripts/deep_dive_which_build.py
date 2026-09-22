@@ -1852,18 +1852,10 @@ CSS = """
   background: var(--surface-2); border: 1px solid var(--border-2);
   border-radius: 6px; }
 #dd-which-build .wb-mine .wb-mem-head { margin-top: 0; }
-/* "The mirror" (round 11): a bordered aside between the builds table and
-   "Is mine in one of these?", so it reads as a second question about the
-   same table rather than as a continuation of it. */
-#dd-which-build .wb-mirror { margin: 14px 0 0; padding: 8px 12px;
-  border: 1px solid var(--border-2); border-radius: 6px; }
-#dd-which-build .wb-mirror-head { margin: 0 0 4px; font-weight: 600;
-  font-size: 0.92rem; }
-#dd-which-build .wb-mirror-lead { margin: 0 0 8px; font-size: 0.86rem; }
-#dd-which-build .wb-mirror-cmp, #dd-which-build .wb-mirror-rate {
-  margin: 6px 0 0; font-size: 0.86rem; }
-#dd-which-build .wb-mirror-table { width: 100%; font-size: 0.84rem; }
-#dd-which-build .wb-mirror-table td { white-space: normal; }
+/* "The mirror" (round 11, cut to two sentences 2026-09-22): a paragraph
+   under the builds table, not an aside -- it is a reading OF that table and
+   is now short enough to read as one. */
+#dd-which-build .wb-mirror { margin: 10px 0 0; font-size: 0.86rem; }
 #dd-which-build .wb-note-entry { margin: 0 0 10px;
   border-top: 1px solid var(--border); padding-top: 6px; }
 #dd-which-build .wb-note-head { margin: 0; font-size: 0.9rem; }
@@ -3825,48 +3817,44 @@ def builds_table_html(arm_builds, preset, facts=None):
 
 
 # ---- "The mirror" (2026-09-22) --------------------------------------------
-# One compact block between the builds table and "Is mine in one of these?",
-# answering the one question the table above cannot: "I want bulk, and I want
-# the mirror to go my way -- what attack wins charge-move priority against the
-# mirrors I will meet?" The table's mirror rows are the focal at PvPoke's ONE
-# default spread; this block reads the baked mirror-slayer cohort, which is a
-# population.
+# TWO SENTENCES between the builds table and "Is mine in one of these?": what
+# attack buys against the mirror-slayer cohort, and the within-build rule that
+# follows from it.
+#
+# It was a block -- a heading, the cohort sentence, a table of the mirror
+# decision cells, the CMP line, and the cohort-rate surface with its Spearman
+# -- until Michael read the four previews (userdata/analysis/
+# 2026-09-22_mirror_line_preview/, branch mirror-line). Against THIS cohort
+# the whole block reduces to "pick the highest attack you have inside the
+# build you already chose" plus what that attack buys, and a block over-sells
+# a one-line rule. TODO.md "NEXT BAKE: mirror population" carries the
+# decision.
+#
+# COMPUTED AND DELIBERATELY NOT RENDERED: ``deep_dive_builds.mirror_facts``
+# still returns the per-scenario decision cells (``cells``), the per-build and
+# whole-grid cohort-rate medians (``rate_med``, ``rate_med_grid``), the grid
+# ceiling (``rate_max_grid``) and the Spearman against the mirror cells
+# (``spearman``), and tests/test_deep_dive_builds.py still pins all of them.
+# They are facts about the blob, they cost nothing to keep, and they are the
+# inputs the population version renders: that one compares ACROSS builds
+# ("Build 2 beats 83% of common Melmetals, Build 3 40%"), which is a reading
+# the cohort cannot support and which earns a block.
 #
 # CONDITIONAL by design (``deep_dive_builds.mirror_facts``): no mirror in the
-# pool, no mirror DECISION cell, or no baked cohort and the block does not
-# render at all. The set GENERATOR the 2026-09-21 prototype measured over the
-# same surface is deliberately not here -- see the comment above
+# pool, no mirror DECISION cell, or no baked cohort and nothing renders at
+# all. The set GENERATOR the 2026-09-21 prototype measured over the same
+# surface is deliberately not here -- see the comment above
 # ``deep_dive_builds.mirror_surface``.
 
-MIRROR_BLOCK_HEAD = 'The mirror'
-MIRROR_BLOCK_CAVEAT = (
-    "Every member of it was picked, over the protocol's rounds, for beating "
-    "the others in the mirror, so it is the mirror you would face if the "
-    "other side were optimising for the mirror too -- not a survey of what "
-    "players build.")
-# Measured, and ONLY measured. An earlier draft explained the ceiling ("a
-# mirror at a shield deficit is lost by every spread"), which this bake
-# cannot check: ``all_scores`` is a 4-tuple of aggregates over all nine
-# scenarios and every cohort member, so no per-scenario or per-member
-# breakdown exists to support the explanation.
-MIRROR_RATE_CAP = (
-    "No spread on this grid passes {cap} of those cells, and the aggregate "
-    "is all this bake keeps -- there is no per-scenario or per-member "
-    "breakdown behind it.")
-MIRROR_STRICT_NOTE = (
-    "The engine breaks priority strictly -- equal attack gives neither side "
-    "the first throw -- so a spread sitting exactly on one of these numbers "
-    "clears nothing. Counting a tie as a win instead, which is what the "
-    "slayer tables do, those two counts would be {a} and {b}.")
-# A cohort can have ONE number where the page would print two: Mimikyu
-# Ultra's 50th and 75th attack percentiles are both 161.34, the grid's own
-# top attack. Printing "161.34 and 161.34" and then saying the same thing
-# twice about them reads as a rendering fault rather than as the finding.
-MIRROR_STRICT_NOTE_ONE = (
-    "The engine breaks priority strictly -- equal attack gives neither side "
-    "the first throw -- so a spread sitting exactly on that number clears "
-    "nothing. Counting a tie as a win instead, which is what the slayer "
-    "tables do, that count would be {a}.")
+# Sentence two's lead. The whole finding against this cohort, once a reader
+# has picked a build: inside it, charge-move priority is decided by raw
+# attack alone, so take the most of it the build holds. (A build's RULE may
+# carry an attack floor of its own -- the stats plane's legend key prints one
+# -- but no floor picks between the members above it, and that is the choice
+# this sentence is about.)
+MIRROR_RULE_LEAD = 'Inside a build, take the highest attack you have'
+MIRROR_TILT = {'atk': 'attack-first here', 'bulk': 'bulk-first here',
+               None: 'neither attack-first nor bulk-first here'}
 
 _ORD_SUFFIX = {1: 'st', 2: 'nd', 3: 'rd'}
 
@@ -3882,7 +3870,7 @@ def _atk2(x):
     """An attack value printed as a LABEL, not as a selector.
 
     Two dp, the page's convention everywhere a stat is named. The selectors
-    in this block are the ``line_printed`` values, which come off
+    in this paragraph are the ``line_printed`` values, which come off
     ``brief.printed_cut`` and carry however many places it takes to select
     the same spreads.
     """
@@ -3907,247 +3895,160 @@ def _cut(row):
     return f"{float(row['line_printed']):.{int(row['line_dp'])}f}"
 
 
-def mirror_tilt_clause(mf):
-    """Attack-first, bulk-first or neither -- computed, with both numbers.
+def mirror_tilt_label(mf):
+    """How the cohort tilts, as sentence one's parenthetical.
 
-    Both numbers whichever way it lands: a cohort can sit at the 98th
-    percentile of attack AND below the grid's median stat product (Melmetal,
-    Great League), and one number alone reads as the opposite of the other.
+    A split cohort is named as SPLIT rather than by the lobe its median sits
+    in: Shadow Sableye's median attack is above 99.6% of the grid while 12
+    of its 30 members are 13 points below it, and "attack-first" describes
+    18 of them.
     """
-    # brief.pct, not an ordinal on a rounded percentile: Shadow Sableye's
-    # cohort median sits above 99.56% of the grid, and "the 100th percentile"
-    # is the one reading that is flatly wrong -- six spreads are above it.
-    share = brief.pct(mf['atk_pct'] / 100.0, 0)
-    rank = brief._n(mf['sp_rank_med']) if mf['sp_rank_med'] else None
-    n_iv = brief._n(mf['n_iv'])
-    where = (f"the median member's attack is higher than {share} of this "
-             f"grid")
-    if rank:
-        where += f" and its stat product ranks {rank} of {n_iv}"
-    # A split cohort is named as split rather than as attack-first: Shadow
-    # Sableye's median is above 99.6% of the grid while 12 of its 30 members
-    # are 13 points below it, and "attack-first" alone describes 18 of them.
     if mf.get('split'):
-        return f"split in two here: {where}"
-    if mf['tilt'] == 'atk':
-        return f"attack-first here: {where}"
-    if mf['tilt'] == 'bulk':
-        return f"bulk-first here: {where}"
-    return f"neither attack-first nor bulk-first here: {where}"
+        return 'split in two here'
+    return MIRROR_TILT[mf.get('tilt')]
 
 
-def mirror_lead(mf, facts):
-    """The cohort sentence: what it is, how it tilts, and what it is NOT.
+def mirror_cut_clause(mf):
+    """Sentence one's second half: what attack buys against the cohort.
 
-    Plain text. The whole sentence is escaped ONCE by its caller, so a name
-    escaped here too would ship "&amp;amp;" on the first focal that carries
-    an ampersand.
+    ``_cut`` is a ``>=`` selector, so it is printed as "156.87 and up" and
+    never as "above 156.87": ``brief.printed_cut`` FLOORS precisely so that
+    the spread sitting exactly on the printed number is one of the spreads
+    that beat the threshold, and "above" would read it out of the set it was
+    computed to select. For the same reason the number is the lowest GRID
+    attack above the cohort quantile rather than the quantile itself -- this
+    grid's attack values sit about 0.002 apart, so "125.17 and up" holds 87
+    spreads where "125.174318 and up" holds 46.
     """
-    name = brief.focal_name(facts['header'])
-    out = [f"The mirror cohort is the {brief._n(mf['n_final'])} spreads the "
-           f"mirror-slayer protocol converges on for {name} -- "
-           f"{mirror_tilt_clause(mf)}. Their attack runs "
-           f"{_atk2(mf['atk_lo'])} to {_atk2(mf['atk_hi'])}"
-           f"{mirror_split_clause(mf)}."]
-    out.append(MIRROR_BLOCK_CAVEAT)
-    return ' '.join(out)
-
-
-def mirror_split_clause(mf):
-    """Names a cohort whose attack comes in two lobes, or says nothing.
-
-    A single median hides it, and on Shadow Sableye the two lobes are 12
-    members at 141.8-143.9 and 18 at 155.9-156.8 with nothing between: a
-    cohort called attack-first on a 99.6th-percentile median, 40% of which
-    is not. The gate is measured, not a per-species literal: the largest gap
-    between consecutive attack values has to hold at least MIRROR_SPLIT_GAP
-    of the whole band, with at least MIRROR_SPLIT_SIDE of the members on each
-    side of it. It fires on one of the four blobs the prototype measured.
-    """
-    sp = mf.get('split')
-    if not sp:
-        return ''
-    return (f", in two groups with nothing between them -- "
-            f"{brief._n(sp['n_lo'])} between {_atk2(sp['lo_lo'])} and "
-            f"{_atk2(sp['lo_hi'])} and {brief._n(sp['n_hi'])} between "
-            f"{_atk2(sp['hi_lo'])} and {_atk2(sp['hi_hi'])}")
-
-
-def mirror_cells_table_html(mf, bl):
-    """Per mirror decision cell: how much of the grid wins it, and who it is
-    guaranteed by."""
-    rows = []
-    for ci, c in enumerate(mf['cells']):
-        who = [role_short(b, i) for i, b in enumerate(bl['builds'])
-               if mf['builds'][i]['guaranteed'][ci]]
-        rows.append(
-            f'<tr><td>{_esc(c["label"])}</td>'
-            f'<td>{_pct(c["wr"])}</td>'
-            f'<td>{_esc(", ".join(who)) if who else "--"}</td></tr>')
-    return ('<table class="wb-mirror-table">'
-            '<tr><th>Mirror matchup</th>'
-            '<th>Share of the grid that wins it</th>'
-            '<th>Guaranteed by</th></tr>'
-            + ''.join(rows) + '</table>')
-
-
-def mirror_cmp_sentences(mf, bl):
-    """The CMP quantile line and what each build does against it."""
     c50, c75 = mf['cmp'][0], mf['cmp'][1]
-    n = brief._n(c50['n_cohort'])
-    # One clause per DISTINCT threshold, because either of them can be
-    # UNREACHABLE (a cohort quantile that is the grid's own top attack has
-    # nothing above it, so a sentence naming a number would be naming a
-    # spread that does not exist) and because the two can be one number.
-    same = c50['T'] == c75['T']
-    rows = [c50] if same else [c50, c75]
-    words = ['it'] if same else ['the first', 'the second']
-    clauses = []
-    for row, word in zip(rows, words):
-        cut = _cut(row)
-        if cut is None:
-            clauses.append(
-                f"nothing on this grid is above {word}, so no spread a "
-                f"reader could build wins priority against that much of "
-                f"the cohort")
-        else:
-            clauses.append(
-                f"the lowest attack on this grid above {word} is {cut}, "
-                f"reached by {brief._n(row['n_grid_strict'])} of its "
-                f"{brief._n(mf['n_iv'])} spreads, and it wins priority "
-                f"against {brief._n(row['n_beaten'])} of the {n} members")
-    heads = (f"are both {_atk2(c50['T'])}" if same
-             else f"are {_atk2(c50['T'])} and {_atk2(c75['T'])}")
-    out = [
-        f"Charge-move priority in a mirror is decided by raw attack. The "
-        f"cohort's {_ordinal(round(c50['q'] * 100))} and "
-        f"{_ordinal(round(c75['q'] * 100))} attack percentiles {heads}: "
-        + '; '.join(clauses) + '.',
-        (MIRROR_STRICT_NOTE_ONE.format(a=brief._n(c50['n_grid_ties']))
-         if same else
-         MIRROR_STRICT_NOTE.format(a=brief._n(c50['n_grid_ties']),
-                                   b=brief._n(c75['n_grid_ties']))),
-    ]
-    # Nothing on the GRID clears it: a sentence about the builds would be a
-    # weaker restatement of the clause above, so there is none.
-    if c50['line'] is None:
-        return out
-    if not any(r['n_clear'][0] for r in mf['builds']):
-        best = max(mf['builds'], key=lambda r: (r['atk_max'] or 0.0))
-        bi = mf['builds'].index(best)
-        line = (f"No build on this page holds a spread that wins priority "
-                f"against even half the cohort; the closest is "
+    lo, hi = _cut(c50), _cut(c75)
+    if lo is None:
+        # Mimikyu Ultra: the cohort's median attack IS the grid's top attack,
+        # so there is no spread to name and the sentence says so instead of
+        # naming one that does not exist.
+        return ("no attack on this grid wins charge-move priority against "
+                "even half of them")
+    lead = (f"attack of {lo} and up wins charge-move priority against "
+            f"{brief._n(c50['n_beaten'])} of them")
+    if c50['T'] == c75['T']:
+        return lead
+    if hi is None:
+        return (f"{lead}, and nothing on this grid is above their "
+                f"{_ordinal(round(c75['q'] * 100))} attack percentile")
+    return f"{lead}, and {hi} and up against {brief._n(c75['n_beaten'])}"
+
+
+def mirror_build_clause(mf, bl):
+    """Sentence two's second half: the measured consequence per build.
+
+    Builds that land in the same place are named together ("Build 1 and
+    Build 3 clear neither with any") and the ones that clear lead, because
+    the reader is choosing between them and what is reachable is the half
+    that decides it.
+
+    Counts are strict, matching ``battle.BattlePokemon.cmp_atk``: equal
+    attack gives neither side the first throw, so a member sitting exactly
+    on a cut clears nothing. (The tie-inclusive count the slayer tables
+    report is still in ``mf['cmp'][i]['n_grid_ties']``; it was printed
+    beside this in the block and is not printed now.)
+    """
+    same = mf['cmp'][0]['T'] == mf['cmp'][1]['T']
+    both = 'it' if same else 'both cuts'
+    rows = mf['builds']
+    if not any(r['n_clear'][0] for r in rows):
+        # Nothing on the page reaches even the first cut. One clause, naming
+        # the closest -- "how far off" is the only number left that a reader
+        # picking a build can act on.
+        best = max(rows, key=lambda r: (r['atk_max'] or 0.0))
+        bi = rows.index(best)
+        return (f"no build on this page holds a spread that clears "
+                f"{'it' if same else 'the first cut'}; the closest is "
                 f"{role_short(bl['builds'][bi], bi)} at "
                 f"{_atk2(best['atk_max'])}")
-        # The Azumarill case: the builds top out BELOW the cohort's floor, so
-        # the claim is not "not half" but "not one of them". Stated because
-        # it is measured -- the builds are selected on matchups, and this is
-        # the one thing they are not selected on.
-        if (best['atk_max'] or 0.0) <= mf['atk_lo']:
-            line += (f", which is under the cohort's lowest attack "
-                     f"({_atk2(mf['atk_lo'])}) -- so no spread in any build "
-                     f"here out-prioritises any member of it")
-        out.append(line + '.')
-    else:
-        parts = []
-        for i, r in enumerate(mf['builds']):
-            nm = role_short(bl['builds'][i], i)
-            if r['n_clear'][0] == r['size'] and r['n_clear'][1] == r['size']:
-                parts.append(f"{nm} clears {'it' if same else 'both'} with "
-                             f"all {brief._n(r['size'])} of its members")
-            elif not r['n_clear'][0]:
-                parts.append(f"{nm} clears it with none of its "
-                             f"{brief._n(r['size'])}" if same else
-                             f"{nm} clears neither with any of its "
-                             f"{brief._n(r['size'])}")
-            elif same:
-                parts.append(f"{nm} clears it with "
-                             f"{brief._n(r['n_clear'][0])} of "
-                             f"{brief._n(r['size'])}")
-            else:
-                parts.append(f"{nm} clears the first with "
-                             f"{brief._n(r['n_clear'][0])} of "
-                             f"{brief._n(r['size'])} and the second with "
-                             f"{brief._n(r['n_clear'][1])}")
-        # Only the first CHARACTER: str.capitalize() lower-cases the rest,
-        # which turned "Build 2" into "build 2" in the middle of the line.
-        joined = '; '.join(parts)
-        out.append(joined[:1].upper() + joined[1:] + '.')
-    return out
-
-
-MIRROR_RHO_BAND = 0.30
-
-
-def mirror_rate_sentences(mf, bl):
-    """The cohort-rate surface, one clause per build, with its own warning."""
-    if mf['rate_med_grid'] is None:
-        return []
-    parts = []
-    for i, r in enumerate(mf['builds']):
-        if r['rate_med'] is None:
-            continue
-        parts.append(f"{role_short(bl['builds'][i], i)} takes "
-                     f"{_pct(r['rate_med'])}")
-    lead = (
-        "Across the cohort's own matchups -- the share of the (shield "
-        "scenario x cohort member) cells a spread wins, the one per-spread "
-        "mirror number this bake keeps -- the median member of "
-        + ', '.join(parts) + f", against {_pct(mf['rate_med_grid'])} over "
-        f"the whole grid.")
-    out = [lead, MIRROR_RATE_CAP.format(cap=_pct(mf['rate_max_grid']))]
-    rho = mf['spearman']
-    if rho is not None:
-        shown = f"{rho:+.2f}"
-        if rho <= -MIRROR_RHO_BAND:
-            tail = (f"That surface runs OPPOSITE to the matchups in the "
-                    f"table above (Spearman {shown} here): the spreads that "
-                    f"win those are the ones that do worse against the "
-                    f"cohort.")
-        elif rho >= MIRROR_RHO_BAND:
-            tail = (f"That surface tracks the matchups in the table above "
-                    f"(Spearman {shown} here), so those rows are a coarse "
-                    f"proxy for it.")
+    # A build whose members SPLIT on a cut carries its own counts, so it is
+    # keyed by index and never grouped; the other two outcomes are the same
+    # words whoever lands in them.
+    order = {'all': 0, 'mixed': 1, 'none': 2}
+    groups = {}
+    for i, r in enumerate(rows):
+        n0, n1 = r['n_clear'][0], r['n_clear'][1]
+        if n0 == r['size'] and n1 == r['size']:
+            key = ('all', -1)
+        elif not n0 and not n1:
+            key = ('none', -1)
         else:
-            tail = (f"That surface barely tracks the matchups in the table "
-                    f"above (Spearman {shown} here), so neither reading "
-                    f"stands in for the other.")
-        out.append(tail)
+            key = ('mixed', i)
+        groups.setdefault(key, []).append((role_short(bl['builds'][i], i), r))
+    parts = []
+    for key in sorted(groups, key=lambda k: (order[k[0]], k[1])):
+        members = groups[key]
+        who = brief._and_list([nm for nm, _ in members])
+        one = len(members) == 1
+        r = members[0][1]
+        size = brief._n(r['size'])
+        if key[0] == 'all':
+            parts.append(f"{who} clear{'s' if one else ''} {both} with "
+                         + (f"every one of its {size} members" if one
+                            else 'every one of their members'))
+        elif key[0] == 'none':
+            if same:
+                parts.append(f"{who} clear{'s' if one else ''} it with "
+                             + (f"none of its {size}" if one
+                                else 'none of theirs'))
+            else:
+                parts.append(f"{who} clear{'s' if one else ''} neither with "
+                             + (f"any of its {size}" if one else 'any'))
+        elif same:
+            parts.append(f"{who} clears it with "
+                         f"{brief._n(r['n_clear'][0])} of {size}")
+        else:
+            parts.append(f"{who} clears the first cut with "
+                         f"{brief._n(r['n_clear'][0])} of {size} and the "
+                         f"second with {brief._n(r['n_clear'][1])}")
+    return '; '.join(parts)
+
+
+def mirror_sentences(mf, bl, facts):
+    """The paragraph, as one or two sentences.
+
+    Sentence two is dropped -- not softened -- where the grid cannot clear
+    the first cut at all: "take the highest attack you have" followed by a
+    clause saying it buys nothing would be a rule with no consequence, and
+    sentence one has already said so (Mimikyu Ultra).
+    """
+    name = brief.focal_name(facts['header'])
+    out = [f"Against the {brief._n(mf['n_final'])} spreads the mirror-slayer "
+           f"protocol converges on for {name} ({mirror_tilt_label(mf)}), "
+           f"{mirror_cut_clause(mf)}."]
+    if mf['cmp'][0]['line'] is not None:
+        out.append(f"{MIRROR_RULE_LEAD}: {mirror_build_clause(mf, bl)}.")
     return out
 
 
-def _mirror_preset_html(mf, bl):
+def _mirror_preset_html(mf, bl, facts):
     if not mf or not bl or not bl['builds']:
         return ''
-    body = [mirror_cells_table_html(mf, bl)]
-    for s in mirror_cmp_sentences(mf, bl):
-        body.append(f'<p class="wb-mirror-cmp">{_esc(s)}</p>')
-    for s in mirror_rate_sentences(mf, bl):
-        body.append(f'<p class="wb-mirror-rate">{_esc(s)}</p>')
-    return ''.join(body)
+    return ('<p class="wb-mirror">'
+            + _esc(' '.join(mirror_sentences(mf, bl, facts))) + '</p>')
 
 
 def mirror_block_html(facts, arm_builds):
-    """The whole "The mirror" block, or '' when this arm has no mirror.
+    """The mirror paragraph, or '' when this arm has no mirror.
 
-    The cohort sentence is invariant (the cohort is a property of the blob,
-    not of the reader's shield prior) and renders ONCE; the table and the
-    two paragraphs name BUILDS, so they render per Build criteria setting
-    inside the same ``.wb-preset`` divs the builds table uses.
+    One paragraph per Build criteria setting, inside the same ``.wb-preset``
+    divs the builds table uses: sentence two names builds, and the builds are
+    per setting. Sentence one does not vary with the setting, but it is the
+    premise of sentence two -- splitting the pair to print it once would put
+    the cohort and what to do about it in two different boxes.
     """
     mirrors = ((arm_builds or {}).get('mirror')) or {}
     if not mirrors:
         return ''
-    any_mf = mirrors[next(iter(mirrors))]
-    return (
-        '<div class="wb-mirror">'
-        f'<p class="wb-mirror-head">{_esc(MIRROR_BLOCK_HEAD)}</p>'
-        f'<p class="wb-mirror-lead">{_esc(mirror_lead(any_mf, facts))}</p>'
-        + _preset_blocks(
-            arm_builds,
-            lambda key: _mirror_preset_html(
-                mirrors.get(key), arm_builds['presets'].get(key)))
-        + '</div>')
+    return _preset_blocks(
+        arm_builds,
+        lambda key: _mirror_preset_html(mirrors.get(key),
+                                        arm_builds['presets'].get(key),
+                                        facts))
 
 
 # ---- "Is mine in one of these?" (proposal s.3 / item 3) --------------------
@@ -4436,12 +4337,12 @@ def section_html(all_facts, arm, moveset_idx=0, mode='pvpoke',
             f'<p class="wb-g-head">{_esc(EMPH_KEY)}</p>'
             f'<p class="wb-g-head">{_esc(GUARANTEE_SORT_KEY)}</p>'))
         # ---- B2. the mirror ----------------------------------------------
-        # Between the builds table and "Is mine in one of these?": it is a
-        # reading OF that table (which builds guarantee the mirror cells,
-        # what their members do on priority), so it belongs with it rather
-        # than after the reader has been sent off to paste a collection.
-        # Empty on any page with no mirror, no mirror decision cell or no
-        # baked cohort -- see deep_dive_builds.mirror_facts.
+        # Two sentences between the builds table and "Is mine in one of
+        # these?": it is a reading OF that table (what a build's members do
+        # on charge-move priority against the cohort), so it belongs with it
+        # rather than after the reader has been sent off to paste a
+        # collection. Empty on any page with no mirror, no mirror decision
+        # cell or no baked cohort -- see deep_dive_builds.mirror_facts.
         parts.append(marker.mark(mirror_block_html(facts, arm_builds)))
         # ---- C. "Is mine in one of these?" --------------------------------
         parts.append(marker.mark(collection_block_html()))
@@ -4689,10 +4590,10 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
                 own.append(gate_text(builds_table_html(ab, key, facts)))
                 own.append(gate_text(
                     notable_html(facts, ab, key, all_facts)))
-            # The mirror block: one lead sentence plus, per setting, a table
-            # and two paragraphs. Gated on every setting for the same reason
-            # the tables are -- a gate that fires only on the setting a
-            # reader happens to pick is a gate that ships the bad string.
+            # The mirror paragraph, one per setting. Gated on every setting
+            # for the same reason the tables are -- a gate that fires only on
+            # the setting a reader happens to pick is a gate that ships the
+            # bad string.
             own.append(gate_text(mirror_block_html(facts, ab)))
             own.append(mirror_trace_caption(ab))
             # Setting-invariant, so gated once -- the same count the page

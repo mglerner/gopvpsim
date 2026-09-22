@@ -1389,16 +1389,18 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # 7bc9b51. Nothing per-IV entered the section; the payload cap below is
     # the number that would show it.
     #
-    # Round 11 (2026-09-22) raised it 196 KB -> 206 KB for "The mirror": the
-    # cohort sentence once, and per Build criteria setting a table of the
-    # mirror decision cells (seven rows on this blob, both Sableye forms) plus
-    # the CMP paragraph and the cohort-rate paragraph. Measured 201.7 KB here
-    # against 193.2 KB with the block suppressed -- +8.4 KB, of which 6.8 KB
-    # is the block itself and the rest is the trace clause on the two builds
-    # captions and the block's CSS. Nothing per-IV entered the section: the
-    # trace's membership is ONE 684-character packed mask, and the payload
-    # caps below are what would show it.
-    assert len(html) < 206_000, len(html)
+    # Round 11 (2026-09-22) raised it 196 KB -> 206 KB for "The mirror" --
+    # the cohort sentence once, and per Build criteria setting a table of the
+    # mirror decision cells (seven rows on this blob, both Sableye forms)
+    # plus the CMP paragraph and the cohort-rate paragraph, 201.7 KB here
+    # against 193.2 KB with the block suppressed. The same day's cut takes it
+    # back to 198 KB: the block is TWO SENTENCES now, one paragraph per Build
+    # criteria setting, measured 195.2 KB here -- 2.0 KB over the suppressed
+    # figure, which is the three paragraphs plus the trace clause on the two
+    # builds captions. Nothing per-IV entered the section: the trace's
+    # membership is ONE 684-character packed mask, and the payload caps below
+    # are what would show it.
+    assert len(html) < 198_000, len(html)
     payload = json.loads(
         re.search(r'class="wb-data">(.*?)</script>', html, re.S).group(1))
     # One 512-byte mask per printed rung plus one for the bulk pair, and
@@ -2818,11 +2820,11 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     # Pre-fix (9cb2b26) it was two, with the verdict lead and the
     # line-status sentence inside the first.
     #
-    # Round 11 (2026-09-22) makes it FOUR: "The mirror" names builds, so its
-    # table and two paragraphs are per setting too. Its cohort sentence is
-    # NOT -- the cohort is a property of the blob -- and renders once, above
-    # the group (asserted in
-    # test_real_section_mirror_lead_keeps_its_caveat).
+    # Round 11 (2026-09-22) makes it FOUR: "The mirror" names builds in its
+    # second sentence, so the paragraph is per setting. It was a block with a
+    # setting-invariant cohort sentence above the group until the same day's
+    # cut; the pair is now rendered together, per setting (the reason is on
+    # ``mirror_block_html``).
     blocks = re.findall(r'<div class="wb-preset" data-preset="(\w+)"( hidden)?>',
                         html)
     assert [b[0] for b in blocks] == ['flat', 'even', 'one_one'] * 4
@@ -2832,11 +2834,17 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     # relative to the table and the collection block is pinned in
     # test_real_section_places_the_mirror_between_the_table_and_the
     # _collection).
-    mirror_at = html.index('<div class="wb-mirror">')
+    #
+    # SEVEN preset divs open before the paragraph and five after, not six and
+    # six: the paragraph sits INSIDE the third group's first div. Pre-cut the
+    # block's bordered wrapper opened before that div, so the two halves were
+    # even -- the numbers move with the wrapper, not with the reading order,
+    # which is what the line above them pins.
+    mirror_at = html.index('<p class="wb-mirror">')
     tails = [m.start() for m in
              re.finditer(r'<div class="wb-preset" data-preset=', html)]
-    assert sum(1 for t in tails if t < mirror_at) == 6
-    assert sum(1 for t in tails if t > mirror_at) == 6
+    assert sum(1 for t in tails if t < mirror_at) == 7
+    assert sum(1 for t in tails if t > mirror_at) == 5
     # one table per preset, each with the seven columns the reader reads.
     # Round 9 (proposal s.3) renamed and re-ordered them: 'What it is' is
     # 'Rule' and carries the rule alone, 'Rarest win' is new, the SP1 column
@@ -6674,69 +6682,147 @@ def test_the_mirror_terms_are_in_the_one_registry():
     assert '<abbr' not in m2.mark('<p>CMP</p>').split('</abbr>')[-1]
 
 
-def test_the_build_clause_capitalises_only_the_first_letter():
-    """Pre-fix this was ``'; '.join(parts).capitalize()``, which lower-cased
-    every later build name: "Build 1 clears neither...; build 2 clears
-    both...". str.capitalize lower-cases the whole rest of the string."""
-    mf = {'n_iv': 4096, 'atk_lo': 100.0,
-          'cmp': [{'q': 0.5, 'T': 1.0, 'line': 1.5, 'line_printed': 1.5,
-                   'line_dp': 2, 'n_beaten': 5, 'n_cohort': 10,
-                   'n_grid_strict': 7, 'n_grid_ties': 9},
-                  {'q': 0.75, 'T': 2.0, 'line': 2.5, 'line_printed': 2.5,
-                   'line_dp': 2, 'n_beaten': 8, 'n_cohort': 10,
-                   'n_grid_strict': 3, 'n_grid_ties': 4}],
-          'builds': [{'role': 'primary', 'size': 50, 'n_clear': [0, 0],
-                      'atk_max': 110.0},
-                     {'role': 'fork', 'size': 60, 'n_clear': [60, 60],
-                      'atk_max': 120.0}]}
-    bl = {'builds': [{'role': 'primary'}, {'role': 'fork'}]}
-    text = ' '.join(W.mirror_cmp_sentences(mf, bl))
-    assert 'Build 2 clears both with all 60 of its members' in text
-    assert 'build 2' not in text
-    assert 'Build 1 clears neither with any of its 50' in text
+def _ul_mirror():
+    """Melmetal Ultra's shape: two distinct cuts, one build clearing both.
+
+    The numbers are the blob's (31 members, 17 and 25 beaten, 71/113/50
+    members); the blob-backed pins below read the real thing.
+    """
+    mf = {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
+          'split': None,
+          'cmp': [{'q': 0.5, 'T': 156.7899, 'line': 156.8712,
+                   'line_printed': 156.87, 'line_dp': 2, 'n_beaten': 17,
+                   'n_cohort': 31, 'n_grid_strict': 2891,
+                   'n_grid_ties': 2996},
+                  {'q': 0.75, 'T': 158.0302568, 'line': 158.0315,
+                   'line_printed': 158.031, 'line_dp': 3, 'n_beaten': 25,
+                   'n_cohort': 31, 'n_grid_strict': 2035,
+                   'n_grid_ties': 2144}],
+          'builds': [{'role': 'primary', 'size': 71, 'n_clear': [0, 0],
+                      'atk_max': 150.0},
+                     {'role': 'fork', 'size': 113, 'n_clear': [113, 113],
+                      'atk_max': 162.0},
+                     {'role': 'third', 'size': 50, 'n_clear': [0, 0],
+                      'atk_max': 149.0}]}
+    bl = {'builds': [{'role': 'primary'}, {'role': 'fork'},
+                     {'role': 'third'}]}
+    return mf, bl
+
+
+def test_the_cut_is_printed_as_a_selector_not_as_a_strict_above():
+    """``brief.printed_cut`` FLOORS, so ``atk >= line_printed`` selects
+    exactly the spreads that beat the cohort quantile and the spread sitting
+    exactly ON the printed number is one of them. "above 156.87" reads it out
+    of the set the number was computed to select, so the paragraph says
+    "156.87 and up".
+
+    The dp comes from ``printed_cut`` too and is not re-rounded: Melmetal
+    Ultra's 75th needs three places (158.031), and "158.03 and up" would take
+    in the 109 spreads between 158.03 and 158.0302568 that lose priority.
+    """
+    mf, _bl = _ul_mirror()
+    clause = W.mirror_cut_clause(mf)
+    assert clause == ('attack of 156.87 and up wins charge-move priority '
+                      'against 17 of them, and 158.031 and up against 25')
+    assert 'above' not in clause
+    assert '158.03 and up' not in clause
+
+
+def test_the_build_clause_groups_and_leads_with_what_is_reachable():
+    """Pre-cut (d66a78d) this was one clause per build in build order, inside
+    the block: "Build 1 clears neither with any of its 71; Build 2 clears
+    both with all 113 of its members; Build 3 clears neither with any of its
+    50." The sentence that replaced the block leads with the build that
+    CLEARS -- that is the half a reader choosing between them acts on -- and
+    names builds that land in the same place together.
+    """
+    mf, bl = _ul_mirror()
+    assert W.mirror_build_clause(mf, bl) == (
+        'Build 2 clears both cuts with every one of its 113 members; '
+        'Build 1 and Build 3 clear neither with any')
+    # A build whose members SPLIT on a cut carries its own counts, so it is
+    # never grouped with another.
+    mf['builds'][0]['n_clear'] = [40, 12]
+    assert W.mirror_build_clause(mf, bl) == (
+        'Build 2 clears both cuts with every one of its 113 members; '
+        'Build 1 clears the first cut with 40 of 71 and the second with 12; '
+        'Build 3 clears neither with any of its 50')
+    # One threshold (the two percentiles are one number) and the clause
+    # speaks of one cut, not of "both" and "neither".
+    mf['cmp'][1] = dict(mf['cmp'][0], q=0.75)
+    mf['builds'][0]['n_clear'] = [0, 0]
+    assert W.mirror_build_clause(mf, bl) == (
+        'Build 2 clears it with every one of its 113 members; '
+        'Build 1 and Build 3 clear it with none of theirs')
+
+
+def test_the_closest_build_is_named_when_nothing_clears():
+    """Melmetal Great and Azumarill: no spread in any build reaches the first
+    cut. The clause names how far off the closest build is, because that is
+    the only number left that a reader picking a build can act on. Pre-cut
+    this sentence also carried the Azumarill-only clause that the builds top
+    out below the cohort's own floor; the two-sentence version drops it (the
+    number is still ``mf['atk_lo']``).
+    """
+    mf, bl = _ul_mirror()
+    mf['builds'][1]['n_clear'] = [0, 0]
+    mf['builds'][1]['atk_max'] = 124.12
+    mf['builds'][0]['atk_max'] = 120.0
+    mf['builds'][2]['atk_max'] = 119.0
+    assert W.mirror_build_clause(mf, bl) == (
+        'no build on this page holds a spread that clears the first cut; '
+        'the closest is Build 2 at 124.12')
 
 
 def test_the_cohort_tilt_never_claims_a_hundredth_percentile():
-    """Shadow Sableye's cohort median is above 99.56% of the grid, and six
-    spreads are above IT. Pre-fix this rendered "the 100th percentile"."""
+    """The parenthetical in sentence one. Pre-cut the block printed the tilt
+    as a clause with the share behind it ("attack-first here: the median
+    member's attack is higher than 99.6% of this grid and its stat product
+    ranks 3366 of 4096"); the paragraph prints the label alone, so the
+    share -- the number that used to read as "the 100th percentile" -- is not
+    printed at all now.
+
+    A split cohort is still named as SPLIT rather than by the lobe its median
+    sits in: Shadow Sableye's median is above 99.6% of the grid while 12 of
+    its 30 members are 13 points below it.
+    """
     base = {'atk_pct': 99.5605, 'sp_rank_med': 3366, 'n_iv': 4096,
             'tilt': 'atk', 'split': None}
-    clause = W.mirror_tilt_clause(base)
-    assert '99.6%' in clause and '100%' not in clause
-    assert 'attack-first here' in clause
-    # A split cohort is named as split, not by the half its median sits in.
+    assert W.mirror_tilt_label(base) == 'attack-first here'
+    assert W.mirror_tilt_label(dict(base, tilt='bulk')) == 'bulk-first here'
+    assert (W.mirror_tilt_label(dict(base, tilt=None))
+            == 'neither attack-first nor bulk-first here')
     split = dict(base, split={'n_lo': 12, 'n_hi': 18, 'lo_lo': 1.0,
                               'lo_hi': 2.0, 'hi_lo': 3.0, 'hi_hi': 4.0})
-    assert W.mirror_tilt_clause(split).startswith('split in two here')
-    assert W.mirror_tilt_clause(dict(base, tilt='bulk')).startswith(
-        'bulk-first here')
-    assert W.mirror_tilt_clause(dict(base, tilt=None)).startswith(
-        'neither attack-first nor bulk-first here')
+    assert W.mirror_tilt_label(split) == 'split in two here'
 
 
-def test_one_threshold_where_the_two_percentiles_are_one_number():
+def test_no_second_sentence_where_nothing_on_the_grid_clears_the_cohort():
     """Mimikyu Ultra: the cohort's 50th AND 75th attack percentiles are both
-    161.34, which is the grid's own top attack. Pre-fix the block printed
-    "161.34 and 161.34" and then said the same sentence about "the first"
-    and "the second", which reads as a rendering fault rather than as the
-    finding -- and, before that, crashed formatting a threshold that no
-    spread on the grid is above."""
+    161.34, which is the grid's own top attack, so there is no spread to
+    name. Sentence one says that in words and sentence two is DROPPED -- "take
+    the highest attack you have" followed by a clause saying it buys nothing
+    is a rule with no consequence.
+
+    Before the honesty pass in d66a78d this branch crashed formatting a
+    threshold no spread is above; pre-cut it printed "nothing on this grid is
+    above it" inside the block.
+    """
     row = {'q': 0.5, 'T': 161.3376, 'line': None, 'line_printed': None,
            'line_dp': None, 'n_beaten': 35, 'n_cohort': 35,
            'n_grid_strict': 0, 'n_grid_ties': 251}
-    mf = {'n_iv': 4096, 'atk_lo': 150.0,
-          'cmp': [row, dict(row, q=0.75)],
+    mf = {'n_iv': 4096, 'atk_lo': 150.0, 'n_final': 35, 'tilt': 'atk',
+          'split': None, 'cmp': [row, dict(row, q=0.75)],
           'builds': [{'role': 'primary', 'size': 50, 'n_clear': [0, 0],
                       'atk_max': 155.0}]}
     bl = {'builds': [{'role': 'primary'}]}
-    text = ' '.join(W.mirror_cmp_sentences(mf, bl))
-    assert 'percentiles are both 161.34' in text
-    assert '161.34 and 161.34' not in text
-    assert text.count('nothing on this grid is above it') == 1
-    assert 'that count would be 251' in text
-    # No per-build clause: nothing on the GRID clears it, so a sentence about
-    # the builds would be a weaker restatement of what was just said.
-    assert 'No build on this page' not in text
+    facts = {'header': {'species': 'Mimikyu', 'shadow': False}}
+    out = W.mirror_sentences(mf, bl, facts)
+    assert out == ['Against the 35 spreads the mirror-slayer protocol '
+                   'converges on for Mimikyu (attack-first here), no attack '
+                   'on this grid wins charge-move priority against even half '
+                   'of them.']
+    assert '161.34' not in out[0] and 'None' not in out[0]
     # And the plot draws no trace for a threshold nothing reaches.
     one = {'mirror': {'flat': dict(mf, builds=[])}}
     assert builds_mod.mirror_payload(one) is None
@@ -6790,64 +6876,97 @@ def test_the_mirror_trace_is_one_masked_trace_drawn_under_the_marks():
 @pytest.mark.slow
 def test_real_section_places_the_mirror_between_the_table_and_the_collection(
         shadow_sableye):
-    """Reading order: builds table -> The mirror -> "Is mine in one of
-    these?". The block is a reading OF the table, so it sits with it."""
+    """Reading order: builds table -> the mirror paragraph -> "Is mine in one
+    of these?". It is a reading OF the table, so it sits with it.
+
+    Pre-cut (d66a78d) this was a bordered ``<div class="wb-mirror">`` with a
+    ``<p class="wb-mirror-head">The mirror</p>`` heading; the two sentences
+    that replaced the block are one ``<p class="wb-mirror">`` per Build
+    criteria setting, with no heading of their own.
+    """
     _state, all_facts, _path = shadow_sableye
     html = W.section_html(all_facts, 0)
     body = html[html.index('<div class="wb-body">'):]
     table = body.index('wb-builds-table')
-    mirror = body.index('<div class="wb-mirror">')
+    mirror = body.index('<p class="wb-mirror">')
     mine = body.index('wb-mine')
     assert table < mirror < mine
-    head = re.search(r'<p class="wb-mirror-head">(.*?)</p>', body).group(1)
-    assert head == 'The mirror'
+    assert 'wb-mirror-head' not in html and 'The mirror</p>' not in html
+    # One paragraph per setting, in the section's own preset divs.
+    assert html.count('<p class="wb-mirror">') == 3
 
 
 @pytest.mark.local_artifacts
 @pytest.mark.slow
-def test_real_section_mirror_lead_keeps_its_caveat(shadow_sableye):
-    """The cohort is a population of mirror-slayers. A page that let a
-    reader take it for a census of what people own would be wrong about the
-    one thing the block is for."""
+def test_real_section_mirror_paragraph_is_the_two_sentences(shadow_sableye):
+    """The whole rendered mirror, verbatim, on the default setting.
+
+    Pre-cut (d66a78d) this arm rendered, under a "The mirror" heading: the
+    cohort sentence ("The mirror cohort is the 30 spreads the mirror-slayer
+    protocol converges on for Sableye (Shadow) -- split in two here: the
+    median member's attack is higher than 99.6% of this grid and its stat
+    product ranks 3366 of 4096. Their attack runs 141.76 to 156.84, in two
+    groups with nothing between them -- 12 between 141.76 and 143.91 and 18
+    between 155.90 and 156.84. Every member of it was picked, over the
+    protocol's rounds, for beating the others in the mirror, so it is the
+    mirror you would face if the other side were optimising for the mirror
+    too -- not a survey of what players build."), then per setting a
+    seven-row table of the mirror decision cells, three CMP paragraphs and
+    three cohort-rate paragraphs -- 6.8 KB of block for a finding that is two
+    sentences long (TODO.md "NEXT BAKE: mirror population").
+
+    The cohort is still named as what it IS -- the spreads the mirror-slayer
+    protocol converges on, not a census of what players own -- which is the
+    one thing a reader could be wrong about; 'mirror cohort' carries the rest
+    in the glossary.
+    """
     _state, all_facts, _path = shadow_sableye
     html = W.section_html(all_facts, 0)
-    raw = re.search(r'<p class="wb-mirror-lead">(.*?)</p>',
-                    html, re.S).group(1)
-    lead = _html.unescape(re.sub(r'<[^>]+>', '', raw))
-    assert lead.startswith('The mirror cohort is the 30 spreads the '
-                           'mirror-slayer protocol converges on for '
-                           'Sableye (Shadow)')
-    assert 'not a survey of what players build' in lead
-    # The cohort sentence is a property of the BLOB, so it is printed once
-    # and not per Build criteria setting.
-    assert html.count('<p class="wb-mirror-lead">') == 1
-    # The numbers it carries are the ones the computation measured.
-    assert 'split in two here' in lead
-    assert '12 between 141.76 and 143.91' in lead
-    assert '18 between 155.90 and 156.84' in lead
+    raw = re.search(r'<p class="wb-mirror">(.*?)</p>', html, re.S).group(1)
+    para = _html.unescape(re.sub(r'<[^>]+>', '', raw))
+    assert para == (
+        'Against the 30 spreads the mirror-slayer protocol converges on for '
+        'Sableye (Shadow) (split in two here), attack of 156.29 and up wins '
+        'charge-move priority against 21 of them, and 156.36 and up against '
+        '24. Inside a build, take the highest attack you have: no build on '
+        'this page holds a spread that clears the first cut; the closest is '
+        'Build 1 at 151.25.')
 
 
 @pytest.mark.local_artifacts
 @pytest.mark.slow
-def test_real_section_mirror_cmp_line_is_strict_and_says_so(shadow_sableye):
-    """Both counts, and which rule each is under. ``cmp_atk`` breaks the tie
-    on a strict ``>``; ``deep_dive_slayer._cmp_pct``'s bisect_right counts
-    ties as beats, and on this blob the two differ 2x (9 against 18)."""
+def test_real_section_mirror_drops_the_readings_it_still_computes(
+        shadow_sableye):
+    """The three readings the cut removed from the PAGE are still computed
+    and still true of the blob: the per-scenario decision cells, the
+    cohort-rate surface, and the Spearman between them. They are the
+    population version's inputs (TODO.md "NEXT BAKE: mirror population"), so
+    they must not be deleted -- and they must not be rendered either.
+
+    Pre-cut the page carried all three: a row per decision cell ("1v1 Sableye
+    (Shadow) | 48% | Build 1"), "the median member of Build 1 takes 33%,
+    Build 2 takes 44%, against 33% over the whole grid", and "That surface
+    barely tracks the matchups in the table above (Spearman +0.24 here)".
+    """
     _state, all_facts, _path = shadow_sableye
     html = W.section_html(all_facts, 0)
-    block = html[html.index('<div class="wb-mirror">'):]
-    block = block[:block.index('<div class="wb-mine">')]
-    text = _html.unescape(re.sub(r'<[^>]+>', ' ', block))
-    assert '50th and 75th attack percentiles are 155.90 and 156.30' in text
-    # The percentile is a LABEL; the number a reader aims at is the lowest
-    # attack on the grid above it, printed through brief.printed_cut so that
-    # ">= it" selects exactly the spreads that beat the percentile.
-    assert ('the lowest attack on this grid above the first is 156.29, '
-            'reached by 9 of its 4096 spreads, and it wins priority against '
-            '21 of the 30 members') in text
-    assert 'those two counts would be 18 and 9' in text
-    assert 'equal attack gives neither side the first throw' in text
-    # Per-build, and the honest negative: nothing on the page clears it.
-    assert ('No build on this page holds a spread that wins priority '
-            'against even half the cohort; the closest is Build 1 at '
-            '151.25.') in text
+    mf = next(iter(all_facts[0]['_builds']['mirror'].values()))
+    # Computed: not one of them is empty or None on this blob.
+    assert len(mf['cells']) == 7
+    assert all(c['wr'] is not None for c in mf['cells'])
+    assert mf['rate_med_grid'] is not None and mf['rate_max_grid'] is not None
+    assert mf['spearman'] is not None
+    assert any(r['rate_med'] is not None for r in mf['builds'])
+    # Not rendered. The cells table had its own class and its own header row;
+    # the other two are pinned on words nothing else on the page uses.
+    assert 'wb-mirror-table' not in html
+    assert 'Share of the grid that wins it' not in html
+    assert 'Spearman' not in html
+    # Not "over the whole grid" on its own: the flavor guide says "random IVs
+    # over the whole grid" a few thousand characters up, and an absence pin
+    # that matches another block's prose fails for the wrong reason.
+    assert 'Across the cohort' not in html
+    assert 'per-scenario or per-member breakdown' not in html
+    # Positive control: a scan that stopped finding the paragraph would pass
+    # every absence above, so the paragraph is asserted present here too.
+    assert html.count('<p class="wb-mirror">') == 3
