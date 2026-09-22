@@ -1094,7 +1094,31 @@ pool children and reports `procs=1 cpu%=0` during sweeps -- i.e. it makes a
 saturated machine look idle. Count the process tree by ppid. (This produced a
 wrong reading on 2026-09-10 that had to be retracted.)
 
-## chain_status.py ml_tail fallback is wrong by ~100x
+## DONE 2026-09-22: chain_status.py ml_tail fallback is wrong by ~100x
+
+**Closed, both halves.** The "better" half (self-calibrate like `gl_full` /
+`ul_full`) landed 2026-09-12 as `overnight_eta.measured_ml_tail_min()`, which
+reads `run_iv_guides.py`'s own `Done in N min: X ok, Y failed` line from
+`userdata/logs/` and supersedes the fallback whenever any past run exists.
+
+The fallback CONSTANT was deliberately left at 420.0 that day, on the theory
+that a wrong-but-flagged last-resort number is acceptable. It is not: on a
+machine with no ML history (a fresh clone, or rotated `userdata/logs`) nothing
+overrides it, and the watcher prints the phantom 7h with only a source code
+comment to contradict it. Recalibrated 2026-09-22 to **10.0** -- the 3.9 min
+measured on 2026-09-12 (60 ok, 0 failed) with ~2.5x headroom, set the same way
+`gl_full` / `ul_full` / `forretress` are.
+
+That measurement now lives beside the constant as
+`overnight_eta.ML_TAIL_MEASUREMENT`, so the two cannot drift apart silently,
+and `tests/test_eta_and_timing_report.py` pins the fallback to within [1x, 5x]
+of it plus an end-to-end "a historyless machine adds < 1h" check. Both fail
+against the pre-fix 420.0.
+
+`chain_status.py` delegates its SCRIPT/DIVE/BUCKETS lines to
+`overnight_eta.py` by subprocess, so this is the one place to fix.
+
+Original item:
 
 `ml_tail=420m` is a hardcoded fallback in `chain_status.py`'s ETA. The measured
 value on 2026-09-12 was **3.9 min** for all 60 guides (0.1 min each, 0 failed).
