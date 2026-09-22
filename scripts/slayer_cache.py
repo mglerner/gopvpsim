@@ -129,10 +129,51 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     return f'{species}_{league}_{h.hexdigest()[:12]}'
 
 
+_SLAYER_ENGINE_HASH = None
+
+
+def slayer_engine_hash():
+    """The SLAYER cache's engine stamp: the sweep engine hash + this worker.
+
+    Why this exists (gap found 2026-09-20, closed 2026-09-22). The slayer
+    stamp used to be ``sweep_cache.engine_hash()`` verbatim, which hashes the
+    five ``gopvpsim/`` engine files plus ``scripts/deep_dive_signature.py``.
+    ``scripts/deep_dive_slayer.py`` is NOT in that set -- but it is the worker
+    that builds the mirror pair and drives every ``simulate()`` call behind a
+    slayer column. So an edit to the slayer worker's own sim logic changed
+    slayer scores while leaving the stamp identical, and the cache would serve
+    the pre-edit column: a WRONG-ANSWER hazard, not merely a stale-cache one.
+    That is also why this module has needed three manual CACHE_VERSION bumps
+    (v3, v6, and the v2 form-change one) under the standing "bump for any
+    worker-code change" rule -- the rule existed precisely because the stamp
+    could not see the worker. It can now.
+
+    Composed rather than added to ``sweep_cache._ENGINE_FILES`` on purpose:
+    the SWEEP cache must not move. ~153,000 sweep columns are stamped with
+    the current sweep hash, and folding a scripts/ file into it would stale
+    every one of them for a file the sweep never reads.
+
+    Memoized per process, like the sweep hash.
+    """
+    global _SLAYER_ENGINE_HASH
+    if _SLAYER_ENGINE_HASH is None:
+        from sweep_cache import engine_hash
+        h = hashlib.md5()
+        h.update(engine_hash().encode())
+        worker = Path(__file__).parent / 'deep_dive_slayer.py'
+        if worker.exists():
+            h.update(worker.read_bytes())
+        _SLAYER_ENGINE_HASH = h.hexdigest()[:12]
+    return _SLAYER_ENGINE_HASH
+
+
 def _current_stamps():
-    """(engine_hash, gamemaster_hash) at the current process state."""
-    from sweep_cache import engine_hash, gamemaster_hash
-    return engine_hash(), gamemaster_hash()
+    """(slayer_engine_hash, gamemaster_hash) at the current process state.
+
+    NOT sweep_cache.engine_hash() -- see slayer_engine_hash() above.
+    """
+    from sweep_cache import gamemaster_hash
+    return slayer_engine_hash(), gamemaster_hash()
 
 
 def read_stamp(sidecar_path):
