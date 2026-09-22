@@ -128,3 +128,21 @@ def test_real_dives_contain_their_declared_pools():
         checked += 1
     if not checked:
         pytest.skip("no rendered dives on this machine")
+
+
+def test_default_markers_are_in_the_committed_gl_pool():
+    """The pool markers must be species the current GL pool actually carries;
+    otherwise the morning gate prints one false "markers missing" line per
+    fresh dive (2026-09-22: 76 of them, for Sylveon and Primeape, which left
+    the pool in the 2026-09-17 regeneration). Pre-fix DEFAULT_MARKERS =
+    ['Sylveon', 'Primeape', 'Umbreon']."""
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / 'scripts'))
+    import verify_overnight as vo
+    pool = {ln.strip() for ln in (root / 'opponent_pools' / 'gl_top50_plus_cs.txt')
+            .read_text().splitlines() if ln.strip() and not ln.startswith('#')}
+    missing = [m for m in vo.DEFAULT_MARKERS if m not in pool]
+    assert missing == [], missing
+    assert len(vo.DEFAULT_MARKERS) >= 2
