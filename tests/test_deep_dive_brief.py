@@ -3593,3 +3593,90 @@ def test_gate_recompute_catches_a_corrupted_corroboration(
     bad['cluster_corroboration'] = None
     with pytest.raises(B.GuardError):
         B.gate_recompute(state, 0, path, 'pvpoke', 'l50', bad, CTX)
+
+
+# ---------------------------------------------------------------------------
+# A merged rung's cells are not all the same primitive
+# ---------------------------------------------------------------------------
+# 2026-09-22. shadow-alolan-ninetales-ultra-league rendered all seven of its
+# files with no "Which one to build?" section at all, because arm 6 raised
+#
+#   G-recompute: field=Floor merge cell=2v2 Ninetales (Alolan)
+#   printed='clean at its own cut' recomputed=not a clean partition there
+#
+# The guard was RIGHT and the page's claim was wrong. ``group_rungs`` gives a
+# rung the kind of its STRONGEST cell (``min(PRIMITIVE_RANK ...)``), so an
+# "exact" rung can hold gate cells beside its exact ones; stage6 merges on the
+# rung kind, and the export then shipped EVERY cell of the merged rung under
+# the exact-only claim ("Also buys: ... every clearer of the printed line wins
+# it"). On this blob the merged rung at T=181.784877804 carried three cells:
+# two exact, plus the mirror 2v2 against the non-shadow form, which is a
+# one-sided gate there -- 25 of the floor's 1235 clearers LOSE it.
+NINETALES_A_UL_SHADOW = ('20260921_222221_Ninetales_Alolan_ultra_shadow'
+                         '.replay.pkl.gz')
+
+
+def test_merged_claim_cells_keeps_only_the_exact_cells():
+    """The filter itself, on hand-built rungs: no blob, no rankings.
+
+    Pre-fix there was no filter at all -- the export shipped ``r['cells']``.
+    """
+    rung = {'T': 100.0, 'kind': 'exact', 'cells': [
+        {'label': 'a', 'kind': 'exact'},
+        {'label': 'b', 'kind': 'gate'},
+        {'label': 'c', 'kind': 'exact'},
+        {'label': 'd', 'kind': 'near_exact'},
+    ]}
+    assert [c['label'] for c in B.merged_claim_cells(rung, CTX)] == ['a', 'c']
+    # A cell with no kind key is a hand-built rung's cell; stage6's own tests
+    # build those, and rung_kind defaults them to exact for the same reason.
+    assert [c['label'] for c in
+            B.merged_claim_cells({'T': 1.0, 'cells': [{'label': 'x'}]},
+                                 CTX)] == ['x']
+    # Positive control: a merged rung whose cells are ALL non-exact cannot
+    # happen (its rung kind would not be exact, so stage6 would not merge
+    # it), and silently shipping an empty "also buys" list would be the
+    # failure this filter exists to prevent.
+    with pytest.raises(B.GuardError) as exc:
+        B.merged_claim_cells({'T': 2.0, 'kind': 'exact',
+                              'cells': [{'label': 'b', 'kind': 'gate'}]}, CTX)
+    assert 'Floor merge' in str(exc.value)
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_a_merged_rung_does_not_claim_its_gate_cells():
+    """The Ninetales (Alolan) UL shadow case, on the blob that raised.
+
+    Pre-fix values recorded: arm 6's merged rung listed
+    ``['0v0 Ninetales (Alolan)', '2v2 Ninetales (Alolan) (Shadow)',
+    '2v2 Ninetales (Alolan)']`` and ``gate_recompute`` raised GuardError on
+    the third. Post-fix the gate cell is gone and the gate passes.
+
+    Reproduces identically under the module's frozen 2026-09-08 rankings and
+    under the live ones (checked 2026-09-22), so the freeze is not what makes
+    the case; it only keeps it from drifting.
+    """
+    path = require_blob(NINETALES_A_UL_SHADOW)
+    state = B.load_blob(str(path))
+    facts = B.compute_brief(state, 6, str(path), mode='pvpoke', level='l50')
+    fl = facts['floor']
+    assert fl['cell'] == '2v0 Tinkaton' and fl['kind'] == 'exact'
+    m = fl['merged_from'][0]
+    assert m['T'] == pytest.approx(181.784877804)
+    labels = [c['label'] for c in m['cells']]
+    assert labels == ['0v0 Ninetales (Alolan)',
+                      '2v2 Ninetales (Alolan) (Shadow)'], (
+        'the merged rung still claims a cell it does not partition')
+    # The dropped cell, as data: at the merged rung's own value it is a
+    # one-sided gate, and 25 of the floor's clearers lose it.
+    sc, meta = B.arm_view(state, 6, 'pvpoke', 'l50')
+    win = B.win_cube(sc)
+    fplane = meta[:, B.AXIS_META_COL[fl['axis']]]
+    si, oi = B._cell_index(state, '2v2 Ninetales (Alolan)')
+    counts = B.cut_counts(fplane, win[:, si, oi], m['T'])
+    assert counts['kind'] == 'gate' and counts['n_wrong'] == 25
+    clearers = win[fplane >= fl['T'], si, oi]
+    assert int(clearers.sum()) == 1210 and clearers.size == 1235
+    # ... and the guard that caught it now passes on this arm.
+    B.gate_recompute(state, 6, str(path), 'pvpoke', 'l50', facts, CTX)

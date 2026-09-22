@@ -1281,6 +1281,9 @@ def stage6_select(rungs, band=DECISION_BAND, n_iv=None,
     # above the printed line wins it") is proved by its own exact partition;
     # a gate or a near-exact rung cannot prove it, and G-recompute checks it
     # cell by cell, so a non-exact rung is never merged and never merged into.
+    # NB a rung's kind is its STRONGEST cell's (group_rungs takes the min
+    # rank), so "exact rung" does NOT mean "every cell exact": the per-cell
+    # claim is re-filtered where it is printed, by merged_claim_cells.
     if rung_kind(pick) == 'exact':
         for nxt in eligible[start + 1:]:
             if rung_kind(nxt) != 'exact':
@@ -1294,6 +1297,38 @@ def stage6_select(rungs, band=DECISION_BAND, n_iv=None,
     out = dict(pick)
     out['merged_from'] = merged
     return out
+
+
+def merged_claim_cells(rung, ctx):
+    """The cells of a MERGED rung that its printed claim actually covers.
+
+    A rung holds every cell that turns over at its value, and ``group_rungs``
+    gives the rung the kind of its STRONGEST cell
+    (``min(PRIMITIVE_RANK ...)``), so an "exact" rung can hold gate and
+    near-exact cells beside its exact ones. :func:`stage6_select` merges on
+    that rung kind, and the page then says of EVERY merged cell that the
+    printed line buys it and that the cell is clean at its own cut -- a claim
+    only an exact cell can support.
+
+    2026-09-22: shadow-alolan-ninetales-ultra-league arm 6 merged a rung whose
+    three cells were two exact partitions plus the mirror 2v2 against the
+    non-shadow form, a one-sided gate there that 25 of the floor's 1235
+    clearers LOSE. G-recompute caught the false sentence and took the whole
+    dive's section down with it. Filtering here keeps the merge (the floor
+    value does not move, and the two true "also buys" claims stay) and drops
+    only the claim that was false.
+
+    Raising when nothing survives is a positive control, not a defensive
+    branch: a merged rung's kind is exact BECAUSE one of its cells is, so an
+    empty result means the kinds and the rung disagree, and an empty "also
+    buys" list is exactly the silent shipment this filter exists to prevent.
+    """
+    cells = [c for c in rung['cells'] if c.get('kind', 'exact') == 'exact']
+    if not cells:
+        guard_fail('G-primitive', 'Floor merge', rung['cells'][0]['label'],
+                   f"merged at {rung['T']}",
+                   'no exact cell in a merged rung', ctx)
+    return cells
 
 
 def line_net(mask, total_won):
@@ -3060,18 +3095,22 @@ def compute_brief(state, arm, blob_path, mode='pvpoke', level='l50'):
         # Their cells are BOUGHT by the printed line (every clearer wins them)
         # but are NOT partitioned by it: they turn over lower down, so some
         # spreads below the line win them too. Both halves are carried.
+        # Only the EXACT cells of each merged rung: the claim printed about
+        # them ("also buys ... clean at its own cut") is a per-cell claim,
+        # and a rung's kind is its strongest cell's. See merged_claim_cells.
         'merged_from': [
             {'T': r['T'],
              'printed': printed_cut(r['T'], fplane, field='Floor merge',
-                                    ctx={'cell': r['cells'][0]['label']})[0],
+                                    ctx={'cell': mc[0]['label']})[0],
              'dp': printed_cut(r['T'], fplane, field='Floor merge',
-                               ctx={'cell': r['cells'][0]['label']})[1],
+                               ctx={'cell': mc[0]['label']})[1],
              'n_pass': r['n_pass'],
              'n_below_floor_win': int(r['n_pass'] - floor_rung['n_pass']),
              'cells': [{'label': c['label'], 'rank': c['rank'],
                         'mech': _mech_facts(c['mech'], c)}
-                       for c in r['cells']]}
-            for r in floor_rung.get('merged_from', [])],
+                       for c in mc]}
+            for r, mc in ((r, merged_claim_cells(r, ctx))
+                          for r in floor_rung.get('merged_from', []))],
         'merge_tol': MERGE_SPREAD_TOL,
     }
     # ONE threshold, ONE number on the page. Stage 7 escalates the FLOOR to
