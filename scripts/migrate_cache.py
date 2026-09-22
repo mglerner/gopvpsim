@@ -547,7 +547,17 @@ def _iter_columns(cache_dir):
                    side.get('gamemaster'), side.get('col'))
 
 
-def list_stamps(cache_dir):
+def _print_stamp_census(counts_by_label):
+    for label, counts, cur in counts_by_label:
+        print(f"\n{label} stamps:")
+        if not counts:
+            print("  (none)")
+        for stamp, n in counts.most_common():
+            tag = '  <- current' if stamp == cur else ''
+            print(f"  {n:>8}  {stamp}{tag}")
+
+
+def list_stamps(cache_dir, slayer_dir=None):
     eng = Counter()
     gm = Counter()
     for _fd, _meta, _jp, e_stamp, gm_stamp, _col in _iter_columns(cache_dir):
@@ -555,16 +565,28 @@ def list_stamps(cache_dir):
         gm[gm_stamp] += 1
     cur_e = sweep_cache.engine_hash()
     cur_gm = sweep_cache.gamemaster_hash()
+    print("=== SWEEP cache ===")
     print(f"current engine hash:     {cur_e}")
     print(f"current gamemaster hash: {cur_gm}")
-    for label, counts, cur in (('engine', eng, cur_e),
-                               ('gamemaster', gm, cur_gm)):
-        print(f"\n{label} stamps:")
-        if not counts:
-            print("  (none)")
-        for stamp, n in counts.most_common():
-            tag = '  <- current' if stamp == cur else ''
-            print(f"  {n:>8}  {stamp}{tag}")
+    _print_stamp_census((('engine', eng, cur_e), ('gamemaster', gm, cur_gm)))
+
+    # The slayer cache has its OWN engine stamp as of 2026-09-22 (it also
+    # hashes scripts/deep_dive_slayer.py), so printing only the sweep hash
+    # here would hand the operator the wrong --from-engine for --slayer.
+    sdir = Path(slayer_dir or slayer_cache.CACHE_DIR)
+    seng = Counter()
+    sgm = Counter()
+    if sdir.exists():
+        for jp in sorted(sdir.glob('*.json')):
+            e_stamp, gm_stamp, _scen = slayer_cache.read_stamp(jp)
+            seng[e_stamp] += 1
+            sgm[gm_stamp] += 1
+    cur_se = slayer_cache.slayer_engine_hash()
+    print(f"\n=== SLAYER cache ({sdir}) ===")
+    print(f"current slayer engine hash: {cur_se}")
+    print(f"current gamemaster hash:    {cur_gm}")
+    _print_stamp_census((('engine', seng, cur_se),
+                         ('gamemaster', sgm, cur_gm)))
 
 
 def _bless(jp, engine, gamemaster):
@@ -635,7 +657,11 @@ def migrate_slayer_engine(slayer_dir, from_engine, predicate_name, apply):
     no stored stamp/scenario and cold-rebake); a sidecar with no readable
     scenario is treated as AFFECTED by the predicate's own fail-safe."""
     affected = PREDICATES[predicate_name]
-    to_engine = sweep_cache.engine_hash()
+    # The SLAYER stamp, not sweep's: it additionally hashes
+    # scripts/deep_dive_slayer.py (2026-09-22). Using sweep_cache.engine_hash()
+    # here would bless slayer sidecars with a stamp the slayer loader then
+    # rejects -- every blessed column a guaranteed miss.
+    to_engine = slayer_cache.slayer_engine_hash()
     cur_gm = sweep_cache.gamemaster_hash()
     slayer_dir = Path(slayer_dir)
     if from_engine == to_engine:
@@ -729,7 +755,12 @@ def migrate_slayer_gamemaster(slayer_dir, from_gamemaster, old_gm_file, apply):
                                     'SLAYER GAMEMASTER')
     if res is None:
         return
-    affected, to_gamemaster, cur_engine = res
+    affected, to_gamemaster, _sweep_engine = res
+    # _gamemaster_delta_or_exit returns the SWEEP engine hash (it is shared
+    # with the sweep path). The slayer sidecars carry the slayer stamp, which
+    # also hashes scripts/deep_dive_slayer.py (2026-09-22), so the
+    # "is this column on the current engine?" test has to use that one.
+    cur_engine = slayer_cache.slayer_engine_hash()
     slayer_dir = Path(slayer_dir)
     blessed = deleted = skipped_engine = skipped_other = 0
     if slayer_dir.exists():
@@ -829,7 +860,7 @@ def main():
     cache_dir = a.cache_dir or sweep_cache.CACHE_DIR
 
     if a.list_stamps:
-        list_stamps(cache_dir)
+        list_stamps(cache_dir, a.slayer_dir)
         return
     if a.from_gamemaster:
         if not a.old_gamemaster_file:

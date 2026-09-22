@@ -315,6 +315,9 @@ def _put_slayer(slayer_dir, key, engine, gamemaster, charged):
 def test_slayer_engine_migration_blesses_and_deletes(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_cur')
+    # The slayer stamp is its own hash since 2026-09-22; migrate_slayer_engine
+    # blesses with THAT, so it is what the sentinel must pin.
+    monkeypatch.setattr(slayer_cache, '_SLAYER_ENGINE_HASH', 'newengine111')
     sd = tmp_path / 'slayer'
     # Pangoro mirror owns CLOSE_COMBAT (self-debuff) -> AFFECTED (mirror).
     aff = _put_slayer(sd, 'Pangoro', 'oldengine000', 'gm_cur',
@@ -334,6 +337,7 @@ def test_slayer_engine_migration_blesses_and_deletes(tmp_path, monkeypatch):
 def test_slayer_engine_migration_skips_other_gamemaster(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_new')
+    monkeypatch.setattr(slayer_cache, '_SLAYER_ENGINE_HASH', 'newengine111')
     sd = tmp_path / 'slayer'
     j = _put_slayer(sd, 'Azumarill', 'oldengine000', 'gm_old',
                     ['ICE_BEAM'])  # unaffected but OLD gamemaster
@@ -544,6 +548,9 @@ def _slayer_gm_setup(tmp_path, monkeypatch):
     monkeypatch.setattr(gdata, 'load_gamemaster', lambda: new_gm)
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', new_h)
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_cur')
+    # migrate_slayer_gamemaster tests a column's engine-currency against the
+    # SLAYER stamp (forked 2026-09-22), so pin that memo to the same sentinel.
+    monkeypatch.setattr(slayer_cache, '_SLAYER_ENGINE_HASH', 'engine_cur')
     return old_h, new_h, old_file
 
 

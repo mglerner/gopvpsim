@@ -33,6 +33,11 @@ def _fresh(monkeypatch, tmp_path, eng='eng_cur', gm='gm_cur'):
     monkeypatch.setattr(slayer_cache, 'CACHE_DIR', tmp_path)
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', eng)
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', gm)
+    # The slayer engine stamp forked from the sweep one on 2026-09-22 (it also
+    # hashes scripts/deep_dive_slayer.py). These tests are about the SIDECAR
+    # mechanism, not about which function feeds it, so both memos are pinned
+    # to the same sentinel and every assertion below keeps its meaning.
+    monkeypatch.setattr(slayer_cache, '_SLAYER_ENGINE_HASH', eng)
 
 
 def test_save_writes_sidecar_with_stamp_and_scenario(tmp_path, monkeypatch):
@@ -67,6 +72,7 @@ def test_stale_engine_stamp_is_a_safe_miss(tmp_path, monkeypatch):
     c.save()
     # Engine bumps -> the cached pkl must NOT be served (stale).
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'eng_new')
+    monkeypatch.setattr(slayer_cache, '_SLAYER_ENGINE_HASH', 'eng_new')
     c2 = slayer_cache.SlayerCache(cache_key='k', disk=True)
     assert c2.get(0, 1) is None        # miss, not a stale serve
     assert c2.data == {}

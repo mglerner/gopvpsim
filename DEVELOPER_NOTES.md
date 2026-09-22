@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->2909<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2914<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -216,14 +216,43 @@ CLI of its own (no `main()`, no argparse), so there is no flag to add;
 
 **Slayer cache identity.** `slayer_cache.compute_cache_key` already
 hashes `mechanics` into the column key (2026-09-02), so legacy and new
-mirrors can never be served for one another. `slayer_cache`'s engine
-stamp is `sweep_cache.engine_hash()`, which hashes the five
-`gopvpsim/` engine files plus `scripts/deep_dive_signature.py` and
-**not** `scripts/deep_dive_slayer.py` -- a change to the slayer
-worker's own sim logic is therefore invisible to the slayer cache.
-That gap is real but pre-existing and orthogonal to this fix (nothing
-here changes slayer output); closing it means invalidating the slayer
-cache, so it is a post-bake item.
+mirrors can never be served for one another.
+
+**Slayer engine stamp: CLOSED 2026-09-22.** Until then `slayer_cache`'s
+engine stamp was `sweep_cache.engine_hash()` verbatim, which hashes the
+five `gopvpsim/` engine files plus `scripts/deep_dive_signature.py` and
+**not** `scripts/deep_dive_slayer.py` -- so a change to the slayer
+worker's own sim logic was invisible to the slayer cache. That is a
+*wrong-answer* hazard rather than a stale-cache one: a stale stamp is a
+safe miss, but an UNCHANGED stamp over changed behaviour is a silent
+stale serve. It is also why this module carried three manual
+`CACHE_VERSION` bumps under the standing "bump for any worker-code
+change" rule (v2, v3, v6) -- the rule existed because the stamp could
+not see the worker.
+
+The stamp is now `slayer_cache.slayer_engine_hash()` =
+`md5(sweep_engine_hash + deep_dive_slayer.py bytes)[:12]`. Composed
+rather than folded into `sweep_cache._ENGINE_FILES` on purpose: **the
+sweep stamp must not move** (~153,000 sweep columns carry it, and the
+sweep never reads the slayer worker). Pinned by
+`tests/test_slayer_engine_stamp.py`, which edits the real worker file
+and asserts the slayer stamp moves while the sweep stamp does not.
+
+One-time cost, paid 2026-09-22: the slayer stamp went
+`9ac12a2754a1` (it was literally the sweep hash) ->
+**`abcd962da95a`**, so **every slayer column is invalidated once** --
+2.6 GB, 249 sidecar/pkl pairs on this machine, of which 150 were on the
+then-current stamp. They are a SAFE MISS (re-simmed, never served
+stale) and re-sim at the next bake's mirror-slayer rounds. Not
+migratable: the whole point is that the pre-fix stamp cannot prove
+whether the worker changed.
+
+`migrate_cache.py --slayer` was updated with it -- both
+`migrate_slayer_engine` and `migrate_slayer_gamemaster` now bless and
+compare against the slayer stamp (blessing with the sweep stamp would
+make every "warm" column a guaranteed miss), and `--list-stamps` prints
+a separate SLAYER section with its own current hash so the operator
+reads the right `--from-engine`.
 
 ## Performance baseline (regression gate)
 
