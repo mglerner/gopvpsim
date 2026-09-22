@@ -87,15 +87,17 @@ DEV_COUNTS_SOURCE_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 # unresolved tokens, blocking the publish. That was a latent break: the
 # reference slug is a plain string with nothing tying it to the dive registry.
 #
-# Corviknight GL is chosen to fit the prose in guides/threshold-tiers/body.md,
-# which reads "cuts on bulk: `def >= X` with an HP floor of `Y`" -- so the
-# featured dive's top tier needs BOTH cutoffs populated. Corviknight's top
-# tier has def 135.47 AND sta 145.00. Altaria and Azumarill also resolve every
-# token but carry sta 0, which would render "an HP floor of `0`".
+# Corviknight GL was originally chosen because its top tier carried BOTH a def
+# and an sta cutoff, which the old hardcoded prose ("cuts on bulk: `def >= X`
+# with an HP floor of `Y`") required. The 2026-09-22 bake moved that tier to
+# atk 112.79 / def 0 / sta 142 and the sentence rendered "def >= 0"; no Great
+# League dive in that bake had all three cutoffs nonzero, so no reference swap
+# could fix it. The prose is now data-driven (`dive:top_tier_axes` /
+# `dive:top_tier_rule`), so the reference dive only has to BE baked with
+# threshold tiers -- whichever axes its top tier cuts on.
 #
-# If you retire Corviknight, pick another dive whose top tier has both cutoffs
-# and re-read that paragraph; test_guides_reference_dive_is_baked pins the
-# registry half of this.
+# test_guides_reference_dive.py pins both halves: registry membership, and
+# that the rendered rule names a nonzero cutoff and never prints a zero one.
 DEFAULT_REFERENCE = {
     'species': 'Corviknight',
     'league': 'great',
@@ -267,6 +269,10 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
         rounded to 2 decimals. A cutoff of exactly 0 renders as ``0``
         (meaning "no cutoff on that stat"), otherwise rendered with
         two digits.
+      - ``top_tier_axes`` / ``top_tier_rule``: the first tier's cutoffs
+        with the unused axes dropped -- ``attack and HP`` and
+        ``atk >= 112.79 and HP >= 142``. Use these in prose instead of
+        the three per-axis tokens, which render an unused axis as ``0``.
       - ``top_tier_clear_count``: how many of the 4096 IVs clear the
         first tier's cutoffs.
       - ``envelope_rider_top_count`` / ``envelope_rider_bottom_count``:
@@ -369,6 +375,39 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
         if raw == 0:
             return '0'
         return f'{float(raw):.2f}'
+    if suffix in ('top_tier_axes', 'top_tier_rule'):
+        # Print only the axes the top tier actually cuts on. A stored 0
+        # means "no cutoff on that stat", so spelling it out would invent
+        # a threshold the tier does not carry -- and WHICH axes a top tier
+        # cuts on varies bake to bake (the 2026-09-22 bake left no Great
+        # League dive with all three nonzero), so guide prose cannot
+        # hardcode them. `top_tier_axes` is the English axis list for the
+        # lead-in ("attack and HP"); `top_tier_rule` is the cutoff list
+        # for the code span ("atk >= 112.79 and HP >= 142").
+        parts: list[tuple[str, str]] = []
+        for key, word, code in (('attack', 'attack', 'atk'),
+                                ('defense', 'defense', 'def'),
+                                ('stamina', 'HP', 'HP')):
+            raw = t0.get(key)
+            if not raw:
+                continue
+            shown = f'{float(raw):.2f}'
+            if key == 'stamina':
+                # HP floors are whole numbers in practice; don't print
+                # "142.00" as if it were a fractional stat.
+                shown = shown.rstrip('0').rstrip('.')
+            parts.append((word, f'{code} >= {shown}'))
+        if not parts:
+            # A tier that cuts on nothing has no rule to print. Return
+            # None so build_guides hard-fails loudly rather than
+            # rendering an empty sentence into the published guide.
+            return None
+        if suffix == 'top_tier_axes':
+            words = [w for w, _ in parts]
+            if len(words) == 1:
+                return words[0]
+            return ', '.join(words[:-1]) + ' and ' + words[-1]
+        return ' and '.join(r for _, r in parts)
     if suffix == 'top_tier_clear_count':
         count = 0
         for iv_tier_list in iv_all:

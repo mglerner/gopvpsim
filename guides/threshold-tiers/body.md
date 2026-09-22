@@ -132,14 +132,16 @@ which of your catchable IV spreads fall inside each.
 
 {{dive:species_display}} {{dive:league_display}} has
 {{dive:tier_count}} threshold-tier cards on its featured moveset.
-The top card - {{dive:top_tier_name}} - cuts on bulk: `def &ge;
-{{dive:top_tier_def_cutoff}}` with an HP floor of
-`{{dive:top_tier_sta_cutoff}}`, and {{dive:top_tier_clear_count}} of
-the {{dive:iv_space_size}} IV spreads meet it. That means clearing
-that tier isn't free; it rules out nearly every attack-weighted IV
-spread. But every IV spread that does meet it also flips the matchups
-listed as primary bullets below - the namesake bulkpoint plus every
-looser cutoff on the same axis for this moveset.
+The top card - {{dive:top_tier_name}} - cuts on
+{{dive:top_tier_axes}}: `{{dive:top_tier_rule}}`, and
+{{dive:top_tier_clear_count}} of the {{dive:iv_space_size}} IV
+spreads meet it. A tier only lists the axes it actually cuts on, so
+the axes named here are the ones this tier constrains; the rest are
+unrestricted. That means clearing that tier isn't free - it rules out
+every IV spread that misses any one of those cutoffs. But every IV
+spread that does meet it also flips the matchups listed as primary
+bullets below - the namesake breakpoint or bulkpoint plus every
+looser cutoff on the same axes for this moveset.
 
 Read the card top-down: tier name tells you what opponent drives the
 cutoff; the cutoff tells you what stat you need; the member count
