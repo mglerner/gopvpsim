@@ -1987,12 +1987,362 @@ def compute_builds(state, arm, mode='pvpoke', level='l50', facts=None,
     # letters, which are per-preset labels.
     sigs = {tuple((b['role'], b['_mask'].tobytes()) for b in p['builds'])
             for p in presets.values()}
+    # The mirror block, per preset because the builds it names are. The rate
+    # surface is a property of the blob, so it is read ONCE and passed in
+    # rather than rebuilt (4096 dict lookups) three times.
+    surf = mirror_surface(ctx, level=level)
+    mirror = {}
+    for key, block in presets.items():
+        mf = mirror_facts(ctx, frame, block, level=level, surface=surf)
+        if mf is not None:
+            mirror[key] = mf
     return dict(ctx=ctx, sets=sets, frame=frame, presets=presets,
+                mirror=mirror,
                 clusters_result=clusters_result,
                 presets_identical=(len(presets) > 1 and len(sigs) == 1),
                 n_decision_cells=len(frame['cells']),
                 n_material_cells=int(frame['mat'].sum()),
                 label=ctx['label'], arm=arm)
+
+
+# ---------------------------------------------------------------------------
+# the mirror-slayer cohort -- read-only
+# ---------------------------------------------------------------------------
+# ``deep_dive.py --mirror-slayer`` bakes a converged population of MIRROR
+# SLAYERS at the top of the blob: spreads selected over several rounds for
+# beating each other in the focal's own mirror. Everything below READS that
+# artifact. Nothing here generates a named set, enters the lattice or changes
+# a build -- the 2026-09-21 prototype (userdata/analysis/2026-09-21_mirror_
+# proto/report.md) measured a set generator over this surface on four blobs
+# and found it unshippable: no region it produces fits a printable rule, the
+# literal quantile basis is empty on three of four, and the grid-quantile
+# fallback breaks the "no build loses a guaranteed cell" gate on a third of
+# the arm-runs. The CMP half of that study is what ships.
+
+MIRROR_QS = (0.50, 0.75)
+# The median member's attack has to sit in the grid's top decile before the
+# cohort is called attack-first, and its stat product in the grid's top decile
+# before it is called bulk-first. Measured: Melmetal GL 97.9 / rank 1854
+# (attack-first), Melmetal UL 26.9 / rank 193 (bulk-first), Azumarill GL
+# 48.4 / rank 1795 (neither -- the cohort sits on an attack plateau).
+MIRROR_TILT_ATK_PCT = 90.0
+MIRROR_TILT_SP_SHARE = 0.10
+# A cohort whose attack comes in two lobes: the largest gap between
+# consecutive member attacks holds at least MIRROR_SPLIT_GAP of the whole
+# band, with at least MIRROR_SPLIT_SIDE of the members each side of it. It
+# fires on Shadow Sableye (12 members at 141.8-143.9, 18 at 155.9-156.8) and
+# on none of the other three prototype blobs, where the big gap has one or
+# three members on the far side of it.
+MIRROR_SPLIT_GAP = 0.40
+MIRROR_SPLIT_SIDE = 0.25
+
+
+def mirror_surface(ctx, level='l50'):
+    """Per-spread mirror-vs-cohort rate, aligned to the grid, or None.
+
+    Returns ``dict(rate, n_pairs, n_final, final, level)`` where ``rate`` is a
+    float array over the arm's ``n_iv`` spreads and NaN marks a spread the
+    slayer run did not score (``--species-iv-floor`` prunes the focal space;
+    the sweep grid does not). ``level`` selects which baked population to read
+    -- note that most blobs store the SAME object under both keys, so 'l51' is
+    usually not a separate best-buddy cohort (identity, not equality:
+    Melmetal GL and Melmetal UL both do this; Shadow Sableye and Azumarill
+    carry distinct cohorts).
+
+    ``rate`` is ``total_wins / (9 * n_pairs)``: the fraction of mirror
+    (shield scenario x cohort member) CELLS a spread wins. It is the only
+    per-spread mirror number the blob keeps -- ``all_scores`` is a 4-tuple of
+    aggregates over all nine scenarios and all opponents, so "beats 83% of
+    them in the 1v1" is not recoverable.
+
+    ``n_pairs`` is how many opponents each spread was actually SCORED
+    against -- the iteration dedups opponents by ``(atk, def, hp)`` before
+    the round -- so it is the denominator, and it is neither ``len(final)``
+    (30 against 25 on Melmetal Great League) nor the number of distinct
+    stat profiles IN ``final`` (22 there). All three are different numbers
+    and only this one divides ``total_wins``.
+
+    MOVESET-BLIND. ``deep_dive.py`` runs the iterative slayer discovery on the
+    FIRST moveset only (``if mi == 0 and args.mirror_slayer``) and stores the
+    result once at the top of the blob, so this surface describes arm 0's
+    mirror no matter which arm's ``ctx`` is passed.
+    """
+    state = ctx['state']
+    key = 'slayer_iter_result' if level == 'l50' else 'slayer_iter_result_l51'
+    res = state.get(key)
+    if not res or not res.get('all_scores') or not res.get('final'):
+        return None
+    all_scores = res['all_scores']
+    meta = ctx['meta']
+    rate = np.full(ctx['n_iv'], np.nan, dtype=np.float64)
+    n_sc = ctx['n_sc']
+    n_pairs = 0
+    for i in range(ctx['n_iv']):
+        triple = (int(meta[i, 0]), int(meta[i, 1]), int(meta[i, 2]))
+        row = all_scores.get(triple)
+        if row is None:
+            continue
+        total_wins, _frac, _avg, np_ = row
+        if not np_:
+            continue
+        n_pairs = max(n_pairs, int(np_))
+        rate[i] = total_wins / float(n_sc * np_)
+    if not np.isfinite(rate).any():
+        return None
+    return dict(rate=rate, n_pairs=n_pairs, n_final=len(res['final']),
+                final=res['final'], level=level)
+
+
+def mirror_opponents(ctx):
+    """Pool entries that ARE the focal species, in pool order.
+
+    BOTH forms: a shadow focal's pool carries the plain form as well (Shadow
+    Sableye's Great League pool holds 'Sableye (Shadow)' and 'Sableye'), and
+    a reader asking "does the mirror go my way" means either of them. The
+    match is on the parsed base species, so a moveset-variant entry
+    ('Forretress (Bug Bite)') counts as the mirror too.
+    """
+    focal = ctx['state']['species']
+    out = []
+    for oi, name in enumerate(ctx['names']):
+        species, _variant, shadow = parse_opponent_spec(name)
+        if species == focal:
+            out.append({'oi': oi, 'name': name, 'shadow': bool(shadow)})
+    return out
+
+
+def mirror_decision_cells(ctx, frame):
+    """``(index into frame['cells'], cell)`` for every mirror decision cell."""
+    ois = {m['oi'] for m in mirror_opponents(ctx)}
+    return [(j, c) for j, c in enumerate(frame['cells']) if c['oi'] in ois]
+
+
+def _rank_avg(x):
+    """Average ranks, ties shared -- the ranking Spearman's rho is over."""
+    x = np.asarray(x, dtype=np.float64)
+    order = np.argsort(x, kind='stable')
+    ranks = np.empty(len(x), dtype=np.float64)
+    i = 0
+    while i < len(x):
+        j = i
+        while j + 1 < len(x) and x[order[j + 1]] == x[order[i]]:
+            j += 1
+        ranks[order[i:j + 1]] = 0.5 * (i + j) + 1.0
+        i = j + 1
+    return ranks
+
+
+def spearman(x, y):
+    """Spearman's rho, or None when either side is constant.
+
+    numpy only: scipy is not a runtime dependency of this project, and one
+    correlation over 4096 points does not justify adding one.
+    """
+    rx, ry = _rank_avg(x), _rank_avg(y)
+    sx, sy = rx.std(), ry.std()
+    if sx == 0 or sy == 0:
+        return None
+    return float(((rx - rx.mean()) * (ry - ry.mean())).mean() / (sx * sy))
+
+
+def mirror_cmp(ctx, cohort_atks, qs=MIRROR_QS):
+    """The cohort's attack quantiles as CMP thresholds, under the ENGINE rule.
+
+    ``battle.BattlePokemon.cmp_atk`` breaks same-turn charged-move priority
+    on a STRICT ``>``; equal attack is no priority at all, and in a mirror the
+    fallback is the stable pokemon-index order, which is arbitrary. So every
+    count here is strict. ``deep_dive_slayer._cmp_pct`` -- and the Slayer
+    Builds section's JS, which prints its number -- uses ``bisect_right`` on
+    the 2-dp attack, counting ties AS beats; that count is carried alongside
+    as ``n_grid_ties`` so a page showing both can say which rule is which.
+    They differ by up to 2x (Melmetal GL a_50: 46 strict against 87).
+
+    ``a_q`` is the ``ceil(q * n)``-th smallest cohort attack: exceeding it
+    wins priority against AT LEAST that many members, which is the smallest
+    threshold for which the "half the cohort" claim is true.
+    """
+    atk = ctx['atk']
+    srt = sorted(float(v) for v in cohort_atks)
+    n = len(srt)
+    out = []
+    for q in qs:
+        k = int(np.ceil(q * n))
+        k = max(1, min(k, n))
+        T = srt[k - 1]
+        # The number a reader can AIM at. ``T`` is one cohort member's
+        # attack, and this grid's attack values sit about 0.002 apart, so T
+        # ROUNDED is not a selector for it: on Melmetal Great League
+        # "attack > 125.17" holds 87 spreads where "attack > 125.174318"
+        # holds 46. The lowest GRID attack strictly above T is a selector --
+        # it is the minimum of an upper set, so ``atk >= line`` is exactly
+        # ``atk > T`` -- and it prints through the same >= machinery every
+        # other threshold on the page uses.
+        above = atk[atk > T]
+        line = float(above.min()) if len(above) else None
+        line_printed, line_dp = (None, None)
+        if line is not None:
+            line_printed, line_dp = brief.printed_cut(
+                line, atk, field='Mirror CMP line',
+                ctx={'cell': f'mirror cohort q{int(round(q * 100))}'})
+        out.append({
+            'q': float(q), 'T': T,
+            'line': line, 'line_printed': line_printed, 'line_dp': line_dp,
+            # Members this threshold is guaranteed to out-prioritise, as a
+            # COUNT of the cohort -- not a quantile position dressed up as
+            # one. Exceeding a_q beats every member below it AND every member
+            # tied at it, so this is >= ceil(q * n).
+            'n_beaten': int(sum(1 for v in srt if v <= T)),
+            'n_cohort': n,
+            'n_grid_strict': int((atk > T).sum()),
+            'n_grid_ties': int((np.round(atk, 2) >= round(T, 2)).sum()),
+        })
+    return out
+
+
+def mirror_split(atks, gap=MIRROR_SPLIT_GAP, side=MIRROR_SPLIT_SIDE):
+    """The cohort's two attack lobes, or None when it has one.
+
+    A median alone is a wrong summary of a bimodal cohort: Shadow Sableye's
+    sits at the grid's 99.6th attack percentile while 40% of the cohort is
+    13 points below it, so a page calling that cohort attack-first and
+    stopping there would be hiding the half it is not about.
+    """
+    srt = sorted(float(v) for v in atks)
+    n = len(srt)
+    if n < 4:
+        return None
+    span = srt[-1] - srt[0]
+    if span <= 0:
+        return None
+    k = max(range(1, n), key=lambda i: srt[i] - srt[i - 1])
+    if (srt[k] - srt[k - 1]) < gap * span:
+        return None
+    if min(k, n - k) < side * n:
+        return None
+    return {'n_lo': k, 'n_hi': n - k,
+            'lo_lo': srt[0], 'lo_hi': srt[k - 1],
+            'hi_lo': srt[k], 'hi_hi': srt[-1]}
+
+
+def _grid_index(meta, iv):
+    """Row of the arm's grid holding one (atk, def, sta) IV triple, or None."""
+    a, d, s = (int(x) for x in iv)
+    hit = np.flatnonzero((meta[:, 0] == a) & (meta[:, 1] == d)
+                         & (meta[:, 2] == s))
+    return int(hit[0]) if len(hit) else None
+
+
+def _build_mirror_row(ctx, b, cmp_rows, rate, mcells):
+    atk = ctx['atk']
+    mask = b['_mask']
+    members = atk[mask]
+    row = {
+        'role': b['role'], 'size': int(b['size']),
+        'atk_max': float(members.max()) if len(members) else None,
+        'n_clear': [int((members > c['T']).sum()) for c in cmp_rows],
+        'guaranteed': [bool(b['_g'][j]) for j, _c in mcells],
+        'rate_med': None, 'rate_min': None, 'rate_max': None,
+    }
+    if rate is not None:
+        r = rate[mask]
+        r = r[np.isfinite(r)]
+        if len(r):
+            row['rate_med'] = float(np.median(r))
+            row['rate_min'] = float(r.min())
+            row['rate_max'] = float(r.max())
+    return row
+
+
+def mirror_facts(ctx, frame, block, level='l50', surface=None):
+    """Everything the section's mirror block prints, or None.
+
+    None -- and therefore no block at all -- unless all three hold:
+
+    (a) the focal species is IN this arm's opponent pool (either form), so
+        there is a mirror to talk about;
+    (b) the mirror is a DECISION cell in at least one shield scenario, so the
+        IV choice is what decides it rather than the matchup;
+    (c) the blob carries a mirror-slayer cohort with a non-empty ``final``.
+
+    ``block`` is one preset's :func:`run_preset` output: the per-build numbers
+    are per-preset because the builds are.
+    """
+    opps = mirror_opponents(ctx)
+    if not opps:
+        return None
+    mcells = mirror_decision_cells(ctx, frame)
+    if not mcells:
+        return None
+    surf = mirror_surface(ctx, level=level) if surface is None else surface
+    if surf is None:
+        return None
+    state = ctx['state']
+    atk = ctx['atk']
+    n_iv = ctx['n_iv']
+    final = surf['final']
+    atks = [float(s['atk']) for s in final if s.get('atk') is not None]
+    if not atks:
+        return None
+    cmp_rows = mirror_cmp(ctx, atks)
+    med_atk = float(np.median(atks))
+    atk_pct = float(100.0 * (atk < med_atk).mean())
+    # The median member's stat-product rank, read off the arm's own grid: the
+    # cohort rows carry IVs, and a rank recomputed from atk x def x hp would
+    # be a second ranking of the same numbers.
+    sp_ranks = []
+    for s in final:
+        gi = _grid_index(ctx['meta'], s['iv'])
+        if gi is not None:
+            sp_ranks.append(int(ctx['sp_rank'][gi]))
+    sp_rank_med = int(np.median(sp_ranks)) if sp_ranks else None
+    tilt = None
+    if atk_pct >= MIRROR_TILT_ATK_PCT:
+        tilt = 'atk'
+    elif (sp_rank_med is not None
+          and sp_rank_med <= MIRROR_TILT_SP_SHARE * n_iv):
+        tilt = 'bulk'
+    rate = surf['rate']
+    finite = np.isfinite(rate)
+    # How well the mirror cells this page already draws -- the focal at
+    # PvPoke's default spread -- track the cohort. Measured per blob and
+    # printed, because it is nil on Melmetal GL (-0.045), NEGATIVE on Shadow
+    # Sableye (-0.195, -0.462 on the 1v1 alone) and strong on Melmetal UL
+    # (+0.662): a page that implied either reading stands in for the other
+    # would be wrong on two of the four blobs the prototype measured.
+    ois = [m['oi'] for m in opps]
+    n_opp = ctx['n_opp']
+    ks = [si * n_opp + oi for si in range(ctx['n_sc']) for oi in ois]
+    cell_wins = ctx['win2'][:, ks].sum(axis=1).astype(float)
+    rho = (spearman(rate[finite], cell_wins[finite])
+           if finite.sum() > 1 else None)
+    return {
+        'species': state['species'], 'shadow': bool(state['shadow']),
+        'level': level,
+        'l51_is_l50': (state.get('slayer_iter_result_l51')
+                       is state.get('slayer_iter_result')),
+        'opponents': opps,
+        'n_final': len(final), 'n_pairs': int(surf['n_pairs']),
+        'n_profiles': len({(s['atk'], s['def_'], s['hp']) for s in final}),
+        'n_iv': int(n_iv),
+        'atk_lo': min(atks), 'atk_hi': max(atks),
+        'atk_pct': atk_pct, 'sp_rank_med': sp_rank_med, 'tilt': tilt,
+        'split': mirror_split(atks),
+        'cmp': cmp_rows,
+        'cells': [{'j': j, 'scenario': c['scenario'], 'label': c['label'],
+                   'name': ctx['names'][c['oi']], 'oi': c['oi'],
+                   'wr': float(c['wr'])} for j, c in mcells],
+        'builds': [_build_mirror_row(ctx, b, cmp_rows, rate, mcells)
+                   for b in block['builds']],
+        'rate_med_grid': (float(np.median(rate[finite]))
+                          if finite.any() else None),
+        'rate_max_grid': float(rate[finite].max()) if finite.any() else None,
+        'spearman': rho,
+        # The plot's one extra trace: the spreads that out-prioritise the
+        # cohort's median member. Packed here rather than in the payload
+        # builder so the number the caption prints and the points the trace
+        # draws come off one array.
+        'clear50': (atk > cmp_rows[0]['T']),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2171,6 +2521,29 @@ def build_plane(build):
                 'atkNote': ' and '.join(atk_bits) if atk_bits else None}
     return {'kind': 'box', 'def': box['def'], 'hp': box['hp'],
             'atkNote': (' and '.join(atk_bits) if atk_bits else None)}
+
+
+def mirror_payload(res):
+    """The plot's one extra trace, or None when this page draws no mirror.
+
+    A marker STYLE rather than a line: attack is an axis on neither builds
+    plane (stat-product rank x wins, and defense x HP), so the spreads that
+    out-prioritise the cohort's median member are outlined where they already
+    sit. ``on`` is False -- the legend key starts toggled OFF -- on a page
+    where no selected build holds one of them, so a page whose builds cannot
+    reach the threshold does not draw the promise of a distinction.
+    """
+    mirror = res.get('mirror') or {}
+    if not mirror:
+        return None
+    mf = next(iter(mirror.values()))
+    c50 = mf['cmp'][0]
+    if c50['line'] is None:
+        return None
+    on = any(r['n_clear'][0] for m in mirror.values() for r in m['builds'])
+    return {'cut': f"{float(c50['line_printed']):.{int(c50['line_dp'])}f}",
+            'n': int(c50['n_grid_strict']), 'on': bool(on),
+            'mask': pack_mask([bool(x) for x in mf['clear50']])}
 
 
 def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
@@ -2384,6 +2757,8 @@ def builds_payload(res, moveset_idx, mode='pvpoke', n_col=6, prose=None):
         'nDecision': len(cells), 'nMaterial': int(frame['mat'].sum()),
         'nOpp': int(ctx['n_opp']),
         'cells': cells, 'regions': regions, 'presets': pay_presets,
+        # One packed mask + three scalars; None on a page with no mirror.
+        'mirror': mirror_payload(res),
         # One row per family, referenced by index from every preset that
         # draws it (see ``add_family``).
         'families': fam_rows,
