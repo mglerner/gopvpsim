@@ -21,6 +21,7 @@ store is not on the machine.
 Every opponent meta rank quoted below is served from a FROZEN rankings
 fixture (see ``_frozen_rankings``), not from the live PvPoke rankings.
 """
+import collections
 import copy
 import importlib.util
 import json
@@ -184,11 +185,104 @@ def require_blob(name):
     return p
 
 
+# ---------------------------------------------------------------------------
+# Blob / fact-set memo
+# ---------------------------------------------------------------------------
+# ``compute_brief`` is the expensive call in this module -- seconds per fact
+# set -- and the ~85 blob-backed tests below ask for only about 15 distinct
+# (blob, arm, mode, level) combinations between them. Recomputing one per
+# test cost the fast tier 218s on 2026-09-22; memoising it changes no
+# contract, because a fact set is a pure function of those four inputs (plus
+# the frozen rankings -- see the assert in ``facts_for``).
+#
+# The fact sets are small and cached without limit. The blob STATES are not:
+# one is 2-4 GB in memory, and an unbounded state cache ended the module
+# holding all eleven (18 GB resident, sampled mid-run 2026-09-22). So the
+# state cache is a small LRU, and a fact set that is already cached is served
+# WITHOUT touching it -- that is what ``facts_for`` is for, and why most call
+# sites below ask for facts rather than for the ``(state, facts, path)``
+# triple. Measured on this file's fast tier (230 tests, 2026-09-22): 218s at
+# 10.9 GB peak with no cache, 125s at 16.8 GB with this one, 113s unbounded.
+# The LRU is the middle term, not free: it trades ~12s of re-reads for the
+# blobs it evicts.
+_BLOB_CACHE_MAX = 3
+_BLOB_CACHE = collections.OrderedDict()
+_BRIEF_CACHE = {}
+
+
+def _rankings_are_frozen():
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import deep_dive_lib.opponents as opponents
+    return opponents.get_rankings_for is _frozen_get_rankings_for
+
+
+def load_blob_cached(name):
+    """``(state, path)`` for one blob, over an LRU of ``_BLOB_CACHE_MAX``.
+
+    ``path`` is a ``str`` (what ``compute_brief`` and ``render_facts`` want);
+    ``str(path)`` on it is a no-op, so call sites that spell it that way are
+    unchanged.
+
+    Sharing a state dict across tests is what the two module-scoped fact
+    fixtures already did. An eviction is only ever a re-read: nothing here
+    mutates a state, and the blob's moveset-variant registrations are
+    additive and idempotent (``register_opponent_variant``), so a reload
+    rebuilds the same object against the same registry.
+    """
+    path = require_blob(name)
+    key = str(path)
+    state = _BLOB_CACHE.pop(key, None)          # pop+reinsert = mark as used
+    if state is None:
+        state = B.load_blob(key)
+    _BLOB_CACHE[key] = state
+    while len(_BLOB_CACHE) > _BLOB_CACHE_MAX:
+        _BLOB_CACHE.popitem(last=False)
+    return state, key
+
+
+def facts_for(name, arm, mode='pvpoke', level='l50'):
+    """The fact set for one (blob, arm, mode, level), computed at most once.
+
+    Every caller gets the SAME dict, so a test that corrupts a fact to prove
+    a guard fires must ``copy.deepcopy`` it first or it corrupts what every
+    later test reads. Every such test below does.
+
+    Only sound inside the frozen-rankings window: ``compute_brief`` reads
+    the opponent meta ranks live, so a fact set cached outside the
+    module-scoped ``_frozen_rankings`` patch would be computed against
+    today's PvPoke ranks and then served to tests that pin the 2026-09-08
+    vintage. Loud rather than silent, in the spirit of
+    ``_frozen_get_rankings_for``: this module's memo is not for other
+    modules to import.
+    """
+    assert _rankings_are_frozen(), (
+        'facts_for() memoises across tests and compute_brief() reads the '
+        'opponent rankings live, so it is only valid under the '
+        '_frozen_rankings fixture (module-scoped to this file)')
+    key = str(require_blob(name))
+    ck = (key, arm, mode, level)
+    if ck not in _BRIEF_CACHE:
+        state, _key = load_blob_cached(name)
+        _BRIEF_CACHE[ck] = B.compute_brief(state, arm, key,
+                                           mode=mode, level=level)
+    return _BRIEF_CACHE[ck]
+
+
+def brief_for(name, arm, mode='pvpoke', level='l50'):
+    """``(state, facts, path)`` -- ``facts_for`` plus the state beside it.
+
+    Only for tests that need the state itself (``render_facts``,
+    ``gate_recompute``, an arm count); asking for it can force a blob
+    re-read that ``facts_for`` alone would not.
+    """
+    facts = facts_for(name, arm, mode=mode, level=level)
+    state, key = load_blob_cached(name)
+    return state, facts, key
+
+
 @pytest.fixture(scope='module')
 def sableye_shadow_facts():
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    return state, B.compute_brief(state, 0, str(path)), str(path)
+    return brief_for(SABLEYE_SHADOW, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -753,8 +847,7 @@ def test_plain_sableye_cmp_line_drops_the_shadow_multiplier():
     plain Sableye flips it at 123.42 with the same 2220, because the whole
     attack axis is the shadow axis divided by 1.2.
     """
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(SABLEYE_PLAIN)
     scores, meta = B.arm_view(state, 0, 'pvpoke')
     win = B.win_cube(scores)
     oi = state['opponent_names'].index('Annihilape')
@@ -891,9 +984,7 @@ def test_deoxys_defense_has_no_floor_and_says_why():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(DEOXYS, 0)
     assert facts['floor'] is None
     assert facts['degradation']['rung'] == 'c'
     assert facts['clean_counts'].get('atk', 0) >= 1   # cuts exist ...
@@ -987,9 +1078,7 @@ def test_plain_sableye_floor_is_clean_in_two_of_four_not_four():
     two of them and at 122.29 in the other two, and the printed line
     partitions only the two.
     """
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(SABLEYE_PLAIN, 0)
     fl = facts['floor']
     assert fl['modes_ok'] == 4                    # pre-fix value, direction
     assert fl['modes_clean'] == 4                 # separability, any value
@@ -1022,9 +1111,7 @@ def test_plain_sableye_floor_is_clean_in_two_of_four_not_four():
 def test_gate_recompute_catches_a_corrupted_clean_count():
     """Positive control for the clean-versus-direction split."""
     import copy
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(SABLEYE_PLAIN, 0)
     B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
     bad = copy.deepcopy(facts)
     bad['floor']['modes_clean'] = 1               # the table says 4
@@ -1047,9 +1134,7 @@ def test_rank1_membership_of_the_alternative_is_set_without_a_floor():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(DEOXYS, 0)
     assert facts['floor'] is None
     assert 'in_alternative' in facts['rank1']
     alt = facts['alternative']
@@ -1078,9 +1163,7 @@ def test_dirty_thresholds_must_beat_the_constant_rule_and_be_material():
     [10%, 90%] band the clean-cut ladder enforces.
     """
     for name in (MELMETAL, DEOXYS):
-        path = require_blob(name)
-        state = B.load_blob(str(path))
-        facts = B.compute_brief(state, 0, str(path))
+        facts = facts_for(name, 0)
         rows = facts['dirty_thresholds']
         assert rows, "a negative must still carry evidence"
         for d in rows:
@@ -1192,15 +1275,14 @@ def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed():
     CLAIMED they never reached field 13 either, so the caveat text appeared
     nowhere on the page.
     """
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(FURRET)
     # V3 moved movesets 1-4 onto a Def line, whose ladder has no material
     # rungs, so the ATTACK ladder this test inspects now lives on moveset 5
     # (the only Furret arm with no line on any axis). The exclusion itself is
     # unchanged; only where the printed ladder is.
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(FURRET, i)['floor'] is None)
+    facts = facts_for(FURRET, arm)
     named = [n for row in facts['rungs_above'] + facts['rungs_below']
              for n in row['names']]
     assert named, "this arm does have material rungs"
@@ -1214,9 +1296,7 @@ def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed():
 @pytest.mark.local_artifacts
 def test_rung_rows_print_the_opponent_rank_inline():
     """D3: lower-ranked rungs still print, with the rank inline."""
-    path = require_blob(ALTARIA)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(ALTARIA, 0)
     rows = facts['rungs_below']
     assert rows
     ranked = [r for r in rows if any(x is not None for x in r['ranks'])]
@@ -1241,9 +1321,7 @@ def test_plain_sableye_annihilape_rung_keeps_its_priority_mechanism():
     so the two Sableye pages headlined different opponents for what is one
     physical priority line.
     """
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(SABLEYE_PLAIN, 0)
     fl = facts['floor']
     assert fl['cell'] == '0v1 Annihilape'        # round-2: 2v2 Electrode (H.)
     assert fl['n_pass'] == 2220                  # the shadow page's 2220
@@ -1305,11 +1383,10 @@ def test_melmetal_catch_line_does_not_claim_a_wild_catch():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     assert facts['acquisition'] == 'none'
     html = B.render_facts(state, arm, str(path), facts)
     assert 'Wild catches' not in html               # pre-fix string
@@ -1343,18 +1420,14 @@ def test_no_floor_alternative_is_rank_gated_and_reframed_when_wide():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(DEOXYS, 0)
     alt = facts['alternative']
     assert alt is not None
     assert not any('Wartortle' in c for c in alt['exclusive'])   # pre-fix cells
     for cell in alt['exclusive']:
         rank = int(cell.rsplit('rank ', 1)[1].rstrip(')').split(';')[0])
         assert rank <= B.RANK_GATE
-    path2 = require_blob(ALTARIA)
-    state2 = B.load_blob(str(path2))
-    facts2 = B.compute_brief(state2, 0, str(path2))
+    facts2 = facts_for(ALTARIA, 0)
     assert facts2['alternative']['too_wide'] is True
     text = ' '.join(B.build_headline(facts2))
     assert 'Bulk does not separate either' in text
@@ -1370,11 +1443,10 @@ def test_melmetal_breakpoint_floor_does_not_say_the_mechanism_is_unattributed():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     assert facts['floor']['mech']['kind'] == 'breakpoint'
     html = B.render_facts(state, arm, str(path), facts)
     assert 'mechanism unattributed; no coverage ladder' not in html  # pre-fix
@@ -1494,9 +1566,7 @@ def test_singular_plural_helper():
 
 @pytest.mark.local_artifacts
 def test_mirror_table_drops_the_dead_columns_without_a_floor():
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(DEOXYS, 0)
     assert facts['floor'] is None
     field = B._f11_mirror(facts)
     if field['rows']:
@@ -1577,11 +1647,10 @@ def test_melmetal_partition_count_can_never_exceed_the_direction_count():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     fl = facts['floor']
     assert (fl['arms_ok'], fl['arms_clean']) == (2, 3)    # the pre-fix pair
     assert fl['arms_partition'] == 1                      # the honest number
@@ -1608,11 +1677,10 @@ def test_separability_is_printed_with_the_values_it_counted():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     html = B.render_facts(state, arm, str(path), facts)
     assert 'THIRD and non-comparable measurement' in html
     # The Dynamic Punch arm wins this cell with 4095 of 4096 spreads, so its
@@ -1631,11 +1699,10 @@ def test_gate_recompute_rejects_a_partition_count_above_the_direction_count():
     expected rank derived at test time.
     """
     import copy
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     B.gate_recompute(state, arm, str(path), 'pvpoke', 'l50', facts, CTX)
     bad = copy.deepcopy(facts)
     bad['floor']['arms_partition'] = bad['floor']['arms_ok'] + 1
@@ -1701,9 +1768,7 @@ def test_deoxys_bulk_rectangle_is_unreachable_and_says_so():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(DEOXYS, 0)
     model = facts['alt_catch_model']
     assert model['restricted'] is True
     assert model['n_grid'] == 216
@@ -1727,11 +1792,10 @@ def test_melmetal_floor_catch_counts_over_the_reachable_grid():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(MELMETAL, i)['floor'] is not None)
+    facts = facts_for(MELMETAL, arm)
     cm = facts['catch_model']
     assert cm['restricted'] is True and cm['n_grid'] == 216
     assert 0 < cm['n_reachable'] < 216
@@ -1799,11 +1863,10 @@ def test_sweep_arm_label_matches_the_page(sableye_shadow_facts):
 @pytest.mark.parametrize('blob', [SABLEYE_SHADOW, MELMETAL, FURRET, DEOXYS])
 def test_hp_thresholds_print_as_integers_everywhere(blob):
     """Round 2 put "HP >= 142" and "HP >= 142.00" on one Melmetal page."""
-    path = require_blob(blob)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(blob)
     out = []
     for arm in range(len(state['moveset_data'])):
-        facts = B.compute_brief(state, arm, str(path))
+        facts = facts_for(blob, arm)
         out.append(B.render_facts(state, arm, str(path), facts))
     text = '\n'.join(out)
     assert 'HP &gt;=' in text, "positive control: the page prints HP lines"
@@ -1830,9 +1893,7 @@ def test_no_floor_arms_still_print_example_spreads():
     from" was field 9 on all 14 no-floor arms in the corpus, so the negative
     verdict never carried its positive half.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(DEOXYS, 0)
     assert facts['floor'] is None
     assert len(facts['examples']) >= 2               # pre-fix: 0
     rules = [e['rule'] for e in facts['examples']]
@@ -1848,9 +1909,7 @@ def test_no_floor_arms_still_print_example_spreads():
 
 @pytest.mark.local_artifacts
 def test_grid_best_sizes_the_decision_against_rank_1():
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(DEOXYS, 0)
     gb, r1 = facts['grid_best'], facts['rank1']
     assert gb['total'] >= r1['total_won']
     assert gb['n_tied'] >= 1
@@ -1880,9 +1939,7 @@ def test_furret_defense_rule_is_the_line_not_the_closest_thing_to_one():
     prints attack lines only, so that one is evidence, not a target." Both
     strings are the pre-fix values recorded here.
     """
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(FURRET, 0)
     fl = facts['floor']
     assert fl is not None                                 # pre-fix: None
     assert (fl['axis'], fl['cell']) == ('def', '1v1 Lapras')
@@ -1907,11 +1964,10 @@ def test_furret_clean_cut_denominators_reconcile():
     only fires on an arm with NO line, so this runs on the Furret arm that
     has none (pre-fix it was arm 1, which now carries a Def line).
     """
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(FURRET)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(FURRET, i)['floor'] is None)
+    facts = facts_for(FURRET, arm)
     cc = facts['clean_counts']
     assert sum(cc.values()) == facts['gate_tally']['n_cuts']
     assert facts['clean_claimed'] + facts['clean_excluded'] == sum(cc.values())
@@ -2002,11 +2058,10 @@ def test_dirty_table_prints_the_genre_precision_cost():
     dirty row was the Def 102.063 rule at a genre precision of 102.0) now
     prints that rule as its line.
     """
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(FURRET)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(FURRET, i)['floor'] is None)
+    facts = facts_for(FURRET, arm)
     top = facts['dirty_thresholds'][0]
     g = top['genre']
     assert g['printed'] == pytest.approx(math.floor(top['t'] * 10) / 10.0)
@@ -2027,11 +2082,8 @@ def test_both_sableye_pages_headline_the_same_priority_line():
     line against the same PvPoke-default Annihilape, 1.0x it on one page and
     1.2x it on the other, over the same 2220 spreads.
     """
-    shadow_path = require_blob(SABLEYE_SHADOW)
-    plain_path = require_blob(SABLEYE_PLAIN)
-    sh_state = B.load_blob(str(shadow_path))
-    pl_state = B.load_blob(str(plain_path))
-    plain = B.compute_brief(pl_state, 0, str(plain_path))['floor']
+    sh_state, shadow_path = load_blob_cached(SABLEYE_SHADOW)
+    plain = facts_for(SABLEYE_PLAIN, 0)['floor']
     assert plain['cell'] == '0v1 Annihilape'
     assert plain['n_pass'] == 2220
     # V3 round 2: all four Shadow Sableye arms print the 148.10 attack line
@@ -2045,7 +2097,7 @@ def test_both_sableye_pages_headline_the_same_priority_line():
     # Def nets +4/+1/+1 against attack +9/+6/+4.
     shadow_cells, printed_axes, nets = set(), [], []
     for arm in range(len(sh_state['moveset_data'])):
-        facts = B.compute_brief(sh_state, arm, str(shadow_path))
+        facts = facts_for(SABLEYE_SHADOW, arm)
         fl = facts['floor']
         assert fl is not None
         printed_axes.append(fl['axis'])
@@ -2061,7 +2113,7 @@ def test_both_sableye_pages_headline_the_same_priority_line():
     assert [n[1] for n in nets[1:]] == [-5, -5, -3]
     assert [n[0] for n in nets[1:]] == [9, 6, 4]
     assert (plain['mech']['opp_cmp_atk']
-            == pytest.approx(B.compute_brief(sh_state, 0, str(shadow_path))
+            == pytest.approx(facts_for(SABLEYE_SHADOW, 0)
                              ['floor']['mech']['opp_cmp_atk']))
 
 
@@ -2098,9 +2150,7 @@ def test_merged_cells_are_stated_as_bought_and_not_as_partitioned():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(SABLEYE_PLAIN, 0)
     fl = facts['floor']
     m = fl['merged_from'][0]
     assert m['cells'][0]['label'] == '2v2 Electrode (Hisuian)'
@@ -2124,9 +2174,7 @@ def test_merged_cells_are_stated_as_bought_and_not_as_partitioned():
 def test_gate_recompute_rejects_a_merge_outside_the_tolerance():
     """Positive control: a merged rung that is not actually close."""
     import copy
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(SABLEYE_PLAIN, 0)
     B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
     bad = copy.deepcopy(facts)
     bad['floor']['merged_from'][0]['n_pass'] = 4000
@@ -2241,9 +2289,7 @@ def test_medicham_now_carries_a_gate_floor_and_badges_it():
     it fails G-direction, holding in 3 of the 4 baked opponent-IV settings.
     The line the page prints is the next one up that holds in all four.
     """
-    path = require_blob(MEDICHAM)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(MEDICHAM, 0)
     fl = facts['floor']
     assert fl is not None                        # pre-fix: None, rung c
     assert fl['kind'] == 'gate' and fl['gate_side'] == 'sufficient'
@@ -2268,9 +2314,7 @@ def test_medicham_now_carries_a_gate_floor_and_badges_it():
 @pytest.mark.local_artifacts
 def test_a_gate_floors_page_never_claims_an_exact_partition():
     """A badge is a claim about the wrong side, so it gates the sentences."""
-    path = require_blob(LAPRAS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(LAPRAS, 0)
     fl = facts['floor']
     assert fl['kind'] == 'gate' and fl['n_win_below'] == 56
     f2 = ' '.join(B._f2_floor(facts)['lines'])
@@ -2349,9 +2393,9 @@ def test_every_rendered_headline_in_the_corpus_passes_the_voice_gate():
         path = find_blob(name)
         if path is None:
             continue
-        state = B.load_blob(str(path))
+        state, _path = load_blob_cached(name)
         for arm in range(len(state['moveset_data'])):
-            facts = B.compute_brief(state, arm, str(path))
+            facts = facts_for(name, arm)
             head = B.build_headline(facts)
             assert len(head) == 2
             B.gate_voice(head, CTX)
@@ -2372,9 +2416,7 @@ def test_every_rendered_headline_in_the_corpus_passes_the_voice_gate():
 def test_strip_labels_switch_with_the_result(sableye_shadow_facts):
     _state, facts, _path = sableye_shadow_facts
     assert [k for k, _v in B.build_strip(facts)] == list(B.STRIP_LABELS_FLOOR)
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    none = B.compute_brief(state, 0, str(path))
+    none = facts_for(DEOXYS, 0)
     strip = B.build_strip(none)
     assert [k for k, _v in strip] == list(B.STRIP_LABELS_NONE)
     assert dict(strip)['Line'] == 'none'
@@ -2388,9 +2430,7 @@ def test_strip_line_carries_the_headline_precision(sableye_shadow_facts):
     assert dict(B.build_strip(facts))['Line'].startswith(
         'Atk >= 148.10 [exact]')
     assert B.headline_value(148.10, 2) == '148.10'
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    plain = B.compute_brief(state, 0, str(path))
+    plain = facts_for(SABLEYE_PLAIN, 0)
     assert plain['floor']['dp'] == 3
     assert B.headline_value(plain['floor']['printed'], 3) == '123.42 (123.419)'
     assert '123.42 (123.419)' in dict(B.build_strip(plain))['Line']
@@ -2426,8 +2466,7 @@ def test_variant_opponents_resolve_to_their_base_species_rank():
     page. The Melmetal bulk rectangle lost its highest-ranked matchup that
     way.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(MELMETAL)
     reg = state.get('opponent_variant_registry') or {}
     assert reg, "positive control: this blob has variant opponents"
     names = state['opponent_names']
@@ -2490,9 +2529,7 @@ def test_azumarill_headline_demotes_a_line_that_costs_more_than_it_buys():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(AZUMARILL)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(AZUMARILL, 0)
     fc = facts['floor_cost']
     assert fc['rank1_total'] == 370 and fc['best_total'] == 331
     assert fc['net'] == -39 and fc['material'] is True
@@ -2512,9 +2549,7 @@ def test_azumarill_headline_demotes_a_line_that_costs_more_than_it_buys():
 @pytest.mark.local_artifacts
 def test_a_cheap_line_keeps_its_directive_and_still_prints_the_price():
     """The other side of the demotion switch: it is graded, not a veto."""
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(SABLEYE_SHADOW, 0)
     fc = facts['floor_cost']
     assert fc['net'] > 0 and fc['material'] is False
     text = ' '.join(B.build_headline(facts))
@@ -2533,9 +2568,7 @@ def test_shadow_headline_carries_the_priority_caveat_and_the_plain_value():
     proven precision (123.419, not 123.41 -- the L51 check is what forces
     the third place).
     """
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(SABLEYE_SHADOW, 0)
     u = facts['floor']['unshadowed']
     assert (u['printed'], u['dp']) == (123.419, 3)
     text = B.build_headline(facts)[0]
@@ -2544,8 +2577,7 @@ def test_shadow_headline_carries_the_priority_caveat_and_the_plain_value():
            'against the live game.' in text
     assert 'A non-shadow Sableye needs 123.42 (123.419) attack for the same '\
            'fight.' in text
-    plain = require_blob(SABLEYE_PLAIN)
-    pf = B.compute_brief(B.load_blob(str(plain)), 0, str(plain))
+    pf = facts_for(SABLEYE_PLAIN, 0)
     assert (pf['floor']['printed'], pf['floor']['dp']) == (u['printed'],
                                                            u['dp'])
 
@@ -2564,9 +2596,7 @@ def test_medicham_names_the_better_ranked_rule_just_below_the_line():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(MEDICHAM)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(MEDICHAM, 0)
     nr = facts['floor']['near_rule']
     assert nr['cell'] == '1v1 Snorlax' and nr['rank'] == 13
     assert round(nr['printed'], 2) == 108.39
@@ -2592,9 +2622,7 @@ def test_a_negative_page_says_why_the_closest_rule_is_not_the_line():
     -- not in the headline, and not in the per-primitive audit, which
     reported "one-sided gate -> nothing eligible".
     """
-    path = require_blob(CORVIKNIGHT)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(CORVIKNIGHT, 0)
     assert facts['floor'] is None
     d = facts['dirty_thresholds'][0]
     assert d['cell'] == '1v2 Florges' and d['n_wrong'] == 1
@@ -2619,9 +2647,7 @@ def test_a_negative_page_says_why_the_closest_rule_is_not_the_line():
 @pytest.mark.local_artifacts
 def test_the_strip_never_names_an_alternative_the_headline_retracts():
     """13 of 35 sections printed a bulk pair the prose calls "not a target"."""
-    path = require_blob(CORVIKNIGHT)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 1, str(path))
+    facts = facts_for(CORVIKNIGHT, 1)
     alt = facts['alternative']
     assert facts['floor'] is None and alt['too_wide'] is True
     strip = dict(B.build_strip(facts))
@@ -2635,12 +2661,10 @@ def test_the_strip_never_names_an_alternative_the_headline_retracts():
 @pytest.mark.local_artifacts
 def test_the_strip_badge_says_which_way_a_gate_runs():
     """"[gate]" covered two opposite pieces of advice."""
-    azu = require_blob(AZUMARILL)
-    f_a = B.compute_brief(B.load_blob(str(azu)), 0, str(azu))
+    f_a = facts_for(AZUMARILL, 0)
     assert f_a['floor']['gate_side'] == 'necessary'
     assert '[gate: required]' in dict(B.build_strip(f_a))['Line']
-    lap = require_blob(LAPRAS)
-    f_l = B.compute_brief(B.load_blob(str(lap)), 0, str(lap))
+    f_l = facts_for(LAPRAS, 0)
     assert f_l['floor']['gate_side'] == 'sufficient'
     assert '[gate: enough]' in dict(B.build_strip(f_l))['Line']
     assert B.strip_badge({'kind': 'exact', 'gate_side': 'both'}) == 'exact'
@@ -2654,8 +2678,7 @@ def test_a_necessary_gate_says_at_or_above_on_a_ge_threshold():
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    azu = require_blob(AZUMARILL)
-    f_a = B.compute_brief(B.load_blob(str(azu)), 0, str(azu))
+    f_a = facts_for(AZUMARILL, 0)
     text = ' '.join(B.build_headline(f_a))
     assert 'for all but 8 of the 1369 spreads at or above the line' in text
     assert 'of the 1369 spreads above the line' not in text        # pre-fix
@@ -2671,9 +2694,8 @@ def test_a_shared_line_is_not_re_explained_on_every_moveset(tmp_path):
     ``_frozen_rankings`` for why the vintage is pinned rather than the
     expected rank derived at test time.
     """
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    facts = [B.compute_brief(state, a, str(path))
+    state, path = load_blob_cached(SABLEYE_SHADOW)
+    facts = [facts_for(SABLEYE_SHADOW, a)
              for a in range(len(state['moveset_data']))]
     assert len(facts) >= 2
     assert B.shared_line_with(facts[0], []) is None
@@ -2715,9 +2737,7 @@ def test_the_breakpoint_mechanism_is_re_derived_at_render_time():
     printed mechanism nothing re-derived.
     """
     import copy
-    path = require_blob(MEDICHAM)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    state, facts, path = brief_for(MEDICHAM, 0)
     assert facts['floor']['mech']['kind'] == 'breakpoint'
     ctx = dict(CTX)
     B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, ctx)
@@ -2736,11 +2756,10 @@ def test_not_claimed_only_counts_the_floors_own_cell_as_claimed():
     Furret arm 3 printed 122 where the exact-cut census says 123; the
     difference is 2v1 Florges, which has no exact cut on any axis.
     """
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
+    state, path = load_blob_cached(FURRET)
     arm = next(i for i in range(len(state['moveset_data']))
-               if B.compute_brief(state, i, str(path))['floor'] is not None)
-    facts = B.compute_brief(state, arm, str(path))
+               if facts_for(FURRET, i)['floor'] is not None)
+    facts = facts_for(FURRET, arm)
     fl = facts['floor']
     assert fl['other_cells_at_T'], "positive control: siblings at this value"
     n_iv = facts['header']['n_iv']
@@ -3020,9 +3039,7 @@ def test_opp_stages_only_takes_guaranteed_buffs():
 
 @pytest.fixture(scope='module')
 def furret_facts():
-    path = require_blob(FURRET)
-    state = B.load_blob(str(path))
-    return state, B.compute_brief(state, 0, str(path)), str(path)
+    return brief_for(FURRET, 0)
 
 
 @pytest.mark.local_artifacts
@@ -3053,7 +3070,7 @@ def test_furret_moveset_3_bulk_line_displaces_the_attack_line(furret_facts):
     rather than dropped.
     """
     state, _facts, path = furret_facts
-    facts = B.compute_brief(state, 2, path)
+    facts = facts_for(FURRET, 2)
     assert facts['floor']['axis'] == 'def'             # pre-fix: 'atk'
     # Round 2 measures a line against the spread that MISSES it and wins the
     # most, not against rank-1 (round 1: atk -25, def 0).
@@ -3078,9 +3095,7 @@ def test_altaria_still_has_no_line_and_now_says_why(furret_facts):
     under the 97% a gate needs, and 190 of 4096 are on the wrong side, over
     the 20 near-exact allows.
     """
-    path = require_blob(ALTARIA)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(ALTARIA, 0)
     assert facts['floor'] is None
     assert facts['axis_nets'] == {'atk': None, 'def': None, 'hp': None}
     d = facts['dirty_thresholds'][0]
@@ -3256,9 +3271,7 @@ def test_deoxys_carries_the_corpus_first_hp_line():
     corpus and this arm printed "no attack, defense or HP threshold decides a
     matchup" -- on a grid where no HP cut could have been tested.
     """
-    path = require_blob(DEOXYS)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 4, str(path))
+    facts = facts_for(DEOXYS, 4)
     fl = facts['floor']
     assert fl is not None                            # pre-fix: None
     assert fl['axis'] == 'hp'
@@ -3411,14 +3424,15 @@ def test_the_negative_headline_names_only_the_axes_it_tested():
     a matchup", including on grids where the HP axis could not produce a
     candidate at all.
     """
-    path = require_blob(ALTARIA)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 0, str(path))
+    facts = facts_for(ALTARIA, 0)
     assert facts['floor'] is None
     assert all(v['ok'] for v in facts['axis_testable'].values())
     head = ' '.join(B.build_headline(facts))
     assert 'No attack, defense or HP threshold decides a matchup' in head
-    # Same page, with the HP axis out of reach of its own gap bar.
+    # Same page, with the HP axis out of reach of its own gap bar. The
+    # copy is not decoration: ``facts`` is the memoised fact set every
+    # other Altaria test reads, so corrupting it in place would travel.
+    facts = copy.deepcopy(facts)
     facts['axis_testable']['hp']['ok'] = False
     facts['axis_testable']['hp']['n_distinct'] = 4
     head = ' '.join(B.build_headline(facts))
@@ -3660,9 +3674,8 @@ def test_a_merged_rung_does_not_claim_its_gate_cells():
     under the live ones (checked 2026-09-22), so the freeze is not what makes
     the case; it only keeps it from drifting.
     """
-    path = require_blob(NINETALES_A_UL_SHADOW)
-    state = B.load_blob(str(path))
-    facts = B.compute_brief(state, 6, str(path), mode='pvpoke', level='l50')
+    state, facts, path = brief_for(NINETALES_A_UL_SHADOW, 6,
+                                   mode='pvpoke', level='l50')
     fl = facts['floor']
     assert fl['cell'] == '2v0 Tinkaton' and fl['kind'] == 'exact'
     m = fl['merged_from'][0]
