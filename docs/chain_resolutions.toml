@@ -76,3 +76,34 @@ gamemaster 6d6e9a7bc32d, the same pair as the other 135 dirs. Regression \
 tests: tests/test_deep_dive_brief.py (the blob case + the filter) and \
 tests/test_which_build_section.py (the per-arm degrade).\
 """
+
+[[resolution]]
+chain_log = "overnight_20260920_164044.log"
+step = "Running ship gates (roster: run_ship_gates.py)"
+fix_commit = "2ed4539"
+resolved_on = "2026-09-22"
+reason = """\
+One gate, one test: verify_tests.py failed on \
+tests/test_guides_reference_dive.py::test_reference_dive_top_tier_has_a_real_hp_floor. \
+The threshold-tiers guide hardcoded its worked example as "cuts on bulk: \
+`def >= X` with an HP floor of `Y`", and after this bake the reference dive's \
+top tier (Corviknight GL, "Aegislash (Shield) Slayer") cut on atk 112.79 and \
+HP 142 with def 0 -- so the published page read "def >= 0" and never named the \
+cutoff the tier does carry. No reference swap could fix it: 0 of the 76 Great \
+League dives in this bake have all three top-tier cutoffs nonzero (measured \
+2026-09-22 across userdata/website/*-great-league). 2ed4539 made the sentence \
+data-driven -- dive:top_tier_axes / dive:top_tier_rule print only the axes the \
+tier cuts on -- and rewrote the test to assert the rendered rule names a \
+nonzero cutoff and never prints a zero one. No dive output was wrong; the \
+bake's 136 dives were already complete when the gate ran.\
+"""
+verified = """\
+2026-09-22: run_ship_gates.py re-run clean on the full roster -- verify_tests \
+2723 passed / 8 skipped / 136 deselected / 13 xfailed (395s), \
+verify_article_links --ship 790 files and 691,888 hrefs with no broken \
+internal refs, verify_no_unicode_dashes --ship clean across the same 790 \
+files, verify_dev_counts --quiet rc=0; no SHIP GATE FAILED line. \
+scripts/build_guides.py re-run, and the rendered page now reads "The top card \
+- Aegislash (Shield) Slayer - cuts on attack and HP: atk >= 112.79 and HP >= \
+142, and 1 of the 4096 IV spreads meet it."\
+"""
