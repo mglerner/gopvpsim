@@ -1795,6 +1795,7 @@ def test_sweep_arm_label_matches_the_page(sableye_shadow_facts):
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow   # ~30s across its 4 blobs (9.9s on Furret alone), 2026-09-22
 @pytest.mark.parametrize('blob', [SABLEYE_SHADOW, MELMETAL, FURRET, DEOXYS])
 def test_hp_thresholds_print_as_integers_everywhere(blob):
     """Round 2 put "HP >= 142" and "HP >= 142.00" on one Melmetal page."""
@@ -2015,6 +2016,7 @@ def test_dirty_table_prints_the_genre_precision_cost():
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow   # 9.9s -- two full pages of briefs, 2026-09-22
 def test_both_sableye_pages_headline_the_same_priority_line():
     """E3: D1's literal "lowest eligible rung" made the verdict opponent flap.
 
@@ -2338,6 +2340,7 @@ def test_render_rejects_an_audit_word_injected_into_the_headline(
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow   # 35.1s -- briefs for 8 blobs x every arm, 2026-09-22
 def test_every_rendered_headline_in_the_corpus_passes_the_voice_gate():
     """The gate is only worth having if it runs on the real pages."""
     seen = 0

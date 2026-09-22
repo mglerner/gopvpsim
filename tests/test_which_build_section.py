@@ -5394,6 +5394,9 @@ def test_the_upset_and_the_scatter_never_share_a_row():
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow   # 19.6s: the module-scoped shadow_sableye blob load lands
+                    # here, and every other consumer is already slow, so this
+                    # is what kept it in the fast tier (2026-09-22)
 def test_the_upset_block_precedes_the_scatter_in_the_rendered_section(
         shadow_sableye):
     """Round 8 item 4, on the artifact: the UpSet div comes FIRST, its
@@ -6080,6 +6083,7 @@ def test_your_collection_is_listed_under_the_plot_grouped_by_build():
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow   # the other shadow_sableye consumer; see above (2026-09-22)
 def test_the_section_ships_the_collection_list_container(shadow_sableye):
     """The container is server-rendered and starts hidden, so a page with no
     collection shows nothing at all rather than an empty heading."""

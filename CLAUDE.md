@@ -357,13 +357,33 @@ names the template tests to copy):
 
 Commands:
 
-- `python -m pytest tests -q -m "not slow"` — the fast tier, **~7 min**
-  (397 s measured 2026-09-20 on an idle 18-core machine; 549 s under
-  load). This is what the `verify_tests.py` ship gate runs, and it is
-  gate 1 of every publish path AND the tail of the overnight chain, so
-  budget ~7-9 min at each. It was "~36s" here until 2026-09-20; the
-  wotb-v4 merge's `tests/test_which_build_section.py` is most of the
-  difference.
+- `python -m pytest tests -q -m "not slow"` — the fast tier, **~5 min**
+  (310 s measured 2026-09-22 on an idle 18-core machine: 2,751 passed,
+  8 skipped, 156 deselected, 13 xfailed). This is what the
+  `verify_tests.py` ship gate runs, and it is gate 1 of every publish
+  path AND the tail of the overnight chain, so budget ~5-7 min at each
+  (it was 549 s under load at the 397 s baseline, so assume ~1.4x when
+  the machine is busy).
+
+  History: "~36s" until 2026-09-20, then 397 s (the wotb-v4 merge's
+  `tests/test_which_build_section.py` was most of that jump), then 310 s
+  on 2026-09-22 when the five fast-tier tests over ~10 s were marked
+  `slow` — the corpus voice gate (35 s), the 4-blob HP-threshold
+  parametrization (~30 s), the two-page Sableye headline pin (10 s), and
+  the two remaining non-slow consumers of
+  `test_which_build_section.py`'s module-scoped `shadow_sableye` blob
+  fixture (20 s, its ~60 other consumers were already slow).
+
+  **What is left, and why.** `tests/test_deep_dive_brief.py` is still
+  ~245 s of the 310 — about 170 blob-backed tests at 1-9 s each, none
+  now over ~10 s. Moving the whole module behind `slow` would take the
+  gate to roughly 1 min, but it drops ~170 published-prose contracts out
+  of every publish path, so that is a coverage decision, not a timing
+  one. The other standing cost is the session-scoped `small_dive_html`
+  real render (25 s), shared by five modules; its consumers carry
+  `@pytest.mark.render`, which the policy above deliberately keeps
+  SEPARATE from `slow`, so marking one of them slow only moves the
+  render onto the next consumer and saves nothing.
 - `python -m pytest tests -q` — full suite incl. the slow gamemaster
   sweep and the blob-backed render tests, **~16-18 min** (two runs on
   2026-09-20: 960 s and 1,042 s). Was "~80s" here until the same date.
