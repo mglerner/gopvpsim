@@ -44,3 +44,35 @@ counts 21..89, 61/61 ML guides fresh). Live site confirmed serving the guide \
 URLs (pogodives.com/guides/{,iv-flavor-guide,threshold-tiers,matchup-clusters} \
 all HTTP 200).\
 """
+
+[[resolution]]
+chain_log = "overnight_20260920_164044.log"
+step = "Which one to build?: omitted"
+fix_commit = "aaffd3f + 5873cd1"
+resolved_on = "2026-09-22"
+reason = """\
+Arm 6 of shadow-alolan-ninetales-ultra-league raised G-recompute on a Floor \
+merge cell ("2v2 Ninetales (Alolan) printed='clean at its own cut' \
+recomputed=not a clean partition there"), and the whole dive degraded: all \
+SEVEN files shipped with no "Which one to build?" section. The guard was \
+RIGHT. group_rungs gives a rung the kind of its STRONGEST cell, so the merged \
+rung at T=181.784877804 held two exact cells plus the mirror 2v2 against the \
+non-shadow form -- a one-sided gate there (n_wrong=25, no clean cut at any \
+value) that 25 of the floor's 1235 clearers lose -- and the export shipped all \
+three under the exact-only "also buys" claim. aaffd3f filters a merged rung's \
+cells to the ones it partitions; 5873cd1 makes the degrade per arm, so one \
+arm's guard failure can no longer take six healthy arms' sections with it.\
+"""
+verified = """\
+2026-09-22: the dive was re-rendered IN PLACE from its existing replay blob \
+(scripts/replay_analysis.py, which calls the same deep_dive.render_dive_html \
+the chain's dive tail calls -- no re-sim), under GOPVPSIM_PIN_DATA_CACHE=1 as \
+the chain runs it. All seven files now carry class="wb-root" (0 before). Arm \
+6's verdict reads "Single-stat line: Attack >= 181.88 decides 2v0 Tinkaton. \
+SP1 is 3.40 short." and its merged-rung sentence names only the two cells the \
+line partitions: "Also buys: 0v0 Ninetales (Alolan) (rank 25), 2v2 Ninetales \
+(Alolan) (Shadow) (rank 30)." vintage.toml still stamps engine 9ac12a2754a1 / \
+gamemaster 6d6e9a7bc32d, the same pair as the other 135 dirs. Regression \
+tests: tests/test_deep_dive_brief.py (the blob case + the filter) and \
+tests/test_which_build_section.py (the per-arm degrade).\
+"""
