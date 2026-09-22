@@ -740,6 +740,17 @@ Slayer Builds input. The render-only CMP line against that cohort ships
 first (branch `mirror-line`) and is replaced by these numbers when the
 bake lands.
 
+Michael, 2026-09-22 (after the four previews on branch `mirror-line`,
+d66a78d): the cohort version is NOT rendered site-wide. Its content
+reduces to "pick the highest attack you have inside the build you chose"
+plus what that attack buys (Melmetal GL and Azumarill: nothing; Melmetal
+UL: the fork clears both cuts with every member). Cut the block to those
+two sentences; keep the code (mirror_surface, the block, the trace, the
+glossary terms), which the population version reuses. The population
+version earns the block because it compares ACROSS builds ("Build 3 wins
+the 1v1 mirror against 40% of common Melmetals; Build 2 against 85% and
+gives up these four matchups").
+
 Shape (bake-side, changes the blob schema -- own bake, own hash bump):
 - After the main sweeps and BEFORE render, compute builds
   (`deep_dive_builds.compute_builds`, ~2 s) so (2) is known; then sweep the
