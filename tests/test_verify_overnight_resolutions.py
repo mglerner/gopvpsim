@@ -59,17 +59,29 @@ def test_shipped_file_parses_and_carries_evidence():
         assert res["verified"], f"{res['chain_log']}: no re-verification"
 
 
-def test_shipped_entries_match_their_own_fail_line():
+def test_shipped_entries_match_a_line_their_gate_reports():
     """Guards against a typo'd step label shipping as a live suppression
     rule. main() reports that case as a stale resolution; this catches it
-    at test time for the entry whose log is still on disk."""
+    at test time for the entry whose log is still on disk.
+
+    Checked against every line check [1/5] reports, not the [FAIL] lines
+    alone: since 2026-09-22 the two WARN scans go through report() too, and
+    the first entry to use that (the which-one-to-build omission on
+    overnight_20260920_164044.log) matches a WARNING line, not a [FAIL] one.
+    Pre-fix this test read only ``"[FAIL]" in ln`` and failed on it.
+    """
     for res in vo.load_resolutions():
         log = next(vo.LOGS.glob(f"*/{res['chain_log']}"), None)
         if log is None:
             continue  # log aged out of userdata/; entry is spent history
-        fails = [ln for ln in log.read_text().splitlines() if "[FAIL]" in ln]
-        assert any(res["step"] in ln for ln in fails), (
-            f"{res['chain_log']}: step {res['step']!r} matches no [FAIL] line")
+        text = log.read_text()
+        reported = ([ln for ln in text.splitlines() if "[FAIL]" in ln]
+                    + vo.scan_narrative_warnings(text)
+                    + vo.scan_which_build_omissions(text))
+        assert reported, f"{res['chain_log']}: nothing reported to match"
+        assert vo.stale_resolutions([res], res["chain_log"], reported) == [], (
+            f"{res['chain_log']}: step {res['step']!r} matches no line the "
+            f"gate reports")
 
 
 # ---------------------------------------------------------------------------
