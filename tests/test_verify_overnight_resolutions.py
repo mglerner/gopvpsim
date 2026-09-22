@@ -70,3 +70,50 @@ def test_shipped_entries_match_their_own_fail_line():
         fails = [ln for ln in log.read_text().splitlines() if "[FAIL]" in ln]
         assert any(res["step"] in ln for ln in fails), (
             f"{res['chain_log']}: step {res['step']!r} matches no [FAIL] line")
+
+
+# ---------------------------------------------------------------------------
+# What a resolution may cover, and when it is stale
+# ---------------------------------------------------------------------------
+# 2026-09-22. The gate's [1/5] step reports three kinds of line -- the status
+# line, [FAIL] step lines, and the two WARN scans (narrative patch,
+# which-one-to-build omission) -- but only the first two could ever be
+# resolved: the scans appended straight to `errors`. A dive whose missing
+# section was diagnosed, fixed and RE-RENDERED by hand therefore kept the
+# gate red forever, with the only ways out being to doctor the chain log or
+# to wave the whole gate off. Both are what this file exists to prevent.
+
+WB_LINE = (
+    "which-one-to-build section missing: [22:22:41] WARNING:   Which one to "
+    "build?: omitted (GuardError: G-recompute: field=Floor merge cell=2v2 "
+    "Ninetales (Alolan) ...)"
+)
+
+
+def test_a_which_build_omission_can_be_resolved():
+    """The line the scan produces must be matchable by a resolution entry."""
+    res = [{"chain_log": "overnight_20260920_164044.log",
+            "step": "Which one to build?: omitted",
+            "fix_commit": "abc1234", "reason": "r", "verified": "v"}]
+    assert vo.match_resolution(
+        res, "overnight_20260920_164044.log", WB_LINE) is not None
+    # and only for the log it names
+    assert vo.match_resolution(
+        res, "overnight_20260921_000000.log", WB_LINE) is None
+
+
+def test_stale_resolutions_looks_at_every_line_the_step_reports():
+    """Pre-fix the staleness test only saw the [FAIL] lines (it keyed on the
+    ids `report()` had collected, and the two WARN scans ran AFTER it), so an
+    entry covering a which-build omission was reported as stale -- red either
+    way."""
+    res = [{"chain_log": "overnight_20260920_164044.log",
+            "step": "Which one to build?: omitted",
+            "fix_commit": "abc1234", "reason": "r", "verified": "v"}]
+    log = "overnight_20260920_164044.log"
+    assert vo.stale_resolutions(res, log, [FAIL_LINE, WB_LINE]) == []
+    # Nothing it names is in this chain's output: that IS stale.
+    stale = vo.stale_resolutions(res, log, [FAIL_LINE])
+    assert len(stale) == 1 and 'Which one to build?' in stale[0]
+    # An entry for another log is spent, not stale.
+    assert vo.stale_resolutions(res, "overnight_20260921_000000.log", []) == []

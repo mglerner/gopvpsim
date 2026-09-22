@@ -227,6 +227,30 @@ def match_resolution(resolutions: list[dict], log_name: str,
     return None
 
 
+def stale_resolutions(resolutions: list[dict], log_name: str,
+                      reported: list[str]) -> list[str]:
+    """Entries naming THIS chain log that match none of its reported lines.
+
+    A resolution that names the current log but matches nothing is a
+    suppression rule nobody is checking -- a typo'd step label, or a step
+    renamed out from under it. Entries naming other logs are simply spent.
+
+    ``reported`` is every line check [1/5] reports, not just the ``[FAIL]``
+    ones: the status line and both WARN scans are resolvable too, and keying
+    staleness on the [FAIL] lines alone (as the id-collecting version did)
+    reported an entry covering a which-build omission as stale -- red
+    whether or not the dive behind it had been fixed and re-rendered.
+    """
+    out = []
+    for res in resolutions:
+        if res['chain_log'] != log_name:
+            continue
+        if not any(res['step'] in line for line in reported):
+            out.append(f'stale resolution for {log_name}: step '
+                       f'{res["step"]!r} matched no reported line')
+    return out
+
+
 def extract_opponents(html_path: Path) -> list[str] | None:
     content = html_path.read_text(errors='replace')
     i = content.find('"opponents": [')
@@ -280,6 +304,26 @@ def missing_pool_entries(opponents: list[str], pool_path: Path) -> list[str]:
     return missing
 
 
+def missing_markers(opponents, markers) -> list[str]:
+    """Markers that no opponent display name names.
+
+    A rendered display name may carry a FORM qualifier, a MOVESET
+    annotation, or both -- "Charjabug (Shadow)", "Forretress (Bug Bite)",
+    "Forretress (Shadow) (Bug Bite)". A marker names a species AND its form,
+    so it matches a name that is the marker exactly or extends it with
+    further parentheticals.
+
+    Pre-2026-09-22 this compared ``o.split(' (')[0] == m``, which strips the
+    form qualifier along with the moveset. That worked only while every
+    marker was a bare species name; the 09-22 marker refresh moved three of
+    them to forms ('Charjabug (Shadow)', 'Forretress (Shadow)', 'Oinkologne
+    (Female)'), which made them unmatchable, and the gate printed the same
+    76 false "markers missing" lines the refresh was meant to clear.
+    """
+    return [m for m in markers
+            if not any(o == m or o.startswith(m + ' (') for o in opponents)]
+
+
 def dive_pool_map() -> dict[str, Path]:
     """slug -> opponents-file path, from run_website_dives' DIVES list.
 
@@ -322,16 +366,23 @@ def main() -> int:
     print('[1/5] chain status')
     resolutions = load_resolutions()
     log_name = log_path.name if log_path else ''
-    matched: list[int] = []
+    reported: list[str] = []
 
-    def report(line: str, err_label: str) -> None:
-        """Print one failing line as RSLV (recorded resolution) or ERR."""
+    def report(line: str, err_label: str | None = None) -> None:
+        """Print one failing line as RSLV (recorded resolution) or ERR.
+
+        ``err_label`` prefixes the line in the verdict list; a line that
+        already describes itself (the two WARN scans build their own) passes
+        None. EVERY line that comes through here is resolvable -- a dive
+        whose section was fixed and re-rendered by hand is exactly the case
+        docs/chain_resolutions.toml exists for.
+        """
+        reported.append(line)
         res = match_resolution(resolutions, log_name, line)
         if res is None:
-            errors.append(f'{err_label}: {line}')
+            errors.append(f'{err_label}: {line}' if err_label else line)
             print(f'  ERR {line}')
             return
-        matched.append(id(res))
         print(f'  RSLV {line}')
         print(f'       fixed in {res["fix_commit"]}: {res["reason"]}')
         print(f'       re-verified: {res["verified"]}')
@@ -356,27 +407,21 @@ def main() -> int:
             report(ln, 'chain step failed')
         if not fails:
             print('  OK  no [FAIL] step lines')
-        # An entry naming THIS log that matched nothing is a suppression
-        # rule nobody is checking (typo'd step label, or a step renamed
-        # out from under it). Entries naming other logs are simply spent.
-        for res in resolutions:
-            if res['chain_log'] == log_name and id(res) not in matched:
-                msg = (f'stale resolution for {log_name}: step '
-                       f'{res["step"]!r} matched no [FAIL] line')
-                errors.append(msg)
-                print(f'  ERR {msg}')
         narr = scan_narrative_warnings(log_text)
         for ln in narr:
-            errors.append(ln)
-            print(f'  ERR {ln}')
+            report(ln)
         if not narr:
             print('  OK  no narrative-patch WARN lines')
         wb = scan_which_build_omissions(log_text)
         for ln in wb:
-            errors.append(ln)
-            print(f'  ERR {ln}')
+            report(ln)
         if not wb:
             print('  OK  no which-one-to-build omission lines')
+        # Staleness is judged against every line reported above, so an entry
+        # may cover any of them -- and is still flagged when it covers none.
+        for msg in stale_resolutions(resolutions, log_name, reported):
+            errors.append(msg)
+            print(f'  ERR {msg}')
 
     # 2. Freshness ----------------------------------------------------
     # Cover league dives (`*-league`) AND limited-cup dives (`*-cup`) so a cup
@@ -465,8 +510,7 @@ def main() -> int:
                 else:
                     contained += 1
         if 'great-league' in d.name:
-            missing = [m for m in args.markers
-                       if not any(o.split(' (')[0] == m for o in opps)]
+            missing = missing_markers(opps, args.markers)
             if missing:
                 errors.append(f'{d.name}: markers missing: {missing}')
                 print(f'  ERR {d.name}: {len(opps)} opponents, '
