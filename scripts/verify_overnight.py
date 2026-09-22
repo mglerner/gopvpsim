@@ -73,8 +73,14 @@ RESOLUTIONS_FILE = REPO / 'docs' / 'chain_resolutions.toml'
 CUP_DIR_GLOB = f'*-{cup_slug_suffix("*")}'
 
 # Species that entered the GL pool in the most recent refresh; their
-# presence in a dive's opponent list proves the new pool loaded.
-DEFAULT_MARKERS = ['Sylveon', 'Primeape', 'Umbreon']
+# presence in a dive's opponent list proves the new pool loaded. Keep this
+# in step with opponent_pools/gl_top50_plus_cs.txt: the 2026-09-20 bake was
+# checked against Sylveon and Primeape, which had LEFT the pool on 09-17, so
+# the morning gate printed 76 false "markers missing" lines. A test now
+# asserts every marker is in the committed pool.
+# 2026-09-17 regeneration entrants (+ Umbreon, in the pool throughout):
+DEFAULT_MARKERS = ['Charjabug (Shadow)', 'Diggersby', 'Forretress (Shadow)',
+                   'Oinkologne (Female)', 'Umbreon']
 
 
 def newest_chain_log() -> Path | None:
