@@ -4196,8 +4196,11 @@ def main():
 
     args = parser.parse_args()
 
-    # BOTH settings carry a caveat as of 2026-09-02 -- legacy is the more
-    # dangerous one because it is the default and nobody opts into it.
+    # BOTH settings carry a caveat, for opposite reasons -- see
+    # mechanics_notice.py. `new` is the DEFAULT (flipped 2026-09-09), so its
+    # caveat is the one a user gets without asking: 237/243 oracle cells match
+    # PvPoke master, the 6 that differ are all Aegislash form change. `legacy`
+    # is a dead ruleset nobody opts into by accident.
     from mechanics_notice import warn_mechanics
     warn_mechanics(args.mechanics, logger.warning)
 

@@ -193,3 +193,110 @@ def test_mechanics_help_oracle_count_matches_the_canonical_caveat(path):
         f'{path} --help cites oracle counts {sorted(help_nums - canon_nums)} '
         f'of 243, which mechanics_notice.py does not; it says '
         f'{sorted(canon_nums)}. Update the help or the caveat so they agree.')
+
+
+def _comments(path):
+    """Contiguous COMMENT-token BLOCKS in a source file, via tokenize.
+
+    tokenize rather than a line regex because comments are exactly what the
+    ast drops -- and a line regex over the whole file also matches the same
+    words inside string literals, which is where the (correct) help prose
+    lives.
+
+    BLOCKS, not tokens: a multi-line `#` comment is N separate COMMENT tokens,
+    and a claim written across a line break ("... -- legacy is the more\n
+    # dangerous one because it is the default ...") matches no single token.
+    Scanning token-at-a-time missed the exact comment this module was written
+    to catch; consecutive-line tokens are joined back into one string first.
+    """
+    import io
+    import tokenize
+    src = (REPO / path).read_text()
+    blocks, start, parts, prev = [], None, [], None
+    for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tok.type != tokenize.COMMENT:
+            continue
+        line = tok.start[0]
+        text = tok.string.lstrip('#').strip()
+        if prev is not None and line == prev + 1:
+            parts.append(text)
+        else:
+            if parts:
+                blocks.append((start, ' '.join(parts)))
+            start, parts = line, [text]
+        prev = line
+    if parts:
+        blocks.append((start, ' '.join(parts)))
+    return blocks
+
+
+_WRONG_DEFAULT_CLAIM = re.compile(
+    r'\b(legacy|new)\b[^.]{0,120}?\bis\s+the\s+default\b', re.I)
+
+
+@pytest.mark.parametrize('path', [
+    'scripts/deep_dive.py',
+    'scripts/battle.py',
+    'scripts/audit_oracle_harness.py',
+])
+def test_no_comment_names_the_wrong_turn_model_as_the_default(path):
+    """The help string is pinned; the COMMENTS next to it were not.
+
+    Pre-fix value (2026-09-22): scripts/deep_dive.py:4199 carried
+
+        # BOTH settings carry a caveat as of 2026-09-02 -- legacy is the more
+        # dangerous one because it is the default and nobody opts into it.
+
+    directly above the `warn_mechanics(args.mechanics, ...)` call. `legacy`
+    stopped being the default on 2026-09-09. Every --mechanics test in this
+    module passed with that comment in place, because all of them read the
+    argparse `help=` string and none of them read a comment. The next person
+    maintaining the warn_mechanics call site reads the comment first.
+
+    Ground truth is the argparse `default=`, same as
+    test_mechanics_help_does_not_contradict_its_own_default. Pins the claim,
+    not the wording.
+    """
+    default = _argparse_default(path)
+    other = 'legacy' if default == 'new' else 'new'
+    offenders = [(line, text) for line, text in _comments(path)
+                 if (m := _WRONG_DEFAULT_CLAIM.search(text))
+                 and m.group(1).lower() == other]
+    assert not offenders, (
+        f'{path} has {len(offenders)} comment(s) calling {other!r} the '
+        f'--mechanics default, but argparse uses {default!r}: {offenders}')
+
+
+def test_the_wrong_default_scanner_actually_matches_the_pre_fix_comment():
+    """Positive control for the scanner above.
+
+    An absence pin is worthless if the regex silently stops matching. This
+    feeds it the literal pre-fix comment text and the literal post-fix text,
+    and requires it to separate them.
+    """
+    # Exactly as _comments joins the two-line pre-fix comment.
+    pre_fix = ('BOTH settings carry a caveat as of 2026-09-02 -- legacy is '
+               'the more dangerous one because it is the default and nobody '
+               'opts into it.')
+    m = _WRONG_DEFAULT_CLAIM.search(pre_fix)
+    assert m and m.group(1).lower() == 'legacy', (
+        'the scanner no longer matches the comment it was written to catch')
+    post_fix = ('`new` is the DEFAULT (flipped 2026-09-09), so its caveat '
+                'is the one a user gets without asking')
+    m2 = _WRONG_DEFAULT_CLAIM.search(post_fix)
+    assert m2 is None or m2.group(1).lower() == 'new', (
+        'the scanner flags the corrected comment')
+
+
+def test_the_comment_scanner_sees_a_nontrivial_number_of_comments():
+    """Floor, set BELOW today's counts, so a broken tokenize walk is loud.
+
+    Counts comment BLOCKS (see _comments), which is strictly fewer than
+    tokens.
+    """
+    for path, floor in [('scripts/deep_dive.py', 100),
+                        ('scripts/battle.py', 3),
+                        ('scripts/audit_oracle_harness.py', 3)]:
+        assert len(_comments(path)) >= floor, (
+            f'{path}: tokenize found only {len(_comments(path))} comment '
+            f'blocks, floor is {floor}')
