@@ -1135,7 +1135,31 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
-## POST-BAKE: deep_dive.py --mechanics help is a known-wrong claim
+## DONE 2026-09-22: deep_dive.py --mechanics help is a known-wrong claim
+
+**Closed.** The help STRING was already corrected before this pass (it now
+reads "DEFAULT IS new ... matching master on 237 of 243 oracle cells"), and
+`test_mechanics_help_oracle_count_matches_the_canonical_caveat` pins its
+count to `mechanics_notice.py`. What was still wrong on 2026-09-22 was the
+COMMENT at the `warn_mechanics` call site (`deep_dive.py:4199`), which read
+"legacy is the more dangerous one because it is the default" -- `legacy`
+stopped being the default on 2026-09-09. Every existing --mechanics test
+passed with it in place, because all of them read the argparse `help=`
+string and none read a comment.
+
+Fixed, plus `tests/test_mechanics_default.py::
+test_no_comment_names_the_wrong_turn_model_as_the_default` (a tokenize scan
+over all three CLIs, pinned to the argparse `default=`, with a positive
+control on the literal pre-fix text and a block-count floor). The scanner
+joins contiguous comment tokens into blocks first: the stale claim straddled
+a line break, so a token-at-a-time scan missed it.
+
+Still open and NOT fixed here: `src/gopvpsim/battle.py:3426,3498` still call
+the new model "EXPERIMENTAL / UNVALIDATED". That file is sweep-cache
+engine-hashed, so a docstring edit stales every cached column -- it must ride
+a bump that is happening anyway.
+
+Original item:
 
 `scripts/deep_dive.py`'s `--mechanics` help still says `new` is
 "still UNVALIDATED (104/243 oracle cells disagree with PvPoke's unmerged
