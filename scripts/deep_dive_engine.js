@@ -984,7 +984,7 @@ function buildHoverText(iv) {
         var rcL = owned[0];
         var mc = (rcL.stats && rcL.stats.cp != null) ? rcL.stats.cp : '?';
         var ml = (rcL.stats && rcL.stats.level != null) ? rcL.stats.level : '?';
-        lines.push('  <b>CP ' + rcL.mon.cp + '</b>' +
+        lines.push('  <b>CP ' + cpText(rcL.mon.cp) + '</b>' +
                    (rcL.mon.level != null ? ' @ L' + rcL.mon.level : '') +
                    ' \u2192 CP ' + mc + ' @ L' + ml);
         if (rcL.csvSpecies && rcL.csvSpecies !== DATA.species) {
@@ -1004,7 +1004,7 @@ function buildHoverText(iv) {
         // below the scatter, so duplicating it in hover just bloats
         // the tooltip until it vertical-clips against the plot edge.
         // One line, CPs descending, primary in-game search handle.
-        var cps = owned.map(function(rc) { return 'CP ' + rc.mon.cp; });
+        var cps = owned.map(function(rc) { return 'CP ' + cpText(rc.mon.cp); });
         lines.push('<b>\u2605 Yours (' + owned.length + '):</b> ' + cps.join(', '));
       }
     }
@@ -1376,14 +1376,14 @@ function annotateAnchorBullets() {
     // user already owns leads the list (best in-game search target).
     hits.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
     var shown = hits.slice(0, 3).map(function(h) {
-      return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
+      return 'CP' + cpText(h.mon.cp) + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
     }).join(', ');
     var extra = hits.length > 3 ? (' +' + (hits.length - 3) + ' more') : '';
     span.textContent = ' - yours: ' + shown + extra;
     span.style.color = 'var(--win)';
     // Full list in the title tooltip for power users.
     var fullList = hits.map(function(h) {
-      return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
+      return 'CP' + cpText(h.mon.cp) + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
     }).join(', ');
     span.setAttribute('title', fullList);
   }
@@ -1401,6 +1401,19 @@ function annotateAnchorBullets() {
 // Each record is also annotated with its yRank (battle rank in the
 // active moveset/scenario) so the tier list answers "which of mine
 // is actually rank #1" at a glance.
+// A CURRENT CP the collection may not know. A manual entry has no CP field
+// on the form, so readManualForm() stores ``cp: 0`` -- and "CP 0" read as a
+// real CP of zero rather than "not told" (Michael, 2026-09-22). Print the
+// same "--" the rest of the page uses for an unknown, and never a false 0.
+// Applies to any non-positive / non-finite cp, so a malformed CSV row is
+// covered by the same rule rather than by a separate provenance flag.
+// The stat-plane "Yours" rows already skip an unknown CP (see the
+// ``!(mon.cp > 0)`` guard in the which-build owner list); this is the same
+// rule at the four remaining print sites.
+function cpText(cp) {
+  return (typeof cp === 'number' && isFinite(cp) && cp > 0) ? String(cp) : '--';
+}
+
 function renderMatchesList() {
   var el = document.getElementById('collection-matches');
   if (!el) return;
@@ -1605,7 +1618,7 @@ function renderMatchesList() {
       var mcpVal = rc.stats ? rc.stats.cp : 0;
       h += '<td class="rank" data-sort="' + brVal + '">' + (brVal < 99999 ? '#' + brVal : '-') + '</td>';
       h += '<td class="rank-sp" data-sort="' + spVal + '">' + (spVal < 99999 ? '#' + spVal : '-') + '</td>';
-      h += '<td data-sort="' + rc.mon.cp + '"><b>CP ' + rc.mon.cp + '</b></td>';
+      h += '<td data-sort="' + rc.mon.cp + '"><b>CP ' + cpText(rc.mon.cp) + '</b></td>';
       h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
       h += '<td data-sort="' + atkVal.toFixed(4) + '">' + (rc.stats ? atkVal.toFixed(2) : '?') + '</td>';
       h += '<td data-sort="' + defVal.toFixed(4) + '">' + (rc.stats ? defVal.toFixed(2) : '?') + '</td>';
