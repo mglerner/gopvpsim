@@ -177,10 +177,16 @@ def test_a_marker_with_a_form_qualifier_is_matched_in_a_rendered_dive():
 
 
 @pytest.mark.local_artifacts
+@pytest.mark.slow
 def test_every_marker_is_found_in_a_real_rendered_dive():
     """The end of the chain the two tests above only cover in halves: the
     committed pool, the renderer's display names, and the matcher, on the
-    dive dirs this machine actually has."""
+    dive dirs this machine actually has.
+
+    Slow by measurement, not by caution: it reads every Great League dive's
+    index.html (76 files, ~20 MB each) to find DATA.opponents, which is
+    minutes of I/O -- too much for the fast tier the ship gate runs. The
+    matcher itself is pinned hermetically by the test above."""
     website = REPO_ROOT / 'userdata' / 'website'
     checked = 0
     for index in sorted(website.glob('*-great-league/index.html')):
