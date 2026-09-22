@@ -997,7 +997,66 @@ matching `SLUG_EXCEPTIONS` row never derive, because Shadow Forretress is not
 in the GL pool; the only shadow Forretress GL page is the EXTRA_DIVES
 bug-bite one.
 
-## POST-BAKE REMINDER (Michael, 2026-09-10): Shadow Sableye GL bands are wild
+## DONE 2026-09-22: Shadow Sableye GL bands (POST-BAKE REMINDER, Michael 2026-09-10)
+
+**Answered, from the published page -- no re-sim.** The question this item
+was raised to settle was whether our analysis actually captures the 0v1
+bands. It does, in two places, and both say the same thing.
+
+Verified against `userdata/website/shadow-sableye-great-league/index.html`
+(rendered 2026-09-20 21:22, Twilight Trails bake, new mechanics).
+
+**1. "Which one to build?", the single-stat line:**
+
+> Single-stat line: Attack >= 148.10 decides 0v1 Annihilape. SP1 is 6.35
+> short.
+
+with the mechanism spelled out in the same section:
+
+> Sableye (Shadow) running Shadow Claw / Drain Punch, Foul Play in Great
+> League has a line at 148.10 attack, which 6/9/7 at L50, 7/12/4 at L49.5,
+> 10/13/11 at L45.5 and 2217 other spreads reach. 2220 of the 4096 IV
+> spreads (54.2%) reach it. It decides the 0v1 against Annihilape (rank 31)
+> outright: every spread at or above it wins that fight, and every spread
+> below it loses. That is the charge-move-priority line against a
+> PvPoke-default Annihilape, 4/13/13: when both sides throw a charged move
+> on the same turn, the higher attack goes first.
+
+**2. Matchup clusters, the 0v1 entry** (flip-threshold table row):
+
+> Annihilape [0v1] -- 54% -- wins iff atk >= 148.10 -- 100% -- named
+
+and two more rows at the identical cut, `Shadow Annihilape [0v1]` and
+`Annihilape (Close Combat+Rage Fist) [0v1]`, both 54% / 100% / named.
+
+So yes: the 0v1 band IS the CMP (Charge Move Priority -- when both sides
+throw on the same turn the higher attack resolves first) line against a
+default Annihilape at 148.10, at 100% rule accuracy, and the page names it
+as an anchor rather than leaving it as unexplained structure.
+
+**The two Sableye forms flip the same 2220 spreads**, and the shadow page
+says so itself:
+
+> A non-shadow Sableye needs 123.42 (123.419) attack for the same fight.
+
+Confirmed on the sibling page: `sableye-great-league/index.html` prints
+"Single-stat line: Attack >= 123.42 decides 0v1 Annihilape", and BOTH pages'
+0v1 panel captions end with the identical sentence "These are the same 2220
+spreads as this page's line." 123.419 x 1.2 = 148.104, so the two forms cut
+the grid in exactly the same place -- the page flags why in its own caveat:
+
+> The comparison uses your attack before the shadow bonus, which is our
+> engine's convention and PvPoke's, not something checked against the live
+> game.
+
+**Scope of this closure.** This settles "does our analysis capture the 0v1
+bands" -- it does. It does NOT claim to have identified what Michael found
+wild; his words were unelaborated and the original item says not to theorise.
+If "wild" meant something other than the 0v1 CMP band, reopen with the
+specific reading. The envelope-crosser glossary gap noted below is also
+still open (`docs/concepts.md` does not define "band-crosser").
+
+Original item:
 
 Michael asked to be reminded, after the Twilight Trails bake finishes, to
 look at **Shadow Sableye in Great League** because "the bands are wild".
