@@ -422,8 +422,42 @@ def extended_first_sentence(facts):
 # The lead: which movesets on this page carry a line
 # ---------------------------------------------------------------------------
 
+# An arm whose brief failed a guard: NOT the same as an arm with no line.
+# "No line" is a computed answer; this is the absence of one, and the lead
+# has to say so rather than fold it into the no-line group.
+FAILED_LINE = object()
+
+
+def failed_arm_facts(state, arm, detail):
+    """The placeholder :func:`prepare` leaves where one arm failed a guard.
+
+    Index-aligned on purpose: every cross-arm helper here indexes
+    ``all_facts`` BY ARM (``_shared_clause`` reads ``facts['header']['arm']``
+    straight into it), so compacting the list would hand one moveset's prose
+    to another moveset's page.
+
+    It carries the arm's LABEL -- the page's own moveset list already has it,
+    and the lead has to be able to name the moveset it could not compute --
+    and deliberately no ``floor`` key at all. A ``floor`` of None would read
+    downstream as the computed answer "this moveset carries no line", which
+    is a claim about numbers nobody has; a KeyError from a path that assumes
+    otherwise is the outcome we want.
+    """
+    return {
+        '_failed': detail,
+        '_builds': None,
+        'header': {'species': state['species'],
+                   'shadow': bool(state.get('shadow')),
+                   'league': state.get('league'), 'arm': arm,
+                   'arm_label': state['moveset_data'][arm]['label'],
+                   'n_arms': len(state['moveset_data'])},
+    }
+
+
 def _line_words(f):
-    """This moveset's line as the lead speaks it, or None."""
+    """This moveset's line as the lead speaks it, None, or FAILED_LINE."""
+    if f.get('_failed'):
+        return FAILED_LINE
     fl = f['floor']
     return None if fl is None else stat_words(fl)
 
@@ -452,8 +486,25 @@ def lead_sentences(all_facts, arm):
                    if mine is None else f", at least {mine}.")]
 
     values = [_line_words(f) for f in all_facts]
-    with_line = [v for v in values if v is not None]
-    if not with_line:
+    # An arm whose brief failed a guard has no line EITHER WAY: it is counted
+    # out of the totals and named, never folded into the no-line group.
+    uncomputed = [names[i] for i, v in enumerate(values) if v is FAILED_LINE]
+    known = [v for v in values if v is not FAILED_LINE]
+    n_known = len(known)
+    with_line = [v for v in known if v is not None]
+    if uncomputed:
+        if not with_line:
+            tail = 'none of them carries a line'
+        elif len(with_line) == n_known and len(set(with_line)) == 1:
+            tail = f'they share one line: at least {with_line[0]}'
+        elif len(with_line) == n_known:
+            tail = 'they all carry a line, at different values'
+        else:
+            carries = 'carries' if len(with_line) == 1 else 'carry'
+            tail = f'{len(with_line)} of them {carries} a line'
+        first = (f"{n_known} of the {n} movesets on this page could be "
+                 f"computed here, and {tail}.")
+    elif not with_line:
         first = f"None of the {n} movesets on this page carries a line."
     elif len(with_line) == n and len(set(with_line)) == 1:
         first = (f"All {n} movesets on this page share one line: at least "
@@ -476,6 +527,8 @@ def lead_sentences(all_facts, arm):
         if i == arm:
             continue
         val = values[i]
+        if val is FAILED_LINE:
+            continue                       # named in its own clause below
         if val is None:
             none.append(names[i])
         elif val == mine:
@@ -491,6 +544,8 @@ def lead_sentences(all_facts, arm):
     if none:
         bits.append(f"{brief._and_list(none)} "
                     f"{'carries' if len(none) == 1 else 'carry'} no line")
+    if uncomputed:
+        bits.append(f"{brief._and_list(uncomputed)} could not be computed")
     if bits:
         second += '; ' + '; '.join(bits)
     return [first, second + '.']
@@ -4168,16 +4223,33 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     n_arms = len(state['moveset_data'])
     all_facts = []
     for arm in range(n_arms):
-        facts = brief.compute_brief(state, arm, blob_path, mode=mode,
-                                    level=level)
-        same = brief.shared_line_with(facts, all_facts)
-        headline, strip, fields, evidence = brief.render_parts(
-            state, arm, blob_path, facts, mode, level, same_as=same)
+        # PER ARM (2026-09-22). A guard failure is a statement about ONE
+        # arm's numbers, and letting it escape cost
+        # shadow-alolan-ninetales-ultra-league the section on all SEVEN of
+        # its files for one bad sentence on arm 6. The arm that failed loses
+        # its section and is named where the other arms' prose would
+        # otherwise have spoken for it; the rest keep theirs. Only GuardError
+        # degrades -- a code bug still stops the dive (see
+        # deep_dive._which_build_sections).
+        try:
+            facts = brief.compute_brief(state, arm, blob_path, mode=mode,
+                                        level=level)
+            same = brief.shared_line_with(
+                facts, [f for f in all_facts if not f.get('_failed')])
+            headline, strip, fields, evidence = brief.render_parts(
+                state, arm, blob_path, facts, mode, level, same_as=same)
+            facts['_masks'] = compute_masks(state, arm, facts, mode, level)
+        except brief.GuardError as exc:
+            deep_dive_logging.get_logger().warning(
+                f"  Which one to build?: omitted for moveset {arm + 1} of "
+                f"{n_arms}, the other movesets keep theirs "
+                f"({type(exc).__name__}: {exc})")
+            all_facts.append(failed_arm_facts(state, arm, str(exc)))
+            continue
         facts['_headline'] = headline
         facts['_strip'] = strip
         facts['_fields'] = fields
         facts['_evidence'] = evidence
-        facts['_masks'] = compute_masks(state, arm, facts, mode, level)
         # v4: the builds. Computed per arm from the same blob the brief read
         # (1-2 s on a 4096 x 9 x 76 grid), and NOT fatal on its own: a page
         # whose builds fail to compute still ships the v3 section, with its
@@ -4205,8 +4277,11 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # headline's own opening sentence (gated per arm above) is the other
     # instance of that fixed phrase. Gating a restatement of an already-
     # gated sentence would fail on the duplicate, not on a defect.
+    computed = [f for f in all_facts if not f.get('_failed')]
+    if not computed:
+        return all_facts
     ctx = {'blob': os.path.basename(blob_path), 'arm': '-', 'mode': mode,
-           'focal': brief.focal_name(all_facts[0]['header'])}
+           'focal': brief.focal_name(computed[0]['header'])}
     own = [CLUSTERS_FALLBACK_CAPTION, BUILDS_CAPTION.format(fam=''),
            BUILDS_CAPTION.format(fam=BUILDS_CAPTION_FAMILY),
            WEIGHTING_NOTE,
@@ -4220,6 +4295,8 @@ def prepare(state, blob_path, mode='pvpoke', level='l50'):
     # ("a dot means the region sits inside...") this change did not write.
     own.extend(STANDOUT_KIND.values())
     for arm, facts in enumerate(all_facts):
+        if facts.get('_failed'):
+            continue           # no prose of its own; the others name it
         ab = facts.get('_builds')
         if ab:
             # Every preset's sentences, for every preset -- gated whether or
