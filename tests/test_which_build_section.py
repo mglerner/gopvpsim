@@ -6488,3 +6488,126 @@ def test_the_aegislash_page_still_gets_a_section():
     for m in cells:
         window = txt[m.start():m.start() + 100]
         assert 'divergence' in window, window
+
+
+# ---------------------------------------------------------------------------
+# 6. A guard failure takes down ONE arm, not the dive
+# ---------------------------------------------------------------------------
+# 2026-09-22. shadow-alolan-ninetales-ultra-league shipped all SEVEN of its
+# files with no "Which one to build?" section because arm 6 raised one
+# GuardError: prepare() computes every arm in one loop and
+# _which_build_sections caught the escape for the whole dive. The guard was
+# right (see tests/test_deep_dive_brief.py, the merged-rung gate cell), but
+# six arms whose numbers were fine lost their section for a seventh arm's bad
+# sentence.
+
+
+def _prepared_stub(arm, label, failed=False):
+    """One entry of a prepare() return list, as the caller sees it."""
+    f = _facts()
+    f['header'] = dict(f['header'], arm=arm, arm_label=label, n_arms=3)
+    if failed:
+        return W.failed_arm_facts(
+            {'species': 'Sableye', 'shadow': True, 'league': 'great',
+             'moveset_data': [{'label': label}] * 3},
+            arm, 'G-recompute: field=Floor merge ...')
+    f['_builds'] = None
+    return f
+
+
+def test_one_arm_s_guard_failure_leaves_the_other_arms_their_section(
+        monkeypatch):
+    """Pre-fix: prepare()'s GuardError escaped and EVERY arm lost its
+    section (``_which_build_sections`` returned five empty maps). Now the
+    failed arm alone is missing, and it is missing out loud."""
+    import deep_dive
+    labels = ['POWDER_SNOW / ICE_BEAM',
+              'POWDER_SNOW / BLIZZARD',
+              'POWDER_SNOW / WEATHER_BALL_ICE']
+    facts = [_prepared_stub(0, labels[0]),
+             _prepared_stub(1, labels[1], failed=True),
+             _prepared_stub(2, labels[2])]
+
+    monkeypatch.setattr(W, 'prepare', lambda state, blob, level='l50': facts)
+    monkeypatch.setattr(W, 'section_html',
+                        lambda af, arm, **kw: f'<section>{arm}</section>')
+    monkeypatch.setattr(W, 'card_specs', lambda f, b: [f'card{f["header"]["arm"]}'])
+
+    state = {'replay_blob_path': '/nowhere/x.replay.pkl.gz',
+             'split_movesets': True,
+             'moveset_data': [{'label': x} for x in labels]}
+    html, presets, cards, h51, c51 = deep_dive._which_build_sections(state)
+
+    assert sorted(html) == [0, 2], html
+    assert sorted(cards) == [0, 2]
+    assert sorted(presets) == [0, 2]
+    assert (h51, c51) == ({}, {})
+
+
+def test_prepare_catches_the_guard_per_arm_and_says_so(monkeypatch, caplog):
+    """The real prepare(), with only the brief's per-arm calls stubbed.
+
+    Pre-fix prepare() had no try/except at all: the GuardError from arm 1
+    propagated out of the loop and the caller dropped all three arms.
+    """
+    labels = ['POWDER_SNOW / ICE_BEAM',
+              'POWDER_SNOW / BLIZZARD',
+              'POWDER_SNOW / WEATHER_BALL_ICE']
+    state = {'species': 'Ninetales (Alolan)', 'shadow': True,
+             'league': 'ultra', 'moveset_data': [{'label': x} for x in labels]}
+
+    def fake_brief(st, arm, blob, mode='pvpoke', level='l50'):
+        if arm == 1:
+            raise B.GuardError(
+                "G-recompute: field=Floor merge cell=2v2 Ninetales (Alolan) "
+                "printed='clean at its own cut' recomputed=not a clean "
+                "partition there (blob=b arm=1 mode=pvpoke)")
+        f = _facts()
+        f['header'] = dict(f['header'], arm=arm, arm_label=labels[arm],
+                           n_arms=3, species='Ninetales (Alolan)')
+        return f
+
+    monkeypatch.setattr(B, 'compute_brief', fake_brief)
+    monkeypatch.setattr(B, 'shared_line_with', lambda f, prev: None)
+    monkeypatch.setattr(B, 'render_parts',
+                        lambda *a, **k: (['head.'], 'strip', [], []))
+    monkeypatch.setattr(W, 'compute_masks', lambda *a, **k: {})
+    monkeypatch.setattr(W.builds, 'compute_builds', lambda *a, **k: None)
+
+    with caplog.at_level('WARNING', logger='deep_dive'):
+        all_facts = W.prepare(state, '/nowhere/b.replay.pkl.gz')
+
+    assert len(all_facts) == 3, 'the list must stay index-aligned by arm'
+    assert all_facts[1]['_failed'].startswith('G-recompute')
+    assert 'floor' not in all_facts[1], (
+        'a failed arm must not carry a floor: "no line" is a computed answer')
+    assert [f.get('_failed') for f in all_facts] == [None, all_facts[1]['_failed'], None]
+    # The morning gate scans the chain log for this literal
+    # (tests/test_verify_overnight_which_build_scan.py), so a per-arm
+    # omission has to keep saying it.
+    msgs = [r.message for r in caplog.records]
+    assert any('Which one to build?: omitted' in m for m in msgs), msgs
+    assert any('moveset 2 of 3' in m for m in msgs), msgs
+
+
+def test_a_failed_arm_is_named_but_never_given_a_line(monkeypatch):
+    """The other arms' cross-arm prose must not invent the failed arm's line.
+
+    A failed arm has no floor, and calling that "carries no line" would be a
+    claim about numbers nobody computed. It is counted out of the totals and
+    named as uncomputed instead.
+    """
+    labels = ['POWDER_SNOW / ICE_BEAM',
+              'POWDER_SNOW / BLIZZARD',
+              'POWDER_SNOW / WEATHER_BALL_ICE']
+    facts = [_prepared_stub(0, labels[0]),
+             _prepared_stub(1, labels[1], failed=True),
+             _prepared_stub(2, labels[2])]
+    lead = ' '.join(W.lead_sentences(facts, 0))
+    assert '2 of the 3 movesets' in lead, lead
+    assert 'could not be computed' in lead, lead
+    assert 'carries no line' not in lead and 'carry no line' not in lead
+    # The summary's clause must not claim a shared line across an arm whose
+    # line was never computed.
+    summary = W.summary_sentence(facts[0], facts)
+    assert 'the same line as its other' not in summary, summary

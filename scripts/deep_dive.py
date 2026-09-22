@@ -3658,19 +3658,24 @@ def _which_build_sections(state):
 
     def _pass(level):
         facts = which_build.prepare(state, blob_path, level=level)
+        # An arm whose brief failed a guard carries a placeholder instead of
+        # facts (which_build.failed_arm_facts): it gets no section, prepare
+        # has already logged it, and the arms around it keep theirs.
+        live = [arm for arm in range(len(facts))
+                if not facts[arm].get('_failed')]
         html = {arm: which_build.section_html(facts, arm, moveset_idx=0,
                                               page_movesets=per_file)
-                for arm in range(len(facts))}
+                for arm in live}
         cards = {arm: which_build.card_specs(facts[arm],
                                              facts[arm].get('_builds'))
-                 for arm in range(len(facts))}
+                 for arm in live}
         return facts, html, cards
 
     try:
         all_facts, html, cards = _pass('l50')
         presets = {arm: list((all_facts[arm].get('_builds') or {})
                              .get('presets', {}))
-                   for arm in range(len(all_facts))}
+                   for arm in html}
     except (GuardError, FileNotFoundError) as e:
         logger.warning(f"  Which one to build?: omitted "
                        f"({type(e).__name__}: {e})")
