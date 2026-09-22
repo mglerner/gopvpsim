@@ -727,6 +727,46 @@ that hard-fails when the pools' recorded rankings vintage does not
 match live (per the lens-grid rule: a cheap lens becomes a code-level
 guard, not a checklist sentence).
 
+## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
+
+Decision: "the mirrors I will meet" = (1) PvPoke's rank-ordered IV list for
+the focal, top N (bulk-first by construction), PLUS (2) the page's own
+builds -- each named build's most-winning member and SP1 (what our readers
+will build once the page exists). Labelled separately on the page. The
+Nash mirror-slayer cohort is NOT this (prototype 2026-09-21,
+`userdata/analysis/2026-09-21_mirror_proto/report.md`: attack-first on
+Melmetal GL, bimodal on Shadow Sableye, never converged); it stays as the
+Slayer Builds input. The render-only CMP line against that cohort ships
+first (branch `mirror-line`) and is replaced by these numbers when the
+bake lands.
+
+Shape (bake-side, changes the blob schema -- own bake, own hash bump):
+- After the main sweeps and BEFORE render, compute builds
+  (`deep_dive_builds.compute_builds`, ~2 s) so (2) is known; then sweep the
+  focal grid against the mirror population as extra opponent columns: same
+  species+form as the focal (and the other shadow form when it is in the
+  pool), explicit IVs, level = under-cap max, default moveset; sweep cache
+  keys columns on opponent IVs already (`sweep_cache.column_key_fields`),
+  so they warm like any other column.
+- Store under `state['mirror_population']`: the member list (source tag:
+  'pvpoke_rank' / 'build:<role>' / 'sp1', IVs, stats), and per-member
+  per-scenario scores (4096 x 9 x M), both bait modes; opponent-IV modes do
+  not apply (the IVs are the point).
+- Size cap: N = 20 from the rank list + up to ~6 build members => ~26
+  columns x 2 bait sweeps x movesets. Measured 2026-09-20: ~0.7 s per
+  column-sweep, so ~3 min per 5-moveset dive, ~6 h across the corpus,
+  warm afterwards.
+- Page: the "The mirror" block (from `mirror-line`) reads this instead of
+  the cohort: per scenario, the share of the population each build's
+  members beat (median, min); the CMP quantiles (a_50 / a_75, strict
+  engine rule) from the population's attack; "Build 2 beats 83% of common
+  Melmetal builds in the 1v1 and wins CMP against 71%". Optional: a
+  thresholds-TOML override list for species where Michael knows what the
+  community runs (candidate 3, deferred).
+- Guards: the population must include SP1 and the rank list's #1; a test
+  that the per-scenario mirror-vs-population numbers reproduce from the
+  stored scores; the vintage stamp covers it.
+
 ## BUILD BRIEF (2026-09-12): decisions taken, what is next, Cramorant hand-off
 
 Status: `scripts/deep_dive_brief.py` + tests merged to main (b6e6263), standalone
