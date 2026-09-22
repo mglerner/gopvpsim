@@ -45,6 +45,11 @@ SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow'
 SABLEYE_PLAIN = '20260911_051621_Sableye_great'
 MEDICHAM = '20260911_071541_Medicham_great'
 MELMETAL = '20260910_190103_Melmetal_great'
+# The other three blobs the 2026-09-21 mirror prototype measured.
+MELMETAL_ULTRA = '20260913_093847_Melmetal_ultra'
+AZUMARILL = '20260912_224739_Azumarill_great'
+# The blob whose cohort quantiles ARE the grid's top attack.
+MIMIKYU_ULTRA = '20260911_153453_Mimikyu_ultra'
 
 sys.path.insert(0, str(REPO_ROOT / 'tests'))
 from test_deep_dive_brief import B, require_blob  # noqa: E402
@@ -571,3 +576,264 @@ def test_a_shared_lead_is_reported_as_a_tie():
         assert (tie['n'] if tie else 1) == n, key
         if tie:
             assert tie['weighted'] == int(round(top['wg']))
+
+
+# ---------------------------------------------------------------------------
+# 5. The mirror-slayer cohort (round 11, 2026-09-22)
+# ---------------------------------------------------------------------------
+# The numbers below are RE-DERIVED from the blobs, not copied: the 2026-09-21
+# prototype (userdata/analysis/2026-09-21_mirror_proto/report.md) measured the
+# same four blobs and its JSONs are the cross-check, not the source. Where the
+# two differ the difference is recorded in the test that finds it -- see
+# test_the_grid_count_is_strict_on_the_raw_attack and
+# test_spearman_shares_the_ranks_of_tied_values.
+
+
+def _mirror(slug, arm=0, preset=None):
+    res = _arm(slug, arm)
+    return res, res['mirror'][preset or D.PRESET_FLAT]
+
+
+def test_spearman_shares_the_ranks_of_tied_values():
+    """Averaged ranks, not ordinal ones.
+
+    The prototype's ``_spearman`` was ``np.argsort(np.argsort(x))``, which
+    breaks ties by ARRAY POSITION. On surfaces like these -- the mirror rate
+    takes 31 distinct values over 4096 spreads and the win count takes ten --
+    that is not Spearman's rho at all: it reports a number that changes when
+    the rows are permuted. Pinned here as permutation invariance, which the
+    ordinal version fails and the averaged-rank one cannot.
+    """
+    x = np.array([1.0, 1.0, 1.0, 2.0, 2.0, 3.0])
+    y = np.array([0.0, 1.0, 1.0, 1.0, 2.0, 2.0])
+    base = D.spearman(x, y)
+    rng = np.random.default_rng(7)
+    for _ in range(5):
+        p = rng.permutation(len(x))
+        assert D.spearman(x[p], y[p]) == pytest.approx(base)
+    # Monotone data is rho = 1 either way; the tie handling is what differs.
+    assert D.spearman(np.arange(5.0), np.arange(5.0) * 3) == pytest.approx(1.0)
+    assert D.spearman(np.arange(5.0), -np.arange(5.0)) == pytest.approx(-1.0)
+    assert D.spearman(np.ones(4), np.arange(4.0)) is None
+
+
+def test_mirror_split_needs_a_real_gap_and_two_real_sides():
+    """One outlier is not a split cohort."""
+    assert D.mirror_split([1, 1, 1, 2, 9, 9, 9, 10])['n_lo'] == 4
+    # A big gap with one member past it -- Melmetal Ultra's 162.80 -- is not.
+    assert D.mirror_split([1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 9]) is None
+    # An even ramp has no gap worth naming.
+    assert D.mirror_split(list(range(10))) is None
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_melmetal_great_cmp_quantiles():
+    """Re-derived from the blob. Cross-checks the prototype's Melmetal GL
+    table: a_50 = 125.17, a_75 = 125.70, 46 and 20 grid spreads strict, no
+    build member clearing a_50, the closest at 124.12."""
+    res, mf = _mirror(MELMETAL)
+    c50, c75 = mf['cmp']
+    assert (c50['q'], c75['q']) == (0.50, 0.75)
+    assert round(c50['T'], 2) == 125.17
+    assert round(c75['T'], 2) == 125.70
+    assert (c50['n_grid_strict'], c75['n_grid_strict']) == (46, 20)
+    # The tie-inclusive counts deep_dive_slayer._cmp_pct would report.
+    assert (c50['n_grid_ties'], c75['n_grid_ties']) == (87, 46)
+    assert mf['n_final'] == 30 and mf['n_pairs'] == 25
+    # n_pairs is the number of opponents each spread was actually SCORED
+    # against -- the deduped set of the round that produced ``all_scores`` --
+    # and it is the denominator of the rate surface. It is NOT the number of
+    # distinct stat profiles in the final cohort, which is 22 here: the
+    # prototype's report glosses the two as one number and they differ.
+    assert mf['n_profiles'] == 22
+    assert mf['tilt'] == 'atk' and mf['split'] is None
+    assert mf['sp_rank_med'] == 1854
+    assert [b['size'] for b in mf['builds']] == [55, 64]
+    assert [b['n_clear'] for b in mf['builds']] == [[0, 0], [0, 0]]
+    assert round(max(b['atk_max'] for b in mf['builds']), 2) == 124.12
+    # Re-derived a second way: the cohort attacks straight off the blob.
+    atks = sorted(float(s['atk'])
+                  for s in res['ctx']['state']['slayer_iter_result']['final'])
+    assert round(atks[14], 2) == 125.17        # nearest-rank 50th of 30
+    assert round(atks[22], 2) == 125.70        # nearest-rank 75th of 30
+    assert int((res['ctx']['atk'] > atks[14]).sum()) == 46
+    # Why the block prints ``line`` and not the threshold itself: the grid's
+    # attack values sit about 0.002 apart, so the ROUNDED threshold is not a
+    # selector for it -- "> 125.17" holds 87 spreads where "> 125.174318"
+    # holds 46. ``line`` is the lowest grid attack above the threshold, so
+    # ``>= line`` is exactly ``> T``.
+    assert int((res['ctx']['atk'] > round(atks[14], 2)).sum()) == 87
+    assert int((res['ctx']['atk'] >= c50['line']).sum()) == 46
+    assert float(f"{c50['line']:.{c50['line_dp']}f}") <= c50['line']
+    # The second measured disagreement with the prototype. Its report gives
+    # Spearman -0.045 and Pearson +0.043 for this pair; the PEARSON agrees
+    # here to four places, which localises the difference to the rank
+    # function -- see test_spearman_shares_the_ranks_of_tied_values.
+    assert mf['spearman'] == pytest.approx(0.0834, abs=5e-4)
+    ois = [m['oi'] for m in mf['opponents']]
+    ks = [si * res['ctx']['n_opp'] + oi
+          for si in range(res['ctx']['n_sc']) for oi in ois]
+    wins = res['ctx']['win2'][:, ks].sum(axis=1).astype(float)
+    rate = D.mirror_surface(res['ctx'])['rate']
+    ok = np.isfinite(rate)
+    pearson = float(np.corrcoef(rate[ok], wins[ok])[0, 1])
+    assert pearson == pytest.approx(0.0426, abs=5e-4)
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_the_grid_count_is_strict_on_the_raw_attack():
+    """Melmetal Ultra a_75: 2035 spreads, not the prototype's 1984.
+
+    The prototype rounded BOTH sides to 2 dp before comparing
+    (``np.round(ctx['atk'], 2) > round(need, 2)``), which drops the 51
+    spreads whose attack is above 158.0302568 and still prints as 158.03.
+    ``battle.BattlePokemon.cmp_atk`` is the raw float, so the engine gives
+    those 51 the priority and the rounded count understates it.
+    """
+    res, mf = _mirror(MELMETAL_ULTRA)
+    c50, c75 = mf['cmp']
+    assert round(c50['T'], 2) == 156.79
+    assert c50['n_grid_strict'] == 2891          # agrees with the prototype
+    assert round(c75['T'], 2) == 158.03
+    assert c75['n_grid_strict'] == 2035          # prototype said 1984
+    atk = res['ctx']['atk']
+    rounded = int((np.round(atk, 2) > round(c75['T'], 2)).sum())
+    assert rounded == 1984 and c75['n_grid_strict'] - rounded == 51
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_melmetal_ultra_fork_clears_both_thresholds_with_every_member():
+    """The one page in the study where the CMP line SPLITS the builds."""
+    _res, mf = _mirror(MELMETAL_ULTRA)
+    assert mf['tilt'] == 'bulk' and mf['sp_rank_med'] == 193
+    by_role = {b['role']: b for b in mf['builds']}
+    assert by_role['fork']['size'] == 113
+    assert by_role['fork']['n_clear'] == [113, 113]
+    assert by_role['primary']['n_clear'] == [0, 0]
+    assert by_role['rank1']['n_clear'] == [0, 0]
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_shadow_sableye_mirror_covers_both_forms():
+    """A shadow focal's mirror is BOTH pool entries, and the cohort is
+    split in two -- which is why it is not called attack-first."""
+    res, mf = _mirror(SABLEYE_SHADOW)
+    assert [o['name'] for o in mf['opponents']] == ['Sableye (Shadow)',
+                                                    'Sableye']
+    assert {c['name'] for c in mf['cells']} == {'Sableye (Shadow)', 'Sableye'}
+    c50 = mf['cmp'][0]
+    assert round(c50['T'], 2) == 155.90
+    assert c50['n_grid_strict'] == 9
+    assert mf['tilt'] == 'atk'          # the median alone says attack-first
+    assert mf['split'] == {'n_lo': 12, 'n_hi': 18,
+                           'lo_lo': pytest.approx(141.755758, abs=1e-5),
+                           'lo_hi': pytest.approx(143.907838, abs=1e-5),
+                           'hi_lo': pytest.approx(155.900158, abs=1e-5),
+                           'hi_hi': pytest.approx(156.836158, abs=1e-5)}
+    assert mf['l51_is_l50'] is False
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_azumarill_builds_lose_priority_to_every_cohort_member():
+    """The builds top out BELOW the cohort's floor, while half the grid
+    clears its median. Both halves are what the block says out loud."""
+    _res, mf = _mirror(AZUMARILL)
+    c50 = mf['cmp'][0]
+    assert round(c50['T'], 2) == 96.27
+    assert c50['n_grid_strict'] == 2091
+    assert max(b['atk_max'] for b in mf['builds']) < mf['atk_lo']
+    assert round(max(b['atk_max'] for b in mf['builds']), 2) == 95.28
+    assert round(mf['atk_lo'], 2) == 96.13
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_the_l51_cohort_is_the_l50_object_on_most_blobs():
+    """Identity, not equality: ``mirror_surface(level='l51')`` silently
+    returns the L50 surface wherever the bake stored one object under both
+    keys, which is two of the four prototype blobs."""
+    for slug, same in ((MELMETAL, True), (MELMETAL_ULTRA, True),
+                       (SABLEYE_SHADOW, False), (AZUMARILL, False)):
+        res = _arm(slug)
+        state = res['ctx']['state']
+        assert (state['slayer_iter_result_l51']
+                is state['slayer_iter_result']) is same, slug
+        assert res['mirror'][D.PRESET_FLAT]['l51_is_l50'] is same, slug
+        if same:
+            s50 = D.mirror_surface(res['ctx'], level='l50')
+            s51 = D.mirror_surface(res['ctx'], level='l51')
+            assert np.array_equal(s50['rate'], s51['rate'], equal_nan=True)
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_a_cohort_quantile_can_be_the_grids_own_top_attack():
+    """Mimikyu Ultra: both quantiles are 161.33759808, which IS the grid
+    maximum, so nothing a reader can build out-prioritises half the cohort.
+
+    Pre-fix the renderer formatted ``line`` unconditionally and raised
+    TypeError on the None, taking the whole section off every Mimikyu Ultra
+    file (it surfaced through the best-buddy render test, not through the
+    four prototype blobs, none of which has this shape).
+    """
+    res = _arm(MIMIKYU_ULTRA)
+    mf = res['mirror'][D.PRESET_FLAT]
+    atk = res['ctx']['atk']
+    for row in mf['cmp']:
+        assert row['T'] == pytest.approx(float(atk.max()))
+        assert row['line'] is None and row['line_printed'] is None
+        assert row['n_grid_strict'] == 0
+        assert row['n_grid_ties'] > 0
+    assert D.mirror_payload(res) is None
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_no_cohort_and_no_mirror_cell_each_switch_the_block_off():
+    """The absence pin, both gates, on a blob that HAS a mirror block.
+
+    Pre-gate the renderer would have printed a cohort sentence with no
+    cohort behind it, and a CMP line about a matchup the IV choice does not
+    decide.
+    """
+    res = _arm(MELMETAL)
+    ctx, frame = res['ctx'], res['frame']
+    block = res['presets'][D.PRESET_FLAT]
+    assert D.mirror_facts(ctx, frame, block) is not None      # the control
+    # (c) no baked cohort: a blob dived without --mirror-slayer.
+    state = ctx['state']
+    kept = state.pop('slayer_iter_result')
+    try:
+        assert D.mirror_facts(ctx, frame, block) is None
+    finally:
+        state['slayer_iter_result'] = kept
+    # (b) the mirror is in the pool but decides nothing: no decision cell
+    # carries it.
+    ois = {m['oi'] for m in D.mirror_opponents(ctx)}
+    assert ois
+    bare = dict(frame, cells=[c for c in frame['cells'] if c['oi'] not in ois])
+    assert len(bare['cells']) < len(frame['cells'])
+    assert D.mirror_facts(ctx, bare, block) is None
+
+
+@pytest.mark.slow
+@pytest.mark.local_artifacts
+def test_mirror_payload_is_one_mask_and_three_scalars():
+    """The plot's extra trace costs a packed mask, not a member list, and
+    starts switched off where no build reaches the threshold."""
+    res = _arm(MELMETAL)
+    pay = D.mirror_payload(res)
+    assert set(pay) == {'cut', 'n', 'on', 'mask'}
+    assert pay['n'] == 46 and pay['on'] is False
+    assert len(pay['mask']) == 684          # 4096 bits, base64
+    assert len(json.dumps(pay)) < 800
+    mf = res['mirror'][D.PRESET_FLAT]
+    assert int(mf['clear50'].sum()) == pay['n']
+    # The cut is a valid >= selector for exactly those spreads.
+    assert int((res['ctx']['atk'] >= float(pay['cut'])).sum()) == pay['n']
+    assert D.mirror_payload({}) is None

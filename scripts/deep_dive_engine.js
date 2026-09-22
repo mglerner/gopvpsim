@@ -5766,6 +5766,35 @@ function _wbBuildGroups(pay, L, wins, colors, den, root, scen) {
   return { traces: out, missing: false };
 }
 
+// "The mirror" (round 11): the spreads whose attack out-prioritises the
+// mirror cohort's median member. A marker STYLE, not a line -- attack is an
+// axis on neither builds plane -- so each qualifying spread gets an open
+// triangle over it under one legend key that toggles the lot. `on` is false
+// on a page where no selected build holds one of them, and the trace then
+// starts as `legendonly`: an empty promise is not drawn by default.
+var WB_MIRROR_SYMBOL = 'triangle-up-open';
+var WB_MIRROR_SIZE = 8;
+
+function _wbMirrorTrace(pay, L, wins, colors, den) {
+  var m = pay.bp && pay.bp.mirror;
+  if (!m || !m.mask) return null;
+  var bits = _wbMask(m.mask);
+  var t = _wbTrace(wrapLegendName('Attack at or above ' + m.cut +
+                                  ' (' + m.n + ')', 34),
+                   colors.alt, WB_MIRROR_SYMBOL, WB_MIRROR_SIZE, 0.9);
+  var side = 'attack at or above ' + m.cut + ': wins charge-move priority ' +
+             'against at least half the mirror cohort';
+  for (var i = 0; i < DATA.nIvs; i++) {
+    if (!_wbBit(bits, i)) continue;
+    var p = _wbXY(L, i, wins);
+    t.x.push(p[0]); t.y.push(p[1]);
+    t.text.push(_wbHover(i, L, wins, side, den));
+  }
+  if (!t.x.length) return null;
+  if (!m.on) t.visible = 'legendonly';
+  return t;
+}
+
 // Every MARKED spread the builds views draw on top of the population: SP1,
 // each build's most-winning member, and the two standouts. Factored out of
 // wbRenderRoot for round 7, because the nine per-scenario minis mark the
@@ -6637,6 +6666,11 @@ function wbRenderBox(root, box) {
     }
   }
   if ((view === 'builds' || view === 'stats') && pblock) {
+    // BEFORE the marks: the mirror outline is context around the population,
+    // and drawn after them it would cover the four marked spreads the
+    // caption names.
+    var mirT = _wbMirrorTrace(pay, L, wins, colors, den);
+    if (mirT) traces.push(mirT);
     traces = traces.concat(
       _wbBuildMarks(pay, pblock, L, wins, colors, den, scen, root, false));
   }

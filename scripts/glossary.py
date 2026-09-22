@@ -107,6 +107,14 @@ TERMS = {
         "PvPoke-default IVs or the bulkiest ones, each with and without the "
         "focal side baiting -- so a claim that holds in all of them does "
         "not depend on how the opponent was made.",
+    # Round 11 (2026-09-22): the term "The mirror" block introduces. 'CMP'
+    # is the short form of an entry that was already here, marked the way
+    # SP1 is -- whichever spelling a reader meets first carries the tooltip.
+    'mirror cohort':
+        "The population of same-species opponents the mirror-slayer "
+        "protocol converges on: spreads picked over several rounds for "
+        "beating each other in the mirror, not a census of what players "
+        "own.",
     'upset plot':
         "A bar chart of set intersections: each column is one candidate "
         "region, and the dots under it mark which named sets it lies inside "
@@ -118,6 +126,7 @@ TERMS = {
 # a reader scanning the terms at the foot for SP1 has to find it there
 # (2026-09-17 round 6 review).
 DISPLAY = {'stat-product rank-1': 'stat-product rank-1 (SP1)',
+           'charge-move priority': 'charge-move priority (CMP)',
            'upset plot': 'UpSet plot',
            'opponent-iv mode': 'opponent-IV mode'}
 
