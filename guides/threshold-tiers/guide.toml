@@ -5,9 +5,9 @@ order = 1
 coming_soon = false
 authorship = "both"
 
-# Reference dive defaults to Oinkologne Female GL (inherited from
-# build_guides.DEFAULT_REFERENCE). Numeric citations resolve via
+# Reference dive is inherited from build_guides.DEFAULT_REFERENCE
+# (Corviknight GL as of 2026-09-22). Numeric citations resolve via
 # dive:* tokens so the worked example auto-updates on every publish.
-# NB the worked example + the containment example assume the reference
-# dive's TOP tier is a def/hp (bulk) cut and name Grumpig Slayer /
-# Oinkologne Atk cutoffs -- re-check both if the reference repoints.
+# The worked example no longer assumes which axes the top tier cuts
+# on: dive:top_tier_axes / dive:top_tier_rule print whatever it
+# carries, so a reference repoint needs no prose edit here.

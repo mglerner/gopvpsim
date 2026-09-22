@@ -11,6 +11,7 @@ opaque token list rather than "your reference dive no longer exists".
 Pre-fix value recorded: `_dive_data('oinkologne-female-great-league')` returned
 None, and `_resolve_dive_token('top_tier_name', None)` returned None.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -23,13 +24,13 @@ import build_guides as bg  # noqa: E402
 from dive_registry import all_dives  # noqa: E402
 
 # Every token guides/*/body.md interpolates off the reference dive's top tier.
-# The prose in guides/threshold-tiers/body.md reads "cuts on bulk: def >= X
-# with an HP floor of Y", so BOTH cutoffs must be non-None -- a dive whose top
-# tier has no HP floor renders "an HP floor of `0`".
+# The prose now reads "cuts on <axes>: <rule>" off `top_tier_axes` /
+# `top_tier_rule`, which print only the axes the tier actually cuts on, so no
+# single dive-shape (bulk tier vs attack tier) is required of the reference.
 _TOP_TIER_TOKENS = (
     'top_tier_name',
-    'top_tier_def_cutoff',
-    'top_tier_sta_cutoff',
+    'top_tier_axes',
+    'top_tier_rule',
     'top_tier_clear_count',
     'iv_space_size',
     'tier_count',
@@ -66,20 +67,47 @@ def test_reference_dive_resolves_every_top_tier_token():
 
 
 @pytest.mark.local_artifacts
-def test_reference_dive_top_tier_has_a_real_hp_floor():
+def test_reference_dive_top_tier_rule_prints_only_real_cutoffs():
     """Guards the prose, not just the token.
 
-    A sta_cutoff of 0 resolves fine (so the test above passes) but renders
-    "with an HP floor of `0`", which reads as a bug to a human. Altaria and
-    Azumarill both resolve every token yet carry sta 0; Corviknight was chosen
-    over them for exactly this reason.
+    A cutoff of 0 means "this tier does not cut on that axis". It resolves
+    fine (so the token test above passes) but renders as a real-looking
+    threshold to a human.
+
+    Pre-fix values recorded (2026-09-22 bake, Corviknight GL top tier
+    "Aegislash (Shield) Slayer" = atk 112.79 / def 0 / sta 142): the guide
+    hardcoded the axes, `top_tier_def_cutoff` resolved to `0`, and the
+    rendered page read `The top card - Aegislash (Shield) Slayer - cuts on
+    bulk: def &ge; 0 with an HP floor of 142.00`. The atk cutoff the tier
+    really carries was not printed at all. No Great League dive in that bake
+    had all three cutoffs nonzero, so no reference swap could fix it.
     """
     slug = bg.DEFAULT_REFERENCE['dive_slug']
     if not (REPO / 'userdata' / 'website' / slug / 'index.html').exists():
         pytest.skip(f'no locally built {slug}')
     dive = bg._dive_data(slug)
-    for token in ('top_tier_def_cutoff', 'top_tier_sta_cutoff'):
-        value = bg._resolve_dive_token(token, dive)
-        assert value is not None and float(value) > 0, (
-            f'{slug} top tier has {token}={value}; the threshold-tiers guide '
-            f'prose names both a def cutoff and an HP floor')
+    rule = bg._resolve_dive_token('top_tier_rule', dive)
+    assert rule, f'{slug} top tier resolved no rule at all'
+
+    clauses = re.findall(r'(atk|def|HP) >= ([0-9.]+)', rule)
+    assert len(clauses) == len(rule.split(' and ')), (
+        f'top_tier_rule {rule!r} has a clause that is not "<axis> >= <value>"')
+    assert clauses, f'top_tier_rule {rule!r} names no cutoff'
+    zeros = [c for c in clauses if float(c[1]) == 0]
+    assert not zeros, (
+        f'top_tier_rule {rule!r} prints a zero cutoff {zeros}; a zero means '
+        f'the tier does not cut on that axis and must not be rendered')
+
+    # And the sentence the rule lands in must not reintroduce a hardcoded
+    # axis: resolve the real guide body and scan the rendered text.
+    body = (REPO / 'guides' / 'threshold-tiers' / 'body.md').read_text()
+    resolved, unresolved = bg._resolve_tokens(
+        body, {}, dive=dive, dev_counts={}, guide_slug='threshold-tiers')
+    assert unresolved == [], f'threshold-tiers has unresolved tokens: {unresolved}'
+    bad = re.findall(r'(?:atk|def|hp|HP)\s*(?:>=|&ge;|\u2265)\s*0(?![0-9.])',
+                     resolved)
+    assert not bad, (
+        f'rendered threshold-tiers guide prints a zero cutoff: {bad}')
+    assert re.search(r'(?:atk|def|HP) >= [0-9.]*[1-9]', resolved), (
+        'rendered threshold-tiers guide names no nonzero cutoff -- the '
+        'positive control for the scan above')
