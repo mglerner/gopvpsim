@@ -146,3 +146,48 @@ def test_default_markers_are_in_the_committed_gl_pool():
     missing = [m for m in vo.DEFAULT_MARKERS if m not in pool]
     assert missing == [], missing
     assert len(vo.DEFAULT_MARKERS) >= 2
+
+
+def test_a_marker_with_a_form_qualifier_is_matched_in_a_rendered_dive():
+    """The markers check has to match the names a dive actually renders.
+
+    Pre-fix (2026-09-22) check [3/5] compared ``o.split(' (')[0] == m``,
+    which strips the FORM qualifier as well as the moveset annotation. The
+    09-22 marker refresh moved DEFAULT_MARKERS to species that carry one --
+    'Charjabug (Shadow)', 'Forretress (Shadow)', 'Oinkologne (Female)' --
+    and every one of them became unmatchable: the gate printed the same 76
+    "markers missing" lines the refresh was meant to clear, now for three
+    different species that were present in every list.
+    """
+    rendered = ['Umbreon', 'Charjabug', 'Charjabug (Shadow)',
+                'Forretress (Shadow)', 'Forretress (Bug Bite)',
+                'Forretress (Shadow) (Bug Bite)', 'Diggersby',
+                'Oinkologne (Female)']
+    assert vo.missing_markers(rendered, vo.DEFAULT_MARKERS) == []
+    # A moveset annotation on the marker itself still matches ...
+    assert vo.missing_markers(['Umbreon (Foul Play)'], ['Umbreon']) == []
+    # ... and a marker nothing names is still reported.
+    assert vo.missing_markers(rendered, ['Sylveon']) == ['Sylveon']
+    # Positive control on the pre-fix rule: it is the parenthetical markers
+    # it could not see.
+    prefix_only = [m for m in vo.DEFAULT_MARKERS
+                   if not any(o.split(' (')[0] == m for o in rendered)]
+    assert prefix_only == ['Charjabug (Shadow)', 'Forretress (Shadow)',
+                           'Oinkologne (Female)']
+
+
+@pytest.mark.local_artifacts
+def test_every_marker_is_found_in_a_real_rendered_dive():
+    """The end of the chain the two tests above only cover in halves: the
+    committed pool, the renderer's display names, and the matcher, on the
+    dive dirs this machine actually has."""
+    website = REPO_ROOT / 'userdata' / 'website'
+    checked = 0
+    for index in sorted(website.glob('*-great-league/index.html')):
+        opps = vo.extract_opponents(index)
+        if opps is None:
+            continue
+        assert vo.missing_markers(opps, vo.DEFAULT_MARKERS) == [], index.parent.name
+        checked += 1
+    if not checked:
+        pytest.skip('no rendered Great League dives on this machine')
