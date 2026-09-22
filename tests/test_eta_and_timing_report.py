@@ -39,8 +39,49 @@ def test_ml_tail_ignores_a_run_where_everything_failed(tmp_path):
 
 def test_ml_tail_falls_back_when_there_is_no_history(tmp_path):
     assert oe.measured_ml_tail_min(tmp_path) is None
-    assert oe.FALLBACKS['ml_tail'] == 420.0, (
-        'the fallback may stay wrong-but-present; it is last resort only')
+    assert oe.FALLBACKS['ml_tail'] == 10.0, (
+        'the ml_tail fallback was recalibrated 2026-09-22')
+
+
+def test_the_ml_tail_fallback_is_within_headroom_of_its_measurement():
+    """The fallback value itself, not just the preference order.
+
+    Pre-fix value (until 2026-09-22): FALLBACKS['ml_tail'] == 420.0, against a
+    measured 3.9 min -- ~108x high. The 2026-09-12 fix added
+    measured_ml_tail_min() but deliberately LEFT the constant wrong, on the
+    theory that a flagged wrong number is acceptable because it is last
+    resort. It is not: on a machine with no ML history (a fresh clone, a
+    rotated userdata/logs) the watcher prints that number with no measurement
+    to override it, and ~7h of phantom ETA is exactly what the Twilight Trails
+    bake showed.
+
+    Ground truth is the one measurement we have, kept in
+    oe.ML_TAIL_MEASUREMENT. The band is deliberately loose -- this pins "the
+    fallback is calibrated against a real run", not a specific rounding.
+    """
+    measured = oe.ML_TAIL_MEASUREMENT['minutes']
+    assert measured == 3.9 and oe.ML_TAIL_MEASUREMENT['guides_ok'] == 60, (
+        'the recorded 2026-09-12 measurement changed; recalibrate the '
+        'fallback against the new one rather than editing this test')
+    fallback = oe.FALLBACKS['ml_tail']
+    assert measured <= fallback <= 5 * measured, (
+        f"ml_tail fallback {fallback}m is not within [1x, 5x] of the only "
+        f"measurement we have ({measured}m on "
+        f"{oe.ML_TAIL_MEASUREMENT['date']}). It was 420.0m -- ~108x -- until "
+        f"2026-09-22.")
+
+
+def test_a_historyless_machine_gets_the_fallback_not_a_phantom_tail(tmp_path):
+    """The path that made the wrong constant visible, end to end.
+
+    No ML history at all -> measured_ml_tail_min() is None -> the ETA adds
+    FALLBACKS['ml_tail']. Pre-fix that added 7 hours to every printed ETA.
+    """
+    assert oe.measured_ml_tail_min(tmp_path) is None
+    added = oe.FALLBACKS['ml_tail']
+    assert added < 60, (
+        f'a historyless machine would add {added / 60:.1f}h of ML tail to '
+        f'every ETA; pre-fix this was 7.0h')
 
 
 def test_timing_report_separates_the_same_species_in_two_leagues(tmp_path):

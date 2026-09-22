@@ -88,18 +88,33 @@ FALLBACKS = {
     'post_dive':  5.0,   # comparison renders + matchup web + index + verify (steps 4-9, sans ML)
     # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides).
     #
-    # This 420m figure is a LAST-RESORT fallback and is known to be far too
-    # large: measured 2026-09-12, the whole tail ran in 3.9 min (60 ok, 0
-    # failed). 420m predates the 2026-06-27 cache-rework, when each guide was
-    # single-process on one core; guides now fan across all cores via
-    # deep_dive.iv_sweep, and the ML IV space is tiny anyway (48 profiles at
-    # DEFAULT_IV_FLOOR=12, against 4096 IVs x 76 opponents x 9 scenarios for a
-    # GL dive). Left in only for a machine with no ML history at all.
+    # RECALIBRATED 2026-09-22: 420.0 -> 10.0. The 420m figure predated the
+    # 2026-06-27 cache-rework, when each guide was single-process on one core;
+    # guides now fan across all cores via deep_dive.iv_sweep, and the ML IV
+    # space is tiny anyway (48 profiles at DEFAULT_IV_FLOOR=12, against 4096
+    # IVs x 76 opponents x 9 scenarios for a GL dive). Measured 2026-09-12,
+    # the whole tail ran in 3.9 min (60 ok, 0 failed) -- so 420m was ~108x
+    # high, and every ETA the watcher printed during the Twilight Trails bake
+    # was inflated by ~7h.
+    #
+    # 10.0 is that 3.9m measurement with ~2.5x headroom, matching how gl_full
+    # / ul_full / forretress above are set (measured mean, rounded up). It is
+    # deliberately NOT left "wrong but flagged": a comment nobody reads does
+    # not un-inflate the number the watcher prints.
     #
     # measured_ml_tail_min() below supersedes it whenever a past run can be
-    # found, which is why every ETA during the Twilight Trails bake
-    # over-reported by ~7h.
-    'ml_tail':    420.0,
+    # found, so this is last resort only -- a machine with no ML history.
+    'ml_tail':    10.0,
+}
+
+# The only measurement FALLBACKS['ml_tail'] has ever been calibrated against.
+# Kept beside it so the two cannot drift apart silently; pinned by
+# tests/test_eta_and_timing_report.py.
+ML_TAIL_MEASUREMENT = {
+    'date':       '2026-09-12',
+    'minutes':    3.9,
+    'guides_ok':  60,
+    'guides_bad': 0,
 }
 
 
