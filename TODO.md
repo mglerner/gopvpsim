@@ -57,24 +57,32 @@ every cached column is now a safe miss. (An earlier note in this session
 said the opposite; it was wrong.) The published site still shows the old
 cells until the next bake + publish.
 
-**Cache fix = a cost question (scoped 2026-09-23):**
-- Live sweep columns at 9ac12a2754a1: 282,168 (of 435,544; the rest are an
-  older engine and never served).
-- Exact migration predicate: re-group each column under the old and new
-  signature; changed partition = re-sim. Must also cover the other delta
-  since 9ac12a2754a1 (the legacy guard, behavior-neutral). Measured on a
-  3,008-column / 256-focal-dir sample: 15.6% affected (~44k columns), cost
-  ~5 ms/column + 0.1 s/focal dir => ~25-40 min for the whole cache.
-- Build: predicate + tests ~2-3 h; the slayer cache needs its own pass
-  (same regroup idea for mirror columns) ~1-2 h more, or it goes cold.
-- Bake: the 09-20 chain took 37.7 h with 113k/184k sweep columns warm;
-  all logged sim phases were ~18.8 h of that and sweep sims only ~1.4 h, so
-  the chain is dominated by non-sweep stages. Migrated (sweep + slayer):
-  expect ~35-40 h. Fully cold: the 08-27 estimate was 57 h. Sweep-only
-  migration saves only a few hours; the slayer pass is where most of the
-  migration's value would come from.
-- Before that bake: the 09-20 chain ended with the ship gate FAILED
-  (verify_tests rc=1) -- run the pre-dive checklist first.
+**Cache migration: BUILT + dry-run, NOT applied (b6e369a, 2026-09-23).**
+Run these before the next bake (both default to dry-run; `--apply` writes):
+
+    direnv exec . python scripts/migrate_cache.py --from-engine 9ac12a2754a1 \
+        --predicate signature_regroup_20260923 --apply
+    direnv exec . python scripts/migrate_cache.py --slayer --from-engine 9ac12a2754a1 \
+        --predicate signature_fix_slayer_20260923 --apply
+
+Dry-run results: sweep 239,091 blessed / 43,077 deleted-to-re-sim (15.3%;
+26 min single-threaded); slayer 150 blessed / 0 deleted. Old-grouping
+reconstruction matched the real pre-fix module on 1,504/1,504 sampled
+columns. `legacy_guard_20260922` was removed unrun (unsafe: same delta).
+Do NOT land another engine-hashed change before applying these, or the
+predicates' from->to delta no longer covers everything.
+
+**Ship gate (09-20 chain FAIL) -- already resolved.** The one failing test
+was `test_reference_dive_top_tier_has_a_real_hp_floor`: the bake moved the
+guides' reference dive's top tier (Corviknight GL) to an atk+HP cut with
+def 0, and the hardcoded guide prose/test required def > 0. Fixed 09-22 by
+2ed4539 (prose now prints whatever axes the tier cuts on; test rewritten).
+Full `run_ship_gates.py` roster re-run 2026-09-23: rc=0 (fast tier 2756
+passed, 691,888 hrefs no broken refs, no dashes, dev counts OK).
+
+**Bake estimate:** ~35-40 h migrated vs ~57 h cold (the 09-20 chain took
+37.7 h; sweep sims were only ~1.4 h of it). Run the pre-dive checklist first.
+
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
 - MICHAEL: reply to u/LeansCenter on the r/TheSilphArena launch thread
