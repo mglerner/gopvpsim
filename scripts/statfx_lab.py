@@ -175,6 +175,52 @@ def _into_predicted_shield_gated(att, dfn, fired, E, O):
     return _into_predicted_shield(att, dfn, fired, E, O)
 
 
+def _shield_pred_survives_opp_effects(att, dfn, E):
+    """Refinement B: the E-shield prediction must survive every stat effect
+    the opponent can apply THIS turn (an affordable guaranteed-effect charged
+    move of theirs resolves first and can shrink E below their shield
+    threshold -- Shadow Cradily's Rock Tomb vs Tinkaton, 2026-09-23)."""
+    for m in dfn.charged_moves:
+        eff = stat_effect(m)
+        if eff is None or dfn.energy < m['energy']:
+            continue
+        buffs = m['buffs']
+        tgt = att if m.get('buffTarget') == 'opponent' else dfn
+        saved = (tgt.atk_stage, tgt.def_stage)
+        tgt.atk_stage = max(-STAGE_CAP, min(STAGE_CAP, tgt.atk_stage + buffs[0]))
+        tgt.def_stage = max(-STAGE_CAP, min(STAGE_CAP, tgt.def_stage + buffs[1]))
+        try:
+            ok = pvpoke_simulate_shield(att, dfn, E)
+        finally:
+            tgt.atk_stage, tgt.def_stage = saved
+        if not ok:
+            return False
+    return True
+
+
+def _into_predicted_shield_v2(att, dfn, fired, E, O):
+    """shields_pred_gated plus the three swap-VETOES from the 2026-09-23
+    failure diagnoses (each only removes swaps, never adds one):
+      A  the opponent must also be predicted to shield O -- 'the shield burns
+         either way' is the rule's premise (Shadow Talonflame vs Tinkaton);
+      B  the E-shield prediction must survive the opponent's same-turn stat
+         effects (_shield_pred_survives_opp_effects);
+      G1 the swap must not leave an immediately affordable follow-up throw
+         that throwing O would not (the cheaper E's surplus energy later
+         fires unshielded at low turns-to-live -- Shadow Talonflame FC)."""
+    if _into_predicted_shield_gated(att, dfn, fired, E, O) is None:
+        return None
+    if not pvpoke_simulate_shield(att, dfn, O):                        # A
+        return None
+    if not _shield_pred_survives_opp_effects(att, dfn, E):             # B
+        return None
+    min_cost = min(m['energy'] for m in att.charged_moves)
+    if (att.energy - E['energy'] >= min_cost
+            and att.energy - O['energy'] < min_cost):                  # G1
+        return None
+    return 'E'
+
+
 def _early(att, dfn, fired, E, O):
     if (fired is O and effect_stage(att, dfn, E) <= 0
             and not kos(att, dfn, O) and throws_after(att, dfn, E) >= 1):
@@ -213,6 +259,7 @@ VARIANTS = {
     'shields': _into_shields,
     'shields_pred': _into_predicted_shield,
     'shields_pred_gated': _into_predicted_shield_gated,
+    'shields_pred_v2': _into_predicted_shield_v2,
     'shields_pred+early': _first(_into_predicted_shield, _early),
     'early': _early,
     'early2': _early2,
