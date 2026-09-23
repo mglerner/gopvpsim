@@ -23,6 +23,17 @@ Two migration modes:
 
 Engine predicates (PROVEN, not guessed):
 
+  signature_regroup_20260923 — the signature-dedup exactness fix a4ca14e
+                plus the neutral legacy guard 2615c6e (--from-engine
+                9ac12a2754a1). COMPUTED per column: affected iff the old and
+                new signatures partition the column's profiles differently
+                (old grouping rebuilt from a frozen pre-fix movable_axes and
+                the old atk/1.2 CMP operand; parity with the real pre-fix
+                module verified 1,504/1,504 columns, 2026-09-23).
+  signature_fix_slayer_20260923 — the slayer side of the same bump
+                (--slayer --from-engine 9ac12a2754a1). Fully blessing: the
+                slayer worker never groups by signature.
+
   no_shadow_either_side_20260920 — the cmp_atk 1-ULP shadow-tie fix
                 (--from-engine 36037e51a2ee). CMP now reads a CARRIED
                 pre-shadow attack instead of `atk / SHADOW_ATK_BONUS`, whose
@@ -299,6 +310,173 @@ def _no_shadow_either_side_20260920(f, c):
     return False
 
 
+# ---------------------------------------------------------------------------
+# 2026-09-23: signature-dedup exactness fix (a4ca14e) + legacy guard (2615c6e)
+# ---------------------------------------------------------------------------
+
+def _movable_axes_pre_20260923(side, other):
+    """deep_dive_signature.movable_axes EXACTLY as it was before a4ca14e
+    (frozen copy: no DP-projection attack clause). Used only to rebuild the
+    OLD grouping for signature_regroup_20260923."""
+    import deep_dive_signature as sig
+    own_all, own_charged = sig._side_moves(side)
+    oth_all, oth_charged = sig._side_moves(other)
+
+    def b(m):
+        return m.get('buffs') or (0, 0)
+
+    atk_mov = side['native_atk'] or any(
+        b(m)[0] != 0 and sig._chance(m) > 0
+        and m.get('buffTarget', 'opponent') in ('self', 'both')
+        for m in own_all if m.get('buffs')
+    ) or any(
+        b(m)[0] > 0 for m in own_charged if m.get('buffs')
+    ) or any(
+        b(m)[0] != 0 and sig._chance(m) > 0
+        and m.get('buffTarget', 'opponent') in ('opponent', 'both')
+        for m in oth_all if m.get('buffs')
+    )
+    def_mov = side['native_def'] or any(
+        b(m)[1] != 0 and sig._chance(m) > 0
+        and m.get('buffTarget', 'opponent') in ('self', 'both')
+        for m in own_all if m.get('buffs')
+    ) or any(
+        b(m)[1] != 0 and sig._chance(m) > 0
+        and m.get('buffTarget', 'opponent') in ('opponent', 'both')
+        for m in oth_all if m.get('buffs')
+    ) or any(
+        b(m)[0] <= 0 and b(m)[1] != 0 for m in oth_charged if m.get('buffs')
+    )
+    return atk_mov, def_mov
+
+
+def _with_pre_20260923_cmp(side):
+    """Copy of a signature side whose CMP operand is the OLD expression:
+    effective atk / 1.2 on a shadow side, effective atk otherwise."""
+    div = 1.2 if side.get('shadow') else 1.0
+    return {**side, 'forms': [{**f, 'cmp_atk': f['atk'] / div}
+                              for f in side['forms']]}
+
+
+def _old_and_new_groups(focal_side, opp_side):
+    import deep_dive_signature as sig
+    new = sig.signature_groups(focal_side, opp_side)
+    saved = sig.movable_axes
+    sig.movable_axes = _movable_axes_pre_20260923
+    try:
+        old = sig.signature_groups(_with_pre_20260923_cmp(focal_side),
+                                   _with_pre_20260923_cmp(opp_side))
+    finally:
+        sig.movable_axes = saved
+    return old, new
+
+
+_FOCAL_SIDE_MEMO = {}
+
+
+def _focal_side_for(meta):
+    """Signature focal side for a focal dir's meta (memoized: every column
+    of one dir shares it). Built exactly the way iv_sweep builds it."""
+    key = json.dumps(meta, sort_keys=True, default=str)
+    if key not in _FOCAL_SIDE_MEMO:
+        import deep_dive_signature as sig
+        from deep_dive_lib.sweep import (compute_iv_metadata,
+                                         group_ivs_by_stat_profile)
+        from gopvpsim.moves import get_moves, parse_types
+        from gopvpsim.pokemon import LEAGUE_CAPS, get_pokemon_entry
+        fast_db, charged_db = get_moves()
+        fmon = get_pokemon_entry(meta['species'])
+        iv_meta = compute_iv_metadata(
+            meta['species'], meta['league'], shadow=meta['shadow'],
+            iv_floor=meta.get('iv_floor'),
+            focal_max_level=meta.get('focal_max_level'))
+        _p2i, pdata = group_ivs_by_stat_profile(
+            iv_meta, per_iv=fmon.get('formChange') is not None)
+        plist = [(pk, *d) for pk, d in pdata.items()]
+        _FOCAL_SIDE_MEMO.clear()      # one focal dir at a time (sorted walk)
+        _FOCAL_SIDE_MEMO[key] = sig.build_focal_side(
+            fmon, parse_types(fmon), dict(fast_db[meta['fast']]),
+            [dict(charged_db[c]) for c in meta['charged']], plist,
+            LEAGUE_CAPS[meta['league']], meta['shadow'])
+    return _FOCAL_SIDE_MEMO[key]
+
+
+def _signature_regroup_20260923(f, c):
+    """Signature-dedup exactness fix (pin --from-engine 9ac12a2754a1).
+
+    The hashed delta 9ac12a2754a1 -> d78c67fd06a7 is exactly two files:
+      (1) battle.py, 2615c6e: simulate() RAISES on mechanics='legacy'
+          without an env opt-in, plus a docstring rewrite. A battle either
+          runs byte-identically or refuses to start; no cached column (all
+          simmed on 'new') can change. Neutral.
+      (2) deep_dive_signature.py, a4ca14e: the CMP column uses the carried
+          pre-shadow attack instead of atk / 1.2, and movable_axes counts a
+          side's own chance-1 opponent-def-debuff charged moves as moving
+          its attack axis (pvpoke_dp's _cm_buff_delta projection).
+
+    The signature only chooses WHICH profiles share a representative sim;
+    a column's scores are a function of that partition (every member gets
+    its representative's result). So a column is unchanged iff the old and
+    new signatures partition its profiles identically -- computed here
+    exactly, per column, by rebuilding both groupings from the stored focal
+    meta and opponent fields the way iv_sweep builds them. The OLD grouping
+    uses a frozen copy of the pre-fix movable_axes and the old CMP operand.
+
+    An identical partition is sufficient but not necessary for unchanged
+    scores (a changed partition can still land on the same numbers), so
+    this over-deletes slightly and never blesses a changed column.
+
+    Fail-safe: any missing field, unknown species/move, an opponent level
+    the stored IVs do not reproduce, or any exception -> AFFECTED.
+    Measured 2026-09-23 on a 3,008-column sample: 15.6% affected.
+    """
+    try:
+        import deep_dive_signature as sig
+        from gopvpsim.moves import get_moves, parse_types
+        from gopvpsim.pokemon import (LEAGUE_CAPS, Pokemon, get_pokemon_entry,
+                                      get_species)
+        if not f or not c:
+            return True
+        fast_db, charged_db = get_moves()
+        base = get_species(c['species'])
+        a, d, s = c['ivs']
+        p = Pokemon(c['species'], base['atk'], base['def'], base['hp'],
+                    a, d, s, float(c['level']), bool(c.get('shadow', False)))
+        omon = get_pokemon_entry(c['species'])
+        opp = {'species': c['species'], 'types': parse_types(omon),
+               'atk': p.atk, 'def_': p.def_, 'hp': p.hp,
+               'fm': dict(fast_db[c['fast']]),
+               'cms': [dict(charged_db[x]) for x in c['charged']],
+               'shadow': bool(c.get('shadow', False)), 'mon': omon,
+               'ivs': (a, d, s), 'level': float(c['level'])}
+        old, new = _old_and_new_groups(
+            _focal_side_for(f),
+            sig.build_opp_side(opp, LEAGUE_CAPS[f['league']]))
+        norm = lambda g: sorted(tuple(m) for _r, m in g)  # noqa: E731
+        return norm(old) != norm(new)
+    except Exception:
+        return True
+
+
+def _signature_fix_slayer_20260923(f, c):
+    """Slayer-cache side of the same bump (pin --slayer --from-engine
+    9ac12a2754a1: the 2026-09-20 bake stamped slayer entries with the SWEEP
+    hash, before 496f366 gave the slayer cache its own stamp).
+
+    The slayer stamp is sha(sweep engine hash + deep_dive_slayer.py), so it
+    moved only because the sweep hash did. Of that delta: (1) the battle.py
+    legacy guard is neutral (see signature_regroup_20260923); (2) the
+    signature file is never used on the slayer path -- deep_dive_slayer.py
+    does not import deep_dive_signature (pinned by
+    tests/test_migrate_cache.py), so slayer scores cannot depend on it.
+    deep_dive_slayer.py is byte-identical since 36b10da (09-20 13:33, before
+    the bake); 496f366 and 4b6342b changed only slayer_cache.py's stamp
+    scheme and key-function signature (same key values for mechanics='new',
+    which the bake used). Fully blessing.
+    """
+    return False
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
@@ -328,13 +506,13 @@ PREDICATES = {
     # tests/test_cramorant.py; the 36 Cramorant oracle cells re-verified
     # exact post-plumbing) -- fully-blessing, like neutral_batch_20260810.
     'cramorant_knobs_20260824': lambda f, c: False,
-    # 2026-09-22 legacy-mechanics guard (pin --from-engine 9ac12a2754a1):
-    # simulate() now RAISES on mechanics='legacy' unless
-    # GOPVPSIM_ALLOW_LEGACY_MECHANICS=1, plus a docstring rewrite. No
-    # battle's result changes under either clock -- a run either completes
-    # exactly as before or refuses to start -- so every cached column is
-    # still correct. Fully-blessing.
-    'legacy_guard_20260922': lambda f, c: False,
+    # (legacy_guard_20260922 was REMOVED unrun on 2026-09-23: it blessed
+    # everything from 9ac12a2754a1, but the signature fix a4ca14e landed in
+    # the same hash delta, so running it would have blessed the ~15% of
+    # columns that fix changes. Both deltas are covered by the two
+    # *_20260923 predicates below -- see their docstrings.)
+    'signature_regroup_20260923': _signature_regroup_20260923,
+    'signature_fix_slayer_20260923': _signature_fix_slayer_20260923,
     # 2026-08-25 pogodives overlay (pin --from-engine <pre-overlay hash>):
     # per-side _pogodives flag threading + the pogodives_dp/pogodives_shield
     # policies + POGODIVES_CASE_SPECIES_PREFIXES. Behavior-identical for
