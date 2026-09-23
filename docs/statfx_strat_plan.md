@@ -112,7 +112,13 @@ also renders Drain Punch + Foul Play).
 4. **Ship.** Engine change behind the PoGoDives marker, a fully-scoped
    `migrate_cache.py` predicate (pogodives-tier columns of class focals),
    rebake of the affected pages, and the pre-dive checklist
-   (`docs/predive_checklist.md`) before the bake.
+   (`docs/predive_checklist.md`) before the bake. **Page copy (Michael,
+   2026-09-23):** every page that uses the strat says so next to the
+   strategy toggle, in the shape "this uses the [PoGoDives strategy] of
+   throwing Drain Punch when we expect opponents to shield; you can switch
+   to the PvPoke strategy with the toggle" -- the move name and trigger
+   generated from the rule and the page's moveset, the link pointing at the
+   strategy article. Never hand-written per page.
 
 ## Phase 1 results so far (2026-09-22, stride 13 = 316 of 4096 spreads)
 
@@ -162,6 +168,19 @@ meets the strict bar in all 9 start scenarios x 4 slices on both pages;
 | Sableye        | 0/0, +38.4/+9519, +16.7/0, 0/0, +47.5/+69118, +36.0/+7275, 0/0, +23.3/+8618, +28.3/+38078 | 807,082 / 4,844 | 31.5%         |
 
 Instrument outputs: `userdata/statfx_lab/{shadow,plain}_sableye_dpfp_pred_s1/`.
+
+## Fragility and shield prediction
+
+The certified rule fires on "the opponent would shield this", answered by
+PvPoke's shield policy. Its gain is paid for by that prediction: if the
+opponent does NOT shield, we traded the bigger hit for the smaller one.
+Measured by the lab's `--opp-shield {never,always}` stress mode, with the
+Cramorant strat run through the same stress for comparison (results
+below as they land). A longer-term consequence (Michael, 2026-09-23): a
+game-theoretic (GTO) shielding model -- mixed shield/no-shield play by both
+sides instead of PvPoke's deterministic rule -- would let strats like this
+one be judged against opponents who adapt, not just against one fixed
+shielder.
 
 ## Open questions for Michael
 

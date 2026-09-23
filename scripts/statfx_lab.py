@@ -51,6 +51,7 @@ sys.path.insert(0, str(REPO / 'src'))
 sys.path.insert(0, str(REPO / 'scripts'))
 
 from gopvpsim.battle import (BattlePokemon, _calc_turns_to_live,  # noqa: E402
+                             always_shield, never_shield, pogodives_dp,
                              pvpoke_dp, pvpoke_simulate_shield, simulate)
 from gopvpsim.moves import get_moves  # noqa: E402
 from gopvpsim.pokemon import Pokemon  # noqa: E402
@@ -59,6 +60,12 @@ SCENARIOS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 SLICES = [('pvpoke', 'bait'), ('pvpoke', 'nobait'),
           ('rank1', 'bait'), ('rank1', 'nobait')]
 N_IV = 4096
+# Opponent shield behaviour. 'pvpoke' is what the pages publish; the others
+# are the fragility stress test (the baseline then becomes a plain-PvPoke
+# re-sim against the same shielder, since the page tensor no longer applies).
+OPP_SHIELD = {'pvpoke': pvpoke_simulate_shield, 'never': never_shield,
+              'always': always_shield}
+POGODIVES = 'pogodives'   # sentinel variant: the shipped PoGoDives tier
 STAGE_CAP = 4
 
 
@@ -191,6 +198,7 @@ def _first(*rules):
 
 VARIANTS = {
     'engine': None,
+    POGODIVES: POGODIVES,
     'shields': _into_shields,
     'shields_pred': _into_predicted_shield,
     'shields_pred+early': _first(_into_predicted_shield, _early),
@@ -206,6 +214,9 @@ def make_policy(rule, bait, script=None, trace=None):
     """pvpoke_dp, with the thrown move re-chosen by `rule` (or by the
     oracle `script`, a sequence of 'E'/'O' over the decision points).
     The swap target must be affordable, so timing is untouched."""
+    if rule == POGODIVES:                 # marker survives the partial
+        return pogodives_dp if bait == 'bait' else functools.partial(
+            pogodives_dp, bait_shields=False)
     base = pvpoke_dp if bait == 'bait' else functools.partial(
         pvpoke_dp, bait_shields=False)
     k = [0]
@@ -268,13 +279,14 @@ def make_opp(data, oi, mode):
                    tuple(link['byMode'][mode]['ivs']))
 
 
-def battle(data, focal_ivs, opp, scen, policy):
+def battle(data, focal_ivs, opp, scen, policy, opp_shield='pvpoke'):
     species, shadow, ms = focal_spec(data)
     me = make_bp(species, data['league'], shadow, ms['fast'], ms['charged'],
                  focal_ivs)
     me.reset_for_battle(scen[0], opp)
     opp.reset_for_battle(scen[1], me)
-    r = simulate(me, opp, charged_policy_0=policy, charged_policy_1=pvpoke_dp)
+    r = simulate(me, opp, charged_policy_0=policy, charged_policy_1=pvpoke_dp,
+                 shield_policy_1=OPP_SHIELD[opp_shield])
     return round(r.pvpoke_score(0))
 
 
@@ -287,7 +299,7 @@ def iv_triplet(data, iv):
 # ---------------------------------------------------------------------------
 
 def _rules_task(args):
-    page, out_dir, mode, bait, oi, ivs, variants = args
+    page, out_dir, mode, bait, oi, ivs, variants, opp_shield = args
     out = Path(out_dir) / f'{mode}_{bait}_{oi:03d}.npz'
     if out.exists():
         return str(out)
@@ -300,7 +312,8 @@ def _rules_task(args):
         for si, scen in enumerate(SCENARIOS):
             for vi, name in enumerate(names):
                 scores[a, si, vi] = battle(
-                    data, trip, opp, scen, make_policy(VARIANTS[name], bait))
+                    data, trip, opp, scen, make_policy(VARIANTS[name], bait),
+                    opp_shield)
     tmp = out.with_suffix('.tmp.npz')
     np.savez(tmp, scores=scores, ivs=np.asarray(ivs), variants=np.asarray(names))
     os.replace(tmp, out)
@@ -309,24 +322,25 @@ def _rules_task(args):
 
 def cmd_rules(args):
     data, _ = load_page(args.page)
-    E, O = split_moves([get_moves()[1][c] for c in data['movesets'][0]['charged']])
-    if E is None:
-        raise SystemExit('page moveset has no helpful guaranteed stat effect')
     variants = ['engine'] + [v for v in (args.variants.split(',') if args.variants
                                          else VARIANTS) if v != 'engine']
     unknown = set(variants) - set(VARIANTS)
     if unknown:
         raise SystemExit(f'unknown variant(s): {sorted(unknown)}')
+    E, O = split_moves([get_moves()[1][c] for c in data['movesets'][0]['charged']])
+    if E is None and variants != ['engine', POGODIVES]:
+        raise SystemExit('page moveset has no helpful guaranteed stat effect')
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / 'run.json').write_text(json.dumps({
         'page': args.page, 'stride': args.stride, 'offset': args.offset,
-        'variants': variants, 'effect_move': E['moveId'],
-        'other_move': O['moveId'], 'started': time.strftime('%Y-%m-%d %H:%M'),
+        'variants': variants, 'opp_shield': args.opp_shield,
+        'effect_move': E and E['moveId'], 'other_move': O and O['moveId'],
+        'started': time.strftime('%Y-%m-%d %H:%M'),
     }, indent=1))
     ivs = list(range(args.offset, N_IV, args.stride))
     n_opp = len(data['opponents'])
-    tasks = [(args.page, str(out_dir), m, b, oi, ivs, variants)
+    tasks = [(args.page, str(out_dir), m, b, oi, ivs, variants, args.opp_shield)
              for m, b in SLICES for oi in range(n_opp)]
     ctx = multiprocessing.get_context('spawn')
     done = 0
@@ -342,6 +356,7 @@ def cmd_summarize(args):
     data, tensors = load_page(run['page'])
     n_opp = len(data['opponents'])
     names = run['variants']
+    opp_shield = run.get('opp_shield', 'pvpoke')
     res = {}
     for mode, bait in SLICES:
         key = f"0_{mode}{'' if bait == 'bait' else ':nobait'}"
@@ -355,12 +370,23 @@ def cmd_summarize(args):
             per_opp.append(z['scores'].astype(np.int32))
             ivs = z['ivs']
         S = np.stack(per_opp, axis=2)          # [n_iv, 9, n_opp, n_var]
-        base = tens[ivs]                        # [n_iv, 9, n_opp]
         eng = S[..., names.index('engine')]
-        bad = int((eng != base).sum())
-        if bad:
-            raise SystemExit(f'{mode}/{bait}: {bad} engine cells differ from the '
-                             'page tensor -- the lab is NOT on the production path')
+        if opp_shield == 'pvpoke':
+            base = tens[ivs]                    # [n_iv, 9, n_opp]
+            checks = [('engine', eng, base)]
+            pkey = key + ':pogodives'
+            if POGODIVES in names and pkey in tensors:
+                ptens = tensors[pkey].reshape(N_IV, 9, n_opp).astype(np.int32)
+                checks.append((POGODIVES, S[..., names.index(POGODIVES)],
+                               ptens[ivs]))
+            for label, got, want in checks:
+                bad = int((got != want).sum())
+                if bad:
+                    raise SystemExit(f'{mode}/{bait}: {bad} {label} cells differ '
+                                     'from the page tensor -- the lab is NOT on '
+                                     'the production path')
+        else:
+            base = eng                          # re-simmed vs the same shielder
         for vi, name in enumerate(names):
             v = S[..., vi]
             for si, (a, b) in enumerate(SCENARIOS):
@@ -374,7 +400,11 @@ def cmd_summarize(args):
     (out_dir / 'summary.json').write_text(json.dumps(res, indent=1))
     print(f"{run['page']}  stride {run['stride']}  "
           f"{run['effect_move']} vs {run['other_move']}")
-    print('engine == page tensor on every cell (production path verified)')
+    if opp_shield == 'pvpoke':
+        print('engine == page tensor on every cell (production path verified)')
+    else:
+        print(f'STRESS: opponent shield policy = {opp_shield!r}; baseline = '
+              'plain PvPoke re-simmed against the same shielder')
     print('cell = worst-slice mean / worst-slice net flips; * = strict bar met '
           'in all 4 slices')
     print(f"{'variant':<20}" + ''.join(f'{s:>13}' for s in res['engine']))
@@ -458,6 +488,8 @@ def main():
     r.add_argument('--offset', type=int, default=0)
     r.add_argument('--out-dir', required=True)
     r.add_argument('--procs', type=int, default=procs)
+    r.add_argument('--opp-shield', default='pvpoke', choices=sorted(OPP_SHIELD),
+                   help="opponent shield policy; non-pvpoke = fragility stress")
     r.add_argument('--variants', default=None,
                    help="comma list (default: all); 'engine' is always added")
     s = sub.add_parser('summarize')
