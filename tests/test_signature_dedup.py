@@ -221,9 +221,12 @@ def test_movable_axes_no_buffs_vs_buffs():
 
     bulldoze = side('FAIRY_WIND', ['GIGATON_HAMMER', 'BULLDOZE'])
     # Bulldoze: guaranteed opponent def debuff -> Azumarill's def axis
-    # moves; nobody touches atk stages or Tinkaton's def stage.
+    # moves; and pvpoke_dp projects it as +stages on TINKATON's attack
+    # (_cm_buff_delta), so Tinkaton's atk axis moves too. Nothing touches
+    # Tinkaton's def stage. (PRE-FIX, 2026-09-23: (False, False) here --
+    # the missing projection was signature-exactness gap 2.)
     assert sig.movable_axes(azu, bulldoze) == (False, True)
-    assert sig.movable_axes(bulldoze, azu) == (False, False)
+    assert sig.movable_axes(bulldoze, azu) == (True, False)
 
 
 def test_signature_grouping_is_scenario_independent():
@@ -234,3 +237,98 @@ def test_signature_grouping_is_scenario_independent():
     import inspect
     params = inspect.signature(sig.signature_groups).parameters
     assert list(params) == ['focal_side', 'opp_side']
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-23 exactness regressions. Each pair below was grouped together by
+# the signature and simmed as ONE battle in a published dive, but the two
+# spreads fight different battles (found by re-simming dive pages with dedup
+# OFF: Florges GL 396 cells, Zygarde UL 774, Blastoise UL 6 wrong). The
+# minimal pair (wrong spread, the representative it was grouped with) is
+# pinned per case; PRE-FIX every one of these grouped the pair and failed.
+# ---------------------------------------------------------------------------
+
+def _profile_l(species, ivs, league):
+    return _profile(species, ivs, league=league)
+
+
+def _opp_entry_l(species, fast_id, charged_ids, ivs, league, shadow=False):
+    fast_db, charged_db = get_moves()
+    gm = load_gamemaster()
+    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    pkm = Pokemon.at_best_level(species, *ivs, league=league, shadow=shadow)
+    return {
+        'species': species, 'types': parse_types(mon),
+        'atk': pkm.atk, 'def_': pkm.def_, 'hp': pkm.hp,
+        'fm': dict(fast_db[fast_id]),
+        'cms': [dict(charged_db[c]) for c in charged_ids],
+        'shadow': shadow,
+        'mon': mon, 'ivs': tuple(ivs), 'level': pkm.level,
+    }
+
+
+def _assert_groups_fight_identically(species, fast_id, charged_ids, ivs_list,
+                                     opp, league):
+    """Every member of every signature group scores exactly like its
+    representative in all 9 shield scenarios (sweep worker path)."""
+    gm = load_gamemaster()
+    focal_mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    focal_types = parse_types(focal_mon)
+    fast_db, charged_db = get_moves()
+    fm = dict(fast_db[fast_id])
+    cms = [dict(charged_db[c]) for c in charged_ids]
+    profiles = [_profile_l(species, t, league) for t in ivs_list]
+    cap = LEAGUE_CAPS[league]
+    groups = sig.signature_groups(
+        sig.build_focal_side(focal_mon, focal_types, fm, cms, profiles, cap,
+                             False),
+        sig.build_opp_side(opp, cap))
+    all_nine = [(a, b) for a in range(3) for b in range(3)]
+    deep_dive._sweep_worker_init(
+        species, focal_types, fm, cms, [opp], all_nine,
+        focal_mon=focal_mon, league_cp=cap, focal_shadow=False)
+    results, _e, _m, _n = deep_dive._sweep_worker(
+        [(prof, 0) for prof in profiles])
+    for rep_pos, members in groups:
+        rep = results[(profiles[rep_pos][0], 0)]
+        for pos in members:
+            assert results[(profiles[pos][0], 0)] == rep, (
+                f"{species} {ivs_list[pos]} grouped with {ivs_list[rep_pos]} "
+                f"vs {opp['species']} but the battles differ")
+    return groups
+
+
+def test_exact_cmp_tie_vs_shadow_is_not_signed_as_win_or_loss():
+    """Gap 1: the CMP column stripped shadow as atk/1.2, which is one ULP
+    low for some spreads (the round trip ebf5944 removed from the engine).
+    Florges 12/5/9 exactly TIES Shadow Annihilape on CMP but was grouped
+    with 8/1/6 (loses CMP); 15/8/5 (loses) was grouped with 12/4/2 (ties)."""
+    opp = _opp_entry_l('Annihilape', 'LOW_KICK', ['RAGE_FIST', 'ICE_PUNCH'],
+                       (4, 13, 13), 'great', shadow=True)
+    for pair in ([(12, 5, 9), (8, 1, 6)], [(15, 8, 5), (12, 4, 2)]):
+        _assert_groups_fight_identically(
+            'Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'],
+            pair, opp, 'great')
+
+
+def test_dp_debuff_projection_counts_as_opponent_attack_axis():
+    """Gap 2, opponent side: pvpoke_dp models Forretress's chance-1
+    opponent-DEFENSE debuffs (Rock/Sand Tomb) as +stages on Forretress's
+    ATTACK (_cm_buff_delta); the signature never tabulated those attack
+    stages, so Blastoise 1/14/14 and 0/13/13 were merged although
+    Forretress's plan differs between them."""
+    opp = _opp_entry_l('Forretress', 'VOLT_SWITCH', ['ROCK_TOMB', 'SAND_TOMB'],
+                       (13, 14, 15), 'ultra')
+    _assert_groups_fight_identically(
+        'Blastoise', 'BITE', ['HYDRO_CANNON', 'SKULL_BASH'],
+        [(1, 14, 14), (0, 13, 13)], opp, 'ultra')
+
+
+def test_dp_debuff_projection_counts_as_focal_attack_axis():
+    """Gap 2, focal side: Zygarde's Bulldoze is projected as Zygarde attack
+    stages inside its own DP; 4/0/0 and 3/0/0 were merged vs Mimikyu."""
+    opp = _opp_entry_l('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
+                       (13, 15, 15), 'ultra')
+    _assert_groups_fight_identically(
+        'Zygarde (Complete Forme)', 'DRAGON_TAIL', ['BULLDOZE', 'CRUNCH'],
+        [(4, 0, 0), (3, 0, 0)], opp, 'ultra')

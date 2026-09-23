@@ -300,7 +300,10 @@ def test_movable_stage_axes_matches_meta_movesets():
     mantine = (FAST_DB['WING_ATTACK'],
                [CHARGED_DB['TWISTER'], CHARGED_DB['WATER_PULSE']])
     (f_atk, f_def), (o_atk, o_def) = t0.movable_stage_axes(tinka, mantine)
-    assert (f_atk, f_def) == (False, False)
+    # Bulldoze also moves Tinkaton's OWN atk axis: pvpoke_dp projects a
+    # chance-1 opponent-def debuff as +stages on the planner's attack
+    # (_cm_buff_delta). PRE-FIX (2026-09-23): (False, False).
+    assert (f_atk, f_def) == (True, False)
     assert (o_atk, o_def) == (False, True)      # Bulldoze debuffs opp def
 
     corv = (FAST_DB['SAND_ATTACK'],

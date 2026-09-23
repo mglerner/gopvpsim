@@ -12,11 +12,14 @@ ways raw stats enter a battle:
   2. CMP:     pairwise attack-priority comparisons between the two
      combatants (``>``, ``>=``, ``<``, ``!=`` at the CMP/ordering sites
      in battle.py), captured exactly by the 3-way sign of
-     (focal.cmp_atk - opp.cmp_atk). NB this is the shadow-STRIPPED
-     attack (``atk / 1.2`` for a shadow mon): the x1.2 boosts damage but
-     not priority, so the dedup column divides each side by its own
-     shadow factor (signature_groups, per the 2026-06-13 cmp_atk fix) —
-     NOT the raw focal.atk/opp.atk an earlier version of this note named;
+     (focal.cmp_atk - opp.cmp_atk). NB this is the PRE-SHADOW attack
+     (the x1.2 boosts damage but not priority), carried per form as
+     ``cmp_atk`` = (base atk + atk IV) * CPM, the same expression the
+     engine's ``raw_atk`` uses. Until 2026-09-23 this column divided the
+     effective attack by 1.2, a round trip that comes back one ULP low for
+     some spreads, so an exact CMP tie against a shadow side was signed as
+     a win or loss and grouped with the wrong fight (the engine dropped the
+     same round trip in ebf5944, 2026-09-20);
   3. HP:      the integer max HP.
 
 Everything else (moves, types, energy, cooldowns, buff config, form
@@ -36,7 +39,14 @@ Stat stages only move when something can move them. Mutation sites:
     thrower's atk stage; otherwise buffs[1] moves the shield
     decider's def stage;
   - form-change nativeStatBuffs (applied to the mon entering the
-    form, e.g. Mimikyu Busted).
+    form, e.g. Mimikyu Busted);
+  - pvpoke_dp's plan projection (_cm_buff_delta): a chance-1
+    opponent-target DEFENSE debuff on the planner's own charged move is
+    modeled as +stages on the planner's ATTACK, and the DP reads damage
+    at those attack stages. Added 2026-09-23: before, Sand Tomb /
+    Bulldoze users' attack axis stayed at stage 0 in the signature, and
+    ``atk*1.25/def`` vs ``atk/(def*0.8)`` floors differ at rare
+    boundaries, so spreads that planned differently were merged.
 A stage axis that nothing can move stays at 0, and the signature
 only carries the stage-0 damage row; a movable axis carries the full
 -4..+4 range (a reachable superset — over-inclusion can only reduce
@@ -58,7 +68,7 @@ import numpy as np
 from gopvpsim.battle import _stat_stage_mult
 from gopvpsim.formchange import build_form_change_state
 from gopvpsim.moves import damage_constant, mega_multiplier
-from gopvpsim.pokemon import mega_level_from_tags
+from gopvpsim.pokemon import CPM, mega_level_from_tags
 
 FULL_STAGES = tuple(range(-4, 5))
 ZERO_STAGE = (0,)
@@ -84,13 +94,14 @@ def damage_vec(power, atk, def_, move_type, attacker_types, defender_types,
     return np.floor(k * atk / def_).astype(np.int64) + 1
 
 
-def _form_dict(types, fast_move, charged_moves, atk, def_):
+def _form_dict(types, fast_move, charged_moves, atk, def_, cmp_atk):
     return {
         'types': tuple(types),
         'fast': fast_move,
         'charged': list(charged_moves),
         'atk': atk,
         'def_': def_,
+        'cmp_atk': cmp_atk,   # pre-shadow attack (BattlePokemon.raw_atk)
     }
 
 
@@ -140,12 +151,17 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
     atk = np.array([p[1] for p in profile_list], dtype=np.float64)
     def_ = np.array([p[2] for p in profile_list], dtype=np.float64)
     hp = np.array([p[3] for p in profile_list], dtype=np.int64)
-    forms = [_form_dict(focal_types, fm_template, cms_template, atk, def_)]
+    # Same expression as pokemon.Pokemon.raw_atk / sweep._build_side.
+    base_atk = focal_mon['baseStats']['atk']
+    cmp_atk = np.array([(base_atk + p[4]) * CPM[p[7]] for p in profile_list],
+                       dtype=np.float64)
+    forms = [_form_dict(focal_types, fm_template, cms_template, atk, def_,
+                        cmp_atk)]
     cfg0 = None
     if focal_mon.get('formChange') is not None:
         extras = _extra_charged_moves(focal_mon)
-        alt_atks, alt_defs = {}, {}   # form idx -> per-profile stat lists
-        base_atks, base_defs = [], []
+        alt_atks, alt_defs, alt_raws = {}, {}, {}   # form idx -> per-profile
+        base_atks, base_defs, base_raws = [], [], []
         for p in profile_list:
             cfg = build_form_change_state(
                 focal_mon, p[4], p[5], p[6], p[7], league_cp, shadow,
@@ -157,15 +173,18 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
             for fi in range(1, len(cfg.forms)):
                 alt_atks.setdefault(fi, []).append(cfg.forms[fi].atk)
                 alt_defs.setdefault(fi, []).append(cfg.forms[fi].def_)
+                alt_raws.setdefault(fi, []).append(cfg.forms[fi].raw_atk)
             base_atks.append(cfg.forms[0].atk)
             base_defs.append(cfg.forms[0].def_)
+            base_raws.append(cfg.forms[0].raw_atk)
         if cfg0 is not None:
             for fi in range(1, len(cfg0.forms)):
                 f = cfg0.forms[fi]
                 forms.append(_form_dict(
                     f.types, f.fast_move, list(f.charged_moves) + extras,
                     np.array(alt_atks[fi], dtype=np.float64),
-                    np.array(alt_defs[fi], dtype=np.float64)))
+                    np.array(alt_defs[fi], dtype=np.float64),
+                    np.array(alt_raws[fi], dtype=np.float64)))
             # apply_form_change restores the base form from FormData's
             # recomputed stats; if those ever drift bitwise from the
             # construction-time stats, treat the recomputation as a
@@ -174,10 +193,12 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
             # belt-and-braces, normally dead.)
             b_atk = np.array(base_atks, dtype=np.float64)
             b_def = np.array(base_defs, dtype=np.float64)
-            if not (np.array_equal(b_atk, atk) and np.array_equal(b_def, def_)):
+            b_raw = np.array(base_raws, dtype=np.float64)
+            if not (np.array_equal(b_atk, atk) and np.array_equal(b_def, def_)
+                    and np.array_equal(b_raw, cmp_atk)):
                 forms.append(_form_dict(
                     cfg0.forms[0].types, cfg0.forms[0].fast_move,
-                    cfg0.forms[0].charged_moves, b_atk, b_def))
+                    cfg0.forms[0].charged_moves, b_atk, b_def, b_raw))
     native_atk, native_def = _native_movability([cfg0])
     # Mega Level is a property of the SPECIES, not the form: no mega has a
     # formChange today, so one value per side is exact. (If one ever gains
@@ -192,8 +213,11 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
 def build_opp_side(opp, league_cp):
     """Build the opponent-side signature struct from an iv_sweep
     opp_cache entry (scalar stats)."""
+    # Same expression as sweep._build_side's raw_atk for the opponent.
+    raw = float((opp['mon']['baseStats']['atk'] + opp['ivs'][0])
+                * CPM[opp['level']])
     forms = [_form_dict(opp['types'], opp['fm'], opp['cms'],
-                        float(opp['atk']), float(opp['def_']))]
+                        float(opp['atk']), float(opp['def_']), raw)]
     cfg = None
     if opp['mon'].get('formChange') is not None:
         cfg = build_form_change_state(
@@ -205,11 +229,13 @@ def build_opp_side(opp, league_cp):
                 f = cfg.forms[fi]
                 forms.append(_form_dict(f.types, f.fast_move,
                                         list(f.charged_moves) + extras,
-                                        f.atk, f.def_))
+                                        f.atk, f.def_, f.raw_atk))
             f0 = cfg.forms[0]
-            if f0.atk != opp['atk'] or f0.def_ != opp['def_']:
+            if (f0.atk != opp['atk'] or f0.def_ != opp['def_']
+                    or f0.raw_atk != raw):
                 forms.append(_form_dict(f0.types, f0.fast_move,
-                                        f0.charged_moves, f0.atk, f0.def_))
+                                        f0.charged_moves, f0.atk, f0.def_,
+                                        f0.raw_atk))
     native_atk, native_def = _native_movability([cfg])
     return {'forms': forms, 'shadow': bool(opp['shadow']),
             'mega_level': mega_level_from_tags(opp['mon'].get('tags')),
@@ -254,6 +280,12 @@ def movable_axes(side, other):
         b(m)[0] != 0 and _chance(m) > 0
         and m.get('buffTarget', 'opponent') in ('opponent', 'both')
         for m in oth_all if m.get('buffs')
+    ) or any(
+        # pvpoke_dp plan projection (_cm_buff_delta): own chance-1
+        # opponent-target def debuff -> +stages on OUR attack in the DP
+        b(m)[1] != 0 and _chance(m) == 1
+        and m.get('buffTarget') == 'opponent'
+        for m in own_charged if m.get('buffs')
     )
 
     def_mov = side['native_def'] or any(
@@ -283,13 +315,6 @@ def signature_groups(focal_side, opp_side):
     n = len(focal_side['hp'])
     f_atk_mov, f_def_mov = movable_axes(focal_side, opp_side)
     o_atk_mov, o_def_mov = movable_axes(opp_side, focal_side)
-    # CMP is decided on the UNBOOSTED attack: shadow's x1.2 boosts damage but
-    # not priority (battle.py cmp_atk, 2026-06-13 fix). Strip it per side so
-    # the CMP column matches the engine even for shadow-mismatched pairs.
-    # (Defaults False so any caller that pre-dates the 'shadow' key is treated
-    # as non-shadow, i.e. the old effective-atk behavior.)
-    f_cmp_div = 1.2 if focal_side.get('shadow') else 1.0
-    o_cmp_div = 1.2 if opp_side.get('shadow') else 1.0
     a_f = FULL_STAGES if f_atk_mov else ZERO_STAGE
     d_f = FULL_STAGES if f_def_mov else ZERO_STAGE
     a_o = FULL_STAGES if o_atk_mov else ZERO_STAGE
@@ -298,9 +323,10 @@ def signature_groups(focal_side, opp_side):
     cols = [focal_side['hp']]
     for ff in focal_side['forms']:
         for of in opp_side['forms']:
-            # CMP: 3-way sign covers >, >=, <, != comparisons, on cmp_atk
+            # CMP: 3-way sign covers >, >=, <, != comparisons, on the
+            # carried pre-shadow attack (never atk / 1.2 -- see docstring)
             cols.append(np.sign(
-                ff['atk'] / f_cmp_div - of['atk'] / o_cmp_div).astype(np.int64))
+                ff['cmp_atk'] - of['cmp_atk']).astype(np.int64))
             for m in [ff['fast'], *ff['charged']]:
                 f_mega = mega_multiplier(m, focal_side['mega_level'])
                 for a_s in a_f:
