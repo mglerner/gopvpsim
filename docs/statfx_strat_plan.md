@@ -175,8 +175,27 @@ The certified rule fires on "the opponent would shield this", answered by
 PvPoke's shield policy. Its gain is paid for by that prediction: if the
 opponent does NOT shield, we traded the bigger hit for the smaller one.
 Measured by the lab's `--opp-shield {never,always}` stress mode, with the
-Cramorant strat run through the same stress for comparison (results
-below as they land). A longer-term consequence (Michael, 2026-09-23): a
+Cramorant strat run through the same stress for comparison. Stride 13,
+worst of the 4 slices, mean rating delta vs plain PvPoke re-simmed against
+the SAME shielder (scenarios where a strat never fires are omitted):
+
+| strat vs opponent that ...     | 0v1   | 0v2   | 1v1   | 1v2   | 2v1   | 2v2   |
+| ------------------------------ | ----- | ----- | ----- | ----- | ----- | ----- |
+| DP rule, Shadow Sableye, never | -24.4 | -29.7 | -51.5 | -63.6 | -28.1 | -36.8 |
+| DP rule, Sableye, never        | -41.7 | -43.7 | -50.5 | -56.4 | -48.6 | -56.9 |
+| Cramorant GL, never            | -2.7  | -0.3  | -13.6 | -11.3 | 0     | -14.6 |
+| Cramorant UL, never            | +1.6  | -0.1  | +1.6  | +1.8  | 0     | -16.8 |
+| DP rule, Shadow Sableye, always | +26.6 | +6.3 | +22.8 | +16.9 | +13.0 | +11.2 |
+| DP rule, Sableye, always       | +38.5 | +16.7 | +48.4 | +35.9 | +24.2 | +28.4 |
+| Cramorant GL, always           | +16.5 | +7.5  | +21.3 | +26.9 | 0     | +0.1  |
+| Cramorant UL, always           | +15.9 | +22.0 | +44.7 | +46.7 | 0     | +26.5 |
+
+Against an always-shielder both strats keep their value. Against a
+never-shielder the Drain Punch rule loses 24-64 rating wherever it fires,
+while Cramorant loses at most ~17 and stays positive in several UL
+scenarios: the DP rule is markedly more dependent on shield prediction.
+(0v0/1v0 carry Cramorant gains of +1 to +9 in both stresses; the DP rule
+never fires there.) A longer-term consequence (Michael, 2026-09-23): a
 game-theoretic (GTO) shielding model -- mixed shield/no-shield play by both
 sides instead of PvPoke's deterministic rule -- would let strats like this
 one be judged against opponents who adapt, not just against one fixed
