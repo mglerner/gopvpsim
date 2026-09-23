@@ -152,6 +152,17 @@ on every simmed cell in every run.
   version, and it is within a few rating points of `shields_pred`
   everywhere except against Aegislash-like shield logic.
 
+**Certified at stride 1 (all 4096 spreads, 2026-09-22):** `shields_pred`
+meets the strict bar in all 9 start scenarios x 4 slices on both pages;
+`engine` equalled the page tensor on every cell.
+
+| page           | worst-slice mean / net flips, per start (0v0 .. 2v2)                                  | wins gained / lost | cells changed |
+| -------------- | ------------------------------------------------------------------------------------- | ------------------ | ------------- |
+| Shadow Sableye | 0/0, +26.7/+1, +6.3/0, 0/0, +22.8/+37760, +16.9/+4404, 0/0, +13.0/+3812, +11.2/+10564 | 544,058 / 6,631    | 24.3%         |
+| Sableye        | 0/0, +38.4/+9519, +16.7/0, 0/0, +47.5/+69118, +36.0/+7275, 0/0, +23.3/+8618, +28.3/+38078 | 807,082 / 4,844 | 31.5%         |
+
+Instrument outputs: `userdata/statfx_lab/{shadow,plain}_sableye_dpfp_pred_s1/`.
+
 ## Open questions for Michael
 
 - Does the strat ride the existing PoGoDives tier on every class page, or
