@@ -269,7 +269,7 @@ def norm_log(entries):
     return [e.replace(' (Shadow)', '') for e in entries]
 
 
-MECHANICS = 'legacy'   # set from --mechanics; see main()
+MECHANICS = 'new'   # set from --mechanics; see main()
 
 
 def run_sim(m, s1, s2):

@@ -874,7 +874,7 @@ def render(usage, resolver, generated):
         '',
         f'format_confirmed = {_toml_value(True)}',
         f'format = {_toml_value("open GL 1500 + Play! banned list")}',
-        f'mechanics = {_toml_value("legacy (old system; Worlds-confirmed)")}',
+        f'mechanics = {_toml_value("new")}',
         f'generated = {_toml_value(generated)}',
         '',
         f'usage_source = {_toml_value("docs/tournament_data/cs_2026_*.json (Dracoviz)")}',

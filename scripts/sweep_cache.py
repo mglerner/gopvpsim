@@ -234,7 +234,7 @@ def bless_sidecar(json_path, *, engine=None, gamemaster=None):
 def focal_key_fields(species, league, shadow, fast_id, charged_ids,
                      iv_floor, shield_scenarios, bait_mode,
                      energy_lead=0, focal_max_level=None,
-                     mechanics='legacy'):
+                     *, mechanics):
     """Focal-side key dict shared by every column of one sweep.
 
     ``energy_lead`` is the focal's starting energy in RAW energy points

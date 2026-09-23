@@ -208,7 +208,7 @@ def test_manifest_save_load_roundtrip(tmp_path):
     assert wp.load_manifest(tmp_path) == manifest
     # and it is valid json on disk (tracked artifact, reviewed in git)
     raw = json.loads((tmp_path / 'manifest.json').read_text())
-    assert raw['mechanics'] == 'legacy'
+    assert raw['mechanics'] == 'new'
 
 
 def test_plane_npz_gitignored_but_manifest_tracked():

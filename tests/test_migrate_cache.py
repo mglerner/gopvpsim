@@ -34,7 +34,8 @@ def _focal_fields(shadow):
     return sweep_cache.focal_key_fields(
         species='Azumarill', league='great', shadow=shadow,
         fast_id='BUBBLE', charged_ids=['ICE_BEAM'],
-        iv_floor=None, shield_scenarios=[(0, 0)], bait_mode='bait')
+        iv_floor=None, shield_scenarios=[(0, 0)], bait_mode='bait',
+        mechanics='new')
 
 
 def _col_fields(opp_shadow):

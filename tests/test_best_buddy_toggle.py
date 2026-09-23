@@ -69,7 +69,8 @@ def test_no_op_detection_level_capped_species():
 def test_focal_key_distinguishes_l50_l51():
     base = dict(species='Mimikyu', league='ultra', shadow=False,
                 fast_id='SHADOW_CLAW', charged_ids=['SHADOW_SNEAK'],
-                iv_floor=None, shield_scenarios=[(1, 1)], bait_mode='bait')
+                iv_floor=None, shield_scenarios=[(1, 1)], bait_mode='bait',
+                mechanics='new')
     k50 = sweep_cache.focal_key_fields(**base, focal_max_level=50.0)
     k51 = sweep_cache.focal_key_fields(**base, focal_max_level=51.0)
     assert k50 != k51

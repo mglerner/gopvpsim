@@ -17,8 +17,8 @@ Write guards (hard failures, not conventions):
 * only ``.npz`` / ``.json`` under the planes dir, path-contained -- and
   ``*_great.toml`` is named explicitly because that glob is the iOS
   threshold-bundler's collision surface (topn_cup_filter_plan.md);
-* ``mechanics`` must be the literal ``'legacy'`` (Worlds is confirmed
-  old-system; an accidental ``'new'`` bake would otherwise be invisible);
+* ``mechanics`` is stamped ``'new'`` (the only live turn system; the
+  2025-26 season's Worlds ran legacy, and that season is over);
 * the gamemaster stamp must be real (sweep_cache.gamemaster_hash()
   degrades to the literal ``'no-gamemaster'`` on a missing cache file --
   never stamp fake provenance);
@@ -61,7 +61,7 @@ MANIFEST_SCHEMA = 1
 # Manual escape hatch for semantic changes the source hash can't see
 # (e.g. a reinterpretation of an existing array).
 WORLDS_PLANE_VERSION = 1
-MECHANICS = 'legacy'
+MECHANICS = 'new'
 
 # The plane-producing sources. A byte change in any of these stamps new
 # manifests differently and REFUSES to extend old ones (see module

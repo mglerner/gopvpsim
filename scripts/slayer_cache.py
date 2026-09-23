@@ -74,7 +74,7 @@ def _move_hash(move_dict):
 
 def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats,
                       shield_scenarios=None, iv_floor=None, focal_max_level=None,
-                      mechanics='legacy'):
+                      *, mechanics):
     """
     Build a stable cache key string identifying a slayer-iteration scenario.
 

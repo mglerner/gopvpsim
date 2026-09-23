@@ -26,7 +26,7 @@ SCEN = [(a, b) for a in range(3) for b in range(3)]
 
 META = {
     'format': 'open GL 1500 + Play! banned list',
-    'mechanics': 'legacy (old system; Worlds-confirmed)',
+    'mechanics': 'new',
     'usage_recent_cutoff': '2026-03',
     'usage_events_recent': 16,
     'usage_teams_recent': 1801,

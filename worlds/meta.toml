@@ -10,7 +10,7 @@
 
 format_confirmed = true
 format = "open GL 1500 + Play! banned list"
-mechanics = "legacy (old system; Worlds-confirmed)"
+mechanics = "new"
 generated = "2026-08-26"
 
 usage_source = "docs/tournament_data/cs_2026_*.json (Dracoviz)"
