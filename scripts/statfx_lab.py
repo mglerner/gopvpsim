@@ -164,6 +164,17 @@ def _into_predicted_shield(att, dfn, fired, E, O):
     return None
 
 
+def _into_predicted_shield_gated(att, dfn, fired, E, O):
+    """shields_pred, only when the effect move costs no more energy than
+    the move it replaces. Throwing into a shield is free only then: a
+    pricier effect move spends the difference on a blocked throw (class
+    sweep 2026-09-23: 10/59 pricier-effect pages pass vs 105/112 otherwise).
+    Energies are fixed per moveset, so this is a per-page switch."""
+    if E['energy'] > O['energy']:
+        return None
+    return _into_predicted_shield(att, dfn, fired, E, O)
+
+
 def _early(att, dfn, fired, E, O):
     if (fired is O and effect_stage(att, dfn, E) <= 0
             and not kos(att, dfn, O) and throws_after(att, dfn, E) >= 1):
@@ -201,6 +212,7 @@ VARIANTS = {
     POGODIVES: POGODIVES,
     'shields': _into_shields,
     'shields_pred': _into_predicted_shield,
+    'shields_pred_gated': _into_predicted_shield_gated,
     'shields_pred+early': _first(_into_predicted_shield, _early),
     'early': _early,
     'early2': _early2,
