@@ -46,17 +46,35 @@ migration problem. Two gaps in `scripts/deep_dive_signature.py`:
    "identical" spreads plan differently. Forretress (opponent side) and
    Zygarde (focal side, Bulldoze vs Mimikyu) both trace to this.
 
-Fix plan (not started): (a) CMP column from carried pre-shadow attack;
-(b) `movable_axes` atk clause for own chance-1 opponent-def-debuff charged
-moves; (c) failing-first tests on the three pairs above (dedup ON == OFF);
-(d) `verify_signature_dedup.py` over a broad corpus; (e) CACHE: the
-signature is NOT in the engine hash, so fixing it does not invalidate the
-wrong columns -- they must be found (re-group each cached column under old
-vs new signature; a changed partition = affected) and re-simmed, or the
-cache's dedup-produced columns bulk-invalidated; (f) rebake + publish
-decision for the affected pages. Per-page evidence: the 25
-`userdata/statfx_lab/C_*/BASELINE` dirs; probes in the 2026-09-23 session.
+**Code FIXED 2026-09-23 (a4ca14e)**: both gaps closed; failing-first tests
+on the three pairs; dedup ON == OFF on all three real pages; the default
+`verify_signature_dedup.py` corpus EXACT MATCH.
 
+**Cache: correctness already protected.** `deep_dive_signature.py` IS in
+the sweep engine hash (`sweep_cache.engine_hash()` adds it; the slayer stamp
+builds on that), so a4ca14e moved the hash 9ac12a2754a1 -> d78c67fd06a7 and
+every cached column is now a safe miss. (An earlier note in this session
+said the opposite; it was wrong.) The published site still shows the old
+cells until the next bake + publish.
+
+**Cache fix = a cost question (scoped 2026-09-23):**
+- Live sweep columns at 9ac12a2754a1: 282,168 (of 435,544; the rest are an
+  older engine and never served).
+- Exact migration predicate: re-group each column under the old and new
+  signature; changed partition = re-sim. Must also cover the other delta
+  since 9ac12a2754a1 (the legacy guard, behavior-neutral). Measured on a
+  3,008-column / 256-focal-dir sample: 15.6% affected (~44k columns), cost
+  ~5 ms/column + 0.1 s/focal dir => ~25-40 min for the whole cache.
+- Build: predicate + tests ~2-3 h; the slayer cache needs its own pass
+  (same regroup idea for mirror columns) ~1-2 h more, or it goes cold.
+- Bake: the 09-20 chain took 37.7 h with 113k/184k sweep columns warm;
+  all logged sim phases were ~18.8 h of that and sweep sims only ~1.4 h, so
+  the chain is dominated by non-sweep stages. Migrated (sweep + slayer):
+  expect ~35-40 h. Fully cold: the 08-27 estimate was 57 h. Sweep-only
+  migration saves only a few hours; the slayer pass is where most of the
+  migration's value would come from.
+- Before that bake: the 09-20 chain ended with the ship gate FAILED
+  (verify_tests rc=1) -- run the pre-dive checklist first.
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
 - MICHAEL: reply to u/LeansCenter on the r/TheSilphArena launch thread
