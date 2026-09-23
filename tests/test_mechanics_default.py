@@ -300,3 +300,39 @@ def test_the_comment_scanner_sees_a_nontrivial_number_of_comments():
         assert len(_comments(path)) >= floor, (
             f'{path}: tokenize found only {len(_comments(path))} comment '
             f'blocks, floor is {floor}')
+
+
+def _registeel_pair():
+    from gopvpsim.battle import BattlePokemon
+    from gopvpsim.moves import get_moves
+    from gopvpsim.pokemon import LEAGUE_CAPS, Pokemon
+    fast_db, charged_db = get_moves()
+    p = Pokemon.at_best_level('Registeel', 15, 15, 15, league='great')
+    return [BattlePokemon.from_pokemon(
+        p, dict(fast_db['LOCK_ON']),
+        [dict(charged_db['FLASH_CANNON']), dict(charged_db['FOCUS_BLAST'])],
+        shields=1, league_cp=LEAGUE_CAPS['great']) for _ in range(2)]
+
+
+def test_legacy_mechanics_refuses_without_an_explicit_opt_in(monkeypatch):
+    """Legacy is a trap, so asking for it by accident must fail loudly.
+
+    2026-09-22: a research probe passed mechanics='legacy' on the word of a
+    stale simulate() docstring ("'legacy' (DEFAULT)") and got numbers for a
+    turn system the game no longer runs. PRE-FIX this simulate() call
+    returned a result instead of raising.
+    """
+    from gopvpsim.battle import simulate
+    monkeypatch.delenv('GOPVPSIM_ALLOW_LEGACY_MECHANICS', raising=False)
+    with pytest.raises(ValueError, match='GOPVPSIM_ALLOW_LEGACY_MECHANICS'):
+        simulate(*_registeel_pair(), mechanics='legacy')
+    # Positive control: the default still runs, and runs to a real result.
+    res = simulate(*_registeel_pair())
+    assert res.timeline or res.pvpoke_score(0) is not None
+
+
+def test_legacy_mechanics_still_runs_when_opted_in(allow_legacy_mechanics):
+    """The opt-in keeps port-fidelity history replayable."""
+    from gopvpsim.battle import simulate
+    res = simulate(*_registeel_pair(), mechanics='legacy')
+    assert 0 <= round(res.pvpoke_score(0)) <= 1000

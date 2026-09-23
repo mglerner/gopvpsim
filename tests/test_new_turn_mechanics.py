@@ -90,7 +90,7 @@ def _mutual_one_shot_pair():
     return a, d
 
 
-def test_legacy_simultaneous_one_turn_fast_already_ties():
+def test_legacy_simultaneous_one_turn_fast_already_ties(allow_legacy_mechanics):
     """Documents the 1v1 baseline: legacy already double-faints (no CMP steal
     for pure fast-vs-fast in 1v1)."""
     a, d = _mutual_one_shot_pair()
@@ -113,7 +113,7 @@ def test_new_simultaneous_one_turn_fast_ties():
 # Change 5: a charged move resolves the turn AFTER it is chosen
 # ---------------------------------------------------------------------------
 
-def test_new_charged_resolves_the_same_turn_as_legacy_not_a_turn_later():
+def test_new_charged_resolves_the_same_turn_as_legacy_not_a_turn_later(allow_legacy_mechanics):
     """Charged priority is an ORDERING within a turn, not a deferral.
 
     Fail-first record: this test previously asserted
@@ -145,7 +145,7 @@ def test_new_charged_resolves_the_same_turn_as_legacy_not_a_turn_later():
         f'damage rather than after it')
 
 
-def test_new_charged_debuff_applies_before_incoming_fast_damage():
+def test_new_charged_debuff_applies_before_incoming_fast_damage(allow_legacy_mechanics):
     """THE discriminator between the two models, and what the footage shows.
 
     A self-DEFENCE-debuffing charged move thrown on the same turn an opposing

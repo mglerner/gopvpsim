@@ -487,7 +487,7 @@ def _sweep_worker(pair_chunk):
     league_cp = ws['league_cp']
     focal_shadow = ws['focal_shadow']
     focal_energy = ws.get('focal_energy', 0)
-    mechanics = ws.get('mechanics', 'legacy')
+    mechanics = ws.get('mechanics', 'new')
     capture_metrics = ws.get('capture_metrics', False)
 
     # Energy is always captured: it is a free read of result.energy_remaining

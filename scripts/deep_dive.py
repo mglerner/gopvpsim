@@ -623,7 +623,7 @@ _opp_robustness_groups = robustness._opp_robustness_groups
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
                              focal_ivs, league, opponent_names,
                              shield_scenarios, opp_movesets=None,
-                             k=DEFAULT_CARD_ROBUST_K, mechanics='legacy',
+                             k=DEFAULT_CARD_ROBUST_K, mechanics='new',
                              focal_max_level=None):
     """Aggregate opp_iv_robustness for ONE focal IV across the curated pool.
 
@@ -1358,7 +1358,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shared_plotly_dir=None,
                               card_out_path=None,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
-                              opp_movesets=None, mechanics='legacy',
+                              opp_movesets=None, mechanics='new',
                               best_buddy=None, slayer_iter_result_l51=None,
                               cup=None, cup_label=None,
                               which_build_html=None,

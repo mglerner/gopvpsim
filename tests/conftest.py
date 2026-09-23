@@ -120,6 +120,16 @@ def small_dive_html(tmp_path_factory):
     return out.read_text()
 
 
+@pytest.fixture
+def allow_legacy_mechanics(monkeypatch):
+    """Opt in to simulate(mechanics='legacy'), which raises by default.
+
+    For tests that compare the retired legacy clock against the live one on
+    purpose; anything else should just use 'new'.
+    """
+    monkeypatch.setenv('GOPVPSIM_ALLOW_LEGACY_MECHANICS', '1')
+
+
 @pytest.fixture(autouse=True, scope='session')
 def _pin_data_cache_ttl():
     """Pin the gamemaster/rankings disk cache for the whole test run.
