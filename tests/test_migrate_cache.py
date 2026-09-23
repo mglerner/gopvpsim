@@ -617,3 +617,90 @@ def test_no_shadow_either_side_20260920_predicate():
     assert p(plain, None) is True
     assert p({}, plain) is True
     assert p(plain, {'species': 'Quagsire'}) is True   # no 'shadow' field
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-23 signature-dedup fix (a4ca14e) + legacy guard (2615c6e)
+# ---------------------------------------------------------------------------
+
+def _sig_meta(species, league, fast, charged, shadow=False):
+    """A focal-dir meta.json as the v7 sweep cache stores it."""
+    return {'species': species, 'league': league, 'shadow': shadow,
+            'fast': fast, 'charged': list(charged), 'iv_floor': None,
+            'focal_max_level': 50.0}
+
+
+def _sig_col(species, fast, charged, ivs, level, shadow=False):
+    return {'species': species, 'shadow': shadow, 'ivs': list(ivs),
+            'level': level, 'fast': fast, 'charged': list(charged)}
+
+
+def test_signature_regroup_flags_the_three_published_mismatch_columns():
+    """The three columns whose published cells did not reproduce (the two
+    signature gaps) must be re-simmed, never blessed."""
+    p = migrate_cache.PREDICATES['signature_regroup_20260923']
+    cases = [
+        (_sig_meta('Florges', 'great', 'FAIRY_WIND',
+                   ['CHILLING_WATER', 'DISARMING_VOICE']),
+         _sig_col('Annihilape', 'LOW_KICK', ['RAGE_FIST', 'ICE_PUNCH'],
+                  (4, 13, 13), 17.0, shadow=True)),          # gap 1 (CMP)
+        (_sig_meta('Blastoise', 'ultra', 'BITE', ['HYDRO_CANNON', 'SKULL_BASH']),
+         _sig_col('Forretress', 'VOLT_SWITCH', ['ROCK_TOMB', 'SAND_TOMB'],
+                  (13, 14, 15), 48.5)),                       # gap 2 (opp)
+        (_sig_meta('Zygarde (Complete Forme)', 'ultra', 'DRAGON_TAIL',
+                   ['BULLDOZE', 'CRUNCH']),
+         _sig_col('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
+                  (13, 15, 15), 50.0)),                       # gap 2 (focal)
+    ]
+    for meta, col in cases:
+        assert p(meta, col) is True, (meta['species'], col['species'])
+
+
+def test_signature_regroup_blesses_a_column_neither_gap_can_reach():
+    """Positive control, so 'always affected' cannot pass: no shadow on
+    either side and no chance-1 opponent-def debuff anywhere -> identical
+    partition -> blessed."""
+    p = migrate_cache.PREDICATES['signature_regroup_20260923']
+    meta = _sig_meta('Azumarill', 'great', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'])
+    col = _sig_col('Medicham', 'COUNTER', ['PSYCHIC', 'ICE_PUNCH'],
+                   (15, 15, 15), 49.0)
+    assert p(meta, col) is False
+
+
+def test_signature_regroup_is_fail_safe():
+    p = migrate_cache.PREDICATES['signature_regroup_20260923']
+    meta = _sig_meta('Azumarill', 'great', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'])
+    assert p(meta, None) is True
+    assert p(meta, {'species': 'Medicham'}) is True           # missing fields
+    assert p(meta, _sig_col('NotAMon', 'COUNTER', ['PSYCHIC'],
+                            (0, 0, 0), 20.0)) is True
+
+
+def test_legacy_guard_predicate_was_removed_unrun():
+    """It blessed everything from 9ac12a2754a1, the same hash delta as the
+    signature fix, so running it would bless columns the fix changes."""
+    assert 'legacy_guard_20260922' not in migrate_cache.PREDICATES
+
+
+def test_slayer_path_never_touches_the_signature():
+    """signature_fix_slayer_20260923 is fully blessing BECAUSE the slayer
+    worker never groups by signature. Checked in a clean interpreter:
+    importing the slayer worker (and the sweep helpers it uses) must not
+    load deep_dive_signature, and its source must not call iv_sweep (the
+    one sweep entry point that imports it lazily). Positive control: the
+    scan does see the build_battle_pair call the worker really makes."""
+    import ast
+    import subprocess
+    code = ('import sys; sys.path.insert(0, "scripts"); sys.path.insert(0, "src");'
+            ' import deep_dive_slayer;'
+            ' print("deep_dive_signature" in sys.modules)')
+    out = subprocess.run([sys.executable, '-c', code], capture_output=True,
+                         text=True, cwd=str(REPO_ROOT))
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == 'False'
+    tree = ast.parse((REPO_ROOT / 'scripts' / 'deep_dive_slayer.py').read_text())
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | {
+        n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    assert 'iv_sweep' not in names and 'signature_groups' not in names
+    assert 'build_battle_pair' in names                       # positive control
+    assert migrate_cache.PREDICATES['signature_fix_slayer_20260923']({}, {}) is False
