@@ -371,7 +371,7 @@ def cmd_summarize(args):
             ivs = z['ivs']
         S = np.stack(per_opp, axis=2)          # [n_iv, 9, n_opp, n_var]
         eng = S[..., names.index('engine')]
-        if opp_shield == 'pvpoke':
+        if opp_shield == 'pvpoke' and args.baseline == 'tensor':
             base = tens[ivs]                    # [n_iv, 9, n_opp]
             checks = [('engine', eng, base)]
             pkey = key + ':pogodives'
@@ -400,8 +400,11 @@ def cmd_summarize(args):
     (out_dir / 'summary.json').write_text(json.dumps(res, indent=1))
     print(f"{run['page']}  stride {run['stride']}  "
           f"{run['effect_move']} vs {run['other_move']}")
-    if opp_shield == 'pvpoke':
+    if opp_shield == 'pvpoke' and args.baseline == 'tensor':
         print('engine == page tensor on every cell (production path verified)')
+    elif opp_shield == 'pvpoke':
+        print('BASELINE = engine re-sim (page tensor NOT checked; use only where '
+              'the tensor was shown not to reproduce)')
     else:
         print(f'STRESS: opponent shield policy = {opp_shield!r}; baseline = '
               'plain PvPoke re-simmed against the same shielder')
@@ -494,6 +497,9 @@ def main():
                    help="comma list (default: all); 'engine' is always added")
     s = sub.add_parser('summarize')
     s.add_argument('--out-dir', required=True)
+    s.add_argument('--baseline', default='tensor', choices=['tensor', 'engine'],
+                   help="'engine' compares against the re-simmed plain PvPoke "
+                        "instead of the page tensor (skips the tensor check)")
     o = sub.add_parser('oracle')
     o.add_argument('--page', required=True)
     o.add_argument('--mode', default='pvpoke', choices=['pvpoke', 'rank1'])

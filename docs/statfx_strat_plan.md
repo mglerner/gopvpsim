@@ -178,6 +178,34 @@ does not break the affordable-swap restriction. The policy-free `shields`
 fails once (Sableye DP + Shadow Sneak, 0v1/0v2, net -53/-73), the same
 Aegislash-style miss as before.
 
+**Class sweep (phase 2 screen, stride 29 = 142 of 4096 spreads, 2026-09-23):**
+the certified `shields_pred` rule, unchanged, on every other rendered
+moveset page whose pair is one helpful guaranteed-effect move + one plain
+move: 165 pages across 58 dives (plus the 6 Drain Punch pairings above).
+Grouped by the effect move's energy relative to the other move:
+
+| effect move vs other | pages | pass all 9 x 4 | fail | notes                                                   |
+| -------------------- | ----- | -------------- | ---- | ------------------------------------------------------- |
+| equal energy         | 22    | 22             | 0    |                                                         |
+| cheaper              | 90    | 83             | 7    | all 7 tiny: worst mean >= -2.2, worst net >= -86        |
+| pricier              | 59    | 10             | 48   | Skull Bash (+35) worst: Snorlax GL 2v1 -118 mean        |
+
+Mechanism: throwing the effect move into a shield is free only when it
+costs no more than the move it replaces. A pricier effect move spends the
+extra energy on a throw that is blocked anyway. Next rule candidate:
+`shields_pred` gated on `E.energy <= O.energy` (checked at runtime from move
+data, still species-free); the 7 small cheaper-move failures need a look
+before certification. Largest gains (worst-slice mean in the best
+scenario): Bubble Beam (Jellicent UL +129), Icy Wind (Seismitoad UL +123),
+Chilling Water (Florges UL +107, Alolan Ninetales UL +106), Rock Tomb
+(Cradily GL +94), Drum Beating (Rillaboom UL +93).
+
+**Baseline caveat:** on 25 of the 165 pages the lab's plain-PvPoke re-sim
+did NOT reproduce the published tensor (1-92 cells per page, ~0.01-0.1%);
+those pages are scored against the re-sim instead (`summarize --baseline
+engine`), which is the right comparison for the strat question. The
+mismatch itself is a dive-integrity finding tracked in TODO.md.
+
 ## Fragility and shield prediction
 
 The certified rule fires on "the opponent would shield this", answered by
