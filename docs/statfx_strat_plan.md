@@ -112,13 +112,15 @@ also renders Drain Punch + Foul Play).
 4. **Ship.** Engine change behind the PoGoDives marker, a fully-scoped
    `migrate_cache.py` predicate (pogodives-tier columns of class focals),
    rebake of the affected pages, and the pre-dive checklist
-   (`docs/predive_checklist.md`) before the bake. **Page copy (Michael,
-   2026-09-23):** every page that uses the strat says so next to the
-   strategy toggle, in the shape "this uses the [PoGoDives strategy] of
-   throwing Drain Punch when we expect opponents to shield; you can switch
-   to the PvPoke strategy with the toggle" -- the move name and trigger
-   generated from the rule and the page's moveset, the link pointing at the
-   strategy article. Never hand-written per page.
+   (`docs/predive_checklist.md`) before the bake. **Page copy (Michael, 2026-09-23;
+   wording approved the same day):** every page that uses the strat says so
+   next to the strategy toggle: "When we expect the opponent to shield, we
+   throw [Drain Punch] into the shield so its [+1 Defense] lands for free.
+   This is the [PoGoDives strategy]; you can switch to the PvPoke strategy
+   with the toggle." The bracketed move and effect are generated from the
+   rule and the page's moveset, and the link points at the strategy article.
+   Never hand-written per page. Avoid the word "bait": at equal energy
+   (Drain Punch vs Foul Play) neither move is the cheap one.
 
 ## Phase 1 results so far (2026-09-22, stride 13 = 316 of 4096 spreads)
 
