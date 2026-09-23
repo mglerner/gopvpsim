@@ -1799,8 +1799,11 @@ Historical/shipped work lives in `CHANGELOG.md`; long-tail open backlog in
 ## Turn system: WAITING on PvPoke to merge new-mechanics (decided 2026-09-02)
 
 The legacy turn system is **gone from the live game** as of 2026-09-02
-(Michael). Our default is `mechanics='legacy'`, so the default path now models
-a ruleset the game no longer runs; `--mechanics new` is our reading of the
+(Michael). **Superseded:** the default has been `mechanics='new'` everywhere
+since commit 7e6a82b (2026-09-09), and since 2026-09-22 `simulate()` raises on
+`'legacy'` unless `GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set. The rest of this
+paragraph is the 2026-09-02 state: our default was then `mechanics='legacy'`,
+modelling a ruleset the game no longer runs; `--mechanics new` was our reading of the
 spec and disagrees with PvPoke's implementation on **104 of 243** oracle
 cells. Full measurement + per-commit attribution:
 `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`.
