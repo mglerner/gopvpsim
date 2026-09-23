@@ -22,14 +22,40 @@ scenario, they match the lab and not the tensor. Examples:
   325/337 in the tensor vs 400/414 re-simmed.
 - Not all CMP-related: Forretress, Giratina, Snorlax, Araquanid opponents too.
 
-Leading hypotheses, untested: (a) signature dedup groups spreads whose fights
-differ (the Florges swap looks like a grouping error across a CMP tie);
-(b) sweep-cache columns carried forward by a migration predicate that was
-not truly neutral. Next step: `scripts/verify_signature_dedup.py` on Florges
-GL / Zygarde UL with those opponents, then check the columns' sidecar stamps
-and migration history. Affected pages + per-cell list:
-`userdata/statfx_lab/C_*/BASELINE` (the 25 dirs) and
-`scripts/statfx_lab.py summarize` on each.
+**ROOT CAUSE (diagnosed 2026-09-23): signature dedup is not exact.** On
+all three probed pairs, `deep_dive.iv_sweep` with signature dedup ON
+reproduces the published tensor exactly, and dedup OFF (per-profile ground
+truth) differs: Florges GL vs Shadow Annihilape 396 cells, Zygarde UL vs
+Mimikyu 774, Blastoise UL vs Forretress 6 (full 4096-spread columns; the
+lab's stride-29 sample understated this). The columns were freshly simmed
+at the bake on the current engine hash, so this is not a stale-cache or
+migration problem. Two gaps in `scripts/deep_dive_signature.py`:
+
+1. **Shadow CMP strip (line ~291).** The CMP sign is computed as
+   `atk / 1.2` for shadow sides -- the exact lossy round trip `ebf5944`
+   (2026-09-20) removed from the engine (`cmp_atk` now carries `raw_atk`).
+   An exact CMP tie against a shadow side is signed as a win/loss, so the
+   spread is grouped with, and given the fight of, a non-tie spread.
+2. **Missing attack axis for the DP's debuff projection.** `_cm_buff_delta`
+   (PvPoke's `attackMult -= buffs[1]`) models a chance-1 opponent-DEFENSE
+   debuff (Sand Tomb, Bulldoze, ...) as +stages on the ATTACKER's attack
+   inside `pvpoke_dp`, and the DP reads damage at those attack stages.
+   `movable_axes` does not count that as making the attacker's attack
+   movable, so those damages are never tabulated; `atk*1.25/def` vs
+   `atk/(def*0.8)` then floors differently at rare boundaries and two
+   "identical" spreads plan differently. Forretress (opponent side) and
+   Zygarde (focal side, Bulldoze vs Mimikyu) both trace to this.
+
+Fix plan (not started): (a) CMP column from carried pre-shadow attack;
+(b) `movable_axes` atk clause for own chance-1 opponent-def-debuff charged
+moves; (c) failing-first tests on the three pairs above (dedup ON == OFF);
+(d) `verify_signature_dedup.py` over a broad corpus; (e) CACHE: the
+signature is NOT in the engine hash, so fixing it does not invalidate the
+wrong columns -- they must be found (re-group each cached column under old
+vs new signature; a changed partition = affected) and re-simmed, or the
+cache's dedup-produced columns bulk-invalidated; (f) rebake + publish
+decision for the affected pages. Per-page evidence: the 25
+`userdata/statfx_lab/C_*/BASELINE` dirs; probes in the 2026-09-23 session.
 
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
