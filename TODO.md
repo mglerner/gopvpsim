@@ -729,6 +729,11 @@ guard, not a checklist sentence).
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
+**Clones cleaned up 2026-09-22:** the seeded-lattice and mirror-proto
+prototypes now live as branches `experiment/seeded-lattice-2026-09-17` and
+`experiment/mirror-proto-2026-09-21` in this repo (local only); the three
+clone directories are deleted.
+
 **Status 2026-09-22 (Michael): WAIT.** Not worth its own bake; it rides the
 next bake that happens for another reason. PRE-LAUNCH PREREQUISITE for that
 bake: build the population sweep + the block that reads it FIRST (one agent
