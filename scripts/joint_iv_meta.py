@@ -374,7 +374,7 @@ def resim_row(cfg, state, fast_id, charged_ids, ivs, oppiv_mode, bait, sc):
         bp0.reset_for_battle(sc[0], opponent=bp1)
         bp1.reset_for_battle(sc[1], opponent=bp0)
         r = simulate(bp0, bp1, charged_policy_0=policy,
-                     charged_policy_1=pvpoke_dp, mechanics='legacy')
+                     charged_policy_1=pvpoke_dp, mechanics='new')
         out.append(round(r.pvpoke_score(0)))
     return out
 

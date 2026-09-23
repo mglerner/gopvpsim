@@ -66,7 +66,10 @@ def _v7_focal_fields(meta):
         charged_ids=meta['charged'], iv_floor=meta.get('iv_floor'),
         shield_scenarios=[tuple(s) for s in meta['scenarios']],
         bait_mode=meta['bait'], energy_lead=meta.get('energy_lead', 0),
-        focal_max_level=meta.get('focal_max_level'))
+        focal_max_level=meta.get('focal_max_level'),
+        # v6 caches predate the 2026-09 flip to 'new', so their columns ARE
+        # legacy scores; keying them 'new' would serve them to live runs.
+        mechanics='legacy')
 
 
 def _v7_dir_for(cache_dir, meta):

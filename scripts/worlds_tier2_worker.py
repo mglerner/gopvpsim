@@ -116,7 +116,7 @@ def tier2_task_worker(task):
                 res = simulate(focal_bp, opp_bp,
                                charged_policy_0=focal_policy,
                                charged_policy_1=pvpoke_dp,
-                               mechanics=task.get('mechanics', 'legacy'))
+                               mechanics=task.get('mechanics', 'new'))
                 sc = res.pvpoke_score(0)
                 n_sims += 1
                 idx = np.asarray(members)

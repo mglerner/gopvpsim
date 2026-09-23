@@ -319,7 +319,7 @@ def test_meta_has_no_mimikyu_entry(meta):
 def test_meta_format_header(meta):
     assert meta['format_confirmed'] is True
     assert meta['format'] == 'open GL 1500 + Play! banned list'
-    assert meta['mechanics'].startswith('legacy')
+    assert meta['mechanics'] == 'new'
 
 
 def test_meta_badges_are_the_planned_ones(meta):

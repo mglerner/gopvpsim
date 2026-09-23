@@ -174,7 +174,7 @@ def test_put_column_routes_through_the_shared_writer(tmp_path, monkeypatch):
     focal = sweep_cache.focal_key_fields(
         species='Azumarill', league='great', shadow=False, fast_id='BUBBLE',
         charged_ids=['ICE_BEAM'], iv_floor=(14, 14, 14),
-        shield_scenarios=[(0, 0)], bait_mode='bait')
+        shield_scenarios=[(0, 0)], bait_mode='bait', mechanics='new')
     col = sweep_cache.column_key_fields(
         opp_species='Medicham', opp_shadow=False, opp_ivs=(7, 15, 14),
         opp_level=49.0, opp_fast_id='COUNTER', opp_charged_ids=['PSYCHIC'])

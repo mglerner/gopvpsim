@@ -45,7 +45,7 @@ _STATS = {'atk': 100, 'def': 100, 'hp': 100}
 def _key(**overrides):
     kw = dict(species='Testmon', league='great', shadow=False,
               fast_move=_FAST, charged_moves=[_CM], base_stats=_STATS,
-              shield_scenarios=[(1, 1)], iv_floor=None)
+              shield_scenarios=[(1, 1)], iv_floor=None, mechanics='new')
     kw.update(overrides)
     return slayer_cache.compute_cache_key(**kw)
 

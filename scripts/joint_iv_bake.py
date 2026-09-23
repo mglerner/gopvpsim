@@ -211,7 +211,7 @@ def main():
         manifest = {
             'engine': engine,
             'gamemaster': gamemaster,
-            'mechanics': 'legacy',
+            'mechanics': 'new',
             'focal': cfg.focal, 'opponent': cfg.opponent,
             'league': cfg.league,
             'opp_fast': cfg.opp_fast,

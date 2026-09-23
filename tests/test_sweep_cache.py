@@ -43,7 +43,7 @@ def _focal_fields(**overrides):
     fields = dict(species='Azumarill', league=LEAGUE, shadow=False,
                   fast_id='BUBBLE', charged_ids=['ICE_BEAM', 'PLAY_ROUGH'],
                   iv_floor=IV_FLOOR, shield_scenarios=SCENARIOS,
-                  bait_mode='bait')
+                  bait_mode='bait', mechanics='new')
     fields.update(overrides)
     return sweep_cache.focal_key_fields(**fields)
 
@@ -165,7 +165,7 @@ def test_gamemaster_not_in_focal_key(tmp_path, monkeypatch):
     assert dir_a == dir_b
     assert 'gamemaster' not in sweep_cache.focal_key_fields(
         'Azumarill', 'great', False, 'BUBBLE', ['ICE_BEAM'], None,
-        [(0, 0)], 'bait')
+        [(0, 0)], 'bait', mechanics='new')
 
 
 def test_gamemaster_hash_narrowing(tmp_path, monkeypatch):

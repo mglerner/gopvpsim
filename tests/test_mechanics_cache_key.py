@@ -36,20 +36,23 @@ SLAYER_BASE = dict(
     base_stats={'atk': 112, 'def': 152, 'hp': 225})
 
 
-def test_sweep_key_legacy_is_byte_identical_to_omitting_it():
+def test_sweep_key_legacy_adds_no_field():
     """Introducing the field must not have cold-invalidated the cache.
 
-    ~153,000 committed columns were simmed before this field existed. If the
-    default added a key, every one of them would have been orphaned.
+    ~153,000 committed columns were simmed before this field existed, keyed
+    with no 'mechanics' entry; the legacy value must still encode that way.
     """
-    assert swc.focal_key_fields(**SWEEP_BASE) == \
-        swc.focal_key_fields(**SWEEP_BASE, mechanics='legacy')
-    assert 'mechanics' not in swc.focal_key_fields(**SWEEP_BASE)
+    assert 'mechanics' not in swc.focal_key_fields(**SWEEP_BASE,
+                                                   mechanics='legacy')
 
 
-def test_slayer_key_legacy_is_byte_identical_to_omitting_it():
-    assert compute_cache_key(**SLAYER_BASE) == \
-        compute_cache_key(**SLAYER_BASE, mechanics='legacy')
+def test_cache_keys_require_mechanics():
+    """No silent default: until 2026-09-22 omitting it keyed as LEGACY, so a
+    caller that forgot the argument could be served legacy-era columns."""
+    with pytest.raises(TypeError):
+        swc.focal_key_fields(**SWEEP_BASE)
+    with pytest.raises(TypeError):
+        compute_cache_key(**SLAYER_BASE)
 
 
 def test_sweep_key_separates_new_from_legacy():

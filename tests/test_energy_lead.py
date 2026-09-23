@@ -89,7 +89,7 @@ def test_focal_key_separates_energy(tmp_path, monkeypatch):
     fields = dict(species='Azumarill', league=LEAGUE, shadow=False,
                   fast_id='BUBBLE', charged_ids=['ICE_BEAM', 'PLAY_ROUGH'],
                   iv_floor=IV_FLOOR, shield_scenarios=SCENARIOS,
-                  bait_mode='bait')
+                  bait_mode='bait', mechanics='new')
     base = sweep_cache.SweepCache(
         sweep_cache.focal_key_fields(**fields))
     lead = sweep_cache.SweepCache(
