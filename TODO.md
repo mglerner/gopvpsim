@@ -6,6 +6,31 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## OPEN: published dive tensors that do not reproduce (found 2026-09-23)
+
+The statfx lab re-sims plain PvPoke for every cell it touches and checks it
+against the page tensor. On **25 of 165** class pages (engine hash
+`9ac12a2754a1`, same as the bake stamp) 1-92 cells per page (~0.01-0.1%)
+differ. The mismatched cells are NOT a lab artifact: rebuilt through the
+dive's own `build_battle_pair` path, reused across scenarios OR fresh per
+scenario, they match the lab and not the tensor. Examples:
+
+- Florges GL vs Shadow Annihilape: spreads 3161/3190 (atk 123.3775648 = an
+  exact CMP tie with the opponent) and 3973/4002 (atk 123.178, loses CMP)
+  appear with their score rows SWAPPED in the tensor.
+- Zygarde (Complete) UL vs Mimikyu: 92 cells, e.g. spread 1044 1v1/2v1 =
+  325/337 in the tensor vs 400/414 re-simmed.
+- Not all CMP-related: Forretress, Giratina, Snorlax, Araquanid opponents too.
+
+Leading hypotheses, untested: (a) signature dedup groups spreads whose fights
+differ (the Florges swap looks like a grouping error across a CMP tie);
+(b) sweep-cache columns carried forward by a migration predicate that was
+not truly neutral. Next step: `scripts/verify_signature_dedup.py` on Florges
+GL / Zygarde UL with those opponents, then check the columns' sidecar stamps
+and migration history. Affected pages + per-cell list:
+`userdata/statfx_lab/C_*/BASELINE` (the 25 dirs) and
+`scripts/statfx_lab.py summarize` on each.
+
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
 - MICHAEL: reply to u/LeansCenter on the r/TheSilphArena launch thread
