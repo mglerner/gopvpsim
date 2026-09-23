@@ -169,6 +169,15 @@ meets the strict bar in all 9 start scenarios x 4 slices on both pages;
 
 Instrument outputs: `userdata/statfx_lab/{shadow,plain}_sableye_dpfp_pred_s1/`.
 
+**Other Drain Punch pairings (phase 1b, stride 13, 2026-09-23):**
+`shields_pred` meets the strict bar in all 9 scenarios x 4 slices on all
+six: Drain Punch + {Power Gem, Dazzling Gleam, Shadow Sneak} on both
+Sableye pages. Worst-slice means where it fires: Sableye +2.5 to +37.7,
+Shadow Sableye +1.5 to +16.7. The unequal energy (Drain Punch 40 vs 50-55)
+does not break the affordable-swap restriction. The policy-free `shields`
+fails once (Sableye DP + Shadow Sneak, 0v1/0v2, net -53/-73), the same
+Aegislash-style miss as before.
+
 ## Fragility and shield prediction
 
 The certified rule fires on "the opponent would shield this", answered by
