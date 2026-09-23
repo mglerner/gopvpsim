@@ -311,7 +311,7 @@ def test_the_slayer_default_mechanics_tracks_the_engine():
         assert got == engine_default, (fn.__name__, got)  # pre-fix: 'legacy'
 
 
-def test_a_slayer_round_runs_on_the_clock_it_is_given():
+def test_a_slayer_round_runs_on_the_clock_it_is_given(allow_legacy_mechanics):
     """The flag reaches simulate() and moves the scores it produces.
 
     Registeel mirror, LOCK_ON / Flash Cannon + Focus Blast, focal 0/15/15

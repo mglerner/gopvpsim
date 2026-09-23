@@ -127,7 +127,7 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
 def opp_plane(focal_species, focal_fast, focal_charged, focal_shadow,
               focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
               league, shield_scenarios, k=512, dedup='signature',
-              mechanics='legacy', focal_max_level=None, focal_bait=True,
+              mechanics='new', focal_max_level=None, focal_bait=True,
               cohort=None):
     """Bool-plane core: ONE fixed focal IV vs an opponent IV cohort.
 
@@ -220,7 +220,7 @@ def opp_plane(focal_species, focal_fast, focal_charged, focal_shadow,
 def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
                       focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
                       league, shield_scenarios, k=512, dedup='signature',
-                      mechanics='legacy', focal_max_level=None):
+                      mechanics='new', focal_max_level=None):
     """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
 
     Historical (wins, total) wrapper over ``opp_plane`` -- the "top-512
@@ -278,7 +278,7 @@ def plane_task_worker(task):
             task['opponent'], task['opp_fast'], task['opp_charged'],
             task['opp_shadow'], task['league'], task['scenarios'],
             dedup=task.get('dedup', 'signature'),
-            mechanics=task.get('mechanics', 'legacy'),
+            mechanics=task.get('mechanics', 'new'),
             focal_bait=task['bait'], cohort=task['cohort'])
         if res is None:
             raise RuntimeError(

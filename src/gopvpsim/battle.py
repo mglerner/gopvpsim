@@ -20,6 +20,7 @@ Turn model (ported from PvPoke's Battle.js):
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -3469,6 +3470,14 @@ def _apply_move_buffs(
 # byte-for-byte unchanged; the default mechanics='new' keeps every
 # current caller (oracle harness, tests, CLI, dives) on it.
 
+_ALLOW_LEGACY_ENV = 'GOPVPSIM_ALLOW_LEGACY_MECHANICS'
+
+
+def _legacy_mechanics_allowed() -> bool:
+    """True iff the caller opted in to the retired legacy turn system."""
+    return os.environ.get(_ALLOW_LEGACY_ENV) == '1'
+
+
 def simulate(
     p0: BattlePokemon,
     p1: BattlePokemon,
@@ -3490,22 +3499,19 @@ def simulate(
 
     mechanics selects the turn-resolution model:
 
-      'legacy' (DEFAULT) -- the pre-2026-06-23 turn system. This is the
-        only path exercised by the oracle harness and the test suite,
-        and it must stay byte-for-byte behavior-identical. Every caller
-        that omits ``mechanics`` lands here.
+      'new' (DEFAULT) -- the turn system the live game runs (charged
+        moves resolve the same turn, ahead of fast landings). PvPoke
+        master implements it as of 2026-09-09 and the oracle harness
+        checks against it. See the _new_* helpers and the in-loop
+        ``mechanics == 'new'`` branches, and the module docstring for the
+        spec mapping and the changes (swaps) deliberately NOT modeled in
+        1v1.
 
-      'new' -- EXPERIMENTAL / UNVALIDATED. Models the 2026-06-23 in-game
-        PvP turn changes (pokemongo.com/news/pvp-updates2026). PvPoke has
-        NOT implemented these, so there is NO reference implementation to
-        cross-check against; this branch is implemented from the spec
-        alone. It changes damage/energy resolution timing, CMP on
-        simultaneous fast moves, and charged-move timing -- so
-        breakpoint/bulkpoint/CMP outputs WILL differ from legacy by
-        design. See the _new_*  helpers and the in-loop ``mechanics ==
-        'new'`` branches below for exactly where it diverges, and the
-        module docstring for the spec mapping and the changes (swaps)
-        that are deliberately NOT modeled in 1v1.
+      'legacy' -- the pre-2026-06-23 turn system. The game no longer runs
+        it, so it is kept only to replay port-fidelity history. It RAISES
+        unless the caller opts in with the environment variable
+        GOPVPSIM_ALLOW_LEGACY_MECHANICS=1 (an env var, not a module flag,
+        so multiprocessing workers inherit the opt-in).
 
     debug=True also enables policy decision logging (OMT fires, DP choices).
     Policy log lines are interleaved into BattleResult.timeline at the turn
@@ -3520,6 +3526,11 @@ def simulate(
 
     if mechanics not in ('legacy', 'new'):
         raise ValueError(f"mechanics must be 'legacy' or 'new', got {mechanics!r}")
+    if mechanics == 'legacy' and not _legacy_mechanics_allowed():
+        raise ValueError(
+            "mechanics='legacy' models a turn system the game no longer runs. "
+            "Use 'new' (the default). To deliberately replay legacy history, "
+            f"set {_ALLOW_LEGACY_ENV}=1.")
 
     if trace_shields or trace_dp:
         debug = True

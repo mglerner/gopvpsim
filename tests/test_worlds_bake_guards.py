@@ -25,6 +25,11 @@ for p in (REPO_ROOT / 'src', REPO_ROOT / 'scripts'):
 import worlds_bake as wb  # noqa: E402
 import worlds_planes as wp  # noqa: E402
 
+# The worlds bake is pinned to the legacy clock on purpose (worlds_planes.
+# MECHANICS; worlds/meta.toml records the Worlds format as legacy), and
+# simulate() refuses legacy without an opt-in, so these guard tests opt in.
+pytestmark = pytest.mark.usefixtures('allow_legacy_mechanics')
+
 WORLDS_MODULES = ('worlds_planes.py', 'worlds_bake.py', 'worlds_tier0.py',
                   'deep_dive_lib/robustness.py')
 ALLOWED_SWEEP_CACHE_IMPORTS = {'engine_hash', 'gamemaster_hash',

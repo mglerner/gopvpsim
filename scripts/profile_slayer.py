@@ -84,7 +84,7 @@ def _side(profile, types, fm_template, cms_template, mon):
 
 
 def run_sims(focal, opps, fm_template, cms_template, types, mon,
-             mechanics='legacy'):
+             mechanics='new'):
     # Mirrors slayer_iter_worker: one BattlePokemon pair per (focal, opp)
     # from the shared build_battle_pair, reset_for_battle between shield
     # scenarios (keeps caches warm). ``mechanics`` is forwarded so the

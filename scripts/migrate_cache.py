@@ -328,6 +328,13 @@ PREDICATES = {
     # tests/test_cramorant.py; the 36 Cramorant oracle cells re-verified
     # exact post-plumbing) -- fully-blessing, like neutral_batch_20260810.
     'cramorant_knobs_20260824': lambda f, c: False,
+    # 2026-09-22 legacy-mechanics guard (pin --from-engine 9ac12a2754a1):
+    # simulate() now RAISES on mechanics='legacy' unless
+    # GOPVPSIM_ALLOW_LEGACY_MECHANICS=1, plus a docstring rewrite. No
+    # battle's result changes under either clock -- a run either completes
+    # exactly as before or refuses to start -- so every cached column is
+    # still correct. Fully-blessing.
+    'legacy_guard_20260922': lambda f, c: False,
     # 2026-08-25 pogodives overlay (pin --from-engine <pre-overlay hash>):
     # per-side _pogodives flag threading + the pogodives_dp/pogodives_shield
     # policies + POGODIVES_CASE_SPECIES_PREFIXES. Behavior-identical for

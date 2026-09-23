@@ -75,7 +75,7 @@ def _initargs(opp_cache):
             opp_cache, SCENARIOS, True,        # focal_bait
             None, False,                       # log_path, verbose
             focal_mon, LEAGUE_CAPS[LEAGUE], False,   # focal_mon, league_cp, shadow
-            0, 'legacy', False)                # energy, mechanics, capture_metrics
+            0, 'new', False)                   # energy, mechanics, capture_metrics
 
 
 def _chunk():
