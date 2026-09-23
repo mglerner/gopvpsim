@@ -729,6 +729,14 @@ guard, not a checklist sentence).
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
+**Status 2026-09-22 (Michael): WAIT.** Not worth its own bake; it rides the
+next bake that happens for another reason. PRE-LAUNCH PREREQUISITE for that
+bake: build the population sweep + the block that reads it FIRST (one agent
+round, ~half a day, additive columns, no hash bump), so the bake carries it
+for free. The gamemaster_subset narrowing (sim-read fields only, prevents
+UI-only PvPoke churn from cooling the cache) also rides that bake ONLY IF it
+is cold for its own reasons; never force a cold bake for it.
+
 Decision: "the mirrors I will meet" = (1) PvPoke's rank-ordered IV list for
 the focal, top N (bulk-first by construction), PLUS (2) the page's own
 builds -- each named build's most-winning member and SP1 (what our readers
