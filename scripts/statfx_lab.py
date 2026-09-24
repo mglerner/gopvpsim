@@ -198,7 +198,14 @@ def _shield_pred_survives_opp_effects(att, dfn, E):
     return True
 
 
-def _into_predicted_shield_v2(att, dfn, fired, E, O):
+def _v2_without(skip):
+    """Ablation of shields_pred_v2 with one veto ('A', 'B' or 'G1') removed."""
+    def rule(att, dfn, fired, E, O):
+        return _into_predicted_shield_v2(att, dfn, fired, E, O, skip=skip)
+    return rule
+
+
+def _into_predicted_shield_v2(att, dfn, fired, E, O, skip=()):
     """shields_pred_gated plus the three swap-VETOES from the 2026-09-23
     failure diagnoses (each only removes swaps, never adds one):
       A  the opponent must also be predicted to shield O -- 'the shield burns
@@ -210,13 +217,14 @@ def _into_predicted_shield_v2(att, dfn, fired, E, O):
          fires unshielded at low turns-to-live -- Shadow Talonflame FC)."""
     if _into_predicted_shield_gated(att, dfn, fired, E, O) is None:
         return None
-    if not pvpoke_simulate_shield(att, dfn, O):                        # A
+    if 'A' not in skip and not pvpoke_simulate_shield(att, dfn, O):                        # A
         return None
-    if not _shield_pred_survives_opp_effects(att, dfn, E):             # B
+    if 'B' not in skip and not _shield_pred_survives_opp_effects(att, dfn, E):             # B
         return None
     min_cost = min(m['energy'] for m in att.charged_moves)
-    if (att.energy - E['energy'] >= min_cost
-            and att.energy - O['energy'] < min_cost):                  # G1
+    if 'G1' not in skip and (att.energy - E['energy'] >= min_cost
+            and att.energy - O['energy'] < min_cost
+            and ('G1b' not in skip or dfn.shields <= 1)):              # G1
         return None
     return 'E'
 
@@ -260,6 +268,12 @@ VARIANTS = {
     'shields_pred': _into_predicted_shield,
     'shields_pred_gated': _into_predicted_shield_gated,
     'shields_pred_v2': _into_predicted_shield_v2,
+    'v2_noA': _v2_without(('A',)),
+    'v2_noB': _v2_without(('B',)),
+    'v2_noG1': _v2_without(('G1',)),
+    # G1b: G1 only when this swap burns the opponent's LAST shield, so the
+    # spare follow-up throw must land unshielded ('G1b' in skip = narrow G1)
+    'v2_G1b': _v2_without(('G1b',)),
     'shields_pred+early': _first(_into_predicted_shield, _early),
     'early': _early,
     'early2': _early2,
