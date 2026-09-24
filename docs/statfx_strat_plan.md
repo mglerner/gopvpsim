@@ -208,6 +208,42 @@ those pages are scored against the re-sim instead (`summarize --baseline
 engine`), which is the right comparison for the strat question. The
 mismatch itself is a dive-integrity finding tracked in TODO.md.
 
+**Refined rule v2 (2026-09-23/24).** Three background diagnoses of the 7
+small cheaper-effect-move failures found three swap-VETOES (each only
+removes swaps) plus three genuine edge costs:
+
+| veto | condition to KEEP the swap                                        | motivating case                                   |
+| ---- | ----------------------------------------------------------------- | ------------------------------------------------- |
+| gate | effect move costs <= the move it replaces                         | the class sweep (10/59 pricier pages pass)        |
+| A    | opponent is also predicted to shield the move we replace          | Tinkaton UL vs Shadow Talonflame                  |
+| B    | the E-shield prediction survives the opponent's same-turn effects | Tinkaton UL vs Shadow Cradily / Toucannon         |
+| G1   | the swap does not leave a spare immediately-affordable throw      | Shadow Talonflame UL Flame Charge vs Ninetales    |
+
+Edge costs with no clean species-free fix (the PvPoke AI reacts better to
+the changed state many turns later): Sand Tomb vs Walrein / Shadow
+Corviknight (the extra debuff stops the AI dying with unspent energy),
+Skeledirge vs Deoxys-Defense (spare energy drifts 17 turns), Tinkaton UL
+0v2 vs Dusknoir. Two agents independently found a rollout veto (sim the
+rest of the battle both ways, keep the swap only if not worse) fixes all of
+them; NOT adopted -- it is search, not a statable rule, and it wins by
+exploiting PvPoke-AI quirks, so it would fail the shield-fragility stress.
+
+**v2 screen, stride 13, 114 pages** (effect move <= other move, incl. both
+Sableye DP+FP pages): v2 passes the strict bar on 108/114 (gated rule
+106/114; v2 fixed 2, broke 0). Mean rating gain over all cells +11.3 (gated
++11.5). Still failing: the 3 Sand Tomb pages, Skeledirge 0v2 (net -185,
+mean +0.1), Tinkaton UL 0v2 (-1.1), and Rillaboom UL m1 2v1 (net -1, mean
+0.0, new at stride 13). Four more pages (3 Shadow Annihilape, Zygarde UL
+m1) failed the tensor check at stride 13 -- the signature-dedup bug -- and
+are scored against the re-sim.
+
+**Ablation (Alolan Ninetales UL m3, the largest v2 cost, -5.4/cell):** G1 is
+the ENTIRE cost; removing A or B changes nothing there. Candidate G1b
+(apply G1 only when the swap burns the opponent's LAST shield) recovers the
+gated gains wherever the opponent keeps a spare shield (0v2/1v2/2v2) and
+still fixes Shadow Talonflame, but not 0v1/1v1/2v1. Next: re-screen with
+G1b before adopting it.
+
 ## Fragility and shield prediction
 
 The certified rule fires on "the opponent would shield this", answered by
