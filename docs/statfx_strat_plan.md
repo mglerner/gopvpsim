@@ -237,6 +237,13 @@ mean +0.1), Tinkaton UL 0v2 (-1.1), and Rillaboom UL m1 2v1 (net -1, mean
 m1) failed the tensor check at stride 13 -- the signature-dedup bug -- and
 are scored against the re-sim.
 
+**v2 certified at stride 1 on both Sableye DP+FP pages (2026-09-24):**
+strict bar met in all 9 scenarios x 4 slices; engine == page tensor on
+every cell; every metric IDENTICAL to the stride-1 `shields_pred`
+certification above (none of the vetoes fires there: Drain Punch and Foul
+Play cost the same, and PvPoke always shields both). Wins gained / lost:
+Shadow Sableye 544,058 / 6,631; Sableye 807,082 / 4,844.
+
 **Ablation (Alolan Ninetales UL m3, the largest v2 cost, -5.4/cell):** G1 is
 the ENTIRE cost; removing A or B changes nothing there. Candidate G1b
 (apply G1 only when the swap burns the opponent's LAST shield) recovers the
