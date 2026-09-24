@@ -6,6 +6,29 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## FUTURE: PoGoDives strategy page (Michael, 2026-09-24)
+
+Expand the Cramorant strategy article into ONE PoGoDives-strategy page with
+a section per strat: Cramorant (the existing content), the stat-effect strat
+(Drain Punch-style "throw the effect move into a predicted shield"; plan:
+docs/statfx_strat_plan.md), and room for later ones. Not started.
+
+Today: `scripts/render_pogodives_strategy_article.py` ->
+`userdata/website/articles/cramorant-pogodives-strategy/`. Carry over its
+contracts: every number recomputed from the rendered dive tensors at render
+time; showcase links computed and gated by verify_url (never hardcoded --
+the 2026-09-12 stale-link incident); authorship "both" with Michael's
+review; ASCII-only prose; publish only on Michael's explicit go.
+
+Prerequisites for the stat-effect section: the rule ported into the engine
+behind the PoGoDives marker, certified per page it ships on (Sableye DP+FP
+pages first), a migrate_cache predicate for the tier change, and a rebake,
+so the section's numbers can come from real PoGoDives-tier tensors. Also
+decide: keep the old slug (Cramorant dive pages link to it) or move to a
+general slug with the old one redirecting. Toggle copy is already approved
+(plan doc, "Page copy"); the page should also state the shield-prediction
+dependence (the fragility results).
+
 ## OPEN: published dive tensors that do not reproduce (found 2026-09-23)
 
 The statfx lab re-sims plain PvPoke for every cell it touches and checks it
