@@ -2,6 +2,176 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
+
+- **Shadow Sableye GL "the bands are wild"** (reminder 2438093, 09-11):
+  answered from the published page, no re-sim (034646c). The 0v1 band is
+  the CMP (charge move priority) line against a PvPoke-default Annihilape
+  4/13/13 at 148.10 attack, 2220 of 4096 spreads, 100% rule accuracy,
+  named both in "Which one to build?" and in the Matchup clusters table.
+  The plain page cuts at 123.42 (123.419 x 1.2 = 148.104), so both forms
+  flip the same 2220 spreads and both pages say so. Scope: this settles
+  "does the analysis capture the 0v1 bands", not what Michael meant by
+  "wild" (unelaborated; reopen with the specific reading). The
+  band-crosser glossary gap stays open in TODO.
+- **ml_tail ETA:** self-calibration from `run_iv_guides.py`'s own
+  `Done in` line landed 3c299aa (09-12,
+  `overnight_eta.measured_ml_tail_min()`), but the fallback constant
+  stayed 420 min, so a machine with no ML history still printed a phantom
+  ~7 h. 399ae72 set it to 10.0 (3.9 min measured for 60 guides on 09-12,
+  ~2.5x headroom), put `ML_TAIL_MEASUREMENT` beside it, and pinned the
+  fallback within [1x, 5x] of it in `tests/test_eta_and_timing_report.py`
+  (fails on 420).
+- **`--mechanics` comment:** the help string was fixed 79ecb48 (09-12;
+  "DEFAULT IS new ... 237 of 243"), but the `warn_mechanics` call-site
+  comment still called legacy the default. Fixed 2ecac26 with
+  `test_no_comment_names_the_wrong_turn_model_as_the_default` (tokenize
+  scan that joins contiguous comment lines into blocks -- the stale claim
+  straddled a line break -- plus a positive control on the pre-fix text).
+  `battle.py`'s "UNVALIDATED" comment is engine-hashed and waits for a
+  bump (TODO).
+
+## 2026-09-15 -- Cramorant close-out: merges + cache migrations (re-dive deferred)
+
+Michael: "Do the first four, don't do the redive." Merged in one pass:
+0afbf6b (Aegislash fix), 1374a70 (predicates), 8a8afcd (v6), 9b5e86d
+(scenario clusters + "Which one to build?"); engine e4d380ec3e5e ->
+1436a17ffbb2 -> 36037e51a2ee, fast tier green after each engine merge.
+After a hardlink snapshot (`sweep_pre_aegislash_20260915`, slayer
+likewise): `form_change_either_side_20260912` (235,768 blessed / 25,320
+re-sim; only Blade columns actually moved), gamemaster 51dfa745457a and
+66b3cba2840d -> 9de08819ae0f (0 further deletions), then
+`pogodives_sheet_v6_20260912` (all blessed). f783255 fixed
+`--from-gamemaster` ignoring `--slayer`; 129 slayer entries migrated.
+**Gamemaster-vintage swap recipe:** the 09-12 rebake was launched with
+`run_website_dives.py` directly (no TTL keeper), so the live gamemaster
+refreshed mid-stream; engine and gamemaster migrations deadlock (each skips
+columns whose other stamp is not current). Resolved by writing each old
+gamemaster blob (from `../pvpoke` history) into
+`~/Documents/gopvpsim_cache/gamemaster.json`, running the engine migration
+per vintage, restoring the live file, then running the gamemaster
+migrations. The re-dive was deferred behind Michael's cluster review; the
+2026-09-20 full chain followed.
+
+## 2026-09-12 -- Aegislash (Blade) reuse leak found + fixed; Cramorant sheet v6
+
+**Engine bug (found 09-12, fixed 2e8d36b):** Aegislash (Blade) columns
+were contaminated across battles on a reused BattlePokemon pair (sweep,
+slayer, robustness and joint-IV workers reuse one pair across the 9
+scenarios). Priority-shuffle clause 4 (`aegislash_shield`, 9fe11e2) stamped
+the shared charged-move dicts in place and `reset_for_battle` never undid
+it; and a fight ending in Blade skipped the form swap on reset, so
+`_dp_init_cache` / `_dp_cache` were never invalidated. Found because
+`cramorant_mini_sweep.py` (fresh pair per cell) disagreed with the tensor
+on one cell (500 vs 490). Blast radius: 8803/36864 cells (24%) of the
+Cramorant-vs-Blade column; every column of the Blade focal dives; 75 of 140
+dive dirs carried a Blade column. Fix = snapshot + restore of the stamp and
+unconditional DP-cache invalidation for form-changers; failing-first test =
+the `aegislash-blade-azumarill` param of
+`test_reset_for_battle_reuse_matches_fresh`. Merged 09-15 (entry above).
+
+**Sheet v6** (8a639e2; record `docs/validations/2026-09-12_cramorant_deep_vet.md`):
+(1,0) terminal-KO guard, (2,2) last-shield chip guard; stride-1
+re-certification of the changed rows 90/90 PASS on 09-15 (net 937,116 ->
+931,522, -0.6%; the four failing GL cells fixed; fbbc213). Render side, no
+hash impact: computed + page-verified article showcases (6f79ab9, 258e11b),
+instruments (9dd51f5, c926558), lab loader fix (dcf33a1), docs (491f819,
+0397089).
+
+## 2026-09-11..12 -- Moveset rules merged; dives-only rebake
+
+Michael 09-11: the old movesets, meta and mechanics are dead; "bake" means
+"bake with a legit set of moves". Rules in `scripts/dive_registry.py`
+("MOVESET RULES"; e7342f2, built in a separate clone during the 09-10
+bake, merged b80f93e 09-12): every dive renders `DEFAULT_TOP_MOVESETS` (5)
+screened movesets (the 42 per-slug overrides are gone; Sableye had 1 and
+Shadow Sableye 4, sharing none); PvPoke's default moveset is always a page
+(`--reference auto`); shadow/plain pairs render the UNION of both forms'
+screened sets (`pair_partner` / `--union-with-form`). Pinned by
+`tests/test_dive_registry_movesets.py`. The 2026-09-10 bake was held
+unpublished as the warm-cache baseline and a dives-only rebake with the
+cache on launched 09-12 18:02; it did not publish as-is (the Aegislash
+leak, 2026-09-12 entry, went first) and the 2026-09-20 chain superseded it. The
+fast-tier red `test_entry_points_route_through_the_roster` (tripped by
+`publish_website.sh --partial`, 986cc01) was fixed by 0af9da4 (`--exclude`
+routes `--partial` through the roster). The dead
+`forretress-shadow-volt-switch-great-league` registry entries came alive
+when a85d62e (09-17) brought Forretress (Shadow) into the GL pool (29913bd).
+
+## 2026-09-09..10 -- Turn system: PvPoke master merge, default flip everywhere, re-baseline
+
+- **09-09:** PvPoke shipped mechanics + moves + rankings to master
+  (5ca1b89): master `src/js` byte-identical to twilight-trails, tripwire
+  fired on Battle.js only; 29 moves / 105 pokemon changed. The gamemaster
+  cache migration was moot (never baked under new). Re-measure vs master
+  (1211b0a; raw `docs/validations/2026-09-09_oracle_new_vs_master_raw.txt`):
+  223 exact + 14 documented + 6 new, all one Aegislash x Azumarill
+  form-change cluster (open in TODO); SHADOW_BALL hypothesis killed
+  (b0c4fb0). Default flipped to new everywhere, `simulate()` and the audit
+  harness included (7e6a82b): seven scripts had silently inherited legacy.
+- **Re-baseline:** the pull left 102 fast-tier failures in 19 files (pinned
+  scores, loud rather than rotting); oracle pins re-derived against PvPoke
+  in tranches f9923e0, fa7d801, 935c38b, d7e9e26, c01aa6a, 5e19bc5,
+  540ce46, 67da3d2. Pools rebuilt against post-rebalance rankings with the
+  ItsAxn augmentation (f92bec1 + follow-ons). Threshold TOMLs re-vetted as
+  inputs: 58 derived stat-cutoff spreads archived, 15 IV-list spreads kept
+  (d363b1d); of the cd_prep blocks, Oinkologne's retired 3f28221 (08-27),
+  Thievul's rides the Worlds checklist, Baxcalibur's is a deliberate
+  hypothetical. Tripwire re-vetted per checklist section B and re-pinned
+  (4407c01; 229 exact + 8 documented + the 6 Aegislash cells). The cold
+  bake under new followed (2026-09-10/12).
+- **09-10 also:** sandbox-link encoder turn-clock fix (e6827a0; PvPoke's
+  post-charge cooldown, auto-fired Gulp Missile excluded; refined 258e11b
+  to one cooldown per round); Worlds artifact tests marked dormant
+  (066e528); the "dead" pogodives constants were found deliberately kept
+  (synthetic-row tests in `test_pogodives.py`) and their removal reverted.
+- **Follow-on:** slayer follows the engine's mechanics (36b10da, 09-20);
+  `simulate()` refuses legacy unless `GOPVPSIM_ALLOW_LEGACY_MECHANICS=1`
+  (2615c6e, 09-22); nothing hardcoded to legacy (4b6342b, 09-22).
+
+## 2026-09-02..03 -- Turn system: new-mechanics A/B, product-CLI default flip, re-port
+
+- **09-02:** the legacy turn system left the live game. Our
+  `mechanics='new'` disagreed with PvPoke's unmerged branch on 104 of 243
+  oracle cells (5f16035; `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`),
+  45 of them from PvPoke's own "for now" revert 442a4afe8 (39dab5d). Both
+  disk caches keyed on `mechanics` (32400af); both models print a CLI
+  caveat (e5ec153, `scripts/mechanics_notice.py`); product CLIs default to
+  new (2228cff; Michael: "It is literally impossible to play an actual game
+  with the old turn system now"). Decision: wait for the merge, do not
+  chase `origin/twilight-trails`.
+- **09-03:** a Caleb Peng breakdown of the live game
+  (`docs/validations/2026-09-03_new_turn_system_ground_truth.md`) gave
+  swaps > charged > fast within a turn; the re-port resolves charged moves
+  the same turn ahead of fast landings: 104 -> 1 mismatch, legacy control
+  still 0 (f1ff911).
+
+## 2026-09-02 -- PvPoke mega drift re-vetted; stale opponent pools now hard-fail a bake
+
+Michael pulled `../pvpoke` (master 7b96d91fb -> 56bc6a8b1) and the
+PVPOKE-ENGINE tripwire fired as designed (Pokemon.js, DamageCalculator.js,
+ActionLogic.js drifted from 78c64048a), blocking `verify_tests` and so every
+ship gate. Upstream: 574aeb0da third charged attacks + Mega Bonus damage
+multiplier, bd8c5d889 Mega Level select, feba66f47 Super Mega tag with
+default Mega Level 4, e86688bd1 mega rankings. Our engine never had an
+`n_cms > 2` guard (every occurrence is `n_cms > 1`), which is why a 3-move
+build used to run silently wrong; the downstream third-charged-move
+plumbing landed the same day (1b2290c). Re-vetted per `docs/rebalance_checklist.md` section B
+and re-pinned 420d829 (`docs/validations/2026-09-02_pvpoke_mega_revet.md`):
+not a rebalance (moves.json byte-unchanged), oracle 208+35 -> 222+21; the
+pre-rebalance baseline pin (46bd08a77 / c431557dcc76) unaffected. Re-pinned
+again 4407c01 (09-10, entry above); green on the 09-20 pre-dive grid.
+
+Same day, the opponent-pool gap: `build_opponent_pool.py` appeared in zero
+of `overnight_redive.sh` / `run_website_dives.py` / `publish_website.sh` /
+`phase2_preship.sh`, and `gl_top50_plus_cs.txt` was still stamped
+2026-06-10. Pools are the INPUT to every dive and a new member is a new,
+un-migrate-able column, so a season-start bake against stale pools was
+silently wrong everywhere. Recorded c70ad94, fixed e8ac919:
+`run_website_dives.py` runs `verify_opponent_pools` as a preflight and
+hard-fails on DRIFT / MISSING / ERROR (`--allow-stale-pools` overrides). The
+season lifecycle policy recorded with it stays in TODO.
+
 ## 2026-08-27 -- L51 dead-tooltip fix + build_collection_data() strong pin
 
 Closing the "[render, unchecked] L51 tooltip registry" follow-up
