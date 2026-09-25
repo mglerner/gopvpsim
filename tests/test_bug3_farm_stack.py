@@ -11,13 +11,17 @@ The gate only fires when the selected farm-down move is self-debuffing -- i.e.
 the focal's moveset is self-debuff-dominant (no non-debuffing alt within 2x
 DPE). Pinsir (Fury Cutter / Close Combat + Super Power) vs the bulky wall
 Cresselia is the canonical case: both charged moves are self-debuffing, so
-the farm-swap can't dodge the debuff and the stack gate engages. Pre-fix our
-0-0 score was 631 (Pinsir fires Close Combat early at ~T15); post-fix it is
-656 (Pinsir stacks the debuffing throws near T25-26), matching PvPoke.
+the farm-swap can't dodge the debuff and the stack gate engages. Under the
+legacy turn system, pre-fix our 0-0 score was 631 (Pinsir fires Close Combat
+early at ~T15) and post-fix it was 656 (Pinsir stacks the debuffing throws
+near T25-26), matching PvPoke; all nine cells were then validated against
+PvPoke's live engine via scripts/pvpoke_trace.js at 15/15/15 IVs both sides
+(9/9 exact on winner + score).
 
-Every cell below was validated against PvPoke's live engine via
-scripts/pvpoke_trace.js at 15/15/15 IVs both sides (9/9 exact on winner +
-score).
+The values below were RE-DERIVED 2026-09-09 under the new turn system
+(fa7d801; 0-0 is now 555). They come from our engine, on the warrant that
+the oracle harness matches PvPoke master on 229 of 243 cells; Pinsir vs
+Cresselia is not itself a harness matchup and was not re-traced.
 """
 import sys
 from pathlib import Path
