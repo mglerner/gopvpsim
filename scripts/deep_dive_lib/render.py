@@ -31,7 +31,7 @@ from deep_dive_logging import get_logger
 from deep_dive_lib.opponents import (
     parse_opponent_spec, resolve_opp_ivs, variant_ivs,
 )
-from deep_dive_lib.sweep import compute_iv_metadata, moveset_label
+from deep_dive_lib.sweep import compute_iv_metadata
 
 logger = get_logger()
 
@@ -48,6 +48,89 @@ _scenario_ranks = rendering.scenario_ranks
 parse_mode = rendering.parse_mode
 parse_energy = rendering.parse_energy
 score_key = rendering.score_key
+
+
+# ---- Per-pass memo for the aggregator and the boundary finder -------------
+# One level pass renders moveset 0's narrative (_generate_narrative_for_
+# moveset) and then its analysis (generate_analysis_sections). Both ran
+# aggregate_flips_by_anchor with IDENTICAL inputs for every opp-IV mode, and
+# find_matchup_boundaries ran THREE times per (mode, sweep) -- the narrative,
+# the analysis's census and the analysis's boundary list (2026-09-25 bake
+# attribution, R2 + R4). The caller (deep_dive._render_level_body) hands both
+# functions one fresh dict per pass as ``pass_memo``; None (every other
+# caller) computes directly, exactly as before.
+#
+# An entry is reused only when the inputs are the same objects (scores list,
+# anchor list, data_obj and its ivAtk/ivDef/ivHp lists -- compared with
+# ``is``; the entry holds strong references so an id can never be recycled)
+# and the same values (nIvs, nS, nO, scenarios, opponents, sweep -- the call
+# sites build those separately). Every consumer gets its own copy of each
+# record: callers set rec['bait_modes'] / rec['energy_modes'] and merge them
+# across modes, so a shared record would leak one consumer's modes into the
+# other.
+
+def _pass_memo_get(pass_memo, key, same_objs, same_vals, compute):
+    hit = pass_memo.get(key)
+    if (hit is None or len(hit[0]) != len(same_objs)
+            or any(a is not b for a, b in zip(hit[0], same_objs))
+            or hit[1] != same_vals):
+        hit = pass_memo[key] = (same_objs, same_vals, compute())
+    return hit[2]
+
+
+def _memo_inputs(scores_flat, data_obj, nIvs, nS, nO, scenarios, opponents,
+                 *extra_objs):
+    objs = (scores_flat, data_obj, data_obj.get('ivAtk'),
+            data_obj.get('ivDef'), data_obj.get('ivHp')) + extra_objs
+    vals = (nIvs, nS, nO, [tuple(s) for s in scenarios], list(opponents))
+    return objs, vals
+
+
+def _copy_flip_record(rec):
+    out = dict(rec)                       # 'anchor' stays the SAME object
+    out['scenarios'] = list(rec['scenarios'])
+    out['passing_ivs'] = list(rec['passing_ivs'])
+    return out
+
+
+def _memo_aggregate_flips(pass_memo, key, scores_flat, nIvs, nS, nO,
+                          resolved_anchors, data_obj, scenarios, opponents,
+                          debug_stats=None):
+    """aggregate_flips_by_anchor through the per-pass memo (see above)."""
+    if pass_memo is None:
+        return _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO, resolved_anchors, data_obj,
+            scenarios, opponents, debug_stats=debug_stats)
+
+    def compute():
+        stats: dict = {}
+        recs = _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO, resolved_anchors, data_obj,
+            scenarios, opponents, debug_stats=stats)
+        return recs, stats
+    objs, vals = _memo_inputs(scores_flat, data_obj, nIvs, nS, nO,
+                              scenarios, opponents, resolved_anchors)
+    recs, stats = _pass_memo_get(pass_memo, key, objs, vals, compute)
+    if debug_stats is not None:
+        debug_stats.update(stats)
+    return [_copy_flip_record(r) for r in recs]
+
+
+def _memo_matchup_boundaries(pass_memo, key, scores_flat, nIvs, nS, nO,
+                             data_obj, scenarios, opponents, sweep_stat):
+    """find_matchup_boundaries through the per-pass memo (see above)."""
+    if pass_memo is None:
+        return _find_matchup_boundaries(
+            scores_flat, nIvs, nS, nO, data_obj, scenarios, opponents,
+            sweep_stat=sweep_stat)
+    objs, vals = _memo_inputs(scores_flat, data_obj, nIvs, nS, nO,
+                              scenarios, opponents)
+    mbs = _pass_memo_get(
+        pass_memo, key, objs, vals + (sweep_stat,),
+        lambda: _find_matchup_boundaries(
+            scores_flat, nIvs, nS, nO, data_obj, scenarios, opponents,
+            sweep_stat=sweep_stat))
+    return [dict(mb, scenarios=list(mb['scenarios'])) for mb in mbs]
 
 
 # Dive-card spread selection. The card names the "Which one to build?"
@@ -339,12 +422,16 @@ def _mirror_synth_scores(score_arrays, moveset_idx):
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
                                     has_toml_tiers, resolved_anchors=None,
-                                    *, species=None, focal_shadow=False):
+                                    *, species=None, focal_shadow=False,
+                                    pass_memo=None):
     """Generate narrative HTML for one moveset.
 
     Computes matchup boundaries (and optionally anchor-flip records if
     resolved_anchors are provided), auto-derives tiers, and renders the
     SwagTips-style IV Flavor Guide zone.
+
+    ``pass_memo`` is the per-pass memo shared with generate_analysis_sections
+    (see _pass_memo_get); None computes everything directly.
 
     Returns narrative HTML string (may be empty).
     """
@@ -374,7 +461,8 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
             _scores = score_arrays.get(_key, [])
             if not _scores:
                 continue
-            _recs = _aggregate_flips_by_anchor(
+            _recs = _memo_aggregate_flips(
+                pass_memo, ('agg', moveset_idx, _mode),
                 _scores, nIvs, nS, nO,
                 resolved_anchors, data_obj, scenarios, opponents,
             )
@@ -401,10 +489,10 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         if not _scores:
             continue
         for _sweep in ('def', 'atk'):
-            _mbs = _find_matchup_boundaries(
+            _mbs = _memo_matchup_boundaries(
+                pass_memo, ('mb', moveset_idx, _mode, _sweep),
                 _scores, nIvs, nS, nO,
-                data_obj, scenarios, opponents,
-                sweep_stat=_sweep,
+                data_obj, scenarios, opponents, _sweep,
             )
             for mb in _mbs:
                 mb['bait_modes'] = {bait_mode}
@@ -489,7 +577,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                base_form_info=None,
                                card_builds=None,
                                card_builds_pinned=False,
-                               clusters_sink=None):
+                               clusters_sink=None,
+                               pass_memo=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -529,6 +618,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     light up "which of your IVs hit this breakpoint" annotations after
     the user loads their CSV. Populated as a side effect - callers who
     just want HTML can leave it at None.
+
+    ``pass_memo`` is the per-pass memo shared with the moveset's narrative
+    (see _pass_memo_get); None computes everything directly.
     """
     nIvs = data_obj['nIvs']
     nS = data_obj['nScenarios']
@@ -757,9 +849,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         if not _scores:
             continue
         for _sweep in ('def', 'atk'):
-            for mb in _find_matchup_boundaries(
+            for mb in _memo_matchup_boundaries(
+                    pass_memo, ('mb', moveset_idx, _mode, _sweep),
                     _scores, nIvs, nS, nO, data_obj, scenarios, opponents,
-                    sweep_stat=_sweep):
+                    _sweep):
                 _k = (mb['opponent'], mb['stat'], mb['threshold'])
                 if _k in _cb_seen:
                     continue
@@ -947,7 +1040,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             if not _scores:
                 continue
             _debug: dict = {}
-            _recs = _aggregate_flips_by_anchor(
+            _recs = _memo_aggregate_flips(
+                pass_memo, ('agg', moveset_idx, _mode),
                 _scores, nIvs, nS, nO,
                 resolved_anchors_top, data_obj, scenarios, opponents,
                 debug_stats=_debug,
@@ -974,10 +1068,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         if not _scores:
             continue
         for _sweep in ('def', 'atk'):
-            _mbs = _find_matchup_boundaries(
+            _mbs = _memo_matchup_boundaries(
+                pass_memo, ('mb', moveset_idx, _mode, _sweep),
                 _scores, nIvs, nS, nO,
-                data_obj, scenarios, opponents,
-                sweep_stat=_sweep,
+                data_obj, scenarios, opponents, _sweep,
             )
             for mb in _mbs:
                 mb['bait_modes'] = {bait_mode}
