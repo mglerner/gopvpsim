@@ -1013,6 +1013,9 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
     Otherwise: apply to defender (matches PvPoke's else-branch).
     """
     damage  = attacker.charged_move_damage(move, defender)
+    # ActionLogic.js:1159 `move.damage = damage`: the memo the post-DP
+    # bandaid[866] reads (see _optimize_move_timing for the other refreshes).
+    move['_cached_damage'] = damage
     post_hp = defender.hp - damage
 
     # Temporarily apply move buffs for damage projection (ActionLogic.js 1110-1140)
@@ -1279,12 +1282,24 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
     # keep LANDING (one extra Counter = the whole -26..-29 margin cluster),
     # so the deviation traded real HP for avoiding a debuff with zero
     # post-KO effect. Removed -- matches PvPoke exactly.
+    #
+    # The damage memo is refreshed for EVERY charged move here, affordable
+    # or not (ActionLogic.js:320 -- only the KO test on line 322 is
+    # energy-gated). Until 2026-09-25 our assignment sat inside the energy
+    # gate, so a move the attacker could not yet afford kept no memo, and
+    # the post-DP bandaid[866] (which reads it) silently skipped: that was
+    # the Moltres-G near-KO "nuke instead of Fly-chain" divergence
+    # (DEVELOPER_NOTES "Near-KO DP plan choice"). Under the new turn system
+    # PvPoke's plan scores better in every cluster cell, so the deviation
+    # was dropped and the memo now mirrors PvPoke at all four of its refresh
+    # points: battle start (simulate), form change (apply_form_change),
+    # would_shield, and both sides' moves here.
     if defender.shields == 0:
         for cm in attacker.charged_moves:
-            if attacker.energy >= cm['energy']:
-                cm['_cached_damage'] = attacker.charged_move_damage(cm, defender)
-                if cm['_cached_damage'] >= defender.hp:
-                    return False
+            cm['_cached_damage'] = attacker.charged_move_damage(cm, defender)
+            if (attacker.energy >= cm['energy']
+                    and cm['_cached_damage'] >= defender.hp):
+                return False
 
     # Opponent's next charged move can KO within our fast-move window
     fms_in_atk_fm = atk_turns // def_turns   # opponent FMs that fit inside our FM
@@ -1293,11 +1308,13 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
             max(0, cm['energy'] - defender.energy) / defender.fast_move['energyGain']
         )
         turns_from_cm = fms_needed * def_turns + 1
+        # ActionLogic.js:336 refreshes the OPPONENT's move.damage here too,
+        # unconditionally (its own bandaid[885] reads it on its next DP).
+        cm['_cached_damage'] = defender.charged_move_damage(cm, attacker)
         if attacker.shields > 0:
             effective_dmg = 1 + opp_fast_dmg * fms_in_atk_fm
         else:
-            effective_dmg = (defender.charged_move_damage(cm, attacker)
-                             + opp_fast_dmg * fms_in_atk_fm)
+            effective_dmg = cm['_cached_damage'] + opp_fast_dmg * fms_in_atk_fm
         if turns_from_cm <= atk_turns and effective_dmg >= attacker.hp:
             return False
 
@@ -2363,12 +2380,29 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     # [866] Prefer non-debuffing when shields down, both sides have significant HP,
     #       and the debuffing move won't KO.
-    #       PvPoke uses move.damage which is only set as a side effect of the OMT
-    #       "can KO" check (line 301). If OMT didn't fire, .damage is undefined
-    #       and undefined/hp < 0.8 is NaN < 0.8 = false in JS → bandaid skips.
+    #       PvPoke reads move.damage, which is set at battle start
+    #       (initializeMove) and refreshed by OMT (both sides, every move,
+    #       no energy gate), wouldShield and form change -- so it is
+    #       essentially never undefined. Our `_cached_damage` mirrors all of
+    #       those refresh points since 2026-09-25 (see simulate and
+    #       _optimize_move_timing); the `is not None` guard below is only a
+    #       safety net for a BattlePokemon driven outside simulate().
+    #
+    #       INTENTIONAL DEVIATION (2026-09-25, kept from the 2026-06-28
+    #       both-self-debuff review): the swap only happens when the target
+    #       cms[0] is itself NON-debuffing. PvPoke's condition does not
+    #       check that, so on a moveset whose charged moves are ALL
+    #       self-debuffing (Lurantis Leaf Storm + Superpower, Blaziken
+    #       Brave Bird + Overheat, Braviary ML) it swaps the DP's nuke for
+    #       a worse-typed self-debuffing move and loses fights we win.
+    #       docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md
+    #       (KEEP, re-upheld under the new turn system 2026-09-09); pinned by
+    #       tests/test_both_self_debuff_divergence.py. Until the memo fix
+    #       above this clause was moot (the memo was None there too).
     _cached_dmg = first_move.get('_cached_damage')
     if (defender.shields == 0 and n_cms > 1
             and cm_self_debuf[first_idx]
+            and not cm_self_debuf[0]
             and cm_energy[first_idx] > 50
             and attacker.hp / attacker.max_hp > 0.5
             and _cached_dmg is not None
@@ -3572,6 +3606,19 @@ def simulate(
     # Pre-compute fast move durations (turns = cooldown_ms / 500)
     for p in pokemon:
         p.fast_move['_turns'] = p.fast_move.get('cooldown', 500) // 500
+
+    # Battle.js:93-113 -> Pokemon.reset -> resetMoves -> initializeMove
+    # (Pokemon.js:880-889): every charged move carries a damage number vs
+    # the opponent from battle start, at the starting stat stages. The
+    # post-DP bandaid[866] reads this memo (`move.damage / opponent.hp`),
+    # so without it a DP call that runs before any refresh point skipped
+    # the bandaid where PvPoke fired it. Refreshed later exactly where
+    # PvPoke refreshes: _optimize_move_timing (both sides), would_shield,
+    # and apply_form_change (the form-changer's new moves).
+    for _i in (0, 1):
+        _me, _opp = pokemon[_i], pokemon[1 - _i]
+        for _cm in _me.charged_moves:
+            _cm['_cached_damage'] = _me.charged_move_damage(_cm, _opp)
 
     # Priority: higher effective attack breaks ties on charged moves.
     # Cramorant mirror: PvPoke 78c64048a Battle.js:253-259 forces priority

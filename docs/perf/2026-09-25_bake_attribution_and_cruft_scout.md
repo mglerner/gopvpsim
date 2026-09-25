@@ -202,3 +202,19 @@ refused it); the Moltres-G near-KO keep-vs-match decision (the documented
 rationale is reversed under the new turn system; tests pin ours and record
 PvPoke's); CLAUDE.md / DEVELOPER_NOTES corrections (Q7, deferred); the
 scout-only TODO sections.
+
+## Addendum: Moltres-G near-KO plan, matched to PvPoke (2026-09-25, late)
+
+Michael's call on the open decision: "do what's consistent with the new turn
+system." The `_cached_damage` memo that our port of PvPoke's post-DP
+bandaid[866] reads is now refreshed at PvPoke's four refresh points (battle
+start, OMT for both sides with no energy gate, would_shield, form change),
+so the six Moltres-G oracle cells match PvPoke master on score and log.
+One deviation kept on purpose: the swap only fires when the target move is
+non-debuffing, so the both-self-debuff cluster (2026-06-28 review, KEEP)
+is unchanged. 243-cell oracle audit: 227 exact (was 220), 8 documented
+Morpeko, 6 open Aegislash, nothing else moved. Benchmark unchanged within
+noise. Engine hash d78c67fd06a7 -> 5a813036625c (slayer b22f67b6ca64 ->
+d3ce425c2ce4); migration predicate `cached_damage_refresh_20260925`:
+sweep 196,497 blessed / 42,594 re-sim (17.8%), slayer 137 / 13. Full
+record: CHANGELOG 2026-09-25.

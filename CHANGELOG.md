@@ -2,6 +2,51 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
+
+- **What changed:** the `_cached_damage` memo that our port of PvPoke's
+  post-DP bandaid[866] ("shields down, prefer the non-debuffing move")
+  reads is now refreshed at every point PvPoke refreshes `move.damage`:
+  battle start (`simulate`, mirroring Pokemon.reset -> resetMoves ->
+  initializeMove), `_optimize_move_timing` for BOTH sides' moves with no
+  energy gate (ActionLogic.js:320/336), `would_shield` (:1159), and the
+  form-changer's moves in `apply_form_change`. Until now the OMT
+  assignment sat inside the affordability gate, so an unaffordable
+  self-debuffing nuke kept no memo and the bandaid silently skipped --
+  the Moltres-G "single Brave Bird instead of a Fly chain" divergence
+  documented 2026-04-15 as intentional.
+- **Why now:** the keep-our-plan rationale (ours retained 23-30pp more
+  Moltres-G HP in 6 of 7 cells) was measured under the legacy turn
+  system; the 2026-09-09 re-derivation under the new turn system
+  reversed it in every cell (PvPoke's plan +72..+129 for MG, Lapras
+  [1,2] still a winner flip against us). Surfaced by the 2026-09-25
+  test-cruft pass; Michael: "do what's consistent with the new turn
+  system".
+- **Verification:** 243-cell oracle audit vs PvPoke master: the six
+  Moltres-G cells VANISHED as divergences (score + chargedLog exact),
+  nothing else moved (8 Morpeko documented, 6 Aegislash open, as
+  before). `tests/test_battle.py::test_moltres_g_nearKO_plan_divergence_pinned`
+  pins PvPoke's values and fails on the old engine (531/670/670,
+  580/689, 482). Benchmark `profile_slayer.py --n-focal 60 --n-opp 20`:
+  5,846 -> 5,800 sims/s (noise).
+- **Kept deviation (both-self-debuff movesets):** with the memo live,
+  PvPoke's bandaid also fires on movesets whose charged moves are ALL
+  self-debuffing (Lurantis Leaf Storm + Superpower, Blaziken Brave Bird +
+  Overheat, Braviary ML Close Combat + Brave Bird), swapping the DP's nuke
+  for a worse-typed self-debuffing move and losing fights we win -- the
+  cluster the 2026-06-28 review decided to KEEP (re-upheld 2026-09-09
+  under the new turn system). The fast tier caught it (three pins in
+  `tests/test_both_self_debuff_divergence.py` moved to PvPoke's values).
+  Our bandaid[866] now requires the swap TARGET cms[0] to be
+  non-debuffing -- the rule's stated intent -- so those pins hold at ours
+  (613 / 646 / 695) and the Moltres-G cells still match (Fly is
+  non-debuffing). One clause, reversible; flagged for Michael.
+- **Cache:** engine hash bump; predicate `cached_damage_refresh_20260925`
+  (self-debuff-either-side: bandaid[866] can only fire when the acting
+  side's DP-chosen first move is self-debuffing, so a column is provably
+  unchanged iff neither side owns one; same Zap-Cannon-mutation caveat
+  as `self_debuff_either_side`, measured harmless 2026-07-03).
+
 ## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
 
 - **Shadow Sableye GL "the bands are wild"** (reminder 2438093, 09-11):

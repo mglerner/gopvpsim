@@ -72,8 +72,9 @@ def test_moltres_galarian_dondozo_ul_1_1_winner_flip():
     res = simulate(molt, dond, charged_policy_0=pvpoke_dp,
                    charged_policy_1=pvpoke_dp)
     assert res.winner == 0, "post-fix Moltres (Galarian) must WIN the UL 1-1"
-    # RE-DERIVED 2026-09-09. NOT PvPoke-verified: PvPoke master returns 516
-    # for this cell where we return 561. The WINNER agrees (Moltres wins),
-    # which is what this test is actually about, but the 45-point score gap is
-    # an open divergence rather than a certified value.
-    assert round(res.pvpoke_score(0)) == 561
+    # RE-DERIVED 2026-09-09 (ours 561; PvPoke master 516, winner agreed).
+    # 2026-09-25: 516 -- the same Moltres-G near-KO fix that closed the
+    # oracle cluster (the `_cached_damage` memo now refreshed at PvPoke's
+    # refresh points; CHANGELOG 2026-09-25) closes this 45-point gap too, so
+    # the value is PvPoke master's.
+    assert round(res.pvpoke_score(0)) == 516

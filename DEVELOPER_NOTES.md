@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->3025<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3026<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -880,7 +880,31 @@ PvPoke's clock semantics (500 ms turns; charged rounds REPLACE the
 turn's 500 ms with 10,000 ms minigame time; shielded rounds discount
 one minigame) as match-level state.
 
-### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (intentional)
+### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (RESOLVED 2026-09-25)
+
+**Resolved 2026-09-25: we now match PvPoke.** The `_cached_damage` memo
+that our port of bandaid[866] reads is refreshed at PvPoke's four refresh
+points (battle start in `simulate`, `_optimize_move_timing` for both
+sides' moves with no energy gate, `would_shield`, and the form-changer's
+moves in `apply_form_change`), so the bandaid fires exactly where PvPoke's
+bandaid[885] does. Why the 2026-04-15 keep-our-plan decision below was
+reversed: its rationale ("ours retains 23-30pp more HP in 6 of 7 cases")
+was measured under the legacy turn system; the 2026-09-09 re-derivation
+under the new turn system inverted it (PvPoke's Fly chain scored 72-129
+points higher for Moltres-G in every divergent cell, and Lapras [1,2] was
+still a winner flip against us). Michael's call 2026-09-25: "do what's
+consistent with the new turn system." Verification: the 243-cell oracle
+audit -- the six Moltres-G cells VANISHED as divergences (score and
+chargedLog now exact), nothing else moved; `tests/test_battle.py`
+`test_moltres_g_nearKO_plan_divergence_pinned` pins PvPoke's values and
+fails on the old engine. One deviation stays: bandaid[866] only swaps when the target cms[0] is
+non-debuffing, so the both-self-debuff cluster (docs/reviews/
+2026-06-28_both_self_debuff_divergence_cluster.md, KEEP) is unchanged;
+PvPoke swaps into another self-debuffing move there. Engine hash bump
+d78c67fd06a7 -> 5a813036625c; cache migration predicate
+`cached_damage_refresh_20260925` (self-debuff-either-side, see
+scripts/migrate_cache.py). The text below is the original analysis, kept
+as history.
 
 **Mechanism (localized 2026-04-15 followup session):** The divergence
 is NOT a difference in the near-KO DP's plan output — both sims' DPs
