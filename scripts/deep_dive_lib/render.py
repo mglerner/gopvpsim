@@ -50,6 +50,53 @@ parse_energy = rendering.parse_energy
 score_key = rendering.score_key
 
 
+# ---- Per-pass memo for the anchor-flip aggregator --------------------------
+# One level pass renders moveset 0's narrative (_generate_narrative_for_
+# moveset) and then its analysis (generate_analysis_sections), and both ran
+# aggregate_flips_by_anchor with IDENTICAL inputs for every opp-IV mode --
+# half of all aggregator calls were exact duplicates (2026-09-25 bake
+# attribution, R2). The caller (deep_dive._render_level_body) hands both one
+# fresh dict per pass as ``flip_memo``; None (every other caller) computes
+# directly, exactly as before.
+#
+# An entry is reused only when the inputs are the same objects (scores list,
+# anchor list, data_obj -- compared with ``is``; the entry holds strong
+# references so an id can never be recycled) and the same values (nIvs, nS,
+# nO, scenarios, opponents -- the two call sites build those lists
+# separately). Every consumer gets its own copy of each record: callers set
+# rec['bait_modes'] / rec['energy_modes'] and merge them across modes, so a
+# shared record would leak one consumer's modes into the other.
+
+def _copy_flip_record(rec):
+    out = dict(rec)                       # 'anchor' stays the SAME object
+    out['scenarios'] = list(rec['scenarios'])
+    out['passing_ivs'] = list(rec['passing_ivs'])
+    return out
+
+
+def _memo_aggregate_flips(flip_memo, key, scores_flat, nIvs, nS, nO,
+                          resolved_anchors, data_obj, scenarios, opponents,
+                          debug_stats=None):
+    """aggregate_flips_by_anchor through the per-pass memo (see above)."""
+    if flip_memo is None:
+        return _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO, resolved_anchors, data_obj,
+            scenarios, opponents, debug_stats=debug_stats)
+    same_objs = (scores_flat, resolved_anchors, data_obj)
+    same_vals = (nIvs, nS, nO, [tuple(s) for s in scenarios], list(opponents))
+    hit = flip_memo.get(key)
+    if (hit is None or any(a is not b for a, b in zip(hit[0], same_objs))
+            or hit[1] != same_vals):
+        stats: dict = {}
+        recs = _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO, resolved_anchors, data_obj,
+            scenarios, opponents, debug_stats=stats)
+        hit = flip_memo[key] = (same_objs, same_vals, recs, stats)
+    if debug_stats is not None:
+        debug_stats.update(hit[3])
+    return [_copy_flip_record(r) for r in hit[2]]
+
+
 # Dive-card spread selection. The card names the "Which one to build?"
 # section's own builds (deep_dive_which_build.card_specs) -- one spread per
 # named build, then the standouts -- and this cap is the hard ceiling on how
@@ -339,12 +386,16 @@ def _mirror_synth_scores(score_arrays, moveset_idx):
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
                                     has_toml_tiers, resolved_anchors=None,
-                                    *, species=None, focal_shadow=False):
+                                    *, species=None, focal_shadow=False,
+                                    flip_memo=None):
     """Generate narrative HTML for one moveset.
 
     Computes matchup boundaries (and optionally anchor-flip records if
     resolved_anchors are provided), auto-derives tiers, and renders the
     SwagTips-style IV Flavor Guide zone.
+
+    ``flip_memo`` is the per-pass memo shared with generate_analysis_sections
+    (see _memo_aggregate_flips); None computes everything directly.
 
     Returns narrative HTML string (may be empty).
     """
@@ -374,7 +425,8 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
             _scores = score_arrays.get(_key, [])
             if not _scores:
                 continue
-            _recs = _aggregate_flips_by_anchor(
+            _recs = _memo_aggregate_flips(
+                flip_memo, ('agg', moveset_idx, _mode),
                 _scores, nIvs, nS, nO,
                 resolved_anchors, data_obj, scenarios, opponents,
             )
@@ -489,7 +541,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                base_form_info=None,
                                card_builds=None,
                                card_builds_pinned=False,
-                               clusters_sink=None):
+                               clusters_sink=None,
+                               flip_memo=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -529,6 +582,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     light up "which of your IVs hit this breakpoint" annotations after
     the user loads their CSV. Populated as a side effect - callers who
     just want HTML can leave it at None.
+
+    ``flip_memo`` is the per-pass memo shared with the moveset's narrative
+    (see _memo_aggregate_flips); None computes everything directly.
     """
     nIvs = data_obj['nIvs']
     nS = data_obj['nScenarios']
@@ -947,7 +1003,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             if not _scores:
                 continue
             _debug: dict = {}
-            _recs = _aggregate_flips_by_anchor(
+            _recs = _memo_aggregate_flips(
+                flip_memo, ('agg', moveset_idx, _mode),
                 _scores, nIvs, nS, nO,
                 resolved_anchors_top, data_obj, scenarios, opponents,
                 debug_stats=_debug,
