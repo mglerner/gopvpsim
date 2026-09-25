@@ -408,16 +408,30 @@ def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
         'trivial_partition': 0, 'no_clean_scenario': 0, 'emitted': 0,
     }
 
-    # Vectorise: reshape scores once, evaluate each anchor's partition via
-    # boolean masks over the IV dim, collapse win counts over scenarios.
-    # Without this the HP co-condition search dominates narrative compute
-    # (see S8a profile 2026-04-17: 236s / 86% of narrative on a 1-moveset
-    # Oinkologne dive was concentrated in the per-anchor HP sweep).
+    # Vectorised. The win matrix is built ONCE for every opponent, and each
+    # opponent's (nIvs, nS) slice is made contiguous once, so per anchor the
+    # pass-side win counts are one mask @ matrix product and the fail side
+    # is the opponent's total minus that (2026-09-25, R2: the old loop
+    # re-thresholded and fancy-indexed the scores per anchor and per HP
+    # floor, ~2 s per call on a 2,424-anchor UL dive, 8 calls per pass).
+    # The HP co-condition search is the find_matchup_boundaries trick: the
+    # passing IVs sorted by HP make every "hp >= floor" subset a suffix, so
+    # all floors' counts come from one reversed cumulative sum, and the
+    # original descending scan (first clean floor, keep relaxing while
+    # clean, stop at the first unclean one after that) runs over the
+    # precomputed per-floor verdicts. Every count is the same integer the
+    # old code summed and every rate the same int/int division, so records
+    # are identical (tests/test_aggregate_flips_vectorized.py pins that
+    # against the pre-vectorisation code on synthetic and real blobs).
     scores_np = np.asarray(scores_flat).reshape(nIvs, nS, nO)
     iv_atk_np = np.asarray(data_obj['ivAtk'])
     iv_def_np = np.asarray(data_obj['ivDef'])
     hp_raw = data_obj.get('ivHp') or []
     iv_hp_np = np.asarray(hp_raw) if len(hp_raw) else None
+
+    wins_all = scores_np > win_threshold          # (nIvs, nS, nO); 500 = tie
+    wins_total = wins_all.sum(axis=0)             # (nS, nO)
+    wins_by_opp: dict = {}                        # oi -> int64 (nIvs, nS)
 
     records = []
     for anchor in resolved_anchors:
@@ -443,9 +457,14 @@ def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
             stats['trivial_partition'] += 1
             continue
 
-        wins_for_opp = scores_np[:, :, oi] > win_threshold  # (nIvs, nS); 500 = tie
-        pw = wins_for_opp[passing_mask].sum(axis=0) / n_pass
-        fw = wins_for_opp[~passing_mask].sum(axis=0) / n_fail
+        wins_o = wins_by_opp.get(oi)
+        if wins_o is None:
+            wins_o = wins_by_opp[oi] = np.ascontiguousarray(
+                wins_all[:, :, oi], dtype=np.int64)
+        total_o = wins_total[:, oi]
+        pass_wins = passing_mask @ wins_o         # (nS,) int
+        pw = pass_wins / n_pass
+        fw = (total_o - pass_wins) / n_fail
         clean = (pw >= pass_winrate_min) & (fw <= fail_winrate_max)
 
         if clean.any():
@@ -467,41 +486,48 @@ def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
 
         # -- HP co-condition search for def-side anchors --
         # When a def partition alone isn't clean, try adding an HP floor
-        # to tighten the passing set. Iterate unique HPs within the
-        # passing set from highest to lowest — first clean scenario gives
+        # to tighten the passing set. Scan the unique HPs within the
+        # passing set from highest to lowest -- first clean scenario gives
         # the tightest useful floor; keep relaxing until clean disappears
-        # to find the minimum HP.
+        # to find the minimum HP. sub_pass = passing AND hp >= floor;
+        # sub_fail is its complement (failing OR passing-with-low-hp).
         if (anchor.target_stat == 'def' and n_pass > 1
                 and iv_hp_np is not None):
-            pass_hps = sorted(set(iv_hp_np[passing_mask].tolist()))
-            best_hp = None
-            best_scenarios = []
-            for hp_floor in reversed(pass_hps):
-                sub_pass_mask = passing_mask & (iv_hp_np >= hp_floor)
-                n_sp = int(sub_pass_mask.sum())
-                n_sf = nIvs - n_sp
-                if n_sp == 0 or n_sf == 0:
+            pass_idx = np.flatnonzero(passing_mask)
+            pass_hp = iv_hp_np[pass_idx]
+            order = np.argsort(pass_hp, kind='stable')
+            hp_sorted = pass_hp[order]
+            rows = wins_o[pass_idx[order]]        # (n_pass, nS), HP-ascending
+            suffix = np.zeros((n_pass + 1, nS), dtype=np.int64)
+            suffix[:n_pass] = np.cumsum(rows[::-1], axis=0)[::-1]
+            floors = np.unique(hp_sorted)         # ascending
+            starts = np.searchsorted(hp_sorted, floors, side='left')
+            n_sub_pass = n_pass - starts          # (nFloors,)
+            n_sub_fail = nIvs - n_sub_pass
+            sub_wins = suffix[starts]             # (nFloors, nS)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                spw = sub_wins / n_sub_pass[:, None]
+                sfw = (total_o - sub_wins) / n_sub_fail[:, None]
+            floor_clean = (spw >= pass_winrate_min) & (sfw <= fail_winrate_max)
+            floor_any = floor_clean.any(axis=1)
+            floor_vals = floors.tolist()
+            best_k = None
+            for k in range(len(floor_vals) - 1, -1, -1):
+                if n_sub_pass[k] == 0 or n_sub_fail[k] == 0:
                     continue
-                # sub_fail = failing ∪ (passing ∧ hp_low), which is ~sub_pass_mask
-                # because sub_pass_mask = passing ∧ hp_ok, so ~sub_pass_mask =
-                # failing ∨ (passing ∧ hp_low). Equivalent to the original.
-                spw = wins_for_opp[sub_pass_mask].sum(axis=0) / n_sp
-                sfw = wins_for_opp[~sub_pass_mask].sum(axis=0) / n_sf
-                hp_clean = (spw >= pass_winrate_min) & (sfw <= fail_winrate_max)
-                if hp_clean.any():
-                    best_hp = hp_floor
-                    best_scenarios = [scenarios[si]
-                                      for si in np.where(hp_clean)[0]]
-                else:
-                    if best_hp is not None:
-                        break
-            if best_hp is not None and best_scenarios:
+                if floor_any[k]:
+                    best_k = k
+                elif best_k is not None:
+                    break
+            if best_k is not None:
+                best_hp = floor_vals[best_k]
                 stats['emitted'] += 1
                 pass_and_hp_mask = passing_mask & (iv_hp_np >= best_hp)
                 records.append({
                     'anchor': anchor,
                     'opponent': anchor.opponent,
-                    'scenarios': best_scenarios,
+                    'scenarios': [scenarios[si] for si
+                                  in np.where(floor_clean[best_k])[0]],
                     'direction': 'gain',
                     'hp_threshold': best_hp,
                     'passing_ivs': np.where(pass_and_hp_mask)[0].tolist(),
