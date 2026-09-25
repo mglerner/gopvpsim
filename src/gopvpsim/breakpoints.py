@@ -25,13 +25,9 @@ These formulas match PvPoke's DamageCalculator.breakpoint / .bulkpoint.
 
 from typing import NamedTuple
 
-from .moves import (
-    damage as calc_damage,
-    type_effectiveness, stab as calc_stab,
-    BONUS, mega_multiplier, damage_constant,
-)
+from .moves import damage as calc_damage, mega_multiplier, damage_constant
 from .pokemon import (
-    get_species, best_level, CPM, LEAGUE_CAPS,
+    get_species, best_level, LEAGUE_CAPS,
     battle_stats, effective_stats, find_pokemon_entry,
     mega_level as _species_mega_level,
 )
