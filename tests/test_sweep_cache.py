@@ -287,6 +287,43 @@ def test_iv_sweep_cache_end_to_end(tmp_path, monkeypatch):
     assert ref3[1] - n3 == n_ref
 
 
+def test_all_miss_sweep_logs_its_cache_line(tmp_path, monkeypatch):
+    """A cold (all-miss) cached sweep logs 'sweep cache: 0/n' like any other.
+
+    Pre-fix (until 2026-09-25) the line was gated on ``if cached_cols:``, so
+    an all-miss sweep logged nothing and overnight_eta._agg_hit_ratio summed
+    only the sweeps that hit something: the 2026-09-20 bake read as 61% warm
+    (hits-only) when 42% of its 268,024 columns hit. The warm re-run is the
+    positive control that the line is still the one the ETA regex parses.
+    """
+    import deep_dive_lib.sweep as sweep_mod
+    import overnight_eta
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    lines = []
+    monkeypatch.setattr(sweep_mod.logger, 'info',
+                        lambda msg, *a, **k: lines.append(str(msg)))
+    opponents = ['Medicham']
+    opp_movesets = [get_default_moveset('Medicham', LEAGUE)]
+
+    _run_sweep(opponents, opp_movesets, use_cache=True)   # cold: 0 hits
+    cold = [ln for ln in lines if 'sweep cache:' in ln]
+    assert [ln.strip() for ln in cold] == [
+        'sweep cache: 0/1 opponent columns hit'], lines
+
+    lines.clear()
+    _run_sweep(opponents, opp_movesets, use_cache=True)   # warm: 1 hit
+    warm = [ln for ln in lines if 'sweep cache:' in ln]
+    assert [ln.strip() for ln in warm] == [
+        'sweep cache: 1/1 opponent columns hit'], lines
+    # Both lines feed the ETA's warm-fraction estimate: 1 hit of 2 columns.
+    assert overnight_eta._agg_hit_ratio('\n'.join(cold + warm)) == 0.5
+
+    # With the cache off there is no cache to report on.
+    lines.clear()
+    _run_sweep(opponents, opp_movesets, use_cache=False)
+    assert not [ln for ln in lines if 'sweep cache:' in ln], lines
+
+
 def _run_sweep_energy(opponents, opp_movesets, use_cache):
     """5-tuple sweep with energy captured (returns canonical_scores +
     canonical_energy at indices 2 and 4)."""
