@@ -42,6 +42,13 @@ ships.
 Usage:
     python scripts/verify_no_unicode_dashes.py PATH [PATH ...]
     python scripts/verify_no_unicode_dashes.py --ship
+    python scripts/verify_no_unicode_dashes.py --ship --jobs 1   # serial
+
+Files are scanned in a worker pool (``--jobs``, default
+min(12, cpu_count - 2)) and results are printed in input order, so the
+report is identical to a serial run (checked 2026-09-25 on the real
+site tree by diffing both). The default leaves cores free for the fast
+test tier, which run_ship_gates.py runs at the same time.
 
 The ``--ship`` flag expands to the Oinkologne pre-ship surface set
 mirroring ``verify_article_links.py``:
@@ -56,6 +63,8 @@ Exit code 0 when clean, 1 when any hit is found.
 from __future__ import annotations
 
 import argparse
+import multiprocessing
+import os
 import re
 import sys
 from html.parser import HTMLParser
@@ -387,6 +396,23 @@ def scan_file(path: Path) -> list[tuple[str, int, int, str, str]]:
     return scanner.hits
 
 
+def default_jobs() -> int:
+    """Pool size when --jobs is not given: min(12, cpu_count - 2), >= 1."""
+    return max(1, min(12, (os.cpu_count() or 1) - 2))
+
+
+def _scan_one(path: Path):
+    """Pool worker: (hits, None), or (None, message) if scan_file raised.
+
+    The message travels as a string because not every exception pickles.
+    main() prints it and stops at that file, exactly as the serial loop did.
+    """
+    try:
+        return scan_file(path), None
+    except Exception as exc:
+        return None, str(exc)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('paths', nargs='*', type=Path,
@@ -395,6 +421,10 @@ def main() -> int:
                         help='Scan the Oinkologne pre-ship surface set.')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Suppress per-file summaries; print hits only.')
+    parser.add_argument('-j', '--jobs', type=int, default=default_jobs(),
+                        help='Worker processes (default min(12, cpu_count-2)); '
+                             '1 runs serially in-process. The report is the '
+                             'same either way.')
     args = parser.parse_args()
 
     surfaces: list[Path] = list(args.paths)
@@ -405,23 +435,31 @@ def main() -> int:
         parser.error('Provide paths, or pass --ship for the pre-ship set.')
 
     total_hits = 0
-    for path in surfaces:
-        try:
-            hits = scan_file(path)
-        except Exception as exc:
-            print(f'{path}: could not read ({exc})')
-            return 1
-        try:
-            rel = path.relative_to(REPO_ROOT)
-        except ValueError:
-            rel = path
-        if not args.quiet:
-            status = 'OK' if not hits else f'{len(hits)} hit(s)'
-            print(f'{rel}: {status}')
-        for kind, lineno, col, container, snippet in hits:
-            print(f'  {rel}:{lineno}:{col}  {kind}-dash  in {container}'
-                  f'  "{snippet}"')
-        total_hits += len(hits)
+    jobs = max(1, min(args.jobs, len(surfaces)))
+    pool = multiprocessing.Pool(jobs) if jobs > 1 else None
+    try:
+        # imap, not imap_unordered: results come back in surface order,
+        # so the printed report is the serial one.
+        results = (pool.imap(_scan_one, surfaces) if pool
+                   else map(_scan_one, surfaces))
+        for path, (hits, exc) in zip(surfaces, results):
+            if exc is not None:
+                print(f'{path}: could not read ({exc})')
+                return 1
+            try:
+                rel = path.relative_to(REPO_ROOT)
+            except ValueError:
+                rel = path
+            if not args.quiet:
+                status = 'OK' if not hits else f'{len(hits)} hit(s)'
+                print(f'{rel}: {status}')
+            for kind, lineno, col, container, snippet in hits:
+                print(f'  {rel}:{lineno}:{col}  {kind}-dash  in {container}'
+                      f'  "{snippet}"')
+            total_hits += len(hits)
+    finally:
+        if pool:
+            pool.terminate()
 
     print()
     if total_hits:
