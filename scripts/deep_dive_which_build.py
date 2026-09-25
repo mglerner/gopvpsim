@@ -2439,18 +2439,6 @@ def family_title(f):
     return f"Family around {f['seed_iv'].split('@')[0]}"
 
 
-def family_counts(f):
-    """'54 spreads, guarantees 54 of 87' -- the legend key's tail."""
-    return (f"{brief._n(f['size'])} spreads, guarantees "
-            f"{brief._n(f['n_guaranteed'])} of "
-            f"{brief._n(f['n_decision_cells'])}")
-
-
-def family_legend(f):
-    """The plot legend key: name, rule, counts. Also the table row's cells."""
-    return f"{family_title(f)}: {f['rule']} ({family_counts(f)})"
-
-
 def family_of(bl, t):
     """The family seeded by one standout, or None."""
     fi = t.get('family')
