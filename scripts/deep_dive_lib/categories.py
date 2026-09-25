@@ -13,7 +13,6 @@ from gopvpsim.battle import WIN_RATING
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import deep_dive_analysis as analysis
 import deep_dive_rendering as rendering
-import deep_dive_slayer as slayer
 
 IVCategory = rendering.IVCategory
 parse_mode = rendering.parse_mode
