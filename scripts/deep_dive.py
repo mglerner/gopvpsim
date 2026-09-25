@@ -44,23 +44,21 @@ Examples:
 import argparse
 import itertools
 import json
-import math
 import os
 from pathlib import Path
 import sys
 import time
 import tomllib
-from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import (
     Pokemon, find_pokemon_entry, get_pokemon_entry, get_species, iv_rank,
-    CPM, best_level,
+    CPM,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL, bestbuddy_caps,
-    cp as calc_cp, pvpoke_default_ivs, mega_level,
+    pvpoke_default_ivs, mega_level,
 )
-from gopvpsim.moves import get_moves, type_effectiveness, stab
+from gopvpsim.moves import get_moves
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
 from gopvpsim.theme import (
     GRUVBOX_CREDIT_HTML,
@@ -73,43 +71,34 @@ from gopvpsim.theme import (
     theme_picker_html,
 )
 from gopvpsim.data import (
-    load_gamemaster, load_rankings, get_default_moveset,
-    sprite_data_uri, load_group as fetch_group, species_id,
+    load_gamemaster, get_default_moveset,
+    sprite_data_uri, load_group as fetch_group,
     cup_pretty_name, get_rankings_for, rankings_cache_path,
 )
 from gopvpsim.moves import parse_types
-from gopvpsim.battle import (
-    BattlePokemon, simulate,
-    pvpoke_dp, pvpoke_simulate_shield, ENERGY_CAP, WIN_RATING,
-)
-from gopvpsim.formchange import attach_form_change
+from gopvpsim.battle import WIN_RATING
 from gopvpsim.thresholds import (
-    ThresholdRegistry, load_file as load_threshold_file, as_legacy_dict,
+    load_file as load_threshold_file, as_legacy_dict,
 )
-from gopvpsim.anchors import (
-    resolve_anchors, ResolvedAnchor, build_auto_anchors,
-    derive_short_name,
-)
+from gopvpsim.anchors import resolve_anchors, build_auto_anchors
 from gopvpsim.display import apply_dive_title_override, pretty_species
 from gopvpsim.efficiency import efficient_frontier
 sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
-import deep_dive_matchup_clusters as matchup_clusters
 import deep_dive_rendering as rendering
 import deep_dive_slayer as slayer
 import pvpoke_links
-from deep_dive_logging import (
-    init_logger, worker_log_setup, get_logger,
-)
+from deep_dive_logging import init_logger, get_logger
 # Extracted deep-dive modules (DRY review 2026-08-05 entry 12 split). Every
 # name they took with them is re-exported below at the point it used to be
 # defined, so `import deep_dive` keeps resolving all of them. sys.path is set
 # up above at IMPORT time, not in main(), because a spawn-mode worker child
 # imports deep_dive_lib.sweep directly (review section G, invariant 22).
-# The imports ABOVE stay as they are even where the split left them unused in
-# this file: `deep_dive.<name>` is a read surface for tests and the analysis /
-# patch scripts (deep_dive.get_moves, deep_dive.get_rankings_for, ...), so
-# pruning them is a deliberate follow-up, not a side effect of moving code.
+# The imports ABOVE that the split left unused in this file were pruned
+# 2026-09-25 after a reader scan (no `deep_dive.<name>`, `from deep_dive
+# import <name>` or getattr use anywhere). The one unused import kept on
+# purpose is get_rankings_for: tests/test_opp_meta_ranks.py reads it as
+# deep_dive.get_rankings_for.
 from deep_dive_lib import (categories, opponents, render, robustness,
                            score_pack, sweep)
 

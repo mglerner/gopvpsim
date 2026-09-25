@@ -7,7 +7,6 @@ HTML generation -- no simulation or analysis logic.
 import hashlib
 import html as _html
 import json
-import math
 import re
 
 from dataclasses import dataclass, field

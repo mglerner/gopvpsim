@@ -13,19 +13,15 @@ Level 3 damage_breakpoint anchors expand into a *family* of ResolvedAnchors
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 from .breakpoints import (
     atk_for_damage, breakpoints as scan_breakpoints,
     def_for_damage, bulkpoints as scan_bulkpoints,
 )
-from .moves import damage as calc_damage, get_moves, parse_types
-from .pokemon import (
-    LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
-    Pokemon, best_level, battle_stats, find_pokemon_entry, get_species,
-    pvpoke_default_ivs,
-)
+from .moves import get_moves, parse_types
+from .pokemon import Pokemon, find_pokemon_entry, pvpoke_default_ivs
 from .thresholds import (
     BulkpointAnchor, CmpAnchor, DamageBreakpointAnchor, IvListSpread,
     LeagueThresholds, SpeciesThresholds, StatCutoffSpread, ThresholdRegistry,

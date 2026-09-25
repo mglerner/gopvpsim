@@ -58,7 +58,7 @@ import math
 
 from .evolution_lines import get_final_forms
 from .pokemon import (
-    CPM, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
+    LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
     battle_stats, best_level, cp as compute_cp, effective_stats,
     get_pokemon_index, iv_rank,
 )
