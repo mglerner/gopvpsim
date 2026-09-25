@@ -70,7 +70,6 @@ RANK_GATE = 50         # opponents beyond this rank do not decide a build
 TOPK_CELLS = 12        # S3 / S5: how many contested cells to package
 MAX_SETS = 18          # named sets kept per arm
 CLUSTER_SCEN_KEEP = 3  # S1: best-silhouette scenarios kept, plus "all"
-TYPICAL = 0.90
 EXACT_J, J99, J95 = 1.0, 0.99, 0.95
 MAX_BOX_CAND = 600
 AXES = ('atk', 'def', 'hp')
@@ -1589,9 +1588,10 @@ def standouts(ctx, frame, builds, weights, wsum):
 # the same 60 matchups is one offer printed five times.
 NOTABLE_DEDUP_J = 0.90
 
-# The fixed order. First wins the naming when two entries merge, so the two
-# standouts -- the spreads the plot marks and the cards headline -- lead.
-NOTABLE_ROLE_ORDER = ('wins', 'both', 'score', 'sp1', 'build')
+# The fixed order is the order notable_spreads() appends its candidates in:
+# the standouts, then SP1, then each build's member. First wins the naming
+# when two entries merge, so the two standouts -- the spreads the plot marks
+# and the cards headline -- lead.
 
 
 def notable_spreads(ctx, frame, builds, standouts_out, weights, wsum):

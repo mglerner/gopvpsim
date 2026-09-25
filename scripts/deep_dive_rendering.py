@@ -7,7 +7,6 @@ HTML generation -- no simulation or analysis logic.
 import hashlib
 import html as _html
 import json
-import math
 import re
 
 from dataclasses import dataclass, field
@@ -125,9 +124,6 @@ class _TooltipRegistry:
     def dump(self) -> dict[str, str]:
         return {self._encode(i): t for i, t in enumerate(self._ordered)}
 
-    def count(self) -> int:
-        return len(self._ordered)
-
 
 _TOOLTIPS = _TooltipRegistry()
 
@@ -138,10 +134,6 @@ def reset_tooltip_registry() -> None:
 
 def dump_tooltip_registry() -> dict[str, str]:
     return _TOOLTIPS.dump()
-
-
-def tooltip_count() -> int:
-    return _TOOLTIPS.count()
 
 
 def tooltip_attr(text: str) -> str:
