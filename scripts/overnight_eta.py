@@ -160,13 +160,23 @@ def classify(slug: str) -> str:
 
 
 # A run whose aggregate sweep-cache hit ratio exceeds this is a warm
-# re-render, not a cold re-dive. Cold chains land ~0-38% (a fully-cold
-# all-miss sweep prints NO cache line, so the ratio stays low even with
-# some intra-chain sibling warming); warm re-renders land ~63-100%. 0.5
-# sits in the empty gap between the two populations.
+# re-render, not a cold re-dive.
+#
+# Re-checked 2026-09-25. Until then an all-miss sweep printed NO cache line
+# (sweep.py gated it on a hit), so the ratio summed only the sweeps that hit
+# something and read high. The 2026-09-20 bake read 0.614 (113,086 /
+# 184,218) and was skipped as "warm", yet it re-simmed 58% of its columns
+# over ~15.4 h of pool time; counting its 1,142 silent all-miss sweeps it is
+# 0.422 (113,086 / 268,024). Corrected values for the three chain logs still
+# on disk: 0.002 (09-10 short), 0.075 (09-10 Twilight Trails), 0.422
+# (09-20). A true warm re-render hits ~every column (~1.0). 0.5 still sits
+# between the two populations, so it is kept -- but the margin above the
+# 09-20 shape is only ~0.08, and chain logs written before 2026-09-25 still
+# carry the inflated hits-only ratio.
 WARM_RUN_HIT_RATIO = 0.5
 
 _CACHE_RE = re.compile(r'sweep cache:\s+(\d+)/(\d+) opponent columns hit')
+_DEDUP_RE = re.compile(r'signature dedup: \d+ profiles x (\d+) opponents')
 _BANNER_RE = re.compile(r'\[(\d+)/(\d+)\]\s+([a-z-]+-(?:great|ultra|master)-league)')
 _DONE_RE = re.compile(r'Done in ([\d.]+) min')
 
@@ -179,13 +189,30 @@ from chain_logs import run_stamp as _run_stamp  # noqa: E402
 def _agg_hit_ratio(text: str) -> float | None:
     """Aggregate sweep-cache hit fraction across one run's log.
 
-    None when the run emitted no cache lines at all -- either pre-cache-era
-    or a fully-cold all-miss chain; both are 'cold' for our purposes.
+    None when the run emitted no cache or dedup lines at all (pre-cache-era);
+    that reads as 'cold' for our purposes.
+
+    Logs written before 2026-09-25 print no cache line for an ALL-MISS sweep
+    (see WARM_RUN_HIT_RATIO), so such a sweep is recovered from its
+    "signature dedup: P profiles x M opponents" line as 0/M. A dedup line
+    that follows a cache line reporting misses describes those same misses
+    and adds nothing; that pairing also keeps newer logs, which print
+    "sweep cache: 0/M" before the dedup line, from being counted twice.
     """
     hits = total = 0
-    for m in _CACHE_RE.finditer(text):
-        hits += int(m.group(1))
-        total += int(m.group(2))
+    open_misses = False
+    for line in text.splitlines():
+        m = _CACHE_RE.search(line)
+        if m:
+            hits += int(m.group(1))
+            total += int(m.group(2))
+            open_misses = int(m.group(1)) < int(m.group(2))
+            continue
+        m = _DEDUP_RE.search(line)
+        if m:
+            if not open_misses:
+                total += int(m.group(1))
+            open_misses = False
     return (hits / total) if total else None
 
 

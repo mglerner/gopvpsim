@@ -105,3 +105,35 @@ def test_current_run_excluded(tmp_path):
     table = oe._build_slug_timing_table(current)
     # The slug exists ONLY in the current run, which is excluded -> absent.
     assert "only-here-great-league" not in table
+
+
+def test_old_logs_recover_silent_all_miss_sweeps():
+    """Pre-2026-09-25 logs print no cache line for an all-miss sweep.
+
+    Such a sweep is recovered from its "signature dedup ... x M opponents"
+    line. Shape of the 2026-09-20 bake, scaled down: one partial-hit sweep
+    and one silent all-miss sweep. Pre-fix the ratio counted only the
+    partial sweep (6/10 = 0.6, over the warm cutoff, so the run was skipped
+    as a warm re-render -- the real bake read 0.614 that way); counting the
+    all-miss sweep's 10 columns gives 6/20 = 0.3, i.e. cold.
+    """
+    old_format = (
+        "[01:00:00]       sweep cache: 6/10 opponent columns hit\n"
+        "[01:00:00]       signature dedup: 2373 profiles x 4 opponents -> "
+        "9000 representative pairs (1.05x)\n"
+        "[01:05:00]       signature dedup: 2373 profiles x 10 opponents -> "
+        "20000 representative pairs (1.19x)\n")
+    assert oe._agg_hit_ratio(old_format) == 0.3
+    assert oe._agg_hit_ratio(old_format) < oe.WARM_RUN_HIT_RATIO
+
+
+def test_new_logs_are_not_double_counted():
+    """Newer logs print 'sweep cache: 0/M' AND the dedup line for the same
+    misses; the pair must count once. An all-hit sweep has no dedup line."""
+    new_format = (
+        "sweep cache: 6/10 opponent columns hit\n"
+        "signature dedup: 2373 profiles x 4 opponents -> 9000 pairs (1.05x)\n"
+        "sweep cache: 0/10 opponent columns hit\n"
+        "signature dedup: 2373 profiles x 10 opponents -> 20000 pairs (1.19x)\n"
+        "sweep cache: 10/10 opponent columns hit\n")
+    assert oe._agg_hit_ratio(new_format) == 16 / 30
