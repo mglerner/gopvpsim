@@ -71,11 +71,20 @@ def load_deep_dive():
 #   --energy-lead on   -> >1 energy value, so 'energy-sel' renders
 #   (--bait both, the default) -> both bait modes, so 'bait-sel' renders
 #   --policy both      -> both strategy tiers, so 'policy-sel' renders
-#                         (Bastiodon is a non-case species, so the
+#                         (Marill is a non-case species, so the
 #                         pogodives tier is byte-identical pvpoke sims --
 #                         cheap, and it exercises the fallback invariant
 #                         through a real render)
 #   (best-buddy auto on Great) -> the sidenav's 'dd-bb-toggle' renders
+#   Marill (not Bastiodon) -> best buddy is ACTIVE (its 14/14/14 IVs are
+#                         under 1500 CP at L50, so they climb to L51), so
+#                         the L51 <template>s render
+#                         and the DOM-id / tooltip / opp-anchor / clusters
+#                         guards see both halves of every host pair. Until
+#                         2026-09-25 this was Bastiodon, a best-buddy NO-OP
+#                         species; no-op dives stopped rendering the L51
+#                         pass then (tests/test_bb_noop_single_pass.py), so
+#                         a no-op fixture would leave those guards vacuous.
 #   (shield scenarios) -> --html implies --interactive, which expands 1,1 to
 #                         all nine, so 'scenario-sel' renders
 #
@@ -85,7 +94,7 @@ def load_deep_dive():
 # --no-sweep-cache while changing the engine": a WIP-engine run with the cache
 # on overwrites trusted columns in place).
 SMALL_DIVE_ARGS = [
-    'Bastiodon', '--league', 'great',
+    'Marill', '--league', 'great',
     '--opponents', '2', '--species-iv-floor', '14,14,14',
     '--top-movesets', '2', '--opp-ivs', 'both', '--energy-lead', 'on',
     '--policy', 'both',
