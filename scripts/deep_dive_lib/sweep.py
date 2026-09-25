@@ -649,8 +649,9 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 
     ``capture_energy`` (opt-in) also records the focal's post-match energy per
     (IV, scenario, opponent) -- the 5th return ``canonical_energy`` (parallel to
-    ``canonical_scores``); it is ``None`` otherwise. Capturing forces the disk
-    cache off (the cache stores only the score column).
+    ``canonical_scores``); it is ``None`` otherwise. Capturing does NOT bypass
+    the disk cache: every column stores the energy plane (cache v5), so this
+    flag only gates whether energy is returned.
 
     Returns (results, n_sims, canonical_scores, canonical_meta, canonical_energy)
     where results is one dict per IV, sorted by avg_score desc, and
@@ -777,9 +778,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                 required_planes=req_planes)
             if col is not None:
                 cached_cols[oi] = col
-        if cached_cols:
-            logger.info(f"      sweep cache: {len(cached_cols)}/"
-                        f"{len(opp_cache)} opponent columns hit")
+        # Logged on an all-miss sweep too (0/n). This line was once gated on
+        # `if cached_cols:`, so all-miss sweeps were silent and
+        # overnight_eta._agg_hit_ratio -- which sums these lines -- counted
+        # only the sweeps that hit something: the 2026-09-20 bake read as 61%
+        # warm when 42% of its 268,024 columns actually hit.
+        logger.info(f"      sweep cache: {len(cached_cols)}/"
+                    f"{len(opp_cache)} opponent columns hit")
     missing_ois = [oi for oi in range(len(opp_cache))
                    if oi not in cached_cols]
 
