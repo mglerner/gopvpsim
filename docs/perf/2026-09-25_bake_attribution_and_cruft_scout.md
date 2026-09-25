@@ -161,3 +161,44 @@ preceded by its own look-before-you-leap check; stop at the first surprise.
 
 Also pending a human: the 12 test-pinned replay blobs already missing from
 disk (tests skip on them today) -- re-pin or drop, undecided.
+
+## Results (2026-09-25, end of day)
+
+Landed on main (each merge commit records the first-hand review): the
+replay byte-diff harness `scripts/replay_render_diff.py`, R1 (render-side
+memo), R2 + R4 (per-pass memo, vectorized aggregator, numpy pack_u16), R5
+(concurrent ship gates, pooled scanners), R6 (sleep detection, keeper
+clock-jump WARN, timing report with a sleep bucket, all-miss cache line),
+and the cruft passes for scripts, dead code and tests. Fast tier on merged
+main: 2855 passed, 0 xfailed. All five baseline blobs render byte-identical.
+
+Paired timing, the same two blobs rendered at the same moment by the
+pre-change tree (4c20eae) and merged main (through 1f77e9d), full 5-moveset
+replay render, `--jobs 2` each:
+
+| blob         | before  | after   | speedup |
+| ------------ | ------- | ------- | ------- |
+| Jellicent UL | 372.5 s | 158.1 s | 2.4x    |
+| Melmetal GL  | 339.2 s | 129.2 s | 2.6x    |
+
+That is the render/analysis layer only (R1 + R2 + R4); R3 (skip the no-op
+best-buddy second pass) is on `swing/r3-noop-bb-pass` and is measured
+separately. Against the 18.6 h of single-core time in the 2026-09-20 bake,
+a 2.4-2.6x render speedup is consistent with the ~13-14 h ceiling above,
+but the bake-level number is only known after the next bake runs.
+
+Storage and cache, done by hand from this session: the two pre-Aegislash
+snapshots deleted (44.6 + 1.36 GB unique), both signature migrations
+applied (sweep 239,091 blessed / 43,077 unlinked; slayer 150 / 0), the
+153,376 legacy-gamemaster sweep columns GC'd (46.2 GB), the 99 legacy slayer
+entries removed (1.12 GB). Disk 752 GiB -> 653 GiB used. Sweep cache 71 GB,
+all 239,091 columns at engine d78c67fd06a7 / gamemaster 6d6e9a7bc32d, so the
+"apply the migrations before the next engine bump" gate is satisfied. The
+replay-blob prune (258 files, 9.5 GB; lists in the session scratchpad) was
+refused by the auto-mode classifier and is still Michael's to run.
+
+Open after today: the `swing/cruft-todo` merge (docs only; classifier
+refused it); the Moltres-G near-KO keep-vs-match decision (the documented
+rationale is reversed under the new turn system; tests pin ours and record
+PvPoke's); CLAUDE.md / DEVELOPER_NOTES corrections (Q7, deferred); the
+scout-only TODO sections.
