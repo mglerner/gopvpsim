@@ -31,11 +31,17 @@ test or documented guard, and the full root-cause writeups live in
    cost, but Shadow Ball does strictly more damage against Azumarill, so
    PvPoke's Gyro Ball pick scores lower for itself.
 4. **Near-KO plan choice: one big self-debuffing move vs a chain of cheaper
-   moves.** In a shields-down endgame our attacker prefers the single nuke
-   where PvPoke sometimes prefers a chain of cheaper non-debuffing throws. Ours
-   keeps 23 to 30 percentage points more HP in 6 of 7 measured cases (which
-   matters for the next Pokemon on a team) and loses one close bulky-defender
-   fight, which is pinned as an xfail. Neither plan is universally right.
+   moves -- RESOLVED 2026-09-25, we now match PvPoke.** In a shields-down
+   endgame PvPoke swaps a self-debuffing nuke for a chain of cheaper
+   non-debuffing throws; our port of that rule only saw the damage number it
+   reads when the nuke was already affordable, so we kept the nuke. That was
+   kept as a deliberate choice in April 2026 because it retained more HP under
+   the old turn system; re-measured under the current turn system PvPoke's
+   chain scored better in every measured cell, so the rule now fires where
+   PvPoke's does (DEVELOPER_NOTES "Near-KO DP plan choice") -- with one
+   exception we keep: when every charged move is self-debuffing, PvPoke
+   swaps one debuffing nuke for another worse-typed one and loses; ours
+   keeps the nuke (docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md).
 5. **Battle-length guard.** PvPoke ends a fight on a 240-second display clock
    that mixes turn time with charged-move animation time; ours is a flat
    500-turn cap. Both are infinite-loop guards and neither is reachable in a

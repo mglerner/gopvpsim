@@ -162,6 +162,30 @@ def _self_debuff_either_side(f, c):
     return bool(set(fch) & sd) or bool(set(cch) & sd)
 
 
+def _cached_damage_refresh_20260925(f, c):
+    """Moltres-G near-KO fix (pin --from-engine d78c67fd06a7 -> 5a813036625c;
+    slayer --from-engine b22f67b6ca64 -> d3ce425c2ce4).
+
+    The delta: the `_cached_damage` memo on each charged-move dict is now
+    written at PvPoke's four refresh points (simulate start, OMT for BOTH
+    sides' moves with no energy gate, would_shield, apply_form_change)
+    instead of only for affordable moves inside OMT. The memo has exactly
+    two readers: (1) OMT's own "can KO" test, which reads the value it just
+    wrote in the same loop iteration and still gates on affordability, so
+    its verdict is unchanged for every battle; (2) the post-DP bandaid[866],
+    which fires only when the acting side's DP-chosen first move is
+    self-debuffing (`cm_self_debuf[first_idx]`). A pokemon whose charged
+    moves are all non-self-debuffing can never satisfy (2), so a column is
+    provably unchanged iff NEITHER side owns a self-debuffing charged move
+    (both orientations are simulated) -- the same shape and proof as
+    `self_debuff_either_side`, including its Zap-Cannon battle-time
+    mutation caveat (measured harmless 2026-07-03). Verified 2026-09-25 by
+    the 243-cell oracle audit (only the six Moltres-G cells moved) and the
+    full battle tier. Fail-safe: unreadable movesets -> affected.
+    """
+    return _self_debuff_either_side(f, c)
+
+
 def _neutral_batch_20260810(f, c):
     """2026-08-10 behavior-neutral engine-hash batch (pinned --from-engine
     1415857072fa). The ENTIRE engine delta at this bump is: (a) comment-only
@@ -495,6 +519,7 @@ PREDICATES = {
         c is None or c.get('policy') == 'pogodives'),
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
     'self_debuff_either_side': _self_debuff_either_side,
+    'cached_damage_refresh_20260925': _cached_damage_refresh_20260925,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'cramorant_port_20260824': _cramorant_port_20260824,
     # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):

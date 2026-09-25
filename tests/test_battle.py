@@ -1830,71 +1830,52 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
 
 
 # ---------------------------------------------------------------------------
-# UL Moltres-G near-KO DP plan-choice divergence (intentional, mostly)
+# UL Moltres-G near-KO plan choice -- RESOLVED 2026-09-25, matches PvPoke
 # ---------------------------------------------------------------------------
-# Mechanism, the 2026-04 keep-our-behavior decision, and its revisit
-# triggers: DEVELOPER_NOTES "Near-KO DP plan choice: nuke-with-self-debuff
-# vs serial-Fly (intentional)" and docs/pvpoke_divergences.md item 4. In
-# short, PvPoke's post-DP bandaid swaps Moltres-G's self-debuffing Brave
-# Bird nuke for a Fly chain in these endgames; ours keeps the nuke.
+# Mechanism and history: DEVELOPER_NOTES "Near-KO DP plan choice" and
+# docs/pvpoke_divergences.md item 4. PvPoke's post-DP bandaid swaps
+# Moltres-G's self-debuffing Brave Bird nuke for a Fly chain in these
+# endgames; it reads `move.damage`, which PvPoke sets at battle start and
+# refreshes in OMT (every move, no energy gate), wouldShield and form
+# change. Our port refreshed the memo only for AFFORDABLE moves, so the
+# bandaid silently skipped here and we kept the nuke. That was documented as
+# an intentional deviation on 2026-04-15 (ours retained more HP under the
+# legacy turn system); the 2026-09-09 re-derivation under the new turn
+# system reversed the outcome in every cell, and on 2026-09-25 the memo was
+# brought in line with PvPoke's four refresh points (battle.py
+# _optimize_move_timing / simulate / would_shield, formchange.py).
 #
-# RE-DERIVED 2026-09-09 against PvPoke master under the new turn system
-# (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt, the
-# `*_vs_moltres_galarian` blocks). Until 2026-09-25 these seven cells were
-# strict xfails asserting the April-2026 legacy PvPoke scores, which neither
-# sim produces any more, so a regression here could not fail. Each cell now
-# asserts OUR current MG score and carries PvPoke master's alongside:
-#   - Corviknight [0,0]: converged, 456 in both sims (Corviknight wins in
-#     both) -- a plain PvPoke-certified pin.
-#   - Jellicent [0,0]/[0,1]/[0,2], Corviknight [0,1]/[0,2]: same winner (MG),
-#     but ours scores MG 71-109 points LOWER than PvPoke, i.e. our MG keeps
-#     LESS HP (Jellicent [0,0]: ours 10/161 HP left).
-#   - Lapras [1,2]: still a winner flip -- ours MG 482 (Lapras wins),
-#     PvPoke MG 611 (MG wins).
-#
-# FLAG, not resolved here: the DEVELOPER_NOTES rationale for keeping our
-# plan ("ours retains 23-30pp more HP in 6 of 7 cases") was measured under
-# the legacy turn system. On the 2026-09-09 numbers above PvPoke's plan
-# scores better for MG in every one of the six still-divergent cells, so
-# that rationale no longer holds as written and the keep-vs-match decision
-# needs re-vetting. These are divergence pins (catch a CHANGE), not a
-# certification that our value is the better one.
-#
-# The pinned PvPoke master score per cell (for the failure message).
-_MG_NEARKO_PVPOKE = {
-    ('Jellicent', 0, 0): 639, ('Jellicent', 0, 1): 779, ('Jellicent', 0, 2): 779,
-    ('Corviknight', 0, 0): 456, ('Corviknight', 0, 1): 652,
-    ('Corviknight', 0, 2): 760,
-    ('Lapras', 1, 2): 611,
-}
-
-
+# Every cell below is now PvPoke master's score AND chargedLog (243-cell
+# oracle audit 2026-09-25: the six former divergences VANISHED, nothing else
+# moved). Pre-fix values, for the record: Jellicent 531/670/670,
+# Corviknight 456/580/689, Lapras 482 (a winner flip: ours lost by 1 HP).
 @pytest.mark.integration
 @pytest.mark.parametrize("opp_species,opp_fast,opp_charged,opp_ivs,opp_level,"
                          "shields_opp,shields_mg,expected_mg_score", [
-    # Ultra League rank-1 IVs. expected_mg_score is OUR current value
-    # (equal to PvPoke's only for Corviknight [0,0]); see the block above.
-    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 0, 531),
-    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 1, 670),
-    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 2, 670),
+    # Ultra League rank-1 IVs. expected_mg_score is PvPoke master's value
+    # (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt); ours
+    # matches every cell since 2026-09-25.
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 0, 639),
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 1, 779),
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 2, 779),
     ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
      (0,15,15), 48.5, 0, 0, 456),
     ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
-     (0,15,15), 48.5, 0, 1, 580),
+     (0,15,15), 48.5, 0, 1, 652),
     ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
-     (0,15,15), 48.5, 0, 2, 689),
-    # Winner flip: PvPoke MG wins (611), ours MG loses (482).
+     (0,15,15), 48.5, 0, 2, 760),
+    # Pre-fix this cell was a winner flip (ours 482, MG lost by 1 HP).
     ('Lapras', 'PSYWAVE', ['SPARKLING_ARIA','ICE_BEAM'],
-     (0,15,15), 42.5, 1, 2, 482),
+     (0,15,15), 42.5, 1, 2, 611),
 ])
 def test_moltres_g_nearKO_plan_divergence_pinned(
         opp_species, opp_fast, opp_charged, opp_ivs, opp_level,
         shields_opp, shields_mg, expected_mg_score):
-    """Pin the UL Moltres-G near-KO DP plan-choice divergence.
+    """Pin the UL Moltres-G near-KO plan choice to PvPoke master.
 
-    Asserts OUR current MG score (a divergence pin, so a change is
-    caught); PvPoke master's score for the cell is in the failure
-    message. Only Corviknight [0,0] is also PvPoke's value.
+    Fails on the pre-2026-09-25 engine (the memo the post-DP bandaid
+    reads was only set for affordable moves): six of the seven cells then
+    scored 72-129 points lower for MG, and Lapras [1,2] flipped winner.
     """
     a, d, s = opp_ivs
     bp_opp = _make_battle_pokemon(
@@ -1909,12 +1890,10 @@ def test_moltres_g_nearKO_plan_divergence_pinned(
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp)
     mg_score = round(result.pvpoke_score(1))
-    pvpoke = _MG_NEARKO_PVPOKE[(opp_species, shields_opp, shields_mg)]
     assert mg_score == expected_mg_score, (
         f"opp={opp_species} sh=[{shields_opp},{shields_mg}]: "
-        f"expected MG score={expected_mg_score}, got {mg_score} "
-        f"(delta={mg_score - expected_mg_score:+d}); PvPoke master "
-        f"scores {pvpoke} for this cell"
+        f"expected MG score={expected_mg_score} (PvPoke master), got "
+        f"{mg_score} (delta={mg_score - expected_mg_score:+d})"
     )
 
 

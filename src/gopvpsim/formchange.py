@@ -555,3 +555,11 @@ def apply_form_change(bp, opponent, target_idx=None):
     bp._dp_init_cache = None
 
     bp._form_idx = target_idx
+
+    # resetMoves() -> initializeMove also re-stamps the form-changer's
+    # move.damage vs the opponent at its post-change stats and stages
+    # (Pokemon.js:880-889); the post-DP bandaid[866] reads that memo.
+    # Only bp's moves: the opponent's are refreshed by its own next OMT /
+    # wouldShield, as in PvPoke.
+    for cm in bp.charged_moves:
+        cm['_cached_damage'] = bp.charged_move_damage(cm, opponent)

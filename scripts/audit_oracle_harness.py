@@ -210,28 +210,28 @@ MATCHUPS = [
     dict(label='moltres_galarian_vs_florges', league='ultra',
          p1=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (4, 11, 11), 'moltres_galarian'),
          p2=P('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], (4, 13, 15), 'florges')),
-    # MG near-KO plan-choice cluster (intentional divergence, DEVELOPER_
-    # NOTES 'Near-KO DP plan choice'): our DP nukes with Brave Bird where
-    # PvPoke serial-Flys. xfail_cells filled from the audited grid.
-    # Audited grid 2026-06-11: (0,x) cells are the documented score-margin
-    # divergences (our MG retains ~29pp more HP, jellicent family d1=-146;
-    # near-KO plan choice, see DEVELOPER_NOTES). The (2,x) LOG-ONLY cells
-    # pinned earlier the same day vanished with the bait-wait fix (the
-    # hold wrongly excluded self-debuffing cms[1]).
+    # MG near-KO plan-choice cluster -- RESOLVED 2026-09-25 (DEVELOPER_
+    # NOTES 'Near-KO DP plan choice'): the `_cached_damage` memo the post-DP
+    # bandaid[866] reads is now refreshed at PvPoke's refresh points, so our
+    # DP Fly-chains where PvPoke does. All nine cells of each matchup match
+    # PvPoke master on score + chargedLog (audit 2026-09-25); the (0,x)
+    # cells were documented score-margin divergences from 2026-06-11 until
+    # then. The (2,x) LOG-ONLY cells pinned 2026-06-11 vanished with the
+    # bait-wait fix (the hold wrongly excluded self-debuffing cms[1]).
     dict(label='jellicent_vs_moltres_galarian', league='ultra',
          p1=P('Jellicent', 'HEX', ['SURF', 'SHADOW_BALL'], (6, 14, 15), 'jellicent'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
-         xfail_cells={(0, 0), (0, 1), (0, 2)}),
+         xfail_cells=set()),
     dict(label='corviknight_vs_moltres_galarian', league='ultra',
          p1=P('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], (0, 15, 15), 'corviknight'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
-         xfail_cells={(0, 0), (0, 1), (0, 2)}),
-    # (1,2) is the documented WINNER FLIP (PvPoke's Fly plan correctly
-    # wins the close fight; ours loses by 1 HP).
+         xfail_cells=set()),
+    # (1,2) was the documented WINNER FLIP (PvPoke's Fly plan wins the
+    # close fight; ours lost by 1 HP) until the 2026-09-25 fix.
     dict(label='lapras_vs_moltres_galarian', league='ultra',
          p1=P('Lapras', 'PSYWAVE', ['SPARKLING_ARIA', 'ICE_BEAM'], (0, 15, 15), 'lapras'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
-         xfail_cells={(1, 2)}),
+         xfail_cells=set()),
     # Cramorant form change + Gulp Missile (ported from pvpoke 78c64048a,
     # 2026-08-24; fixtures also pinned in tests/test_cramorant.py).
     # Gulping cycle + re-prey after the missile revert:

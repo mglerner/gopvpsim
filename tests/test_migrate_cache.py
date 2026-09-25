@@ -704,3 +704,25 @@ def test_slayer_path_never_touches_the_signature():
     assert 'iv_sweep' not in names and 'signature_groups' not in names
     assert 'build_battle_pair' in names                       # positive control
     assert migrate_cache.PREDICATES['signature_fix_slayer_20260923']({}, {}) is False
+
+
+def test_cached_damage_refresh_20260925_predicate():
+    """2026-09-25 Moltres-G near-KO fix (engine d78c67fd06a7 -> 5a813036625c):
+    the `_cached_damage` memo is now refreshed at PvPoke's refresh points.
+    Its only behavior-changing reader is bandaid[866], which needs the acting
+    side's DP-chosen first move to be self-debuffing, so the affected set is
+    exactly self_debuff_either_side's (both orientations). Pre-fix there was
+    no such predicate: the whole bump would have been a cold re-dive."""
+    p = migrate_cache.PREDICATES['cached_damage_refresh_20260925']
+    lick = {'species': 'Lickitung', 'fast': 'LICK',
+            'charged': ['BODY_SLAM', 'POWER_WHIP']}           # no self-debuff CM
+    azu = {'species': 'Azumarill', 'fast': 'BUBBLE',
+           'charged': ['ICE_BEAM', 'PLAY_ROUGH']}             # no self-debuff CM
+    mg = {'species': 'Moltres (Galarian)', 'fast': 'SUCKER_PUNCH',
+          'charged': ['FLY', 'BRAVE_BIRD']}                   # BRAVE_BIRD = SD
+    assert p(lick, azu) is False and p(azu, lick) is False   # bless
+    assert p(lick, mg) is True and p(mg, lick) is True       # either side
+    assert p(mg, mg) is True                                 # slayer mirror
+    # Fail-safe: an unreadable moveset is AFFECTED, never blessed.
+    assert p({'species': 'x'}, azu) is True
+    assert p(None, azu) is True
