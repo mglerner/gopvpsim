@@ -405,21 +405,6 @@ def test_sheet_tank_rules():
         B._POGODIVES_SHEET = saved
 
 
-def test_sheet_2v1_ready_nuke_gate():
-    """RETIRED 2026-09-10: the (2, 1) ready-nuke gate is gone.
-
-    The rule this pinned ('cmp_ready_dpt' with dpt_max 0.0150) stopped
-    paying after the Twilight Trails rebalance and (2, 1) is a full
-    exemption again -- see test_start_scenario_sheet_exemptions, which is
-    now what guards this start scenario.
-
-    Kept as a skip rather than deleted because the rule may come back: if
-    a future campaign re-derives a 2v1 discriminator, this is the shape of
-    the test it needs. The original body is in git history at 460a63e~1.
-    """
-    pytest.skip("(2, 1) is exempt again; see the docstring")
-
-
 def test_sheet_2v2_loaded_tank():
     """v4 2v2 'lead_ready' tank: decline the shield at 1.6 only while
     the opponent's POST-THROW energy still covers another charged move;
