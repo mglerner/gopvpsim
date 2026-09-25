@@ -6,6 +6,40 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## OPEN: Bake speed (2026-09-25 scout)
+
+Plan of record, with file:line evidence and the verified attribution of the
+2026-09-20 chain's 37.7 h: `docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md`.
+More than half of that bake ran on one core of 18 (the two render passes
+alone were 12.4 h). Ranked options, all **in progress on `swing/*`
+branches** (2026-09-25); none touches an engine-hashed file:
+
+- R1 -- memoize the rank-1 `iv_rank` lookup render-side (`_opp_link_data`,
+  per Michael's Q2 ruling; ~1.7 h/bake).
+- R2 -- `aggregate_flips_by_anchor`: compute once per render pass (the
+  narrative and analysis call it with identical inputs), then vectorize
+  (~5.9-7.9 h/bake).
+- R3 -- skip the second render pass on no-op best-buddy dives (~4.6 h/bake;
+  drops the L51 `<template>` on those pages, Michael's Q3 go).
+- R4 -- `find_matchup_boundaries` once per (mode, sweep) per pass (~1.2 h).
+- R5 -- run the four ship gates concurrently (~470 s per roster run).
+- R6 -- attribution guards: flag a system sleep inside the bake window, a
+  sleep bucket in `bake_timing_report.py`, log all-miss sweeps (`0/n`).
+
+Every render change ships behind the `scripts/replay_render_diff.py`
+byte-diff. Not ranked: `--jobs N` dive overlap (the "parallelize the dive
+step" plan below assumes 0.8 GB per dive; the scout saw 2.5-8.5 GB RSS,
+unverified).
+
+**Michael runs by hand** (irreversible; commands and look-first checks are
+in the doc's appendix), in order: (1) delete the
+`sweep_pre_aegislash_20260915` + `slayer_pre_aegislash_20260915` snapshots
+(~47 GB); (2) apply the two built signature migrations with `--apply` (next
+item); (3) GC the 153,376 legacy-mechanics `515a0a95171b` columns (~47 GB);
+(4) prune superseded replay blobs (~9.5 GB; keep-set = site-referenced +
+test-pinned + newest per key, NOT plain newest-per-key). Undecided: the 12
+test-pinned replay blobs already missing from disk (re-pin or drop).
+
 ## FUTURE: PoGoDives strategy page (Michael, 2026-09-24)
 
 Expand the Cramorant strategy article into ONE PoGoDives-strategy page with
@@ -96,7 +130,8 @@ Do NOT land another engine-hashed change before applying these, or the
 predicates' from->to delta no longer covers everything.
 
 **Bake estimate:** ~35-40 h migrated vs ~57 h cold (the 09-20 chain took
-37.7 h; sweep sims were only ~1.4 h of it). Run the pre-dive checklist first.
+37.7 h: sweep pool sims 15.4 h (cache only 42% warm after the ebf5944
+shadow bump) plus 1.4 h mirror-slayer). Run the pre-dive checklist first.
 
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
