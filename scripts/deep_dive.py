@@ -2744,11 +2744,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         ``robust_max_level`` is the focal cap for the opponent-IV robustness
         sim (None = league default; the alt cap for the L51 card)."""
         _n0 = _time.time()
+        # One memo per pass: moveset 0's narrative and analysis share their
+        # aggregator results through it (render._memo_aggregate_flips).
+        flip_memo = {}
         ms0_nar, ms0_flavors = _generate_narrative_for_moveset(
             dobj, sarr, 0, scenarios_list, opponent_names or [],
             opp_iv_modes or [dobj.get('oppIvModes', ['pvpoke'])[0]],
             has_toml_tiers, resolved_anchors=_resolved_anchors,
-            species=species, focal_shadow=shadow)
+            species=species, focal_shadow=shadow, flip_memo=flip_memo)
         logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
                     f"{_time.time() - _n0:.1f}s")
         sink = {}
@@ -2776,7 +2779,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             # Round 7: the Matchup clusters section comes back HERE instead
             # of inside an_html, so this function's caller can drop it into
             # the slot above the scatter controls.
-            clusters_sink=mc_sink)
+            clusters_sink=mc_sink, flip_memo=flip_memo)
         if split_info is not None:
             _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
             assert _expected in r_html, (
