@@ -30,8 +30,10 @@ the 2026-06-12 morning where they were done by hand):
    the older marker-species check on fresh GL dives. Proof the intended
    opponent pool actually loaded, and that no entry was silently dropped
    by a get_default_moveset failure.
-4. ship gates — verify_article_links --ship and
-   verify_no_unicode_dashes --ship, run as subprocesses.
+4. ship gates -- the full run_ship_gates.SHIP_GATES roster (fast
+   test tier, link scan, unicode-dash scan, dev-count sentinels), run
+   concurrently as subprocesses via run_ship_gates.run_roster, so the
+   step takes about as long as the fast test tier (~310-414 s).
 5. ML IV guides — every species in the ML pool (run_iv_guides'
    master_top60) must have a fresh _iv_envelope_all9.json, and the
    chain log must carry no "[WARN] ML IV guides" line. The ML bake is a
@@ -50,7 +52,6 @@ import argparse
 import datetime
 import json
 import re
-import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -529,16 +530,15 @@ def main() -> int:
     # 4. Ship gates ---------------------------------------------------
     # Roster imported from run_ship_gates (single source; entry 3b).
     print('[4/5] ship gates')
-    from run_ship_gates import SHIP_GATES
-    for gate, argv in SHIP_GATES:
-        r = subprocess.run(
-            [sys.executable, str(REPO / 'scripts' / gate), *argv],
-            capture_output=True, text=True)
+    # Run concurrently (run_roster); results come back in roster order.
+    from run_ship_gates import SHIP_GATES, run_roster
+    for r in run_roster(SHIP_GATES):
         tail = (r.stdout or r.stderr).strip().splitlines()[-1:]
-        verdict = 'OK ' if r.returncode == 0 else 'ERR'
-        print(f'  {verdict} {gate}: {tail[0] if tail else "(no output)"}')
-        if r.returncode != 0:
-            errors.append(f'{gate} failed (rc={r.returncode})')
+        verdict = 'OK ' if r.rc == 0 else 'ERR'
+        print(f'  {verdict} {r.gate} ({r.elapsed:.0f} s): '
+              f'{tail[0] if tail else "(no output)"}')
+        if r.rc != 0:
+            errors.append(f'{r.gate} failed (rc={r.rc})')
 
     # 5. ML IV guides -------------------------------------------------
     # The ML bake is a best-effort tail step (run_iv_guides outside step(),

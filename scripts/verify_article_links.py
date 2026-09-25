@@ -21,6 +21,13 @@ tool's scope wholesale.
 Usage:
     python scripts/verify_article_links.py PATH [PATH ...]
     python scripts/verify_article_links.py --ship
+    python scripts/verify_article_links.py --ship --jobs 1   # serial
+
+Files are verified in a worker pool (--jobs, default
+min(12, cpu_count - 2)) and results are printed in input order, so the
+report is identical to a serial run (checked 2026-09-25 on the real
+site tree by diffing both). The default leaves cores free for the fast
+test tier, which run_ship_gates.py runs at the same time.
 
 The --ship flag expands to the Oinkologne pre-ship surface set:
   - userdata/website/index.html (site index)
@@ -33,7 +40,10 @@ Exit code is 0 when there are zero broken internal refs, 1 otherwise.
 from __future__ import annotations
 
 import argparse
+import multiprocessing
+import os
 import sys
+from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse, unquote
@@ -194,6 +204,29 @@ def verify_file(path: Path, id_cache: dict[Path, set[str]]) -> tuple[list[str], 
     return errors, parsed.hrefs
 
 
+def default_jobs() -> int:
+    """Pool size when --jobs is not given: min(12, cpu_count - 2), >= 1."""
+    return max(1, min(12, (os.cpu_count() or 1) - 2))
+
+
+# Per-process id cache for _verify_one. With --jobs 1 this is the single
+# cache main() used to keep; in a pool each worker has its own. The
+# cache only saves re-parsing target pages (a page's ids do not depend
+# on which process parsed it), so splitting it changes no result.
+_ID_CACHE: dict[Path, set[str]] = {}
+
+
+def _verify_one(path: Path) -> tuple[list[str], int, Counter]:
+    """verify_file for one surface, reduced to what main() prints.
+
+    Returns (errors, href count, per-class counts), not the href list:
+    sending ~690k hrefs back through the pool pipe costs more than
+    counting them where they were parsed.
+    """
+    errs, hrefs = verify_file(path, _ID_CACHE)
+    return errs, len(hrefs), Counter(_classify(h) for h in hrefs)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('paths', nargs='*', type=Path,
@@ -202,6 +235,10 @@ def main() -> int:
                         help='Scan the Oinkologne pre-ship surface set.')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Suppress per-file summaries; print errors only.')
+    parser.add_argument('-j', '--jobs', type=int, default=default_jobs(),
+                        help='Worker processes (default min(12, cpu_count-2)); '
+                             '1 runs serially in-process. The report is the '
+                             'same either way.')
     args = parser.parse_args()
 
     surfaces: list[Path] = list(args.paths)
@@ -211,25 +248,33 @@ def main() -> int:
     if not surfaces:
         parser.error('Provide paths, or pass --ship for the pre-ship set.')
 
-    id_cache: dict[Path, set[str]] = {}
     total_hrefs = 0
     total_errors = 0
     counts = {'anchor': 0, 'internal': 0, 'external': 0, 'other': 0}
-    for path in surfaces:
-        errs, file_hrefs = verify_file(path, id_cache)
-        for h in file_hrefs:
-            counts[_classify(h)] += 1
-        total_hrefs += len(file_hrefs)
-        if not args.quiet:
-            status = 'OK' if not errs else f'{len(errs)} error(s)'
-            try:
-                rel = path.relative_to(REPO_ROOT)
-            except ValueError:
-                rel = path
-            print(f'{rel}: {len(file_hrefs)} hrefs, {status}')
-        for e in errs:
-            print(f'  {e}')
-        total_errors += len(errs)
+    jobs = max(1, min(args.jobs, len(surfaces)))
+    pool = multiprocessing.Pool(jobs) if jobs > 1 else None
+    try:
+        # imap, not imap_unordered: results come back in surface order,
+        # so the printed report is the serial one.
+        results = (pool.imap(_verify_one, surfaces) if pool
+                   else map(_verify_one, surfaces))
+        for path, (errs, n_hrefs, file_counts) in zip(surfaces, results):
+            for kind, n in file_counts.items():
+                counts[kind] += n
+            total_hrefs += n_hrefs
+            if not args.quiet:
+                status = 'OK' if not errs else f'{len(errs)} error(s)'
+                try:
+                    rel = path.relative_to(REPO_ROOT)
+                except ValueError:
+                    rel = path
+                print(f'{rel}: {n_hrefs} hrefs, {status}')
+            for e in errs:
+                print(f'  {e}')
+            total_errors += len(errs)
+    finally:
+        if pool:
+            pool.terminate()
 
     print()
     print(f'Scanned {len(surfaces)} file(s), {total_hrefs} href(s) '
