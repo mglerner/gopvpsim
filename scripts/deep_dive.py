@@ -2778,8 +2778,21 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # pass mutates data_obj (tier renames, pasteTiers, _cardCtx). Done here so
     # the L51 prose runs on the original tiers, not the renamed ones.
     import copy as _copy
+    # The best-buddy (L51) render pass runs only when best buddy is ACTIVE and
+    # NOT a no-op. On a no-op dive (every IV CP-capped below the alt cap) the
+    # L51 grids are aliases of the L50 grids, so the second pass re-rendered
+    # the same fight with renumbered ids plus a misleading "builds pinned to
+    # the league cap" card note, at ~30 s per page (~4.6 h per full bake,
+    # docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md R3). Michael's
+    # 2026-09-25 decision (Q3): skip the pass and ship no L51 <template>s.
+    # The hosts stay (unstyled wrappers) and the sidenav toggle stays (the
+    # consistent-UI decision of 2026-06-28, with its "no change for this mon"
+    # hint): _bbInitHost skips a host with no template, so the toggle only
+    # rebinds DATA to the aliased L51 arrays -- a true no-op, no console
+    # error. Same gate as _bb_section_active for the which-build section.
+    _bb_pass2 = _bb_active and not best_buddy.get('noop')
     _dobj51 = _sarr51 = None
-    if _bb_active:
+    if _bb_pass2:
         _dobj51 = _copy.deepcopy(data_obj)
         _dobj51.update(_dobj51.pop('ivL51'))   # override level-dependent arrays
         _dobj51.pop('bestBuddy', None)
@@ -2802,8 +2815,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
 
     # ---- Best-buddy (L51) pass: rendered into <template>s for the toggle ----
-    _results51 = _analysis51 = _card51_html = ''
-    if _bb_active:
+    _results51 = _analysis51 = _card51_html = _clusters51 = ''
+    if _bb_pass2:
         # The L51 body is a second, independent copy of the prose, so it needs
         # its own id="opp-<slug>" set: without this reset the first-mention-wins
         # registry (already fully claimed by the L50 pass) suppresses every
@@ -2826,7 +2839,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         if _bb_active:
             _card_block = (
                 f'<div id="dd-bb-card-host" class="dd-bb-host">{_card50_html}</div>'
-                f'<template id="dd-bb-card-tmpl">{_card51_html}</template>')
+                + (f'<template id="dd-bb-card-tmpl">{_card51_html}</template>'
+                   if _bb_pass2 else ''))
         else:
             _card_block = _card50_html
         html = html.replace('<!-- DIVE_CARD_SLOT -->', _card_block, 1)
@@ -2855,7 +2869,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if which_build_html:
         _wb50 = which_build_html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->',
                                          _clusters50 or '', 1)
-        if _bb_active and which_build_html_l51:
+        if _bb_pass2 and which_build_html_l51:
             _wb51 = which_build_html_l51.replace(
                 '<!-- MATCHUP_CLUSTERS_SLOT -->', _clusters51 or '', 1)
             _wb_block = (
@@ -2869,7 +2883,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             _mc_block = (
                 f'<div id="dd-bb-clusters-host" class="dd-bb-host">'
                 f'{_clusters50}</div>'
-                f'<template id="dd-bb-clusters-tmpl">{_clusters51}</template>')
+                + (f'<template id="dd-bb-clusters-tmpl">{_clusters51}</template>'
+                   if _bb_pass2 else ''))
         else:
             _mc_block = _clusters50
         html = html.replace('<!-- MATCHUP_CLUSTERS_SLOT -->', _mc_block, 1)
@@ -2882,9 +2897,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # host's innerHTML between the two on toggle.
     if _bb_active:
         html += (f'<div id="dd-bb-prose-host" class="dd-bb-host">'
-                 f'{results_html}{analysis_html}</div>'
-                 f'<template id="dd-bb-prose-tmpl">'
-                 f'{_results51}{_analysis51}</template>')
+                 f'{results_html}{analysis_html}</div>')
+        if _bb_pass2:
+            html += (f'<template id="dd-bb-prose-tmpl">'
+                     f'{_results51}{_analysis51}</template>')
     else:
         html += results_html
         html += analysis_html
