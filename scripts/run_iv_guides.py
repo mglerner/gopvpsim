@@ -4,21 +4,23 @@
 Each guide is one ``iv_envelope_analysis.py --all-shields`` run followed by a fast
 ``render_iv_envelope_article.py`` call. Since the 2026-06-27 cache-rework the
 analysis runs on the shared ``deep_dive.iv_sweep`` engine, which fans a SINGLE
-guide across all cores (multiprocessing.Pool, min(cpu_count, 16) workers) -- just
-like a GL/UL dive. So the right pattern now is SERIAL guides, each using all cores
-(the default), exactly mirroring run_website_dives.py.
+guide across all cores (multiprocessing.Pool, min(cpu_count, chunk count)
+workers; the old 16-worker cap is gone) -- just like a GL/UL dive. So the right
+pattern now is SERIAL guides, each using all cores (the default), exactly
+mirroring run_website_dives.py.
 
 History: pre-cache-rework each guide was single-process (~one core) with no
 internal worker pool, so this script ran several at once (physical cores -
 --reserve). That model now OVERSUBSCRIBES -- N concurrent guides x ~N workers each
-thrash a <=16-core machine. --jobs/--reserve still allow opting back into
-concurrency (useful only on >16-core hosts, where one guide caps at 16 workers and
-leaves cores idle); a warning fires when jobs > 1.
+thrash the machine. --jobs/--reserve still exist, but because one guide already
+uses every core, any value that yields more than one concurrent guide makes the
+concurrency preflight in main() ABORT (jobs x cores > physical cores) unless
+--allow-oversubscribe is also passed.
 
 Usage:
   python scripts/run_iv_guides.py                       # whole master_top60 pool (serial)
   python scripts/run_iv_guides.py --species "Metagross" "Kyogre"
-  python scripts/run_iv_guides.py --jobs 2              # opt into concurrency (>16-core hosts)
+  python scripts/run_iv_guides.py --jobs 2              # ABORTs at the preflight (see above)
   python scripts/run_iv_guides.py --skip-existing       # skip already-built guides
 """
 import argparse
@@ -126,8 +128,9 @@ def main():
                          'default is now SERIAL (one guide, all cores).')
     ap.add_argument('--jobs', type=int, default=None,
                     help='concurrent guides (default 1: serial, each guide fans '
-                         'across all cores via iv_sweep). >1 oversubscribes on '
-                         '<=16-core hosts -- only use on >16-core machines.')
+                         'across all cores via iv_sweep). >1 always '
+                         'oversubscribes, so the preflight ABORTs unless '
+                         '--allow-oversubscribe is also given.')
     ap.add_argument('--skip-existing', action='store_true',
                     help='skip species whose article dir already exists')
     ap.add_argument('--no-index-refresh', action='store_true',
@@ -187,8 +190,8 @@ def main():
             f'cores ({jobs} concurrent guides x {per_guide_workers} workers '
             f'each). Since the cache-rework one guide already saturates the '
             f'cores, so concurrent guides oversubscribe and risk OOM-killed / '
-            f'incomplete guides. Use the default (serial, --jobs 1) on a '
-            f'<=16-core host, or pass --allow-oversubscribe to override.')
+            f'incomplete guides. Use the default (serial, --jobs 1), or '
+            f'pass --allow-oversubscribe to override.')
     print(f'Detected {cores} physical cores; running {jobs} guide(s) '
           f'{"serially" if jobs == 1 else "concurrently"} '
           f'(each fans across all cores via iv_sweep).')
