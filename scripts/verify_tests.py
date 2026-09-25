@@ -19,12 +19,15 @@ Two checks in one gate:
    BUDGET ~5 MINUTES (310 s measured 2026-09-22 on an idle 18-core
    machine: 2,751 passed, 8 skipped, 156 deselected, 13 xfailed).
    Assume ~1.4x on a busy machine -- the previous 397 s baseline
-   measured 549 s under load. This gate runs twice around a bake --
-   once at the launch keyboard on every publish path, once as the
-   overnight chain's own last step -- so a stale number here is
-   unexplained wait, twice over. It said "~44s" until 2026-09-20 and
-   "~7 min" until 2026-09-22, when the five fast-tier tests over ~10 s
-   picked up `@pytest.mark.slow` (397 s -> 310 s).
+   measured 549 s under load. This gate runs three times per
+   bake->publish cycle -- as the overnight chain's own last step
+   (overnight_redive.sh step 9, or phase2_preship.sh), again in the
+   morning check (verify_overnight.py [4/5]), and again in
+   publish_website.sh (skipped under --partial) -- all via run_ship_gates.SHIP_GATES, so a stale
+   number here is unexplained wait, three times over. It said "~44s"
+   until 2026-09-20 and "~7 min" until 2026-09-22, when the five
+   fast-tier tests over ~10 s picked up `@pytest.mark.slow`
+   (397 s -> 310 s).
 
    If it needs to come down further, the lever is
    `tests/test_deep_dive_brief.py`: ~245 s of the 310, about 170

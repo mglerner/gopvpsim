@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all website dives serially (the focal list lives in
-# run_website_dives.DIVES -- 44 = 38 GL + 6 UL as of the 2026-06-27
-# refresh; DIVES is authoritative, the loop iterates it, so trust that
-# count over any literal here),
+# Runs all website dives serially (the focal list is
+# run_website_dives.DIVES, DERIVED from the opponent pools since
+# 2026-09-10 -- 136 dives when counted 2026-09-25; see
+# run_website_dives.DIVES for the live list, not any literal here),
 # patches per-opponent anchors, renders the Aegislash form-change comparison
 # page + first-draft narrative article and the Forretress/Jumpluff/Ninetales
 # comparison pages, bakes the Master-league ML IV guides (run_iv_guides.py,
@@ -13,7 +13,10 @@
 #
 # 2026-06-25 changes: the Oinkologne CD article + Male-vs-Female comparison
 # steps were removed (both pages archived/deleted from the site -- see
-# TODO.md); the ML IV-guide bake was added as a (long, ~7h cold) tail step.
+# TODO.md); the ML IV-guide bake was added as a tail step. (The old "~7h
+# cold" estimate predates the cache-rework. Measured with the sweep cache on:
+# 3.9 min on 2026-09-12, 194 s in the 2026-09-20 chain. A cold ML tail on the
+# current engine has NOT been measured.)
 # Concurrency (2026-06-27): dives run all-cores serially (--reserve-cpus 0);
 # ML guides run ONE-AT-A-TIME, each fanning across all cores (--jobs 1) --
 # since the cache-rework one guide already saturates the cores, so the old
@@ -28,7 +31,8 @@
 #
 # Morning check: `python scripts/verify_overnight.py` — one-shot
 # aggregate of chain status, dive-dir freshness (stale split-orphan
-# detection), opponent-pool sanity markers, and both ship gates.
+# detection), opponent-pool sanity markers, and all four ship gates
+# (run_ship_gates.SHIP_GATES).
 # (`tail userdata/logs/overnight_status.txt` is the raw pass/fail line;
 # scan the log file for per-step elapsed times.)
 set -euo pipefail
@@ -287,7 +291,8 @@ step "Rebuilding website index" \
     python scripts/build_website_index.py
 
 # 9. Final ship-gate sweep -- ALL gates from the shared roster
-#    (scripts/run_ship_gates.py: link verification + unicode-dash check).
+#    (run_ship_gates.SHIP_GATES: verify_tests, verify_article_links,
+#    verify_no_unicode_dashes, verify_dev_counts).
 #    This chain used to run only the link gate and could print SUCCESS
 #    with dash violations present (DRY review 2026-08-05 entry 3b).
 step "Running ship gates (roster: run_ship_gates.py)" \
