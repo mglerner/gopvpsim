@@ -105,6 +105,24 @@ cache_age_secs() {
 
 touch_data_cache
 
+# Sleep tripwire (2026-09-25). The keeper below cannot tick while the machine
+# is asleep, so when the wall clock moves much more than one poll between two
+# ticks, the excess is (roughly) system sleep. Write a WARN line into
+# the chain log so a paused bake is visible where its timings are read: the
+# 2026-09-20 bake lost 1.82 h to two lid-closes that were first misread as
+# slow render code, and the 2026-08-06 bake lost 18 h the same way.
+# verify_overnight.py's pmset check is the authoritative count; this is the
+# in-log breadcrumb. Defined before the fork (log() below is not).
+CLOCK_JUMP_SLACK="${CLOCK_JUMP_SLACK:-120}"   # seconds of lateness tolerated
+clock_jump_warning() {
+    local gap=$(( $2 - $1 ))
+    if [ "$gap" -gt $(( CACHE_TOUCH_POLL + CLOCK_JUMP_SLACK )) ]; then
+        printf '%s [WARN] wall clock jumped %ss between %ss keeper ticks (~%ss unaccounted): system sleep? see pmset -g log\n' \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "$gap" "$CACHE_TOUCH_POLL" \
+            "$(( gap - CACHE_TOUCH_POLL ))"
+    fi
+}
+
 # AGE-BASED, not interval-based (tightened 2026-09-10). data.py computes
 # staleness as `time.time() - mtime` -- WALL CLOCK, which keeps advancing while
 # the machine is asleep. A plain `sleep N` timer may not advance across system
@@ -118,9 +136,14 @@ touch_data_cache
 # chain dies, and the EXIT trap kills it promptly on a normal finish. Forked
 # BEFORE the trap is installed, so the subshell does not inherit it.
 (
+    last_tick=$(date +%s)
     while kill -0 $$ 2>/dev/null; do
         sleep "$CACHE_TOUCH_POLL"
         kill -0 $$ 2>/dev/null || break
+        now_tick=$(date +%s)
+        # `|| true`: a failed log write must not kill the TTL keeper (set -e).
+        clock_jump_warning "$last_tick" "$now_tick" >> "$LOG" || true
+        last_tick=$now_tick
         if [ "$(cache_age_secs)" -gt "$CACHE_TOUCH_MAX_AGE" ]; then
             touch_data_cache
         fi
