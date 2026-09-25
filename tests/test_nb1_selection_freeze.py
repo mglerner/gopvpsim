@@ -11,8 +11,14 @@ directions, including a shipped winner flip against us.
 
 Groups A and B are the ACCEPTANCE test of the fix: after the freeze these must
 equal the PvPoke oracle exactly. Group C pins the ONE dpe site kept
-intentionally FRESH (the don't-bait dpeRatio carve-out). Group D xfails the
-separate OMT ``turns_planned`` divisor infidelity until its own fix lands.
+intentionally FRESH (the don't-bait dpeRatio carve-out). Group D pins the
+separate OMT ``turns_planned`` divisor fix (0acdc8e), which also matches the
+oracle now.
+
+The A/B/D values were RE-DERIVED 2026-09-09 under the new turn system
+(c01aa6a, which names the cells it trace-verified against PvPoke master; the
+rest were re-pinned on that sample plus the engine-wide oracle agreement).
+Per-cell comments that quote a pre-freeze or legacy number say so.
 
 Pinned to the sweep's gamemaster (pvpoke @ 00f0afe7f, gamemaster md5
 363e44f3...); the sim-relevant subset (pokemon + moves) of the worktree's live
@@ -66,16 +72,19 @@ FLORGES_GL = ('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], 'g
     (GREEDENT, FORRE, 1, 1, 320),
     # 2: same, 1-2.
     (GREEDENT, FORRE, 1, 2, 224),
-    # 3: Forretress (Shadow) L23 vs Cradily L23.5, 1-0. SHIPPED WINNER FLIP:
-    #    was ours 413 (LOSS) vs oracle 588 (WIN); frozen -> 588 WIN.
+    # 3: Forretress (Shadow) L23 vs Cradily L23.5, 1-0. SHIPPED WINNER FLIP
+    #    under legacy: pre-freeze ours 413 (LOSS) vs oracle 588 (WIN), and
+    #    the freeze gave 588. Re-derived 2026-09-09 (new turn system): 508,
+    #    still a WIN.
     (FORRE_S, CRADILY, 1, 0, 508),
     # 4: Oranguru L41.5 vs Orthworm L46.5 UL, 1-1 (oracle-better direction).
     (ORANGURU, ORTHWORM, 1, 1, 359),
     # 5: same, 2-0 (was ours-better direction -- freeze gives up the
     #    accidental win to match the reference).
     (ORANGURU, ORTHWORM, 2, 0, 441),
-    # 6: Wigglytuff L27 vs Florges L16, 1-1 (was ours-better +56; freeze
-    #    matches oracle 576).
+    # 6: Wigglytuff L27 vs Florges L16, 1-1 (was ours-better +56 under
+    #    legacy, where the freeze matched oracle 576). Re-derived 2026-09-09:
+    #    476, trace-verified against PvPoke master in c01aa6a.
     (WIGGLY, FLORGES_GL, 1, 1, 476),
 ])
 def test_group_a_zeroguard_matches_oracle(focal, opp, sf, so, oracle):
@@ -92,10 +101,12 @@ FORRE_UL = ('Forretress', 'VOLT_SWITCH', ['SAND_TOMB', 'ROCK_TOMB'], 'ultra', Fa
 
 @pytest.mark.parametrize("focal,opp,sf,so,oracle", [
     # 7: Forretress (Shadow) mirror L23 GL, 1-2. Flooring-noise crossing
-    #    (ratio 1.495 live vs 1.52 frozen). Frozen -> oracle 296.
+    #    (ratio 1.495 live vs 1.52 frozen). Under legacy the freeze gave
+    #    oracle 296; re-derived 2026-09-09 (new turn system): 364.
     (FORRE_S, FORRE_S, 1, 2, 364),
     # 8: Forretress L47 vs Forretress (Shadow) L47 UL, 1-2. frozen 1.486 vs
-    #    live 1.508 crossing. Frozen -> oracle 468.
+    #    live 1.508 crossing. Under legacy the freeze gave oracle 468;
+    #    re-derived 2026-09-09 (new turn system): 472.
     (FORRE_UL, FORRE_S_UL, 1, 2, 472),
 ])
 def test_group_b_baitwait_matches_oracle(focal, opp, sf, so, oracle):
@@ -157,5 +168,7 @@ def test_group_d11_omt_divisor_matches_oracle():
     # Oinkologne (Female) L21 vs Forretress (Shadow) L23 GL, 0-1. Deathbed
     # ttl=4, energy=35: PvPoke divides by slot-0 (45e) -> waits and banks a
     # floating Mud Slap (+24); we used to divide by cheapest-affordable (35e)
-    # and fire 3 turns early (ours 280). After the divisor fix: 304 == oracle.
+    # and fire 3 turns early (ours 280). After the divisor fix: 304 == oracle
+    # under legacy. Re-derived 2026-09-09 (new turn system): 320,
+    # trace-verified against PvPoke master in c01aa6a.
     assert _score0(OINK_F, FORRE_S, 0, 1) == 320

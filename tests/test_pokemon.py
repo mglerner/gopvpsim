@@ -527,7 +527,9 @@ def test_pvpoke_default_ivs_cp_under_cap():
 #   - Master League (always 15/15/15)
 #
 # It may differ for common non-legendary Pokemon in older gamemaster entries.
-# The broad-match test is marked xfail to document this known limitation.
+# The broad-match tests (test_compute_default_ivs_mismatch_rate_sampled /
+# _full_sweep, below) pin that known limitation as a two-sided band on the
+# mismatch rate; they replaced the old permanent xfail on 2026-08-09.
 # ===========================================================================
 
 @pytest.mark.integration
