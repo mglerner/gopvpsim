@@ -1677,26 +1677,11 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
     )
 
 
-# Aegislash bandaid-triage xfails. Each reason pins the specific
-# divergence the chargedLog reveals, not just "scores don't match".
-# Captured 2026-04-15 from scripts/pvpoke_trace.js harness.
-_AEGI_XFAIL_GB_SHIELD_FIRST = pytest.mark.xfail(
-    strict=True,   # XPASS must be loud: it means PvPoke fixed bug #3 upstream
-    reason=(
-        "PvPoke bug #3: picks Gyro Ball over Shadow Ball for the first "
-        "(shielded) throw. GB and SB cost the same energy; SB does "
-        "strictly more damage. Since the first throw is shielded, both "
-        "score the same, but the chargedLog disagrees on which move was "
-        "thrown. Our Aegislash correctly picks SB."))
-_AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
-    strict=True,   # XPASS must be loud: it means PvPoke fixed bugs #2/#3
-    reason=(
-        "PvPoke bug #3 + #2: Aegislash throws 3x Gyro Ball where we "
-        "throw 3x Shadow Ball (with a Play Rough shielded in between). "
-        "Root cause: PvPoke picks GB over SB for Aegislash AND keeps "
-        "Azu's bestChargedMove cached against Shield-form def (IB), so "
-        "Azu never switches to PR after Aegi goes Blade. Our 510 vs "
-        "PvPoke's 376."))
+# Aegislash (1,1) and (2,1): OPEN divergence cells, pinned to OUR value (see
+# the test docstring). Value = PvPoke master's Aegislash score for the same
+# cell, from docs/validations/2026-09-09_oracle_new_vs_master_raw.txt, carried
+# into the assertion message so a failure shows both sides.
+_AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
 
 
 @pytest.mark.integration
@@ -1704,48 +1689,50 @@ _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
     # Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13, Great League
     # AEGISLASH_CHARGE_PSYCHO_CUT / SHADOW_BALL / GYRO_BALL
     # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
-    # Verified at pvpoke.com/battle/ 2026-04-14
     # Form change: Shield -> Blade on charged move (activate_charged),
     # Blade -> Shield on shield use (activate_shield).
     #
-    # Expected chargedLog is the PvPoke harness ground truth. Cases
-    # where our log disagrees with PvPoke's log get an xfail with a
-    # concrete reason describing the mechanical difference.
+    # RE-DERIVED 2026-09-09 against PvPoke master under the new turn
+    # system (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt,
+    # `aegislash_vs_azumarill_form_change`). Seven cells are OK there on
+    # score AND chargedLog, so score and log below are PvPoke's. Until
+    # 2026-09-25 six of the nine were strict xfails asserting April-2026
+    # legacy values (Gyro Ball logs, 374/640/376) that neither sim
+    # produces any more, so they pinned nothing.
     (0, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    pytest.param(0, 1, 374, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Shadow Ball',
-                             'Azumarill: Ice Beam'],
-                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
-    pytest.param(0, 2, 112, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Shadow Ball (shielded)',
-                             'Azumarill: Ice Beam'],
-                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
+    (0, 1, 348, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball',
+                 'Azumarill: Ice Beam']),
+    (0, 2, 112, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Azumarill: Ice Beam']),
     (1, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    pytest.param(1, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Shadow Ball (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Aegislash (Blade): Shadow Ball'],
-                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
-    pytest.param(1, 2, 376, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Gyro Ball'],
-                 marks=_AEGI_XFAIL_GB_CASCADE),
+    # DIVERGENCE PIN (ours 564, PvPoke master 618, same winner). Score is
+    # OURS; the chargedLog matches PvPoke's (oracle log_ok=True).
+    (1, 1, 564, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Aegislash (Blade): Shadow Ball']),
+    (1, 2, 382, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball']),
     (2, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    pytest.param(2, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Shadow Ball (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Aegislash (Blade): Shadow Ball'],
-                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
-    pytest.param(2, 2, 376, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Gyro Ball (shielded)',
-                             'Aegislash (Blade): Gyro Ball'],
-                 marks=_AEGI_XFAIL_GB_CASCADE),
+    # DIVERGENCE PIN (ours 550, PvPoke master 618, same winner). Score AND
+    # chargedLog are OURS: the oracle reports log_ok=False for this cell.
+    (2, 1, 550, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Azumarill: Play Rough (shielded)',
+                 'Aegislash (Blade): Shadow Ball']),
+    (2, 2, 382, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball (shielded)',
+                 'Aegislash (Blade): Shadow Ball']),
 ])
 def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
                                             expected_aegi_score, expected_log):
@@ -1755,9 +1742,11 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
     score 564/435 and 550/449 against PvPoke's 618/381. Both agree on the
     WINNER; the gap is that our Aegislash banks 100 energy in Shield form
     and throws on T44 where PvPoke commits on T30. Which is right is
-    unresolved (see scripts/mechanics_notice.py). The other seven cells
-    match PvPoke exactly. Pinned here so a CHANGE is caught, not because
-    the value is certified.
+    unresolved (see scripts/mechanics_notice.py). Those two are pinned so
+    a CHANGE is caught, not because the value is certified; PvPoke's
+    value rides in the failure message (_AEGI_OPEN_DIVERGENCE_PVPOKE).
+    The other seven cells match PvPoke master exactly on score, winner
+    and chargedLog (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt).
 
     Aegislash form change: Shield<->Blade on charged move / shield use.
 
@@ -1780,12 +1769,16 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
                       charged_policy_1=pvpoke_dp,
                       log=True)
     score = round(result.pvpoke_score(0))
+    pvpoke = _AEGI_OPEN_DIVERGENCE_PVPOKE.get((shields_a, shields_z))
+    note = ("" if pvpoke is None else
+            f" [divergence pin: expected is OUR value; PvPoke master "
+            f"scores {pvpoke}]")
     assert score == expected_aegi_score, (
         f"{shields_a}v{shields_z}: expected Aegislash score={expected_aegi_score}, "
-        f"got {score} (delta={score - expected_aegi_score:+d})"
+        f"got {score} (delta={score - expected_aegi_score:+d}){note}"
     )
     assert _extract_battle_log(result) == expected_log, (
-        f"{shields_a}v{shields_z}: chargedLog mismatch vs PvPoke harness"
+        f"{shields_a}v{shields_z}: chargedLog mismatch vs pinned log{note}"
     )
 
 
@@ -1812,8 +1805,7 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
     Assertion checks both PvPoke score AND chargedLog. chargedLog is
     diagnostic: it reveals the actual SS-delay / Azu-IB-timing
     divergences, whereas scores can coincidentally align even when the
-    fights play out differently (as they do in the score-match / log-mismatch
-    xfail cases below).
+    fights play out differently.
     """
     bp_m = _make_battle_pokemon(
         'Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
@@ -1840,75 +1832,69 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
 # ---------------------------------------------------------------------------
 # UL Moltres-G near-KO DP plan-choice divergence (intentional, mostly)
 # ---------------------------------------------------------------------------
-# Captured 2026-04-15. PvPoke's near-KO DP returns the slow multi-Fly plan
-# for Moltres-G vs Water-defender cases; ours returns the fast single-
-# BraveBird-nuke plan. In 6 of 7 cases (Jellicent/Corviknight clear wins)
-# ours retains 23-30pp more attacker HP and KOs 6-12 turns earlier with
-# the same winner — we keep our behavior.
+# Mechanism, the 2026-04 keep-our-behavior decision, and its revisit
+# triggers: DEVELOPER_NOTES "Near-KO DP plan choice: nuke-with-self-debuff
+# vs serial-Fly (intentional)" and docs/pvpoke_divergences.md item 4. In
+# short, PvPoke's post-DP bandaid swaps Moltres-G's self-debuffing Brave
+# Bird nuke for a Fly chain in these endgames; ours keeps the nuke.
 #
-# CAVEAT: 1 of 7 cases (Lapras [1,2]) is a winner-flip edge case. In that
-# close fight PvPoke's slower plan wins (MG 608) while ours loses (MG
-# 497, by a 1-HP margin). This is real evidence that PvPoke's plan is
-# better for close/bulky fights. The overall decision to keep our plan
-# rests on the 6:1 weight of clear-win cases; revisit if the flip
-# frequency grows (e.g. if wider harness sampling adds more bulky
-# opponents).
+# RE-DERIVED 2026-09-09 against PvPoke master under the new turn system
+# (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt, the
+# `*_vs_moltres_galarian` blocks). Until 2026-09-25 these seven cells were
+# strict xfails asserting the April-2026 legacy PvPoke scores, which neither
+# sim produces any more, so a regression here could not fail. Each cell now
+# asserts OUR current MG score and carries PvPoke master's alongside:
+#   - Corviknight [0,0]: converged, 456 in both sims (Corviknight wins in
+#     both) -- a plain PvPoke-certified pin.
+#   - Jellicent [0,0]/[0,1]/[0,2], Corviknight [0,1]/[0,2]: same winner (MG),
+#     but ours scores MG 71-109 points LOWER than PvPoke, i.e. our MG keeps
+#     LESS HP (Jellicent [0,0]: ours 10/161 HP left).
+#   - Lapras [1,2]: still a winner flip -- ours MG 482 (Lapras wins),
+#     PvPoke MG 611 (MG wins).
 #
-# Per CLAUDE.md "When our sim diverges from PvPoke" policy: we document
-# and xfail; XPASS on any of these alerts us to re-evaluate.
-_MG_NEARKO_PLAN = pytest.mark.xfail(
-    strict=True,   # XPASS must be loud: the divergence pin vanished — re-vet
-    reason=(
-        "Intentional divergence: our near-KO DP returns [Brave Bird] (fast "
-        "self-debuffing nuke); PvPoke returns [Fly, Fly, ...] (slow non-"
-        "debuffing serial). In 6 of 7 UL cases ours retains 23-30pp more "
-        "MG HP with same winner; 1 case (Lapras [1,2]) is a 1-HP winner "
-        "flip where PvPoke's slower plan is correct. See DEVELOPER_NOTES "
-        "'Known divergences: Near-KO DP plan choice'."))
-_MG_NEARKO_PLAN_FLIP = pytest.mark.xfail(
-    strict=True,   # XPASS must be loud: the winner flip resolved — re-vet
-    reason=(
-        "Same root cause as _MG_NEARKO_PLAN but this case is a WINNER "
-        "FLIP: PvPoke's Fly-Fly-Fly plan correctly predicts MG wins "
-        "(608), ours' BB-nuke predicts Lapras barely wins (497, 1-HP "
-        "margin). PvPoke is demonstrably better HERE. Kept as a cluster "
-        "xfail because the overall decision favors our plan across the "
-        "6:1 majority of cluster cases; this flip is the cost we pay."))
+# FLAG, not resolved here: the DEVELOPER_NOTES rationale for keeping our
+# plan ("ours retains 23-30pp more HP in 6 of 7 cases") was measured under
+# the legacy turn system. On the 2026-09-09 numbers above PvPoke's plan
+# scores better for MG in every one of the six still-divergent cells, so
+# that rationale no longer holds as written and the keep-vs-match decision
+# needs re-vetting. These are divergence pins (catch a CHANGE), not a
+# certification that our value is the better one.
+#
+# The pinned PvPoke master score per cell (for the failure message).
+_MG_NEARKO_PVPOKE = {
+    ('Jellicent', 0, 0): 639, ('Jellicent', 0, 1): 779, ('Jellicent', 0, 2): 779,
+    ('Corviknight', 0, 0): 456, ('Corviknight', 0, 1): 652,
+    ('Corviknight', 0, 2): 760,
+    ('Lapras', 1, 2): 611,
+}
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("opp_species,opp_fast,opp_charged,opp_ivs,opp_level,"
                          "shields_opp,shields_mg,expected_mg_score", [
-    # Ultra League rank-1 IVs; PvPoke harness ground truth captured
-    # 2026-04-15 from scripts/pvpoke_trace.js. In clear-win cases MG
-    # wins in both sims; the xfail pins the score margin (loser HP
-    # carry-over) where our retained HP diverges from PvPoke's.
-    pytest.param('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0,
-                 0, 0, 639, marks=_MG_NEARKO_PLAN),
-    pytest.param('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0,
-                 0, 1, 779, marks=_MG_NEARKO_PLAN),
-    pytest.param('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0,
-                 0, 2, 779, marks=_MG_NEARKO_PLAN),
-    pytest.param('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
-                 (0,15,15), 48.5, 0, 0, 521, marks=_MG_NEARKO_PLAN),
-    pytest.param('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
-                 (0,15,15), 48.5, 0, 1, 602, marks=_MG_NEARKO_PLAN),
-    pytest.param('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
-                 (0,15,15), 48.5, 0, 2, 683, marks=_MG_NEARKO_PLAN),
-    # Winner-flip edge case: PvPoke is correct here (MG wins 608), ours
-    # loses by 1 HP (MG 497). Same root cause as the cluster.
-    pytest.param('Lapras', 'PSYWAVE', ['SPARKLING_ARIA','ICE_BEAM'],
-                 (0,15,15), 42.5, 1, 2, 608,
-                 marks=_MG_NEARKO_PLAN_FLIP),
+    # Ultra League rank-1 IVs. expected_mg_score is OUR current value
+    # (equal to PvPoke's only for Corviknight [0,0]); see the block above.
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 0, 531),
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 1, 670),
+    ('Jellicent', 'HEX', ['SURF','SHADOW_BALL'], (6,14,15), 50.0, 0, 2, 670),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
+     (0,15,15), 48.5, 0, 0, 456),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
+     (0,15,15), 48.5, 0, 1, 580),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'],
+     (0,15,15), 48.5, 0, 2, 689),
+    # Winner flip: PvPoke MG wins (611), ours MG loses (482).
+    ('Lapras', 'PSYWAVE', ['SPARKLING_ARIA','ICE_BEAM'],
+     (0,15,15), 42.5, 1, 2, 482),
 ])
 def test_moltres_g_nearKO_plan_divergence_pinned(
         opp_species, opp_fast, opp_charged, opp_ivs, opp_level,
         shields_opp, shields_mg, expected_mg_score):
     """Pin the UL Moltres-G near-KO DP plan-choice divergence.
 
-    Asserts PvPoke harness score for MG. Currently xfails because our
-    DP picks Brave Bird (faster KO, more HP retained in 6/7 cases; 1
-    winner-flip edge case where PvPoke's plan is correct).
+    Asserts OUR current MG score (a divergence pin, so a change is
+    caught); PvPoke master's score for the cell is in the failure
+    message. Only Corviknight [0,0] is also PvPoke's value.
     """
     a, d, s = opp_ivs
     bp_opp = _make_battle_pokemon(
@@ -1923,10 +1909,12 @@ def test_moltres_g_nearKO_plan_divergence_pinned(
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp)
     mg_score = round(result.pvpoke_score(1))
+    pvpoke = _MG_NEARKO_PVPOKE[(opp_species, shields_opp, shields_mg)]
     assert mg_score == expected_mg_score, (
         f"opp={opp_species} sh=[{shields_opp},{shields_mg}]: "
         f"expected MG score={expected_mg_score}, got {mg_score} "
-        f"(delta={mg_score - expected_mg_score:+d})"
+        f"(delta={mg_score - expected_mg_score:+d}); PvPoke master "
+        f"scores {pvpoke} for this cell"
     )
 
 
