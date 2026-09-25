@@ -25,15 +25,17 @@ default timestamp made byte-identical data produce different HTML
 run-to-run -- caught by replay-vs-original diffing, arc S4), then
 base64'd for inline embedding.
 
-Stdlib only, and deliberately importable on its own: the ML-guide
-renderer must not have to import the ~8k-line ``deep_dive`` module just
-to spell its decoder. That also keeps it outside the
+Stdlib plus numpy only, and deliberately importable on its own: the
+ML-guide renderer must not have to import the ~8k-line ``deep_dive``
+module just to spell its decoder. That also keeps it outside the
 ``opponents -> sweep -> render`` import chain described in the package
 docstring -- ``score_pack`` depends on nothing in the package.
 """
 import base64
 import gzip
 import struct
+
+import numpy as np
 
 # One decoder body. ``__FN__`` is substituted, not formatted, so the JS
 # braces stay readable (an f-string / str.format template would have to
@@ -82,9 +84,27 @@ def pack_u16(values):
     The inverse of :func:`decoder_js`'s output. Values are clamped into
     ``[0, 65535]`` and truncated toward zero; ``mtime=0`` keeps the
     output byte-stable run-to-run.
+
+    A flat numeric array (every production caller: the score and energy
+    grids) is clamped in numpy -- truncate, clip, cast to little-endian
+    uint16 -- which is byte-identical to the per-value
+    ``max(0, min(65535, int(v)))`` it replaced (2026-09-25: 0.35 s -> 0.26 s
+    for a 2.3 M-value score list; gzip-9 is most of what is left).
+    Anything else (NaN or inf, which ``int()`` rejects; nested or
+    non-numeric input) takes that original per-value path, so it fails
+    exactly as before (tests/test_pack_u16_numpy_parity.py).
     """
-    clamped = [max(0, min(65535, int(v))) for v in values]
-    raw = struct.pack(f'<{len(clamped)}H', *clamped)
+    arr = np.asarray(values)
+    if (arr.ndim == 1 and arr.dtype.kind in 'biuf'
+            and (arr.dtype.kind != 'f' or np.isfinite(arr).all())):
+        if arr.dtype.kind == 'f':
+            arr = np.trunc(arr)
+        elif arr.dtype.kind == 'b':
+            arr = arr.astype(np.int64)
+        raw = np.clip(arr, 0, 65535).astype('<u2').tobytes()
+    else:
+        clamped = [max(0, min(65535, int(v))) for v in values]
+        raw = struct.pack(f'<{len(clamped)}H', *clamped)
     gz = gzip.compress(raw, compresslevel=9, mtime=0)
     return base64.b64encode(gz).decode('ascii')
 
