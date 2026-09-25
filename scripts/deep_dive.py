@@ -5513,8 +5513,14 @@ def main():
         # widget's CMP pill is like-for-like in best-buddy view (both mirror
         # sides best-buddied) rather than a best-buddy attack vs an L50 cohort.
         # One extra slayer pass, only when best-buddy is active and the L50
-        # --mirror-slayer pass actually ran. cache=None: these are distinct
-        # (best-buddy-level) sims, kept out of the L50 slayer cache.
+        # --mirror-slayer pass actually ran. cache=None, NOT slayer_cache: that
+        # SlayerCache is keyed on the L50 focal cap (compute_cache_key's
+        # focal_max_level, slayer cache v4+) and stores scores by
+        # (focal_idx, opp_idx) alone, so reusing it here would serve L50 scores
+        # as L51 ones. None gives iterative_slayer_discovery a throwaway
+        # in-memory SlayerCache(disk=False), so this pass re-sims on every
+        # bake. Since v4 a second SlayerCache keyed with
+        # focal_max_level=_bb_alt_cap could persist it; not wired up.
         main_slayer_iter_result_l51 = None
         if _bb_noop and main_slayer_iter_result:
             # No-op: the mirror cohort is identical at L51, so alias it (no
