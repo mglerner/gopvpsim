@@ -31,7 +31,7 @@ from deep_dive_logging import get_logger
 from deep_dive_lib.opponents import (
     parse_opponent_spec, resolve_opp_ivs, variant_ivs,
 )
-from deep_dive_lib.sweep import compute_iv_metadata, moveset_label
+from deep_dive_lib.sweep import compute_iv_metadata
 
 logger = get_logger()
 
