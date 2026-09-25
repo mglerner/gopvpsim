@@ -36,7 +36,8 @@ from gopvpsim.theme import (  # noqa: E402
 )
 from deep_dive_analysis import pretty_moveset  # noqa: E402
 
-# Hard cap on rendered recommendation spreads. Mirrors deep_dive.REC_MAX_SPREADS
+# Hard cap on rendered recommendation spreads. Mirrors
+# deep_dive_lib.render.REC_MAX_SPREADS
 # (kept as a local literal to avoid a circular import: deep_dive imports this
 # module). card_ctx already passes a pre-trimmed list of chosen spreads, so this
 # slice is a belt-and-suspenders bound; the .ddcard-spreads auto-fit grid wraps

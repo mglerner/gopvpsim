@@ -268,9 +268,6 @@ tier_slug = rendering.tier_slug
 # Moved to deep_dive_lib/categories.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
 build_iv_categories = categories.build_iv_categories
-_FORM_SHADOW_TAGS = categories._FORM_SHADOW_TAGS
-_base_opponent = categories._base_opponent
-_merge_matchup_variant_dupes = categories._merge_matchup_variant_dupes
 
 
 def auto_discover_thresholds(results, n_tiers=2):
@@ -606,11 +603,6 @@ def _read_best_buddy_toml(species, shadow):
 # the render_dive_html .get fallbacks (an old replay blob lacks the key).
 DEFAULT_CARD_ROBUST_K = 512
 
-# Moved to deep_dive_lib/render.py (DRY review 2026-08-05 entry 12
-# split); re-exported here so existing importers keep working.
-REC_MAX_SPREADS = render.REC_MAX_SPREADS
-REC_TWO_ONES_MIN_WINRATE_GAP = render.REC_TWO_ONES_MIN_WINRATE_GAP
-
 # Moved to deep_dive_lib/robustness.py (Worlds 2026 robustness split,
 # session 2); re-exported here so existing importers keep working. The
 # cache alias is the SAME dict object (tests clear it through this name).
@@ -676,32 +668,26 @@ def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
 # split); re-exported here so existing importers keep working.
 get_top_opponents = opponents.get_top_opponents
 resolve_opp_ivs = opponents.resolve_opp_ivs
-ATK_WEIGHTED_SUFFIX = opponents.ATK_WEIGHTED_SUFFIX
 _OPPONENT_VARIANT_REGISTRY = opponents._OPPONENT_VARIANT_REGISTRY
 register_opponent_variant = opponents.register_opponent_variant
 parse_opponent_spec = opponents.parse_opponent_spec
 build_opp_meta_ranks = opponents.build_opp_meta_ranks
 rankings_snapshot_date = opponents.rankings_snapshot_date
 _parse_opponent_pool_line = opponents._parse_opponent_pool_line
-ACTIVE_VARIANTS_PATH = opponents.ACTIVE_VARIANTS_PATH
 _apply_active_variants = opponents._apply_active_variants
-_atk_weighted_spread_name = opponents._atk_weighted_spread_name
 variant_ivs = opponents.variant_ivs
 expand_opponents_with_variants = opponents.expand_opponents_with_variants
 
 
 # Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
-sim_score = sweep.sim_score
 moveset_label = sweep.moveset_label
 moveset_label_raw = sweep.moveset_label_raw
-_REF_TIE_MARGIN = sweep._REF_TIE_MARGIN
 screen_movesets = sweep.screen_movesets
 
 
 # Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
-_worker_state = sweep._worker_state
 compute_iv_metadata = sweep.compute_iv_metadata
 
 slayer.compute_iv_metadata = compute_iv_metadata
@@ -712,99 +698,9 @@ slayer.compute_iv_metadata = compute_iv_metadata
 base_form_focal = render.base_form_focal
 
 
-def _form_damage_census(species, shadow, league, focal_moves, focal_types,
-                        iv, opp_info_cache, opp_names):
-    """UNUSED, superseded. Per-opponent RAW-damage break/bulkpoint sets.
-
-    Formerly fed ``form_sibling_trade``'s spanning bar, but the raw-damage
-    set-difference over-counts badly: the shadow's +20% atk beats the
-    non-shadow on ~every opponent and the -16.7% def loses on ~every opponent,
-    so the bar read "whole pool minus a few immunities" (the 73-vs-73 bug,
-    2026-06-24). The bar now uses the ANCHOR-based newly-guaranteed census
-    (the same basis as the per-spread ``n_breakpoint_newly``), computed at the
-    render call site. Kept for reference; no live callers.
-
-    Pure damage calc (the floor(0.5*1.3*Power*Atk/Def*Eff*STAB)+1 formula,
-    NO win sim) at a single representative IV spread ``iv = (atk_iv, def_iv,
-    sta_iv)``, evaluated under the league CP cap. Formerly set-differenced a
-    focal form against its sibling for ``form_sibling_trade``.
-
-    Returns ``(bp, blk)`` where:
-      * ``bp[opp_display]``  = max integer damage this form's BEST-damaging move
-        deals to that opponent (the breakpoint reach against it).
-      * ``blk[opp_display]`` = max integer damage that opponent's BEST-damaging
-        move deals to this form (the incoming hit the form takes; a HIGHER
-        def form takes LESS, so a smaller number is the bulkier outcome).
-
-    Both keyed by the pretty opponent display name. The caller compares two
-    forms' dicts: focal does +1 damage where ``bp_focal[X] > bp_sibling[X]``
-    (a newly-guaranteed breakpoint); focal takes -1 where
-    ``blk_focal[X] < blk_sibling[X]`` (a bulkpoint the focal holds and the
-    sibling gives up).
-    """
-    from gopvpsim.moves import damage as calc_damage
-
-    a_iv, d_iv, s_iv = iv
-    try:
-        mon = Pokemon.at_best_level(species, a_iv, d_iv, s_iv,
-                                    league=league, shadow=shadow)
-    except (KeyError, ValueError):
-        return {}, {}
-    focal_atk, focal_def = mon.atk, mon.def_
-
-    bp, blk = {}, {}
-    for name in opp_names:
-        info = opp_info_cache.get(name)
-        if info is None:
-            continue
-        _osp, _ovar, _oshadow = parse_opponent_spec(name)
-        # Keep the shadow qualifier so the bar's opp link matches the dive
-        # anchor: a shadow-only pool entry ("Dusknoir (Shadow)") must stay
-        # "Shadow Dusknoir" -> #opp-dusknoir-shadow, not bare "dusknoir".
-        disp = pretty_species(f'{_osp} (Shadow)' if _oshadow else _osp)
-        opp_atk, opp_def, opp_types = info['atk'], info['def_'], info['types']
-        # Outgoing: best integer damage any focal move does to this opponent.
-        out_best = None
-        for (_mid, power, mtype) in focal_moves:
-            d = calc_damage(power, focal_atk, opp_def, mtype,
-                            focal_types, opp_types)
-            if out_best is None or d > out_best:
-                out_best = d
-        if out_best is not None:
-            bp[disp] = max(bp.get(disp, 0), out_best)
-        # Incoming: worst integer damage any of the opponent's moves does to
-        # the focal at this def. (Max over moves = the threat hit the bulkpoint
-        # is measured against.)
-        in_worst = None
-        for (_mid, power, mtype) in info.get('moves', []):
-            d = calc_damage(power, opp_atk, focal_def, mtype,
-                            opp_types, focal_types)
-            if in_worst is None or d > in_worst:
-                in_worst = d
-        if in_worst is not None:
-            blk[disp] = in_worst if disp not in blk else min(blk[disp], in_worst)
-    return bp, blk
-
-
-# Moved to deep_dive_lib/render.py (DRY review 2026-08-05 entry 12
-# split); re-exported here so existing importers keep working.
-form_sibling_trade = render.form_sibling_trade
-
-
 # Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
-_stat_profile_key = sweep._stat_profile_key
-group_ivs_by_stat_profile = sweep.group_ivs_by_stat_profile
-
-
-# Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
-# split); re-exported here so existing importers keep working.
-# BattleSide/build_battle_pair are the D10 core the sweep worker, the
-# slayer worker and profile_slayer all construct their pair through;
 # SweepConfig (D9) is the run-wide knob block main() passes to iv_sweep.
-BattleSide = sweep.BattleSide
-build_battle_pair = sweep.build_battle_pair
-_METRIC_NAMES = sweep._METRIC_NAMES
 _sweep_worker_init = sweep._sweep_worker_init
 _sweep_worker = sweep._sweep_worker
 SweepConfig = sweep.SweepConfig
@@ -992,7 +888,6 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
 
 
 _threshold_desc = rendering.threshold_desc
-_scenario_ranks = rendering.scenario_ranks
 
 
 # Moved to deep_dive_lib/render.py (DRY review 2026-08-05 entry 12
@@ -1005,15 +900,8 @@ resolve_reference_moveset = render.resolve_reference_moveset
 # ---------------------------------------------------------------------------
 
 # Aliases for extracted analysis functions (deep_dive_analysis.py)
-_find_flips = analysis.find_flips
-_merge_flip_dicts = analysis.merge_flip_dicts
-_build_move_tuples = analysis.build_move_tuples
-_pretty_name = analysis.pretty_name
 _pretty_moveset = analysis.pretty_moveset
-_stat_cutoffs_from_anchors = analysis.stat_cutoffs_from_anchors
 _aggregate_flips_by_anchor = analysis.aggregate_flips_by_anchor
-_synthesize_mirror_tier = analysis.synthesize_mirror_tier
-_find_matchup_boundaries = analysis.find_matchup_boundaries
 _auto_derive_tiers = analysis.auto_derive_tiers
 
 
@@ -1023,7 +911,6 @@ _auto_derive_tiers = analysis.auto_derive_tiers
 _rename_plotly_tiers = render._rename_plotly_tiers
 _promote_flavors_to_paste_tiers = render._promote_flavors_to_paste_tiers
 _recompute_tier_assignments = render._recompute_tier_assignments
-_mirror_synth_scores = render._mirror_synth_scores
 _generate_narrative_for_moveset = render._generate_narrative_for_moveset
 generate_analysis_sections = render.generate_analysis_sections
 
