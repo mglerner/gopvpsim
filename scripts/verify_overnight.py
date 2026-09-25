@@ -20,7 +20,11 @@ the 2026-06-12 morning where they were done by hand):
    "Which one to build?: omitted/skipped" lines (see
    scan_which_build_omissions): deep_dive degrades that section to a
    WARNING and still exits 0, so the flagship section can vanish from a
-   whole bake with nothing red anywhere.
+   whole bake with nothing red anywhere. Finally it reads macOS
+   `pmset -g log` for system sleep inside the chain window (see
+   chain_sleep_report): a lid-close pauses the bake without failing
+   anything, and the 2026-09-20 bake's 1.82 h of clamshell sleep was first
+   misread as slow render code.
 2. freshness — every dive dir under userdata/website/ must have its
    index*.html either all newer than the chain start (re-dived) or all
    older (not in this chain). Mixed vintages mean stale split-file
@@ -127,6 +131,50 @@ def scan_which_build_omissions(log_text: str) -> list[str]:
                 or 'Which one to build?: skipped' in ln):
             out.append(f'which-one-to-build section missing: {ln.strip()}')
     return out
+
+
+def chain_sleep_report(pmset_text: str | None, start: float,
+                       end: float) -> tuple[str, str]:
+    """-> (verdict, message) for system sleep inside [start, end).
+
+    verdict is 'ERR' when the machine slept at all inside the chain window,
+    'OK' when the power log covers the whole window and shows no sleep, and
+    'SKIP' when it cannot say: no pmset (not macOS), pmset failed, an
+    unparseable log, or a log that begins after the chain did and shows no
+    sleep in the part it does cover. SKIP never counts as a failure.
+
+    Why red: a sleeping chain fails nothing -- every step still passes -- but
+    every wall-clock number from that bake (per-dive "Done in", the ETA seed
+    table, bake_timing_report) silently includes the slept time. The
+    2026-09-20 bake slept 1.82 h across two lid-closes, and the long gaps in
+    Jellicent UL and Shadow Charjabug were first blamed on render code. Once
+    the timings are understood, record a resolution for this log in
+    docs/chain_resolutions.toml (step "system slept") to clear it.
+    """
+    from pmset_sleep import overlap_seconds, parse_sleep_windows
+    if pmset_text is None:
+        return 'SKIP', ('system sleep unchecked: `pmset -g log` unavailable '
+                        '(not macOS, or pmset failed)')
+    windows, first = parse_sleep_windows(pmset_text)
+    if first is None:
+        return 'SKIP', ('system sleep unchecked: `pmset -g log` output had '
+                        'no timestamped lines')
+    slept = overlap_seconds(windows, start, end)
+    if slept > 0:
+        inside = [(s, r) for s, e, r in windows if min(e, end) > max(s, start)]
+        lids = [datetime.datetime.fromtimestamp(s).strftime('%m-%d %H:%M')
+                for s, r in inside if r == 'Clamshell Sleep']
+        lid_txt = (f', lid-close (Clamshell Sleep) at {", ".join(lids)}'
+                   if lids else '')
+        return 'ERR', (f'system slept {slept:.0f} s ({slept / 3600:.2f} h) '
+                       f'during the chain: {len(inside)} sleep entries'
+                       f'{lid_txt}; its wall-clock timings include this')
+    if first > start:
+        began = datetime.datetime.fromtimestamp(first)
+        return 'SKIP', (f'system sleep unchecked before {began:%Y-%m-%d %H:%M}'
+                        f': `pmset -g log` starts after the chain did (none '
+                        f'after that)')
+    return 'OK', 'no system sleep in the chain window (pmset -g log)'
 
 
 VINTAGE_FILE = 'vintage.toml'
@@ -417,6 +465,14 @@ def main() -> int:
             report(ln)
         if not wb:
             print('  OK  no which-one-to-build omission lines')
+        # Window = chain start .. the log's last write (the chain's end).
+        from pmset_sleep import read_pmset_log
+        verdict, msg = chain_sleep_report(
+            read_pmset_log(), cutoff, log_path.stat().st_mtime)
+        if verdict == 'ERR':
+            report(msg)
+        else:
+            print(f'  {verdict:<3} {msg}')
         # Staleness is judged against every line reported above, so an entry
         # may cover any of them -- and is still flagged when it covers none.
         for msg in stale_resolutions(resolutions, log_name, reported):
