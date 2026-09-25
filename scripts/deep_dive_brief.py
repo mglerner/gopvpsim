@@ -191,8 +191,6 @@ ACQUISITION_IV_FLOOR_NOTE = (
     "not over the whole grid")
 IV_FLOOR = 10                      # raid / research / trade floor, per IV
 
-SHIELD_LABELS = None  # filled per blob from state['shield_scenarios']
-
 BANNED_WORDS = (
     'recommend', 'recommended', 'best', 'strong', 'solid', 'definitive',
     'reliable', 'consistent', 'worth', 'great', 'good', 'bad', 'should',
@@ -250,10 +248,6 @@ FLOOR_DP_OPTIONS = {'atk': (2, 3), 'def': (2, 3, 4, 5, 6), 'hp': (2, 3)}
 # to. G-attributed is the gate; an UNATTRIBUTED cut is printed as evidence and
 # can never be the floor, on any axis.
 ATTRIBUTED_KINDS = ('cmp', 'breakpoint', 'bulkpoint', 'hp_bulkpoint')
-
-
-def axis_plane(planes, axis):
-    return planes[axis]
 
 
 class GuardError(RuntimeError):
@@ -946,10 +940,6 @@ def opponent_iv_grid(species, league, shadow):
                 lines[k] = pk.atk / SHADOW_ATK_BONUS if shadow else pk.atk
                 k += 1
     return lines
-
-
-COVERAGE_ROWS = ('rank-1', 'PvPoke default', '10/10/10', 'grid median',
-                 'hundo (15/15/15)', '12/12/12', 'max attack')
 
 
 def stage5_coverage(cut, state, mode, atk, league):
@@ -1904,9 +1894,6 @@ def _missed_row(rung, atk):
 # ---------------------------------------------------------------------------
 # Stage 12 -- degradation ladder
 # ---------------------------------------------------------------------------
-
-DEGRADATION_RUNGS = ('a', 'b', 'c', 'd', 'e', 'floor')
-
 
 def stage12_degradation(triage, cuts, rungs, floor, n_modes, n_arms, n_iv,
                         n_excluded=0):
@@ -3958,14 +3945,6 @@ def _settings_col(row):
     if lo == hi:
         return f"{_n(hi)}/{_n(tot)}"
     return f"{_n(lo)}-{_n(hi)} of {_n(tot)}"
-
-
-def _rung_line(row, dp_default=2, axis=None):
-    parts = [stat_threshold_str(axis or row.get('axis', 'atk'),
-                                row['printed'], row['dp']),
-             f"{_n(row['n_pass'])} spreads ({pct(row['pool_share'])})",
-             _cell_names(row)]
-    return '  '.join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -7462,14 +7441,6 @@ def document_html(title, subtitle, sections):
 # ---------------------------------------------------------------------------
 # One arm, end to end
 # ---------------------------------------------------------------------------
-
-def render_arm(state, arm, blob_path, mode='pvpoke', level='l50', same_as=None):
-    """Compute + render one arm. Returns (facts, html fragment)."""
-    ctx = {'blob': os.path.basename(blob_path), 'arm': arm, 'mode': mode}
-    facts = compute_brief(state, arm, blob_path, mode=mode, level=level)
-    return facts, render_facts(state, arm, blob_path, facts, mode, level,
-                               same_as=same_as)
-
 
 def shared_line_with(facts, earlier):
     """Label of an earlier moveset on this page printing the SAME result.
