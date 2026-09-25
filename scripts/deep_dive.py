@@ -690,6 +690,39 @@ variant_ivs = opponents.variant_ivs
 expand_opponents_with_variants = opponents.expand_opponents_with_variants
 
 
+# Page-side memo of resolve_opp_ivs for _opp_link_data (render path only).
+# Without it every split file re-ran the rank-1 iv_rank (4096 combos,
+# 63-76 ms) for every opponent x every rank1 mode, ~1.7 h per bake
+# (docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md R1).
+# Key = everything resolve_opp_ivs reads from its arguments: species, league,
+# shadow and the BASE opp-IV mode (resolve_opp_ivs itself strips the
+# bait/energy tags via parse_mode, so 'rank1' and 'rank1:nobait' share an
+# entry). It takes no level cap: rank 1 is ranked at the league's default
+# max level. The only other input is the gamemaster, so the memo joins
+# gopvpsim.invalidate_caches() (the mock_gm test fixture calls it on both
+# sides of a MOCK_GAMEMASTER swap). Process-local by construction. Placed
+# HERE, not in deep_dive_lib/opponents.py, on purpose: opponents.py feeds
+# the sweep workers' opp_cache and counts as worker code under the
+# CACHE_VERSION convention (sweep_cache.py) -- Michael's 2026-09-25 ruling.
+_OPP_LINK_IVS_MEMO = {}
+
+
+def _opp_link_ivs_cache_clear():
+    _OPP_LINK_IVS_MEMO.clear()
+
+
+def _memo_resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
+    key = (species_name, league, bool(shadow), parse_mode(opp_iv_mode)[0])
+    hit = _OPP_LINK_IVS_MEMO.get(key)
+    if hit is None:
+        if not _OPP_LINK_IVS_MEMO:
+            from gopvpsim import register_cache_invalidator
+            register_cache_invalidator(_opp_link_ivs_cache_clear)
+        hit = _OPP_LINK_IVS_MEMO[key] = tuple(
+            resolve_opp_ivs(species_name, league, shadow, opp_iv_mode))
+    return hit
+
+
 # Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
 sim_score = sweep.sim_score
@@ -1547,7 +1580,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         vi = variant_ivs(opp_clean, variant, league, threshold_registry)
         by_mode = {}
         for mode in opp_iv_modes:
-            oa, od, os_ = vi if vi is not None else resolve_opp_ivs(
+            oa, od, os_ = vi if vi is not None else _memo_resolve_opp_ivs(
                 opp_clean, league, opp_is_shadow, mode)
             op = Pokemon.at_best_level(opp_clean, oa, od, os_, league=league,
                                        shadow=opp_is_shadow)
