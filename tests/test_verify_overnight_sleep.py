@@ -115,6 +115,7 @@ def chain(tmp_path, monkeypatch):
     monkeypatch.setattr(vo, "dive_pool_map", lambda: {})
     ship = types.ModuleType("run_ship_gates")
     ship.SHIP_GATES = []
+    ship.run_roster = lambda gates: []   # verify_overnight imports it (R5)
     monkeypatch.setitem(sys.modules, "run_ship_gates", ship)
     guides = types.ModuleType("run_iv_guides")
     guides.DEFAULT_POOL = tmp_path / "ml_pool.txt"
