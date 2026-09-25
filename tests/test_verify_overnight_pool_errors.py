@@ -49,6 +49,7 @@ def gate(tmp_path, monkeypatch):
 
     ship = types.ModuleType("run_ship_gates")
     ship.SHIP_GATES = []
+    ship.run_roster = lambda gates: []
     monkeypatch.setitem(sys.modules, "run_ship_gates", ship)
     guides = types.ModuleType("run_iv_guides")
     guides.DEFAULT_POOL = tmp_path / "ml_pool.txt"
