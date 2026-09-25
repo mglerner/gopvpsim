@@ -226,7 +226,7 @@ constant drifted three times before its scans existed. The fix is
 
 Explicitly LEFT OPEN (verified as fine): `cache_base.py` (the
 "zero refs" was a matcher artifact -- 14 sweep-cache tests drive it
-through real disk I/O), `patch_iv_guide_nav_width.py` (legacy-only,
+through real disk I/O), `patch_iv_guide_nav_width.py` (deleted 2026-09-25, source at commit deb007f; legacy-only,
 self-reporting), `render_article.py` (dormant: zero valid TOML inputs
 exist today), `rerender_dive_cards.py` (fails loud), and the ~14
 one-off analysis scripts.

@@ -1,7 +1,7 @@
 # PvPoke harness-driven code review (2026-04-15)
 
 Research session: use the new headless Node harness
-(`scripts/pvpoke_trace.js`, `scripts/verify_pvpoke_harness.py`, 27/27
+(`scripts/pvpoke_trace.js`, `scripts/verify_pvpoke_harness.py` (deleted 2026-09-25; source at commit 789cb62), 27/27
 oracle green) to systematically surface places where our sim diverges
 from PvPoke or under-implements its behavior. **No fixes in this
 session** — the deliverable is a prioritized findings report plus

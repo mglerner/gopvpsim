@@ -6,7 +6,7 @@ which IVs to build, and does best-buddy (L51) vs regular (L50) change the call?
 
 Polished writeup: `~/coding/reports/dialga-palkia-origin-etm-ml-2026-06-19.html`.
 Raw tables: `userdata/dives/{dialga,palkia}_origin_etm_analysis.md` (gitignored).
-Tooling: `scripts/{dialga,palkia}_origin_etm_analysis.py`, `opponent_pools/master_top60.txt`,
+Tooling: `scripts/{dialga,palkia}_origin_etm_analysis.py` (deleted 2026-09-25; source at commits 48a8de9 / 4171011), `opponent_pools/master_top60.txt`,
 and the new `deep_dive.py --max-level` flag. Branch: `dialga-origin-etm-dive`.
 
 ## Method
