@@ -22,17 +22,22 @@ rankings refresh that changes resolution produces a different column key
 stamp (v7) — a stale-stamp column misses, and migrate_cache can bless the
 columns a balance patch provably doesn't touch.
 
-Columns store raw float64 per-IV scores in canonical iv_meta order,
-shape (n_ivs, n_scenarios) — ~300KB per column at 4096 IVs x 9
-scenarios — so replayed analysis is bit-identical to a fresh sim.
-S3's signature dedup is upstream and invisible here (columns hold
-post-fan-out scores).
+Each column is a multi-plane .npz (v5+; uncompressed np.savez via
+cache_base.write_planes) holding one (n_ivs, n_scenarios) array per
+plane in canonical iv_meta order: always score (float64) + energy
+(uint8), plus won/hp/max_hp/shields when the sweep captured metrics
+(the ML path). Dtypes are in _PLANE_DTYPES; every plane is exact, so
+replayed analysis is bit-identical to a fresh sim. A score+energy
+column at 4096 IVs x 9 scenarios is ~332KB. S3's signature dedup is
+upstream and invisible here (columns hold post-fan-out values).
 
-Layout on disk:
+Layout on disk (v7 schema, unchanged at v8; CACHE_VERSION is in the focal key):
   ~/.cache/gopvpsim/sweep/<species>_<league>_<focalhash12>/
       meta.json            human-readable focal-key fields
-      <colhash16>.npy      one score column
-      <colhash16>.json     human-readable column-key fields
+      <colhash16>.npz      one column: {plane_name: ndarray}
+      <colhash16>.json     sidecar: {'engine': <hash>, 'gamemaster':
+                           <hash>, 'col': <column-key fields>} -- the
+                           per-column stamps; a mismatch is a miss
 """
 import hashlib
 import json
