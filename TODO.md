@@ -31,14 +31,16 @@ byte-diff. Not ranked: `--jobs N` dive overlap (the "parallelize the dive
 step" plan below assumes 0.8 GB per dive; the scout saw 2.5-8.5 GB RSS,
 unverified).
 
-**Michael runs by hand** (irreversible; commands and look-first checks are
-in the doc's appendix), in order: (1) delete the
-`sweep_pre_aegislash_20260915` + `slayer_pre_aegislash_20260915` snapshots
-(~47 GB); (2) apply the two built signature migrations with `--apply` (next
-item); (3) GC the 153,376 legacy-mechanics `515a0a95171b` columns (~47 GB);
-(4) prune superseded replay blobs (~9.5 GB; keep-set = site-referenced +
-test-pinned + newest per key, NOT plain newest-per-key). Undecided: the 12
-test-pinned replay blobs already missing from disk (re-pin or drop).
+**Storage and cache, DONE 2026-09-25** (commands and counts in the doc's
+"Results" section): the two pre-Aegislash snapshots deleted (~46 GB), both
+signature migrations applied (sweep 239,091 blessed / 43,077 unlinked;
+slayer 150 / 0), the 153,376 legacy-mechanics `515a0a95171b` columns GC'd
+(46 GB), the 99 legacy slayer entries and 258 superseded replay blobs (9.5
+GB) removed. Disk 752 -> 650 GiB used. Every remaining sweep column is at
+engine d78c67fd06a7 / gamemaster 6d6e9a7bc32d, so the "apply the migrations
+before the next engine bump" gate is satisfied. Undecided: the 12
+test-pinned replay blobs already missing from disk (re-pin or drop; the
+tests skip on them today).
 
 ## FUTURE: PoGoDives strategy page (Michael, 2026-09-24)
 
@@ -1515,8 +1517,8 @@ CHANGELOG 2026-09-02..03 and 2026-09-09..10. Open:
   2026-09-09 re-measure (2 aegislash_blade, 1
   corviknight_vs_moltres_galarian). Do not un-xfail them piecemeal before
   the Aegislash cluster is understood; they may be the same root cause
-  moving. (The 13 strict xfails in `tests/test_battle.py` are also on the
-  2026-09-25 scout's Tests list.)
+  moving. (The 13 strict xfails in `tests/test_battle.py` became real pins on
+  2026-09-25; see that file's Aegislash / Moltres-G block comments.)
 - **Threshold-TOML prose (3b(c) of the 2026-09-09 re-vet):** 182
   descriptions cited a decimal number in prose; each one whose underlying
   threshold moved is now a wrong published sentence. d363b1d has since
