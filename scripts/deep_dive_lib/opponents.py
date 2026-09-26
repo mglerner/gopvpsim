@@ -47,6 +47,40 @@ def get_top_opponents(league, n, exclude_species=None):
     return opponents
 
 
+# Process-local memo of resolve_opp_ivs (perf plan R1,
+# docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md). The rank1 branch
+# is a full 4096-combo iv_rank (63-76 ms) and was recomputed for every
+# opponent on every rank-1 sweep (~1,432 sweeps x ~63 opponents per bake,
+# ~1.7-2.1 h single-core) plus again on every rendered split file.
+#
+# Safe because resolve_opp_ivs is a pure function of its arguments and the
+# gamemaster/rankings. Key = everything it reads from its arguments: species,
+# league, bool(shadow) and the BASE opp-IV mode (it strips the bait/energy
+# tags via parse_mode itself, so 'rank1' and 'rank1:nobait:e1' share one
+# entry). There is no level-cap argument: rank 1 is ranked at the league's
+# default max level. The gamemaster side is covered by joining
+# gopvpsim.invalidate_caches() (registered on first fill; the mock_gm test
+# fixture calls it on both sides of a MOCK_GAMEMASTER swap), so a swapped
+# gamemaster can never be served a stale entry. Values are immutable tuples.
+#
+# Where it runs: in the PARENT, at pool-load time -- the sweep builds opp_cache
+# from these IVs before the pool spawns, and workers consume the pre-resolved
+# IVs (see the opp_cache comment block below). A worker that does call it
+# gets its own empty memo (process-local by construction).
+#
+# Why this is NOT a sweep_cache CACHE_VERSION bump (Michael's call, pending):
+# the memo is output-identical by construction -- it returns exactly the ints
+# the direct computation returns (tests/test_resolve_opp_ivs_memo.py proves
+# it over both opponent pools, both modes, both shadow states) -- so the
+# opponent-IV fields of every column key (sweep_cache.column_key_fields) are
+# byte-identical and every cached column keys exactly as before.
+_RESOLVE_OPP_IVS_MEMO = {}
+
+
+def _resolve_opp_ivs_cache_clear():
+    _RESOLVE_OPP_IVS_MEMO.clear()
+
+
 def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
     """Return (atk_iv, def_iv, sta_iv) for an opponent based on the IV mode.
 
@@ -56,7 +90,24 @@ def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
 
     Tolerates composite mode strings like ``'pvpoke:nobait'`` - the bait axis
     is focal-side and has no effect on opponent IV selection, so we strip it.
+
+    Memoized per process (see ``_RESOLVE_OPP_IVS_MEMO`` above); the direct
+    computation is ``_resolve_opp_ivs_uncached``.
     """
+    base_mode, _ = parse_mode(opp_iv_mode)
+    key = (species_name, league, bool(shadow), base_mode)
+    hit = _RESOLVE_OPP_IVS_MEMO.get(key)
+    if hit is None:
+        if not _RESOLVE_OPP_IVS_MEMO:
+            from gopvpsim import register_cache_invalidator
+            register_cache_invalidator(_resolve_opp_ivs_cache_clear)
+        hit = _RESOLVE_OPP_IVS_MEMO[key] = tuple(
+            _resolve_opp_ivs_uncached(species_name, league, key[2], base_mode))
+    return hit
+
+
+def _resolve_opp_ivs_uncached(species_name, league, shadow, opp_iv_mode):
+    """The direct (un-memoized) computation behind ``resolve_opp_ivs``."""
     opp_iv_mode, _ = parse_mode(opp_iv_mode)
     if opp_iv_mode == 'rank1':
         ranked = iv_rank(species_name, league=league, shadow=shadow)
