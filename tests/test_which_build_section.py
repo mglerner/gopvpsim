@@ -66,8 +66,7 @@ AEGISLASH_SHIELD = '20260913_062354_Aegislash_Shield_great.replay.pkl.gz'
 # neither Sableye blob reaches.
 MELMETAL = '20260910_190103_Melmetal_great.replay.pkl.gz'
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / 'src'))

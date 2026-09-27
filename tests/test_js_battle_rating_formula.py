@@ -36,10 +36,9 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS = _ROOT / 'scripts'
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(_ROOT / 'src'))
 
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 HARNESSES = ('pvpoke_url_run.js', 'pvpoke_sandbox_driver.js',
              'pvpoke_trace.js')
