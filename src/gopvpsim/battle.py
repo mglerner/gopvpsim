@@ -3518,15 +3518,16 @@ def _apply_move_buffs(
 # Core simulation
 # ---------------------------------------------------------------------------
 #
-# EXPERIMENTAL TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP
-# turn system; live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026).
+# TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP turn system;
+# live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026). The default
+# since 2026-09-09.
 #
-#   *** UNVALIDATED -- there is NO PvPoke reference for this mode. ***
-#   PvPoke still implements the legacy turn system, so the 'new' branch is
-#   coded from the published spec alone and cross-checked only against our
-#   own spec-derived unit tests (tests/test_new_turn_mechanics.py), never
-#   against an external oracle. Treat all 'new'-mode breakpoint/CMP output
-#   as experimental.
+#   Cross-checked against PvPoke master, which implements this system since
+#   2026-09-09: scripts/audit_oracle_harness.py --mechanics new matches it
+#   on every oracle cell except the documented divergences on its MATCHUPS
+#   entries. Before that merge the 'new' branch was coded from the published
+#   spec alone and checked only by our spec-derived unit tests
+#   (tests/test_new_turn_mechanics.py).
 #
 # The spec lists five changes. Mapping to this engine:
 #

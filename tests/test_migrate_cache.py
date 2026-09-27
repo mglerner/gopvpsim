@@ -753,7 +753,7 @@ def test_cram_0v1_surf_gate_20260927_predicate():
 
 def test_aegislash_blade_atk_20260927_predicate():
     """Shield-form charged estimate at the Blade atk (engine 32a20be48379 ->
-    addf7deb49d7): affected iff an Aegislash (either start form) is on
+    45cf73a2d23d): affected iff an Aegislash (either start form) is on
     EITHER side; slayer mirrors iff the scenario species is an Aegislash.
     Pre-fix there was no predicate: the bump was a cold re-dive."""
     p = migrate_cache.PREDICATES['aegislash_blade_atk_20260927']
