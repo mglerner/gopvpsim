@@ -206,37 +206,21 @@ data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
 a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
 letting the live gamemaster refresh mid-bake -- is still unpinned.
 
-**Post-bake Cramorant verification -- still owed** (no evidence it ran
-after the 2026-09-20 bake; the strategy article is still the 2026-09-12
-render): `verify_overnight.py` + the ship gates, then
-`python scripts/cramorant_certify.py --league both --selftest 5 --out
-userdata/certify/cramorant_record.json` (the `--out` record is what
-`publish_website.sh` checks with `--check-record`; since 2026-09-27 a
-rendered Cramorant page that is missing from, or differs from, that record
-blocks the publish)
-(must print 0 bar failures, 0 exemption violations, selftest all exact) and
-`cramorant_mini_sweep.py --check-tensor` on the two v6 cells in
-`tests/test_pogodives_v6.py` (the Blade contamination is gone, so
---check-tensor is a full integer-exact gate again). `--league` and
-`--scenario` are REQUIRED, so the bare `... --check-tensor` form that used
-to stand here could not be run at all; both argv were verified against the
-current pages 2026-09-20:
+**Post-bake Cramorant verification -- DONE 2026-09-27** (CHANGELOG 2026-09-27
+"PoGoDives sheet v7"): the certifier found one uncertified page (GL Peck /
+Fly + Surf, entered via the 09-17 pool regeneration), sheet v7 fixed its 0v1
+row, both pages were re-dived and re-certified (720 cells, 0 failures,
+selftest 5/5 exact), the strategy article re-rendered, and the site published
+2026-09-27 18:4x. Standing runbook after every bake that touches Cramorant:
 
-    python scripts/cramorant_mini_sweep.py --league great \
-        --page index_m4_peck_hydro_pump_surf.html --scenario 2v2 \
-        --opp-ivs pvpoke --bait nobait --cap 50 --stride 1 --check-tensor
-    python scripts/cramorant_mini_sweep.py --league ultra \
-        --page index.html --scenario 1v0 \
-        --opp-ivs rank1 --bait bait --cap 51 --stride 1 --check-tensor
+    python scripts/cramorant_certify.py --league both --selftest 5 --out \
+        userdata/certify/cramorant_record.json
+    python scripts/render_pogodives_strategy_article.py --out <scratch>   # rehearse
+    python scripts/render_pogodives_strategy_article.py
+    python scripts/cramorant_certify.py --check-record userdata/certify/cramorant_record.json
 
-`--page` names a file in `userdata/website/cramorant-<league>-league/`, and
-the `index_mN_*` numbering comes from the bake's moveset SCREEN -- re-check
-the filenames after the re-dive (`index.html` is the landing, PECK / DIVE,
-FLY in both leagues; the GL v6 cell is the Peck / Hydro Pump + Surf page,
-the UL one is the landing). Then re-render the strategy article
-(`render_pogodives_strategy_article.py`; rehearse it with `--out <scratch>`
-first -- the showcase gate re-picks and page-verifies) and run
-`tests/test_pogodives_article_showcases.py`.
+`publish_website.sh` runs the last check itself and refuses to publish a
+rendered Cramorant page that is missing from, or differs from, the record.
 
 - **DEEP RE-VERIFICATION CAMPAIGN (started 2026-09-12, Fable's first look
   at the strat; Michael: "we're free to vet things deeply").** Instruments:
