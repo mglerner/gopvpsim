@@ -8,7 +8,6 @@ refuse loudly.
 """
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -276,7 +275,7 @@ console.log(JSON.stringify(out));
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_popover_script_behavior(tmp_path):
     """Exercise the hub popover script in node against a minimal DOM
     shim. Pre-2026-08-18 clicking a non-IV-decided matrix cell did

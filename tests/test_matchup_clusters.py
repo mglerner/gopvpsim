@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tests.conftest import load_deep_dive
+from tests.conftest import find_blob, load_deep_dive
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
@@ -948,24 +948,10 @@ def test_render_smoke_from_real_blob(tmp_path):
 SABLEYE_SHADOW_BLOB = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
 
 
-def _find_blob(name):
-    """This clone's blob store, then the sibling main checkout's.
-
-    A working clone shares the machine's replay blobs rather than
-    duplicating them (same lookup as tests/test_deep_dive_brief.py).
-    """
-    for d in (REPO_ROOT / "userdata" / "replay",
-              REPO_ROOT.parent / "gopvpsim" / "userdata" / "replay"):
-        p = d / name
-        if p.exists():
-            return p
-    return None
-
-
 def _blob_cluster_run(name):
     import gzip
     import pickle
-    path = _find_blob(name)
+    path = find_blob(name)
     if path is None:
         pytest.skip(f"{name} is not on this machine")
     with gzip.open(path, "rb") as f:
@@ -1057,7 +1043,7 @@ def test_combined_bits_are_ordered_most_discriminating_first():
     """
     import gzip
     import pickle
-    path = _find_blob(SABLEYE_SHADOW_BLOB)
+    path = find_blob(SABLEYE_SHADOW_BLOB)
     if path is None:
         pytest.skip(f"{SABLEYE_SHADOW_BLOB} is not on this machine")
     with gzip.open(path, "rb") as f:

@@ -31,6 +31,7 @@ import numpy as np
 import pytest
 
 from gopvpsim.battle import is_win, WIN_RATING
+from tests.conftest import strip_js
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / 'scripts'
@@ -105,10 +106,11 @@ def test_no_ge_against_win_boundary_variable_in_scripts():
 # BOTH guards below apply: no ``>=`` against the boundary, and no bare ``500``
 # comparison outside the one fallback declaration.
 #
-# Comments and strings are stripped by a real JS scanner (below), not by regex
-# over raw text: several legitimate comments discuss ">= 500" in prose, several
-# display strings spell the number for the reader, and several regex literals
-# contain quote characters that a naive stripper would swallow.
+# Comments and strings are stripped by a real JS scanner (``strip_js`` in
+# tests/conftest.py, self-tested below), not by regex over raw text: several
+# legitimate comments discuss ">= 500" in prose, several display strings spell
+# the number for the reader, and several regex literals contain quote
+# characters that a naive stripper would swallow.
 # ---------------------------------------------------------------------------
 
 _JS_GE_RE = re.compile(r'>=\s*(?:500(?![0-9.])|WIN_RATING\b)')
@@ -127,82 +129,6 @@ _JS_500_CMP_RE = re.compile(
 # match the regex above -- the allow-list is belt-and-braces against a
 # reformat).
 _JS_ALLOWED_500 = ('WIN_RATING_FALLBACK',)
-
-# Characters after which a `/` starts a regex literal rather than a division.
-_RE_PRECEDERS = set('(,=:[!&|?{};+-*%~^<>\n')
-
-
-def strip_js(text):
-    """Blank out JS comments, string literals and regex literals.
-
-    Removed regions are replaced by spaces so line numbers and columns are
-    preserved for reporting. Handles ``//`` line comments, ``/* */`` block
-    comments, ``'``/``"``/`` ` `` strings with backslash escapes, and regex
-    literals (disambiguated from division by the previous significant char).
-    """
-    out = list(text)
-    i, n = 0, len(text)
-    prev_sig = '\n'   # last significant (non-space) code character
-
-    def blank(a, b):
-        for k in range(a, b):
-            if out[k] != '\n':
-                out[k] = ' '
-
-    while i < n:
-        c = text[i]
-        if c == '/' and i + 1 < n and text[i + 1] == '/':
-            j = text.find('\n', i)
-            j = n if j < 0 else j
-            blank(i, j)
-            i = j
-            continue
-        if c == '/' and i + 1 < n and text[i + 1] == '*':
-            j = text.find('*/', i + 2)
-            j = n if j < 0 else j + 2
-            blank(i, j)
-            i = j
-            continue
-        if c in '\'"`':
-            j = i + 1
-            while j < n:
-                if text[j] == '\\':
-                    j += 2
-                    continue
-                if text[j] == c:
-                    j += 1
-                    break
-                j += 1
-            blank(i, j)
-            prev_sig = 'x'   # a string is a value, like an identifier
-            i = j
-            continue
-        if c == '/' and prev_sig in _RE_PRECEDERS:
-            j, in_class = i + 1, False
-            while j < n:
-                ch = text[j]
-                if ch == '\\':
-                    j += 2
-                    continue
-                if ch == '\n':
-                    break            # not a regex after all; bail
-                if ch == '[':
-                    in_class = True
-                elif ch == ']':
-                    in_class = False
-                elif ch == '/' and not in_class:
-                    j += 1
-                    break
-                j += 1
-            blank(i, j)
-            prev_sig = 'x'
-            i = j
-            continue
-        if not c.isspace():
-            prev_sig = c
-        i += 1
-    return ''.join(out)
-
 
 def test_strip_js_detects_only_real_code():
     """The JS scanner itself: code hits found, comment/string/regex hits not.
@@ -546,6 +472,7 @@ def test_dive_bakes_win_rating_into_data(small_dive_html):
     assert data['winRating'] == WIN_RATING
 
 
+@pytest.mark.node
 def test_js_helpers_agree_with_python_is_win():
     """Run the shipped JS helpers under node and compare to is_win().
 
@@ -554,8 +481,6 @@ def test_js_helpers_agree_with_python_is_win():
     when node is unavailable (same pattern as tests/test_js_wire_contract.py).
     """
     node = shutil.which('node')
-    if node is None:
-        pytest.skip('node not installed')
     src = (SCRIPTS / 'cmp_panels.js').read_text()
     block = re.search(
         r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',
@@ -581,6 +506,7 @@ def test_js_helpers_agree_with_python_is_win():
     assert out['tie'] == [s == WIN_RATING for s in scores]
 
 
+@pytest.mark.node
 def test_js_helpers_fall_back_without_data():
     """No DATA (or a blob predating winRating) -> the pinned fallback, no throw.
 
@@ -589,8 +515,6 @@ def test_js_helpers_fall_back_without_data():
     and take the whole compare box down.
     """
     node = shutil.which('node')
-    if node is None:
-        pytest.skip('node not installed')
     src = (SCRIPTS / 'cmp_panels.js').read_text()
     block = re.search(
         r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',

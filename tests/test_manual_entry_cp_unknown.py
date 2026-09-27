@@ -20,15 +20,13 @@ smaller change, it also covers a malformed CSV row (cp 0 from a bad export is
 equally unknown), and it needs no per-record provenance flag.
 """
 import re
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / 'tests'))
 
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 JS_PATH = REPO / 'scripts' / 'deep_dive_engine.js'
 
@@ -140,13 +138,11 @@ def test_the_which_build_owner_list_still_skips_an_unknown_cp():
     (0, '--'), (-5, '--'), (None, '--'), (float('nan'), '--'),
     (float('inf'), '--'), (1500, '1500'), (10, '10'),
 ])
+@pytest.mark.node
 def test_cptext_semantics_under_node(cp, expected):
     """Run the shipped helper itself, so the contract is executed not read."""
     import json
-    import shutil
     import subprocess
-    if shutil.which('node') is None:
-        pytest.skip('node not installed')
     src = JS_PATH.read_text()
     start = src.index('function cpText(')
     end = src.index('\n}', start) + 2

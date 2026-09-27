@@ -34,7 +34,6 @@ Pattern mirrors tests/test_js_shadow_constants.py.
 import importlib.util
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -169,7 +168,7 @@ def test_mode_grammar_defined_once_and_used():
     assert not re.search(r"_fallback\.match\(/:e", text)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_mode_grammar_round_trips_against_python():
     program = _js_grammar_source() + """
 const modes = %s;

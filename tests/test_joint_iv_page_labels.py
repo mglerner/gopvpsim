@@ -26,7 +26,6 @@ back out. Test one pins the display-label plumbing, test two pins the
 escaping independently of where the label came from.
 """
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -177,7 +176,7 @@ def _render(focal, opponent):
     return html
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_cross_arm_page_names_both_arms():
     """A moveset-fork page must name its two arms, not say "Thievul" twice.
 
@@ -194,7 +193,7 @@ def test_cross_arm_page_names_both_arms():
     assert ("sucker punch damage by " + _OPP_LABEL + " attack stage") in html
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_label_regex_survives_metacharacters():
     """reEsc(): a label reaching the RegExp must be matched literally.
 

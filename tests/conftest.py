@@ -2,12 +2,35 @@
 Shared fixtures for gopvpsim tests.
 """
 import importlib.util
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 import gopvpsim
 import gopvpsim.data as data_module
+
+
+# ---------------------------------------------------------------------------
+# @pytest.mark.node -- the ONE "skip if node is missing" rule
+# ---------------------------------------------------------------------------
+# Tests that run shipped JS under node carry this marker instead of each
+# re-implementing the check (there were ~30 open-coded skipifs and imperative
+# skips before 2026-09-27). The skip stays per test, as the 2026-08-09 review
+# decided; scripts/verify_tests.py is what makes a node-less SHIP machine loud.
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        'markers', 'node: runs JS under node; skips (reason "node not '
+                   'installed") when node is not on PATH')
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    # tryfirst: skip before fixture setup, so a module fixture that shells
+    # out to node is never entered on a node-less machine.
+    if item.get_closest_marker('node') and shutil.which('node') is None:
+        pytest.skip('node not installed')
 
 # ---------------------------------------------------------------------------
 # Shared scripts/deep_dive.py loader (DRY review 2026-08-05 entry 12, T8)
@@ -58,6 +81,170 @@ def load_deep_dive():
         sys.modules.pop('deep_dive', None)
         raise
     return mod
+
+
+def load_script(name):
+    """Return ``scripts/<name>.py`` as module ``name``, loaded at most once.
+
+    Get-or-create by name, registered in ``sys.modules`` before exec, so every
+    test module asking for e.g. ``sweep_cache`` shares one object. Four cache
+    test modules carried this body verbatim (as ``sys.modules.get(n) or
+    _load(n)``) until 2026-09-27. Callers put ``scripts/`` on ``sys.path``
+    themselves when the script imports its siblings.
+    """
+    mod = sys.modules.get(name)
+    if mod is not None:
+        return mod
+    spec = importlib.util.spec_from_file_location(
+        name, SCRIPTS_DIR / f'{name}.py')
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# ---------------------------------------------------------------------------
+# Replay-blob lookup (was open-coded in five test modules until 2026-09-27)
+# ---------------------------------------------------------------------------
+
+def replay_dirs():
+    """Where replay blobs may live: this clone, then a sibling checkout.
+
+    A working clone of this repo shares the machine's blob store with the
+    main checkout rather than duplicating 9 GB of pickles.
+    """
+    return [REPO_ROOT / 'userdata' / 'replay',
+            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
+
+
+def find_blob(name):
+    """Path to replay blob ``name``, or None when it is not on this machine."""
+    for d in replay_dirs():
+        p = d / name
+        if p.exists():
+            return p
+    return None
+
+
+def require_blob(name):
+    """Path to replay blob ``name``; skips the test when it is absent."""
+    p = find_blob(name)
+    if p is None:
+        pytest.skip(f"{name} is not on this machine")
+    return p
+
+
+# ``deep_dive_which_build.prepare`` at its defaults (pvpoke, l50), once per
+# blob per session. prepare() is the expensive step (13.8 s on the Shadow
+# Sableye blob, 7.5 s on Melmetal, against 1-2 s for load_blob), and the
+# which-build tests asked for the SAME three blobs (Sableye shadow/plain,
+# Melmetal GL) from module fixtures, parametrized tests and three separate
+# modules -- about 17 prepare() calls where 3 do (those three modules' full
+# run: 242 s -> 99 s, 2026-09-27). Memory is not new: the module-level
+# ``_facts_for`` cache in test_which_build_section.py already held exactly
+# these three (state, facts) pairs for the rest of the session; this memo
+# replaces it and lets the module fixtures share it instead of holding their
+# own copies. Consumers must treat the result as read-only (a probe on
+# 2026-09-27 found all three fact sets pickle-identical at the end of a full
+# run of their consumers).
+_PREPARED = {}
+
+
+def prepared_blob(name):
+    """``(state, all_facts, path_str)`` for replay blob ``name``, memoised."""
+    if name not in _PREPARED:
+        path = str(require_blob(name))
+        for p in (REPO_ROOT / 'src', SCRIPTS_DIR):
+            if str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+        import deep_dive_brief as B
+        import deep_dive_which_build as W
+        state = B.load_blob(path)
+        _PREPARED[name] = (state, W.prepare(state, path), path)
+    return _PREPARED[name]
+
+
+# ---------------------------------------------------------------------------
+# strip_js -- the tests' shared JS scrubber. Moved here from
+# test_win_boundary.py on 2026-09-27 (a dozen modules imported it from that
+# test module); its self-test, test_strip_js_detects_only_real_code, stays
+# there.
+# ---------------------------------------------------------------------------
+
+# Characters after which a `/` starts a regex literal rather than a division.
+_RE_PRECEDERS = set('(,=:[!&|?{};+-*%~^<>\n')
+
+
+def strip_js(text):
+    """Blank out JS comments, string literals and regex literals.
+
+    Removed regions are replaced by spaces so line numbers and columns are
+    preserved for reporting. Handles ``//`` line comments, ``/* */`` block
+    comments, ``'``/``"``/`` ` `` strings with backslash escapes, and regex
+    literals (disambiguated from division by the previous significant char).
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    prev_sig = '\n'   # last significant (non-space) code character
+
+    def blank(a, b):
+        for k in range(a, b):
+            if out[k] != '\n':
+                out[k] = ' '
+
+    while i < n:
+        c = text[i]
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            j = text.find('\n', i)
+            j = n if j < 0 else j
+            blank(i, j)
+            i = j
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            j = text.find('*/', i + 2)
+            j = n if j < 0 else j + 2
+            blank(i, j)
+            i = j
+            continue
+        if c in '\'"`':
+            j = i + 1
+            while j < n:
+                if text[j] == '\\':
+                    j += 2
+                    continue
+                if text[j] == c:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'   # a string is a value, like an identifier
+            i = j
+            continue
+        if c == '/' and prev_sig in _RE_PRECEDERS:
+            j, in_class = i + 1, False
+            while j < n:
+                ch = text[j]
+                if ch == '\\':
+                    j += 2
+                    continue
+                if ch == '\n':
+                    break            # not a regex after all; bail
+                if ch == '[':
+                    in_class = True
+                elif ch == ']':
+                    in_class = False
+                elif ch == '/' and not in_class:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'
+            i = j
+            continue
+        if not c.isspace():
+            prev_sig = c
+        i += 1
+    return ''.join(out)
 
 
 # Flags for the smallest dive that still renders EVERY conditional piece of

@@ -32,11 +32,9 @@ re-stamps the hash without thinking.
 """
 import importlib.util
 import re
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / 'scripts'

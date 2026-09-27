@@ -13,13 +13,11 @@ import json
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 _JS = Path(__file__).resolve().parents[1] / 'scripts' / 'deep_dive_engine.js'
 
@@ -45,11 +43,10 @@ def test_cluster_panels_have_no_inline_trace_literal():
         'expected exactly two _mcTrace() call sites (clusters + owned overlay)')
 
 
+@pytest.mark.node
 def test_mc_trace_shape():
     """Empty arrays by default; caller-supplied arrays passed through."""
     node = shutil.which('node')
-    if node is None:
-        pytest.skip('node not installed')
     text = _JS.read_text()
     m = re.search(r'function _mcTrace\(.*?\n\}', text, re.S)
     assert m, '_mcTrace not found'

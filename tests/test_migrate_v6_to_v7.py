@@ -5,7 +5,6 @@ Pins the adversarial-review safety properties: COPY (source intact),
 idempotent/resumable (skip existing v7 target), correct re-key (target dir
 == a live v7 dive's dir), and per-column gamemaster stamp = narrowed old hash.
 """
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -17,17 +16,9 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 
-def _load(name):
-    spec = importlib.util.spec_from_file_location(
-        name, REPO_ROOT / "scripts" / f"{name}.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-sweep_cache = sys.modules.get("sweep_cache") or _load("sweep_cache")
-mig = sys.modules.get("migrate_v6_to_v7") or _load("migrate_v6_to_v7")
+from tests.conftest import load_script  # noqa: E402
+sweep_cache = load_script("sweep_cache")
+mig = load_script("migrate_v6_to_v7")
 
 # A tiny gamemaster blob; its full + narrowed hashes are computed, not pinned.
 OLD_GM = {'timestamp': 't', 'cups': [1],

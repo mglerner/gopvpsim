@@ -33,13 +33,11 @@ Two separate things can go wrong there, and only one of them ever did:
 """
 import json
 import re
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENGINE_JS = REPO_ROOT / 'scripts' / 'deep_dive_engine.js'

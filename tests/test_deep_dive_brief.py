@@ -23,15 +23,19 @@ fixture (see ``_frozen_rankings``), not from the live PvPoke rankings.
 """
 import collections
 import copy
+import hashlib
 import importlib.util
 import json
 import math
+import pickle
 import re
 import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
+
+from tests.conftest import find_blob, require_blob
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
@@ -160,31 +164,6 @@ def test_the_frozen_species_still_exist_in_the_live_rankings():
     assert len(live) >= 1000, 'positive control: the cache is a real ranking'
 
 
-def _replay_dirs():
-    """Where replay blobs may live: this clone, then a sibling checkout.
-
-    A working clone of this repo shares the machine's blob store with the
-    main checkout rather than duplicating 9 GB of pickles.
-    """
-    return [REPO_ROOT / 'userdata' / 'replay',
-            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
-
-
-def find_blob(name):
-    for d in _replay_dirs():
-        p = d / name
-        if p.exists():
-            return p
-    return None
-
-
-def require_blob(name):
-    p = find_blob(name)
-    if p is None:
-        pytest.skip(f"{name} is not on this machine")
-    return p
-
-
 # ---------------------------------------------------------------------------
 # Blob / fact-set memo
 # ---------------------------------------------------------------------------
@@ -278,6 +257,32 @@ def brief_for(name, arm, mode='pvpoke', level='l50'):
     facts = facts_for(name, arm, mode=mode, level=level)
     state, key = load_blob_cached(name)
     return state, facts, key
+
+
+# The ``gate_recompute`` positive controls below each start with a CLEAN run
+# ("the untouched facts pass") before corrupting one field. 51 such clean
+# runs re-checked only FOUR distinct memoised fact sets (Sableye shadow and
+# plain arm 0, Melmetal's floor arm, Furret arm 0). The clean run is a pure
+# function of (blob, arm, facts), with mode/level/ctx fixed here: the blob
+# state is never mutated (``load_blob_cached``), the guard only reads its
+# ctx to format a message, and a probe on 2026-09-27 found the facts digest
+# unchanged after every clean run. So it runs once per distinct input and is
+# remembered: the 53 tests under ``-k "gate_recompute or
+# wrong_primitive_badge"`` went 60.8 s -> 30.3 s of call time. The key
+# is a digest of the facts' CONTENT, not their identity: a test that broke
+# the deepcopy contract and corrupted the shared dict in place would change
+# the digest and get a fresh clean run (which would then fail), exactly as
+# before. A failing clean run raises before it is recorded.
+_GATE_CLEAN_SEEN = set()
+
+
+def assert_gate_clean(state, arm, path, facts):
+    """``gate_recompute`` passes on untouched facts (pvpoke, l50, CTX)."""
+    key = (str(path), arm, hashlib.sha256(pickle.dumps(facts)).digest())
+    if key in _GATE_CLEAN_SEEN:
+        return
+    B.gate_recompute(state, arm, str(path), 'pvpoke', 'l50', facts, CTX)
+    _GATE_CLEAN_SEEN.add(key)
 
 
 @pytest.fixture(scope='module')
@@ -884,7 +889,7 @@ def test_gate_recompute_catches_a_corrupted_number(sableye_shadow_facts,
                                                    path_to_corrupt, new_value):
     import copy
     state, facts, path = sableye_shadow_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    assert_gate_clean(state, 0, path, facts)   # clean
     bad = copy.deepcopy(facts)
     node = bad
     for key in path_to_corrupt[:-1]:
@@ -1112,7 +1117,7 @@ def test_gate_recompute_catches_a_corrupted_clean_count():
     """Positive control for the clean-versus-direction split."""
     import copy
     state, facts, path = brief_for(SABLEYE_PLAIN, 0)
-    B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
+    assert_gate_clean(state, 0, path, facts)
     bad = copy.deepcopy(facts)
     bad['floor']['modes_clean'] = 1               # the table says 4
     with pytest.raises(B.GuardError) as exc:
@@ -1205,7 +1210,7 @@ def test_gate_recompute_now_covers_the_fields_it_used_to_miss(
     """
     import copy
     state, facts, path = sableye_shadow_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    assert_gate_clean(state, 0, path, facts)   # clean
     bad = copy.deepcopy(facts)
     node = bad
     for key in path_to_corrupt[:-1]:
@@ -1703,7 +1708,7 @@ def test_gate_recompute_rejects_a_partition_count_above_the_direction_count():
     arm = next(i for i in range(len(state['moveset_data']))
                if facts_for(MELMETAL, i)['floor'] is not None)
     facts = facts_for(MELMETAL, arm)
-    B.gate_recompute(state, arm, str(path), 'pvpoke', 'l50', facts, CTX)
+    assert_gate_clean(state, arm, path, facts)
     bad = copy.deepcopy(facts)
     bad['floor']['arms_partition'] = bad['floor']['arms_ok'] + 1
     with pytest.raises(B.GuardError) as exc:
@@ -1836,7 +1841,7 @@ def test_gate_recompute_covers_the_round_2_probe_gaps(
     """
     import copy
     state, facts, path = sableye_shadow_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    assert_gate_clean(state, 0, path, facts)   # clean
     bad = copy.deepcopy(facts)
     node = bad
     for key in path_to_corrupt[:-1]:
@@ -2175,7 +2180,7 @@ def test_gate_recompute_rejects_a_merge_outside_the_tolerance():
     """Positive control: a merged rung that is not actually close."""
     import copy
     state, facts, path = brief_for(SABLEYE_PLAIN, 0)
-    B.gate_recompute(state, 0, str(path), 'pvpoke', 'l50', facts, CTX)
+    assert_gate_clean(state, 0, path, facts)
     bad = copy.deepcopy(facts)
     bad['floor']['merged_from'][0]['n_pass'] = 4000
     with pytest.raises(B.GuardError) as exc:
@@ -2330,7 +2335,7 @@ def test_gate_recompute_rejects_a_wrong_primitive_badge(sableye_shadow_facts):
     """Positive control for G-primitive."""
     import copy
     state, facts, path = sableye_shadow_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)
+    assert_gate_clean(state, 0, path, facts)
     for key, bad_value in (('kind', 'gate'), ('n_wrong', 7),
                            ('n_win_below', 3)):
         bad = copy.deepcopy(facts)
@@ -3129,7 +3134,7 @@ def test_gate_recompute_covers_the_defense_line(furret_facts, path_to_corrupt,
     """
     import copy
     state, facts, path = furret_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    assert_gate_clean(state, 0, path, facts)   # clean
     bad = copy.deepcopy(facts)
     node = bad
     for key in path_to_corrupt[:-1]:
@@ -3331,7 +3336,7 @@ def test_gate_recompute_covers_the_round_2_facts(furret_facts,
     """
     import copy
     state, facts, path = furret_facts
-    B.gate_recompute(state, 0, path, 'pvpoke', 'l50', facts, CTX)   # clean
+    assert_gate_clean(state, 0, path, facts)   # clean
     bad = copy.deepcopy(facts)
     node = bad
     for key in path_to_corrupt[:-1]:

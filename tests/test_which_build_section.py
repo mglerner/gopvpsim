@@ -46,12 +46,13 @@ import html as _html
 import importlib.util
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.conftest import prepared_blob, replay_dirs, require_blob
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
@@ -65,8 +66,7 @@ AEGISLASH_SHIELD = '20260913_062354_Aegislash_Shield_great.replay.pkl.gz'
 # neither Sableye blob reaches.
 MELMETAL = '20260910_190103_Melmetal_great.replay.pkl.gz'
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / 'src'))
@@ -75,18 +75,6 @@ import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
 import deep_dive_brief as B  # noqa: E402
 import deep_dive_builds as builds_mod  # noqa: E402
-
-
-def _replay_dirs():
-    return [REPO_ROOT / 'userdata' / 'replay',
-            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
-
-
-def require_blob(name):
-    for d in _replay_dirs():
-        if (d / name).exists():
-            return d / name
-    pytest.skip(f"{name} is not on this machine")
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +108,7 @@ def test_glossary_anchors_point_at_real_guide_headings():
     build uses, so a renamed heading fails here rather than shipping a link
     that scrolls nowhere.
     """
-    markdown = pytest.importorskip('markdown')
+    import markdown
     for term, anchor in glossary.ANCHORS.items():
         slug, _, frag = anchor.partition('#')
         body = GUIDES_DIR / slug / 'body.md'
@@ -677,7 +665,7 @@ def _engine():
     return strip_js(ENGINE_JS.read_text())
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_engine_js_parses():
     subprocess.run(['node', '--check', str(ENGINE_JS)], check=True,
                    capture_output=True)
@@ -1115,7 +1103,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_section_grouping_logic_runs(tmp_path):
     """Run the panel's grouping code for real, on a 6-spread synthetic grid.
 
@@ -1284,7 +1272,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_builds_view_logic_runs(tmp_path):
     """Run the builds view's own code for real, on a 6-spread synthetic grid.
 
@@ -1348,9 +1336,7 @@ def test_section_is_omitted_without_a_blob_path():
 
 @pytest.fixture(scope='module')
 def shadow_sableye():
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    return state, W.prepare(state, str(path)), str(path)
+    return prepared_blob(SABLEYE_SHADOW)
 
 
 @pytest.mark.local_artifacts
@@ -1678,9 +1664,7 @@ def test_a_real_no_line_moveset_renders_the_negative_section():
     negative summary strings, the two-view selector and the negative compare
     prefill would only ever have run against a hand-built fact dict.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     no_line = [i for i, f in enumerate(all_facts) if f['floor'] is None]
     assert no_line, 'this blob no longer carries a no-line moveset'
     arm = no_line[0]
@@ -2265,7 +2249,7 @@ def _candidate_blobs():
     for name in _LINE_ARM_HINTS:
         seen.add(name)
         out.append(name)
-    for d in _replay_dirs():
+    for d in replay_dirs():
         if d.is_dir():
             for name in sorted(q.name for q in d.glob('*.replay.pkl.gz')):
                 if name not in seen:
@@ -2285,7 +2269,7 @@ def _arm_with_a_line_and_an_empty_scenario():
     """
     tried = 0
     for name in _candidate_blobs():
-        path = next((d / name for d in _replay_dirs() if (d / name).exists()),
+        path = next((d / name for d in replay_dirs() if (d / name).exists()),
                     None)
         if path is None:
             continue
@@ -2333,9 +2317,7 @@ def test_the_negative_page_carries_the_control_and_its_captions(
     at what value) moves whenever PvPoke re-ranks the meta. Pinning Melmetal
     arm 2 made the 2026-09-15 rankings refresh look like a code failure.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     neg = next((f for f in all_facts if f['floor'] is None), None)
     assert neg is not None, 'this blob no longer carries a no-line moveset'
     arm = neg['header']['arm']
@@ -2450,9 +2432,7 @@ SABLEYE_PLAIN = '20260911_051621_Sableye_great.replay.pkl.gz'
 
 @pytest.fixture(scope='module')
 def sableye_plain():
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    return state, W.prepare(state, str(path)), str(path)
+    return prepared_blob(SABLEYE_PLAIN)
 
 
 @pytest.mark.local_artifacts
@@ -2472,9 +2452,7 @@ def test_every_scenario_ladder_is_one_axis_and_nests(blob):
     counts: this is the invariant the encoding rests on.
     """
     import numpy as np
-    path = require_blob(blob)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(blob)
     seen_multi = 0
     for arm, facts in enumerate(all_facts):
         _scores, meta = B.arm_view(state, arm, 'pvpoke', level='l50')
@@ -2578,9 +2556,7 @@ def test_no_shipped_closest_rule_is_one_every_spread_clears(blob):
     a threshold nobody can miss. Those are dropped from the candidate pool
     now; the caption says which side of the band the survivor missed on.
     """
-    path = require_blob(blob)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(blob)
     n_iv = int(all_facts[0]['header']['n_iv'])
     seen = 0
     for facts in all_facts:
@@ -3164,9 +3140,7 @@ def test_a_negative_page_bridges_its_summary_to_its_builds():
     """The v3 "zero matchups wide" sentence is about TOTAL wins and stays
     (Michael's call). Standing alone beside a builds table guaranteeing 29
     of 51 decision matchups it read as a contradiction."""
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     arm = next(i for i, f in enumerate(all_facts) if f['floor'] is None)
     ab = all_facts[arm]['_builds']
     assert ab and ab['presets'], 'this arm no longer builds anything'
@@ -3628,16 +3602,10 @@ def test_each_build_carries_a_drawable_plane_or_says_it_cannot(
 # ---------------------------------------------------------------------------
 
 
-_FACTS_CACHE = {}
-
-
 def _facts_for(name):
-    """(state, all_facts) for one blob, loaded once per test session."""
-    if name not in _FACTS_CACHE:
-        path = require_blob(name)
-        state = B.load_blob(str(path))
-        _FACTS_CACHE[name] = (state, W.prepare(state, str(path)))
-    return _FACTS_CACHE[name]
+    """(state, all_facts) for one blob, via the session memo in conftest."""
+    state, all_facts, _path = prepared_blob(name)
+    return state, all_facts
 
 
 def test_the_builds_caption_explains_every_marker_the_view_draws():
@@ -5053,7 +5021,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_the_wide_region_rings_every_member_and_draws_underneath(tmp_path):
     """Run the ring code on a synthetic grid whose wide region CONTAINS
     Build 1 -- the shape the round-6 trace could not draw.
@@ -5544,7 +5512,7 @@ console.log(JSON.stringify({
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_the_panel_height_is_measured_from_the_legend_not_counted(tmp_path):
     """Round 8 review, the major finding -- executed, not source-pinned.
 
@@ -6165,7 +6133,7 @@ _ATTACK_PAIRED_BLOBS = [
 
 def _first_present(names):
     for name in names:
-        for d in _replay_dirs():
+        for d in replay_dirs():
             if (d / name).exists():
                 return d / name
     pytest.skip("no attack-paired replay blob on this machine")
