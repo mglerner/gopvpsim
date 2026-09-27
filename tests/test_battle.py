@@ -2081,10 +2081,14 @@ def test_jit_and_python_dp_paths_agree(monkeypatch, spec, shields):
     # shield gate (ported 2026-04-15, commit 359e693): MG's bestChargedMove
     # is Brave Bird ([0,-3] self-def-debuff), so every cell where MG holds
     # shields routes Florges' incoming charged moves through wouldShield
-    # instead of always-shield. Until now the only tests through that path
-    # were the MG near-KO xfails, where a gate regression would stay
-    # invisible (a different wrong score still XFAILs). The Florges matchup
-    # has no near-KO-plan divergence, so these cells pin the gate green.
+    # instead of always-shield. When this pin was added (2026-06-11), the
+    # only other tests through that path were the MG near-KO cells, then
+    # xfails, where a gate regression would stay invisible (a different
+    # wrong score still XFAILs). Those cells are exact PvPoke pins since
+    # 2026-09-25
+    # (test_moltres_g_nearKO_plan_divergence_pinned above), so both now
+    # guard the gate; the Florges matchup never had a near-KO-plan
+    # divergence, so it pinned the gate green throughout.
     (0, 0, 1, 318, ["Florges: Disarming Voice", "Moltres (Galarian): Fly", "Florges: Chilling Water"]),
     (0, 1, 1, 143, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
     (0, 2, 1, 143, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),

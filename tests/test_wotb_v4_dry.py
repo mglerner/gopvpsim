@@ -13,7 +13,7 @@ Vocabulary (docs style rule, per document):
 - Preset block: one ``<div class="wb-preset" data-preset=...>`` in the
   rendered section. Only the active one is visible; the other two ship
   hidden, so every byte inside one is paid for three times.
-- strip_js: the tests' JS scrubber (``tests/test_win_boundary.strip_js``),
+- strip_js: the tests' JS scrubber (``tests/conftest.strip_js``),
   which blanks comments, string literals and regex literals so a source scan
   cannot match a word that only appears inside a quoted sentence.
 - Wire contract: the payload keys the section's inline JSON carries and the
@@ -25,36 +25,26 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import prepared_blob
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
 ENGINE_JS = SCRIPTS_DIR / 'deep_dive_engine.js'
 SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
-import deep_dive_brief as B  # noqa: E402
 import deep_dive_matchup_clusters as MC  # noqa: E402
-
-
-def require_blob(name):
-    for d in (REPO_ROOT / 'userdata' / 'replay',
-              REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay'):
-        if (d / name).exists():
-            return d / name
-    pytest.skip(f"{name} is not on this machine")
 
 
 @pytest.fixture(scope='module')
 def shadow_section():
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    _state, all_facts, _path = prepared_blob(SABLEYE_SHADOW)
     return W.section_html(all_facts, 0)
 
 

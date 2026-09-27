@@ -27,7 +27,6 @@ node is absent.
 import ast
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +35,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS = _ROOT / "scripts"
@@ -204,7 +203,7 @@ def test_cmp_panels_prefers_the_baked_label_and_keeps_the_dash_fallback():
     assert "s[0] + '-' + s[1]" in body
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_scen_label_prefers_data_in_node():
     program = _js_fn(_js(), "scenLabel") + """
 var DATA = { scenarios: [[1,1],[0,2]], scenarioLabels: ['1v1', '0v2'] };
@@ -246,7 +245,7 @@ def test_cmp_battle_url_does_not_split_the_display_label():
         "DATA.movesets[i].fast/.charged instead")
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_cmp_battle_url_builds_from_structured_fields_in_node():
     """Behavioral half: the URL's move segment must be FAST-CM1-CM2 taken
     from DATA.movesets[i].fast/.charged, and a moveset without two charged
@@ -394,7 +393,7 @@ def test_article_tier_slug_uses_the_helper():
     assert "re.sub(r'[^a-z0-9]+', '-', badge.lower())" not in text
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_js_slug_fallback_matches_python():
     """The JS keeps a fallback slugify for a DATA blob predating the field;
     it must produce exactly what the Python helper does."""
@@ -445,7 +444,7 @@ def test_js_has_no_bare_level_ceiling_literals():
     assert not re.search(r"level\s*[<>]=?\s*5[01]\b", text)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_level_cap_prefers_data_in_node():
     text = _js()
     m = re.search(r"var LEVEL_CAP_FALLBACK = \{[^}]*\};", text)
@@ -540,7 +539,7 @@ def test_js_reads_those_exact_payload_field_names():
     assert not re.search(r"\.notAPayloadField\b", text)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_mc_headline_renders_the_payload_in_node():
     """The mini-grid titles and the scatter legend both read through
     ``_mcHeadline``; run the real function over a real payload."""
@@ -591,7 +590,7 @@ def test_the_cluster_coloured_minis_read_the_clusters_payload_only():
     assert 'function _mcHeadline(' in raw
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_mini_grid_headline_is_empty_when_labels_do_not_apply():
     """Run the gate itself: with the predicate false, no headline text."""
     program = """

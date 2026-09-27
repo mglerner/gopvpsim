@@ -28,7 +28,6 @@ import base64
 import gzip
 import json
 import re
-import shutil
 import struct
 import subprocess
 from pathlib import Path
@@ -119,7 +118,7 @@ def test_dive_emits_the_shared_template(small_dive_html):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.render
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_dive_page_decoder_round_trips_its_own_shipped_bytes(small_dive_html):
     """Chain 1: run the page's OWN emitted decoder over the page's OWN
     SCORES_GZ / ENERGY_GZ and require it to reproduce what Python packed."""
@@ -149,7 +148,7 @@ def test_dive_page_decoder_round_trips_its_own_shipped_bytes(small_dive_html):
             assert decoded[grid][key] == _py_unpack(blob), f'{grid}[{key}]'
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_guide_decoder_round_trips_the_shared_encoder():
     """Chain 2: the guide's embedded decoder, over bytes from the shared
     encoder -- scores at the win boundary, the clamp edges, and a value
@@ -173,7 +172,7 @@ def test_guide_decoder_round_trips_the_shared_encoder():
     assert _py_unpack(grids['q']) == want
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_the_two_chains_decode_each_other():
     """The cross-chain claim the old comments made and nothing checked:
     guide-packed bytes decode under the dive's decoder name, and the

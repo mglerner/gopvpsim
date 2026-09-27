@@ -51,8 +51,7 @@ AZUMARILL = '20260912_224739_Azumarill_great'
 # The blob whose cohort quantiles ARE the grid's top attack.
 MIMIKYU_ULTRA = '20260911_153453_Mimikyu_ultra'
 
-sys.path.insert(0, str(REPO_ROOT / 'tests'))
-from test_deep_dive_brief import B, require_blob  # noqa: E402
+from tests.conftest import require_blob  # noqa: E402
 
 
 def _load(name):
@@ -66,6 +65,7 @@ def _load(name):
     return mod
 
 
+B = _load('deep_dive_brief')
 D = _load('deep_dive_builds')
 
 # The reference implementation's own output, written by builds_lattice.py.

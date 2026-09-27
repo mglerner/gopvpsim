@@ -14,7 +14,6 @@ constants at all (float32 family or exact), and delegates stat math to
 POGOCollection (spelling pinned). Positive control per testing policy.
 """
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -23,15 +22,12 @@ import pytest
 
 REPO = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO / 'scripts'))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 JS_PATH = REPO / 'scripts' / 'worlds_iv_explorer.js'
 POGO_JS = REPO / 'scripts' / 'deep_dive_user_collection.js'
 
-needs_node = pytest.mark.skipif(shutil.which('node') is None,
-                                reason='node not installed')
 
 CASES = [
     # (species_id, a, d, s, level-or-None)
@@ -52,8 +48,6 @@ def data_blob():
 
 @pytest.fixture(scope='module')
 def js_results(data_blob, tmp_path_factory):
-    if shutil.which('node') is None:
-        pytest.skip('node not installed')
     tmp = tmp_path_factory.mktemp('explorer')
     data_file = tmp / 'data.json'
     data_file.write_text(json.dumps(data_blob))
@@ -91,7 +85,7 @@ def _py_stats(data_blob, sid, a, d, s, level):
     return level, atk, def_, st['hp']
 
 
-@needs_node
+@pytest.mark.node
 def test_stats_parity_bit_exact(data_blob, js_results):
     for case, js in zip(CASES, js_results):
         sid, a, d, s, level = case
@@ -102,7 +96,7 @@ def test_stats_parity_bit_exact(data_blob, js_results):
         assert js['stamina'] == hp, case
 
 
-@needs_node
+@pytest.mark.node
 def test_ladder_readouts_match_engine_damage(data_blob, js_results):
     import worlds_tier0 as t0
     from gopvpsim.moves import get_moves
@@ -153,7 +147,7 @@ def test_ladder_readouts_match_engine_damage(data_blob, js_results):
     assert oor_seen >= 1
 
 
-@needs_node
+@pytest.mark.node
 def test_excluded_pairs_marked(js_results):
     # Every case must mark the Aegislash opponent excluded, never a
     # silent ladder.

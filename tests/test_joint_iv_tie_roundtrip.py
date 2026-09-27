@@ -20,7 +20,6 @@ now the primary path.
 import importlib.util
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -69,7 +68,7 @@ _CASES = [
 ]
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_emitted_tie_line_parses_back_to_its_count():
     """assemble emits -> tieText parses -> the count survives."""
     cards = [{"lines": [_assemble.tie_line(n, metric, tb)]}
@@ -93,7 +92,7 @@ console.log(JSON.stringify(cards.map(tieText)));
             assert tb in out, (tb, out)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_structured_tie_block_is_preferred_and_complete():
     """The primary path: a card carrying `tie` needs no string parsing."""
     cards = [{"tie": {"n_tied": 7, "metric": "meta wins (SP/IW+PR, 1-1)"},

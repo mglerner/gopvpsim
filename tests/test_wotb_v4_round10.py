@@ -16,7 +16,7 @@ Vocabulary (docs style rule, per document):
   column in the set panel and no card, and it is not a build.
 - SP1: stat-product rank-1, the spread with the largest attack x defense x HP
   at the league's CP cap.
-- strip_js: the tests' JS scrubber (``tests/test_win_boundary.strip_js``),
+- strip_js: the tests' JS scrubber (``tests/conftest.strip_js``),
   which blanks comments, string and regex literals.
 """
 import html as _html
@@ -26,14 +26,15 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import prepared_blob
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
 ENGINE_JS = SCRIPTS_DIR / 'deep_dive_engine.js'
 SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
 MELMETAL_GREAT = '20260910_190103_Melmetal_great.replay.pkl.gz'
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(REPO_ROOT / 'src'))
@@ -46,18 +47,8 @@ import deep_dive_builds as BL  # noqa: E402
 _TAGS = re.compile(r'<[^>]+>')
 
 
-def require_blob(name):
-    for d in (REPO_ROOT / 'userdata' / 'replay',
-              REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay'):
-        if (d / name).exists():
-            return d / name
-    pytest.skip(f"{name} is not on this machine")
-
-
 def _load(name):
-    path = require_blob(name)
-    state = B.load_blob(str(path))
-    return W.prepare(state, str(path))
+    return prepared_blob(name)[1]
 
 
 @pytest.fixture(scope='module')
