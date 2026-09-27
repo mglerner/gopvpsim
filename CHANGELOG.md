@@ -205,6 +205,33 @@ Closed out of TODO's post-Worlds checklist 2026-09-27.
   `battle.py`'s "UNVALIDATED" comment is engine-hashed and waits for a
   bump (TODO).
 
+## 2026-09-12..22 -- Build brief -> "Which one to build?" v4, published
+
+Closed out of TODO's "BUILD BRIEF (2026-09-12)" section 2026-09-27.
+
+- **Build brief:** standalone compute core + renderer + tests (b6e6263, v2);
+  v3 floors on Def and HP with bulkpoint mechanisms (d65c509; acceptance
+  cases Altaria Def >= 148.29 vs 2v2 Clodsire, Furret Def >= 102.06 vs 1v1
+  Lapras). Michael 2026-09-12: split placement (D11; superseded by v4's
+  one-section, answer-first layout, 94c201e), retire the flavor badge +
+  catch phrase (D10, still open in TODO), Cramorant first (done, entries
+  2026-09-12/15). Named "Which one to build?" 2026-09-13; merged
+  with the all-scenario matchup clusters 09-15 (9b5e86d).
+- **Analyses:** spread sets (2026-09-15; 108 dives / 448 arms / 7944 named
+  sets; two-/three-stat structure in 88% of arms but only 1.8% of decision
+  cells after the materiality bar; the explicit list stays the primitive)
+  and the builds lattice (2026-09-16; 993 builds; best region beats best
+  single set by a median 6 guaranteed cells; 79% of arms name a fork).
+  Reports in `~/coding/reports/` (spread-sets 09-15, builds-lattice 09-16).
+- **v4:** the section shows 2-3 BUILDS (primary / fork / rank-1 region)
+  with a three-preset Build-criteria knob (a06a74f, d9fbb09; review rounds
+  2-10 through 65e78cc), merged cfbbb98 (09-20), live since the 2026-09-22
+  publish of the 2026-09-20 bake. Rankings-vintage drift found on the way (9adc094: tests
+  freeze `tests/fixtures/pvpoke_rankings_20260908.json`); the chain pins
+  the data cache for the whole bake (88bec7b). The Cramorant hand-off rules
+  (local clone, no engine edits during a bake) were followed and the clones
+  deleted 09-22.
+
 ## 2026-09-15 -- Cramorant close-out: merges + cache migrations (re-dive deferred)
 
 Michael: "Do the first four, don't do the redive." Merged in one pass:
