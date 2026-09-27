@@ -209,7 +209,11 @@ letting the live gamemaster refresh mid-bake -- is still unpinned.
 **Post-bake Cramorant verification -- still owed** (no evidence it ran
 after the 2026-09-20 bake; the strategy article is still the 2026-09-12
 render): `verify_overnight.py` + the ship gates, then
-`python scripts/cramorant_certify.py --league both --selftest 5`
+`python scripts/cramorant_certify.py --league both --selftest 5 --out
+userdata/certify/cramorant_record.json` (the `--out` record is what
+`publish_website.sh` checks with `--check-record`; since 2026-09-27 a
+rendered Cramorant page that is missing from, or differs from, that record
+blocks the publish)
 (must print 0 bar failures, 0 exemption violations, selftest all exact) and
 `cramorant_mini_sweep.py --check-tensor` on the two v6 cells in
 `tests/test_pogodives_v6.py` (the Blade contamination is gone, so
