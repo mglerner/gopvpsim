@@ -749,3 +749,23 @@ def test_cram_0v1_surf_gate_20260927_predicate():
     # Fail-safe.
     assert p(None, pg) is True and p({'species': 'Cramorant'}, pg) is True
     assert p(fly_surf, None) is True
+
+
+def test_aegislash_blade_atk_20260927_predicate():
+    """Shield-form charged estimate at the Blade atk (engine 32a20be48379 ->
+    addf7deb49d7): affected iff an Aegislash (either start form) is on
+    EITHER side; slayer mirrors iff the scenario species is an Aegislash.
+    Pre-fix there was no predicate: the bump was a cold re-dive."""
+    p = migrate_cache.PREDICATES['aegislash_blade_atk_20260927']
+    plain = {'species': 'Azumarill'}
+    for sp in ('Aegislash (Shield)', 'Aegislash (Blade)'):
+        assert p({'species': sp}, plain) is True
+        assert p(plain, {'species': sp}) is True
+        assert p({'species': sp}, {'species': sp}) is True    # slayer mirror
+    # Other form-change species do not build a Shield-form cache.
+    for sp in ('Cramorant', 'Mimikyu', 'Morpeko (Full Belly)', 'Registeel'):
+        assert p({'species': sp}, plain) is False
+        assert p({'species': sp}, {'species': sp}) is False   # slayer mirror
+    # Fail-safe.
+    assert p(None, plain) is True and p(plain, None) is True
+    assert p({}, plain) is True and p(plain, {'species': ''}) is True

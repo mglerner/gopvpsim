@@ -72,6 +72,13 @@ Engine predicates (PROVEN, not guessed):
                 non-SURF charged move; slayer fully blesses. Proof in the
                 predicate's docstring.
 
+  aegislash_blade_atk_20260927 -- Shield-form Aegislash charged-move
+                estimates priced at the Blade atk (--from-engine
+                32a20be48379; slayer 9b90c8d8b434). Affected iff EITHER
+                side's species starts with 'Aegislash'; the slayer mirror is
+                affected iff the scenario species does. Proof in the
+                predicate's docstring.
+
   neutral_batch_20260810 — the 2026-08-10 behavior-neutral bump
                 (--from-engine 1415857072fa): comment rewording + the
                 parse_types relocation into moves.py. Blesses everything
@@ -239,6 +246,49 @@ def _cram_0v1_surf_gate_20260927(f, c):
     if not sp.startswith('Cramorant'):
         return False
     return 'SURF' in ch and any(m not in ('DIVE', 'SURF') for m in ch)
+
+
+def _aegislash_blade_atk_20260927(f, c):
+    """Shield-form charged estimate at the Blade atk (pin --from-engine
+    32a20be48379 -> addf7deb49d7; slayer --from-engine 9b90c8d8b434 ->
+    93bbb87f64b2).
+
+    The ENTIRE delta is in battle.py: a new BattlePokemon._charged_atk_base
+    feeds the charged-move rows of _ensure_dmg_cache, _ensure_dp_init_cache
+    and the buff-delta stage rows of _ensure_dp_cache; the rest is comments.
+    It returns something other than ``self.atk`` only when the mon's CURRENT
+    form's trigger is 'activate_charged' -- in the gamemaster, only
+    aegislash_shield. So the change lives inside the damage caches OF a
+    Shield-form Aegislash, and only a battle that contains an Aegislash can
+    build one:
+      * Shield-start Aegislash: from turn one.
+      * Blade-start Aegislash: too -- a shielded Blade throw reverts it to
+        Shield form, which then rebuilds these caches (38 such builds across
+        the 36 Aegislash oracle cells), so Blade columns are affected as well.
+      * The OTHER side of such a battle is affected even when it is not an
+        Aegislash: its would_shield / turns-to-live read the Aegislash's
+        cached charged damage (defender._cached_charged_dmgs), so the
+        non-Aegislash side's decisions move with it.
+    A battle with no Aegislash on either side never builds a Shield-form
+    cache, so its columns are byte-identical -- blessed. Measured: the
+    243-cell oracle audit moved exactly the six Aegislash x Azumarill
+    cluster cells; a 1080-cell Aegislash sample moved 153 cells per seat.
+
+    Slayer: mirrors are the focal vs itself, so a slayer entry contains an
+    Aegislash iff its scenario species does -> affected(scen, scen) is True
+    exactly for Aegislash scenarios.
+
+    Fail-safe: missing side or species metadata -> AFFECTED. One-shot; never
+    re-run against another --from-engine hash.
+    """
+    def _hit(side):
+        if not side:
+            return True
+        sp = side.get('species')
+        if not isinstance(sp, str) or not sp:
+            return True
+        return sp.startswith('Aegislash')
+    return _hit(f) or _hit(c)
 
 
 def _neutral_batch_20260810(f, c):
@@ -576,6 +626,7 @@ PREDICATES = {
     'self_debuff_either_side': _self_debuff_either_side,
     'cached_damage_refresh_20260925': _cached_damage_refresh_20260925,
     'cram_0v1_surf_gate_20260927': _cram_0v1_surf_gate_20260927,
+    'aegislash_blade_atk_20260927': _aegislash_blade_atk_20260927,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'cramorant_port_20260824': _cramorant_port_20260824,
     # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):
