@@ -106,6 +106,44 @@ def test_timing_report_separates_the_same_species_in_two_leagues(tmp_path):
     assert any('ul' in k for k in rows), list(rows)
 
 
+_SH_OPTS = '--union-with-form plain --shield-scenario 1,1 --shadow --opp-ivs both'
+_PLAIN_OPTS = '--union-with-form shadow --shield-scenario 1,1 --opp-ivs both'
+
+
+def test_timing_report_keys_a_shadow_dive_apart_without_a_rerun_suffix(
+        tmp_path):
+    """Shadow and non-shadow dives of one species+league, as the 2026-09-26
+    chain ran them (real CLI option order; the plain dive carries
+    '--union-with-form shadow', which must NOT read as --shadow).
+
+    Pre-fix (until 2026-09-27) the keys were 'Ninetales [gr]' and
+    'Ninetales [gr]#2' -- distinct only via the re-run suffix."""
+    for classify, path in (
+            (btr.classify, tmp_path / 'chain.log'),
+            (lambda p: btr.classify_dive_logs([p]), tmp_path / 'dive.log')):
+        if classify is btr.classify:
+            path.write_text(
+                f'[10:00:00] CLI: python scripts/deep_dive.py Ninetales '
+                f'--league great {_SH_OPTS}\n'
+                '[10:00:10] Writing HTML...\n'
+                f'[10:01:00] CLI: python scripts/deep_dive.py Ninetales '
+                f'--league great {_PLAIN_OPTS}\n'
+                '[10:01:10] Writing HTML...\n'
+                '[10:02:00] Done.\n')
+        else:
+            _dive_log(path, [
+                ('10:00:00', f'CLI: python scripts/deep_dive.py Ninetales '
+                             f'--league great {_SH_OPTS}'),
+                ('10:00:10', 'Writing HTML...'),
+                ('10:01:00', f'CLI: python scripts/deep_dive.py Ninetales '
+                             f'--league great {_PLAIN_OPTS}'),
+                ('10:01:10', 'Writing HTML...'),
+                ('10:02:00', 'Done.')])
+        keys = list(classify(path))
+        assert keys == ['Ninetales [gr sh]', 'Ninetales [gr]'], keys
+        assert not any('#' in k for k in keys), keys
+
+
 def test_timing_report_totals_survive_the_key_change(tmp_path):
     """Positive control: splitting rows must not double-count time."""
     log = tmp_path / 'chain.log'
