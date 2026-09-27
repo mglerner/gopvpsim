@@ -208,6 +208,26 @@ else
     exit 1
   fi
   echo
+  # Cramorant certification guard (2026-09-27). The strict bar says no
+  # negative cell ships, but the certifier only covers pages that exist when
+  # it runs -- a moveset page that enters through the screen shipped
+  # uncertified on 2026-09-20 (Peck / Fly + Surf 0v1 vs Araquanid). The
+  # post-bake certification writes its record here; --check-record fails
+  # unless every rendered Cramorant page is in it, byte-for-byte, and the
+  # record is clean. Refresh the record with:
+  #   python scripts/cramorant_certify.py --league both --selftest 5 \
+  #       --out userdata/certify/cramorant_record.json
+  CRAM_RECORD="${REPO_ROOT}/userdata/certify/cramorant_record.json"
+  echo "Checking the Cramorant certification record (${CRAM_RECORD})..."
+  if [ ! -f "$CRAM_RECORD" ]; then
+    echo "error: no Cramorant certification record; run cramorant_certify.py --out first" >&2
+    exit 1
+  fi
+  if ! python "${REPO_ROOT}/scripts/cramorant_certify.py" --check-record "$CRAM_RECORD"; then
+    echo "error: a rendered Cramorant page is uncertified or changed since certification" >&2
+    exit 1
+  fi
+  echo
 fi
 
 RSYNC_EXCLUDES=(--exclude='meta.toml' --exclude='vintage.toml')

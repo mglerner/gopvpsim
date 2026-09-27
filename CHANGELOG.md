@@ -2,6 +2,42 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (dfebbd8)
+
+- **Finding:** the post-bake Cramorant certification (owed since 09-20, run
+  after the 09-26/27 bake) showed 8 bar failures, all one cell: GL page
+  PECK / FLY, SURF, start 0v1, vs plain Araquanid -- PoGoDives tier -1,971
+  net wins / -155.7 mean vs plain; 3,214 of 4,096 spreads worse, none
+  better. Not a regression: that page did not exist before the 09-20 bake
+  (a85d62e regenerated the GL opponent pool on 09-17, the top-20 screening
+  set changed, and Fly+Surf edged out Hydro Pump+Surf by 1.2 points), so it
+  had never been certified.
+- **Mechanism:** row (0,1) 'cmp' raises the Dive/Surf-ASAP DPE threshold
+  from 1.5 to 3.0 when Cramorant wins CMP. 3.0 was fitted to Fly vs DIVE
+  (neutral ratio 1.42: one type step ~2.28 admitted, two ~3.64 excluded).
+  With SURF the neutral ratio is 1.07, so two steps (~2.65-2.75: Araquanid,
+  Jumpluff, Kingdra) were admitted untested; vs Araquanid the tier throws a
+  resisted Surf into a kept shield and eats two Mirror Coats.
+- **Fix:** row (0,1) gains `surf_gate_dpe: 2.25` (3.0 x 1.07/1.42), read
+  by `_cram_dive_gate_dpe` only when the gulp move is SURF; Dive pages are
+  byte-identical by construction. Stride-1 recert of all 8 changed slices:
+  pvpoke +11 net / +10.49 mean, rank1 +0 / +13.30 (bar PASS); 24 control
+  slices (GL/UL Dive+Fly, UL Hydro Pump+Surf, stride 13, --check-tensor)
+  reproduce the shipped tensors exactly. Accepted cost: Jumpluff and Kingdra
+  fall back to plain at 0v1 (about -165 rating on fights Cramorant loses
+  anyway, 0 flips; page mean +12.5 -> +10.5). Tests in
+  `tests/test_pogodives_v6.py` (plain 720 / shipped 551 / fixed 720, a Dive
+  control, a field-scope probe); failing-first verified.
+- **Cache:** engine 5a813036625c -> 32a20be48379 (slayer d3ce425c2ce4 ->
+  9b90c8d8b434); predicate `cram_0v1_surf_gate_20260927` -- affected iff a
+  pogodives column whose focal is Cramorant with SURF plus a non-Dive,
+  non-Surf charged move; slayer fully blesses.
+- **Guard:** `cramorant_certify.py --out` now records every certified
+  page's sha256; `--check-record REC.json` exits 1 if any rendered Cramorant
+  page is missing from, or differs from, the record, or the record is not
+  clean -- so a page that enters through the moveset screen can no longer
+  ship uncertified. Wired into publish_website.sh's gate section.
+
 ## 2026-09-27 -- Sweep-side rank-1 IV memo (ea32bd9), no CACHE_VERSION bump
 
 - `deep_dive_lib.opponents.resolve_opp_ivs` is memoized per process
