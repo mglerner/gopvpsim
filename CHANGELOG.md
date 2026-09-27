@@ -73,6 +73,33 @@ Completed/shipped work, reverse chronological.
 - **Process:** "charger connected" added to the pre-dive triggers
   (caffeinate cannot hold off sleep on battery).
 
+## 2026-08-31..09-25 -- Worlds 2026 post-event: publish path unblocked; code dormant until 2027
+
+Closed out of TODO's post-Worlds checklist 2026-09-27.
+
+- **08-31 (Michael):** the Worlds surfaces retire with the Twilight Trails
+  site update. `verify_worlds.py` left the ship-gate roster (5985777) -- it
+  failed from main on all six gamemaster stamps and, the roster being
+  shared, blocked every publish path; the publish-time Worlds re-render
+  became opt-in (`WORLDS_RERENDER=1`). The pinned `gopvpsim-worlds` worktree
+  was removed after its one delta (`scripts/worlds_meta.py`) was verified
+  byte-identical to main. The `.cards_rerender_pending` sentinel set that
+  day (L51 dead-tooltip fix 061d93c; the cup banner's false "dated archive"
+  claim) cleared with the September full re-renders.
+- **09-10:** the three Worlds artifact tests marked dormant, not broken
+  (066e528). **09-20:** the deferred cmp_atk 1-ULP shadow-tie fix landed on
+  its own hash bump (ebf5944; pin now
+  `test_cmp_shadow_roundtrip_artifact_no_longer_reaches_cmp`). **09-22:**
+  nothing is hardcoded to legacy mechanics, Worlds included (4b6342b).
+- **Aegislash rebake question: moot.** Cramorant was not Worlds-legal
+  (eligible 09-01), the surface retired, and Aegislash was fixed and rebaked
+  site-wide (CHANGELOG 2026-09-12/15).
+- **09-25 (Michael, perf-doc Q4):** do NOT execute the retire/delete pass;
+  the Worlds code stays dormant until 2027. The pages are off the live
+  site (absent from `userdata/website/`, which publish rsyncs with
+  `--delete`); the exact publish that removed them is not recorded. Open
+  residue stays in TODO.
+
 ## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
 
 - **What changed:** the `_cached_damage` memo that our port of PvPoke's
@@ -118,6 +145,37 @@ Completed/shipped work, reverse chronological.
   unchanged iff neither side owns one; same Zap-Cannon-mutation caveat
   as `self_debuff_either_side`, measured harmless 2026-07-03).
 
+## 2026-09-23..25 -- Signature dedup made exact (a4ca14e); migrations applied
+
+- **Found 2026-09-23** by the statfx lab, which re-sims plain PvPoke for every
+  cell it touches: on 25 of 165 class pages (engine 9ac12a2754a1, the bake
+  stamp) 1-92 cells per page (~0.01-0.1%) did not reproduce, e.g. Florges GL
+  vs Shadow Annihilape (an exact-CMP-tie spread's score rows swapped) and
+  Zygarde (Complete) UL vs Mimikyu (1044 1v1/2v1 = 325/337 vs 400/414).
+- **Root cause (a617f98):** `deep_dive_signature.py` dedup was not exact.
+  Dedup ON reproduced the tensors, OFF (per-profile truth) did not: 396 /
+  774 / 6 cells on Florges, Zygarde, Blastoise UL vs Forretress. Two gaps:
+  (1) the CMP column divided shadow attack by 1.2 -- the lossy round trip
+  ebf5944 had removed from the engine -- so exact CMP ties vs a shadow side
+  were signed win/loss; (2) `movable_axes` missed the attack axis that
+  `pvpoke_dp`'s `_cm_buff_delta` moves for a chance-1 opponent-DEFENSE
+  debuff (Sand Tomb, Bulldoze), so `atk*1.25/def` vs `atk/(def*0.8)` floored
+  differently at rare boundaries.
+- **Fix (a4ca14e):** `cmp_atk = (base atk + atk IV) * CPM` like the engine's
+  `raw_atk`; def-debuff charged moves make the owner's atk axis movable.
+  Failing-first tests on the three pairs; two pins that encoded gap 2
+  corrected with pre-fix values recorded. Dedup ON == OFF on all three
+  pages; `verify_signature_dedup.py` default corpus EXACT MATCH.
+- **Cache:** the signature module is in the sweep engine hash, so the hash
+  moved 9ac12a2754a1 -> d78c67fd06a7 (every column a safe miss). Predicates
+  (b6e369a): `signature_regroup_20260923` (old grouping rebuilt from a frozen
+  pre-fix module, matched 1,504/1,504 sampled columns) and
+  `signature_fix_slayer_20260923`; the unsafe `legacy_guard_20260922` was
+  removed unrun. Applied by hand 2026-09-25: sweep 239,091 blessed / 43,077
+  unlinked, slayer 150 / 0 (docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md
+  "Results"). The corrected tensors reached the site with the 2026-09-26/27
+  bake and the 2026-09-27 publish.
+
 ## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
 
 - **Shadow Sableye GL "the bands are wild"** (reminder 2438093, 09-11):
@@ -146,6 +204,33 @@ Completed/shipped work, reverse chronological.
   straddled a line break -- plus a positive control on the pre-fix text).
   `battle.py`'s "UNVALIDATED" comment is engine-hashed and waits for a
   bump (TODO).
+
+## 2026-09-12..22 -- Build brief -> "Which one to build?" v4, published
+
+Closed out of TODO's "BUILD BRIEF (2026-09-12)" section 2026-09-27.
+
+- **Build brief:** standalone compute core + renderer + tests (b6e6263, v2);
+  v3 floors on Def and HP with bulkpoint mechanisms (d65c509; acceptance
+  cases Altaria Def >= 148.29 vs 2v2 Clodsire, Furret Def >= 102.06 vs 1v1
+  Lapras). Michael 2026-09-12: split placement (D11; superseded by v4's
+  one-section, answer-first layout, 94c201e), retire the flavor badge +
+  catch phrase (D10, still open in TODO), Cramorant first (done, entries
+  2026-09-12/15). Named "Which one to build?" 2026-09-13; merged
+  with the all-scenario matchup clusters 09-15 (9b5e86d).
+- **Analyses:** spread sets (2026-09-15; 108 dives / 448 arms / 7944 named
+  sets; two-/three-stat structure in 88% of arms but only 1.8% of decision
+  cells after the materiality bar; the explicit list stays the primitive)
+  and the builds lattice (2026-09-16; 993 builds; best region beats best
+  single set by a median 6 guaranteed cells; 79% of arms name a fork).
+  Reports in `~/coding/reports/` (spread-sets 09-15, builds-lattice 09-16).
+- **v4:** the section shows 2-3 BUILDS (primary / fork / rank-1 region)
+  with a three-preset Build-criteria knob (a06a74f, d9fbb09; review rounds
+  2-10 through 65e78cc), merged cfbbb98 (09-20), live since the 2026-09-22
+  publish of the 2026-09-20 bake. Rankings-vintage drift found on the way (9adc094: tests
+  freeze `tests/fixtures/pvpoke_rankings_20260908.json`); the chain pins
+  the data cache for the whole bake (88bec7b). The Cramorant hand-off rules
+  (local clone, no engine edits during a bake) were followed and the clones
+  deleted 09-22.
 
 ## 2026-09-15 -- Cramorant close-out: merges + cache migrations (re-dive deferred)
 
@@ -193,6 +278,41 @@ re-certification of the changed rows 90/90 PASS on 09-15 (net 937,116 ->
 hash impact: computed + page-verified article showcases (6f79ab9, 258e11b),
 instruments (9dd51f5, c926558), lab loader fix (dcf33a1), docs (491f819,
 0397089).
+
+## 2026-09-10..12 -- Cramorant: rebalance re-verify, deep re-verification, stale-article audit
+
+Closed out of TODO 2026-09-27 (every thread below finished with the sheet v7
+re-dive, re-certification and article re-render, entry 2026-09-27).
+
+- **Rebalance re-verify (09-10):** sheet v5 FAILED the bar under the new
+  move data (d492963): UL 2v1 -1.325 mean (all Jellicent), UL 0v1 -2 win
+  cells (Dondozo). The LEAD constant is inert (460a63e: lead 30-45 vs static
+  differ in 12 of 2,394 cells). Fix option A: (2,1) re-exempted (f116674);
+  the UL 0v1 -2 is pre-existing, byte-identical under legacy and new
+  mechanics and against the June pool (8c5c219) -- a standing dive-early
+  cost, kept as the one accepted exception (the 09-12 full-resolution read
+  then found the -2 was a single-spread artefact of the PvPoke-default IV
+  run). Writeup:
+  `docs/validations/2026-09-10_cramorant_strat_reverify.md`.
+- **Deep re-verification (09-12):** instruments `cramorant_certify.py`
+  (strict bar over the full 720-cell grid from the dive tensors;
+  `--selftest N`) and `cramorant_mini_sweep.py` (`--check-tensor`,
+  coprime `--stride`) plus a changed-row recert driver (9dd51f5, c926558).
+  First full-grid read 716/720; the 4 failures (GL Peck/Hydro Pump+Surf 2v2
+  nobait, Corviknight-driven) led to sheet v6 (entry below; stride-1 15/15
+  priority slices fbbc213, 90/90 changed rows 09-15).
+- **Live article stale (09-12 audit):** the four hardcoded 08-27 sandbox
+  links replayed differently after PvPoke's post-charge cooldown (Twilight
+  Trails merge acb3ce461), Jellicent's 2-1 premise died with Shadow Ball
+  100->90, Blastoise's default moved Rollout -> Bite, and every number on the
+  page was a legacy-clock value. Fixes: showcases computed and page-verified
+  at render time (6f79ab9); `verify_url` emulates pvpoke.com's double run of
+  a sandbox link (`hasActed` survives `Pokemon.reset()`, PvPoke Report 9
+  drafted, 491f819) and the encoder shifts by DISTINCT prior resolved turns,
+  not charged-action count (17/17 same-turn-pair cells had been mis-encoded;
+  258e11b); the policy lab's GL pool loads again (dcf33a1). The article was
+  re-rendered from rebaked new-clock pages 2026-09-27; its fixed prose pass
+  stays open in TODO.
 
 ## 2026-09-11..12 -- Moveset rules merged; dives-only rebake
 

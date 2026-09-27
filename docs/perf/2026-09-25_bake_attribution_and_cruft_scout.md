@@ -72,7 +72,7 @@ Do NOT do today: any byte change to battle.py / pokemon.py / moves.py / formchan
 
 4. CRUFT CLEANUP (V = both refuters failed to refute; U = scout-only, unverified)
 
-Scripts (V, delete, 5 files / 1,124 lines):
+Scripts (V, delete, 5 files / 1,124 lines; all five deleted 2026-09-25 in 8d5ec13):
   - scripts/status_tick.sh (101): hard-codes userdata/logs/2026-04 and a 20260419_ glob; chain_status.py --chain overnight replaces it.
   - scripts/verify_pvpoke_harness.py (188): April-era hand-typed PvPoke scores, 19/27 no longer match the 09-09 re-pinned fixtures; audit_oracle_harness.py covers the same matchups live.
   - scripts/patch_iv_guide_nav_width.py (59): 0 of 60 guides still carry 'flex:0 0 190px'; renderer emits 260px at render_iv_envelope_article.py:764.
