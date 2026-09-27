@@ -103,3 +103,62 @@ def test_ko_guard_fires_only_when_our_charged_move_kos():
     assert mult(5, 40, 65) == B._POGODIVES_TANK_CONSERVATIVE, 'affordable KO now'
     assert mult(5, 24, 65) == B._POGODIVES_TANK_CONSERVATIVE, 'KO within two fast moves'
     assert mult(5, 20, 65) == 1.9, 'KO not reachable in two fast moves'
+
+
+# --- Sheet v7 (2026-09-27): Surf-normalized 0v1 gate ----------------------
+
+def test_0v1_surf_gate_gl_fly_surf_araquanid():
+    """The only cramorant_certify GL bar failure after v6: GL Peck / Fly +
+    Surf, start 0v1, vs plain Araquanid (page pvpoke-mode IVs 5/15/14 L32,
+    Infestation / Water Pulse + Mirror Coat). Cramorant is the page's
+    rank-1 spread 0/14/11. Shipped (sheet v6): plain 720, PoGoDives 551 --
+    the (0,1) 'cmp' gate's 3.0 (fitted to Fly vs DIVE) admitted a Fly/Surf
+    DPE ratio of 2.65, so a resisted Surf fired at T15 into a kept shield
+    and two Mirror Coats followed. With the Surf-normalized 2.25 the gate
+    stays shut and the line is PvPoke's."""
+    cram = make_focal('great', 'PECK', ['FLY', 'SURF'], (0, 14, 11), 50)
+    opp = make_bp('Araquanid', 'great', False, 'INFESTATION',
+                  ['WATER_PULSE', 'MIRROR_COAT'], ivs=(5, 15, 14))
+    plain, pg = _both(cram, opp, (0, 1))
+    assert plain == 720
+    assert pg == 720, f'shipped (pre-fix) value was 551, got {pg}'
+
+
+def test_0v1_surf_gate_leaves_dive_pages_alone():
+    """Byte-identity control for the v7 fix: a DIVE-gulp 0v1 cell where the
+    gate DOES fire. GL Peck / Dive, Fly (index.html), rank-1 spread 0/14/11
+    vs Azumarill (page rank1 IVs 0/15/15, Bubble / Ice Beam + Play Rough),
+    0v1: the shipped tensor reads plain 346, PoGoDives 500; the fix must
+    not move it (a DIVE gulp never reads 'surf_gate_dpe')."""
+    cram = make_focal('great', 'PECK', ['DIVE', 'FLY'], (0, 14, 11), 50)
+    opp = make_bp('Azumarill', 'great', False, 'BUBBLE',
+                  ['ICE_BEAM', 'PLAY_ROUGH'], ivs=(0, 15, 15))
+    plain, pg = _both(cram, opp, (0, 1))
+    assert (plain, pg) == (346, 500)
+
+
+def test_surf_gate_dpe_read_only_for_surf_gulp_at_0v1():
+    """Unit probe: 'surf_gate_dpe' replaces the 3.0 only when the gulp move
+    is SURF and only on the row that carries it ((0,1)); a DIVE gulp or a
+    caller passing no id gets the row's usual value."""
+    from test_battle import make_bp as mk, make_fast, make_charged  # noqa: E402
+
+    def probe(start, gulp_move_id, cram_atk=120, opp_atk=100):
+        cram = mk(atk=cram_atk, hp=130, fast=make_fast(power=6, energy_gain=8),
+                  charged=[make_charged(power=65, energy=40)])
+        opp = mk(atk=opp_atk, hp=140, fast=make_fast(power=6, energy_gain=8),
+                 charged=[make_charged(power=90, energy=45)])
+        cram._pogodives = True
+        cram._start_shields = start
+        return B._cram_dive_gate_dpe(cram, opp, gulp_move_id=gulp_move_id)
+
+    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
+    surf = B._POGODIVES_SHEET[(0, 1)]['surf_gate_dpe']
+    assert surf == 2.25
+    assert probe((0, 1), 'SURF') == surf
+    assert probe((0, 1), 'DIVE') == PG
+    assert probe((0, 1), None) == PG
+    assert probe((0, 1), 'SURF', cram_atk=90) == PV      # cmp lost: still off
+    assert probe((1, 1), 'SURF') == PG                   # other rows untouched
+    assert all('surf_gate_dpe' not in row for k, row in B._POGODIVES_SHEET.items()
+               if row is not None and k != (0, 1))
