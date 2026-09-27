@@ -234,6 +234,12 @@ auditing or whether anyone remembers the lens.
 
 Pre-launch triggers, run at the launch keyboard:
 
+- **Charger connected for the whole bake (added 2026-09-27).** `caffeinate -is`
+  holds off idle and system sleep ONLY on AC power; on battery macOS puts the
+  machine into maintenance sleep every ~20 minutes regardless. The 2026-09-26
+  bake lost 12.1 h this way (lid open, charger out from 22:04). Trigger:
+  `pmset -g batt | grep -q 'AC Power'` at launch; the keeper's clock-jump
+  WARN and verify_overnight's pmset check catch it after the fact.
 - **Lid stays open for the whole bake.** `pmset sleep 0` + `caffeinate`
   (now built into overnight_redive.sh) cover idle/timer sleep, but
   NOTHING prevents lid-close clamshell sleep without an external
