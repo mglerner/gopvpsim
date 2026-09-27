@@ -436,176 +436,49 @@ Shape (bake-side, changes the blob schema -- own bake, own hash bump):
   that the per-scenario mirror-vs-population numbers reproduce from the
   stored scores; the vintage stamp covers it.
 
-## BUILD BRIEF (2026-09-12): decisions taken, what is next, Cramorant hand-off
+## "Which one to build?" -- what is next (record: CHANGELOG 2026-09-12..22)
 
-Status: `scripts/deep_dive_brief.py` + tests merged to main (b6e6263), standalone
-only (HTML + JSON + sweep under `userdata/analysis/2026-09-12_build_brief/`).
-Report: `~/coding/reports/gopvpsim-build-brief-2026-09-12.html`. Design of
-record: `docs/expert_verdict_plan.md`.
+Design of record: `docs/expert_verdict_plan.md`. The build brief (v2/v3),
+the spread-sets and builds-lattice analyses and the section's v4 (rounds
+1-10) are shipped; see CHANGELOG. Open:
 
-Michael's answers, 2026-09-12 evening:
-
-1. **Bulk floors (Def / HP lines) = v3, standalone, before integration.** Same
-   three primitives (exact / one-sided gate / near-exact) on Def and HP with
-   bulkpoint mechanism labels. Altaria (Def >= 148.29 vs 2v2 Clodsire) and
-   Furret (Def >= 102.06 vs 1v1 Lapras) are the acceptance cases.
-2. **Placement (D11): split by outcome.** Above the scatter as the first IV
-   Recommendations block when a line (or a cost-demoted line) exists; inside
-   the collapsed Dive Analysis block on pure negatives.
-3. **Flavor guide (D10): retire BOTH** the `[Recommended]` badge and the
-   "almost any will do" catch phrase when the brief ships, as separate commits.
-4. **Sequencing: Cramorant first.** Page integration of the brief WAITS until
-   the Cramorant strategy reinvestigation lands. v3 (standalone) may proceed.
-
-Naming + spread visibility (Michael, 2026-09-13): the section is called
-**"Which one to build?"** (not "build brief"; "verdict" and "recommended"
-stay reserved). Collapsed by default; the summary line is the question plus
-the headline's first sentence. Integration must make the line VISIBLE AS
-SPREADS: (1) example spreads in the first sentence ("... 148.10 attack, which
-6/9/7 at L50, 10/13/11 at L45.5 and 2218 other spreads reach"); (2) hover/tap
-on the number lists the top spreads by stat product with a "show all N"
-expander (reuse the flavor guide's Member IVs pattern); (3) a small in-section
-plot (SP rank vs wins; at-or-above-the-line filled, bulk alternative in its
-own color, rest muted; hover = IVs/level/stats/side of the line), drawn
-client-side like the cluster panels; plus the main scatter's color mode.
-
-Shield scenarios in "Which one to build?" (Michael, 2026-09-13): accepted
-as a middle point that the section is inert to the main plot's Shields
-dropdown (every fact in it is scenario-tagged and the floor is chosen across
-all nine; the y-axis is wins of 684). Follow-ups, in order: (1) a "scenario"
-control on the section's OWN selector (filter rungs to one scenario, y-axis
-= that scenario's wins, summary reworded), never coupled to the main plot's
-dropdowns; (2) the real synthesis: a usage prior over shield states (lead /
-safe swap / closer) so floor selection can weight cells and the headline can
-say "in the shield states Sableye usually sees". (2) needs an expert-supplied
-or usage-derived prior; the sim does not have one.
-
-SPREAD-SETS ANALYSIS DONE (2026-09-15; report
-`~/coding/reports/gopvpsim-spread-sets-2026-09-15.html`, artifacts + 112
-per-blob fact files with explicit member lists under
-`userdata/analysis/2026-09-15_spread_sets/`, ~246 MB, gitignored, not to
-keep forever). Michael's framing: SETS of spreads are the primitive (users
-check their mons against a set on the plot; gobattlekit gets explicit IV
-lists); descriptions are labels. Findings on the deduplicated corpus (108
-dives / 448 arms / 7944 named sets, pvpoke mode, L50):
-- Two-/three-stat structure beyond every single-stat threshold (atk, def,
-  hp AND stat product): 88% of arms have at least one such top-50 cell, but
-  the MAGNITUDE is small: 3.8% of decision cells, 1.8% after a materiality
-  bar (best single-stat rule wins the cell <= 95%). With only the four
-  brief-specified generators (no S5 boxes): 32% of arms.
-- Plain Sableye: the 863-spread 0v1 cluster wins Annihilape AND
-  Aegislash-Shield for every member; "atk >= 123.4 and HP >= 118" does NOT
-  (55%); the exact description is atk-floor + a Def-vs-HP staircase; the
-  genre's linear form "atk >= 123.4 and Def + 1.15*HP >= 255.88" fits at
-  J=0.98. Shadow Sableye's strongest cluster IS the floor set (2220).
-- Description shapes: 11% single threshold, 36% two-stat box, 15%
-  atk-floor + staircase, 36% list-only (at 95% fidelity 830 of those
-  rescued). The linear Def + k*HP family fits exactly 82 sets, 4% of the
-  hard sets at 99%, 14% at 95%: the list stays the primitive.
-- Frontier slope (corpus): median 0.54 Def per HP (q 0.36-0.80); the "1 HP
-  for 2 Def" ratio was Michael's paraphrase, not a RyanSwag quote; the
-  SHAPE is the genre's, the ratio is species-specific.
-- Score-only structure ("do better or worse"), ten dives: 12 of 486
-  (set, cell) pairs have non-overlapping p5-p95 score bands with no result
-  flip; strict separation never occurs.
-- gobattlekit: no schema change; `ivs = [[a,d,s],...]` already exists;
-  floors express lower bounds only, so 59% of sets need the explicit list;
-  the list is lossless only under the L50 cap; MAX_TARGETS=4 and file size
-  are the real constraints.
-OPEN: (1) the per-arm set-keeping cut (18 per arm) still uses the old
-interest score; adopt the material-cells ranking in spread_sets.py and
-re-run the corpus (~2.5 h, nice'd); (2) extend the score column to the
-corpus; (3) product: plot the named sets as color groups in "Which one to
-build?" with the collection overlay (the sets JSON is the input), and an
-export of explicit lists to gobattlekit behind the four-target cap.
-
-BUILDS LATTICE DONE (2026-09-16; report
-`~/coding/reports/gopvpsim-builds-lattice-2026-09-16.html`, artifacts under
-`userdata/analysis/2026-09-16_builds/`, 17 MB, re-runnable from the blobs in
-~5 min via builds_lattice.py; verify_builds.py re-derives 12 arms from the
-blobs with zero mismatches). "Builds, not lines": per (dive, moveset) the
-lattice of intersections (<= 4) of the top-8 named sets from the
-2026-09-15 spread-sets analysis; 2-3 builds per moveset = the region
-guaranteeing the most decision cells (primary), a FORK (disjoint region
-whose guaranteed cells differ, Jaccard < 0.8), and the rank-1 region
-(constructed as a (Def, HP) box when no lattice region holds rank-1).
-Corpus (108 dives / 448 arms / 993 builds): best region beats best single
-set by a median 6 guaranteed decision cells (88% of arms gain; 26% gain
->= 10); 79% of arms name a fork; the fork is the textbook "bulk side
-holding rank-1" on only 20% of fork arms (26% both sides carry an attack
-floor); the two objectives (region guaranteeing the most cells vs the
-single most-winning spread) pick different builds on 41% of arms, by a
-median 4 matchups vs 4.5 cells; 54% of builds are rule-quotable (30%
-two-stat box, 23% attack floor + printed Def-vs-HP staircase, 18%
-three-stat box), 23% list-only. Honesty: 23% of guaranteed (build, cell)
-pairs are cells the rest of the grid wins > 90% anyway; the median build
-guarantees ZERO cells that are both material and survive all opponent
-IV/bait modes -- one of those two bars must loosen before a headline.
-A shield-scenario prior (an explicit flat-defaulted knob) re-weights
-objective A directly: even-shields changes the leading build on 16% of
-multi-build arms, 1v1-only on 24% (partly size tie-breaks among tiny
-counts). Sableye shadow: primary atk >= 150.24 + Def >= d(HP) (61
-spreads, 55 cells) vs fork def >= 101.4 & HP >= 125 (114, 41 cells,
-holds rank-1); the grid's most-winning spread 7/2/14 is in neither.
-OPEN: (1) the lattice searches only the 18 named sets per arm (a
-hand-built (Def, HP) box out-guarantees every lattice region on 45 arms:
-the generators are the binding constraint); (2) decide the material /
-all-modes bars for headlines; (3) objective B under the prior needs the
-per-scenario win cube; (4) product: this is the v4 input for "Which one
-to build?" (builds as color groups + UpSet panel + explicit lists +
-collection overlay + gobattlekit targets).
-
-"WHICH ONE TO BUILD?" v4 + BUILD CRITERIA KNOB (Michael, 2026-09-16; in
-progress on branch wotb-v4 in the clone): the section shows 2-3 BUILDS
-(primary / fork / rank-1 region from the intersection lattice), not one
-line. A "Build criteria" dropdown in the scatter controls strip with THREE
-presets and no free weights: "All shields, equal" (default), "Even shields
-(0v0, 1v1, 2v2)", "1v1 only (open GBL lead)". The knob drives exactly three
-surfaces and the page says so: the section (ranking, selection, summary,
-headline, plot, UpSet), the Matchup clusters "all scenarios" partition
-(one precomputed per preset), and a NEW Shields entry "All (by build
-criteria)" (weighted wins); the old 'avg' entry is renamed "All (equal
-weight)" and never changes. All other sections stay all-nine-equal, with a
-one-line caption saying so. Section text self-labels the preset
-("[even shields]"). Preset persists in the URL hash. gobattlekit export
-stays at the default preset. Placeholder "lead-and-closer" prior: skipped.
-Gate before the rebake: Michael reviews the preview renders (Sableye pair
-+ Melmetal) and says go.
-
-RANKINGS-VINTAGE SENSITIVITY (found 2026-09-16 fixing test drift on wotb-v4,
-commit 9adc094): opponent PvPoke ranks are a LIVE read at render time
-(build_opp_meta_ranks -> get_rankings_for). The 2026-09-15 refresh moved
-Annihilape 30 -> 31 and Charjabug 60 -> 41; with RANK_GATE = 50 the newly
-eligible Charjabug cells deleted Melmetal's floor. So a rankings refresh can
-change a page's verdict with no change in sim data. Tests now freeze a
-rankings fixture (tests/fixtures/pvpoke_rankings_20260908.json, great+ultra
-only; cups raise loudly). For the next rebake: run through the chain wrapper
-/ TTL keeper so all 135 pages see ONE rankings vintage (the direct
-run_website_dives.py launch on 2026-09-12 did not). Proper fix, before the
-bake after this one: stamp opponent facts (ranks, default builds) into the
-blob at dive time (expert_verdict_plan Phase 0 "blob stamping", deferred), so
-replay re-renders cannot drift. Other test modules that read live rankings
-were not audited.
-
-Cramorant reinvestigation hand-off (for the session that picks it up):
-
-- Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
-  ~/coding/gopvpsim-cramorant`, branch `cramorant-reinvestigate`), the way
-  the moveset-rules and build-brief work was done. Read blobs / policy-lab
-  corpus from the main repo by absolute path; write outputs under the clone's
-  own `userdata/`. Python: `/Users/mglerner/coding/gopvpsim/.venv/bin/python`
-  run from the clone (direnv is not loaded there).
-- The strat lives in engine-hashed code. Do NOT edit engine files in the main
-  tree while a bake runs (mixed-vintage bake). Merge engine changes only after
-  the current rebake is published, then decide migration (localized predicate
-  vs cold re-dive) per the CLAUDE.md cache rules.
-- CPU: the dive rebake launched 2026-09-12 18:02 uses all cores
-  (`userdata/logs/2026-09/rebake_movesets_20260912.log`). Reading, analysis
-  and small lab runs are fine; full-resolution policy-lab corpus runs should
-  wait for it to finish.
-- Start from the Cramorant section above, `docs/strat_development_playbook.md`,
-  `docs/cramorant_policy_plan.md`, and
-  `docs/validations/2026-09-10_cramorant_strat_reverify.md`.
+- **Retire the flavor guide's `[Recommended]` badge AND the "almost any will
+  do" catch phrase** (Michael 2026-09-12, D10: two separate commits "when the
+  brief ships"). NOT done: both still in `scripts/deep_dive_narrative.py`
+  (:52, :1368, :1399) and the badge is on all 136 local dive pages
+  (2026-09-27).
+- **Shield scenarios in the section:** the v4 Build-criteria presets (all
+  nine equal / even shields / 1v1 only) partly cover follow-up (1); a
+  section-own selector over any one of the nine scenarios is not built.
+  Follow-up (2), a usage prior over shield states (lead / safe swap /
+  closer), needs an expert-supplied or usage-derived prior the sim does not
+  have ("lead-and-closer" placeholder was skipped in v4).
+- **Spread sets** (report `~/coding/reports/gopvpsim-spread-sets-2026-09-15.html`):
+  (1) the per-arm set-keeping cut (18 per arm) still uses the old interest
+  score; adopt the material-cells ranking and re-run the corpus (~2.5 h,
+  nice'd); (2) extend the score column to the corpus; (3) export explicit
+  IV lists to gobattlekit behind its four-target cap (the color-group plot
+  half of this shipped as v4). Not re-verified item by item after v4:
+  `deep_dive_builds.py` still ranks kept sets by `rank_interest`, and the
+  gobattlekit export had not been run as of 2026-09-22.
+- **Builds lattice** (report `~/coding/reports/gopvpsim-builds-lattice-2026-09-16.html`):
+  (1) the lattice searches only the 18 named sets per arm (a hand-built
+  (Def, HP) box out-guarantees every lattice region on 45 arms: the
+  generators are the binding constraint); (2) decide the material /
+  all-modes bars for headlines (the median build guarantees ZERO cells
+  that are both material and survive all opponent IV/bait modes); (3)
+  objective B under the prior needs the per-scenario win cube. Item (4),
+  the product, shipped as v4.
+- **Rankings-vintage sensitivity** (9adc094, e9c70ed): opponent PvPoke
+  ranks are a LIVE read at render time (`build_opp_meta_ranks` ->
+  `get_rankings_for`), so a rankings refresh can change a page's verdict
+  with no sim change (2026-09-15: Charjabug 60 -> 41 deleted Melmetal's
+  floor). Bakes now see one vintage via the chain's data-cache pin
+  (88bec7b; the direct-launch gap is the TTL-keeper item in the Cramorant
+  section). Proper fix still open: stamp opponent facts (ranks, default
+  builds) into the blob at dive time (expert_verdict_plan Phase 0 "blob
+  stamping") so replay re-renders cannot drift; other test modules that read
+  live rankings were not audited.
 
 ## PLAN ONLY: parallelize the dive step (re-scoped 2026-09-27: <=6.9 h ceiling, memory-bound)
 
