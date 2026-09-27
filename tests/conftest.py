@@ -83,6 +83,26 @@ def load_deep_dive():
     return mod
 
 
+def load_script(name):
+    """Return ``scripts/<name>.py`` as module ``name``, loaded at most once.
+
+    Get-or-create by name, registered in ``sys.modules`` before exec, so every
+    test module asking for e.g. ``sweep_cache`` shares one object. Four cache
+    test modules carried this body verbatim (as ``sys.modules.get(n) or
+    _load(n)``) until 2026-09-27. Callers put ``scripts/`` on ``sys.path``
+    themselves when the script imports its siblings.
+    """
+    mod = sys.modules.get(name)
+    if mod is not None:
+        return mod
+    spec = importlib.util.spec_from_file_location(
+        name, SCRIPTS_DIR / f'{name}.py')
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
 # Flags for the smallest dive that still renders EVERY conditional piece of
 # page chrome. Each entry that is not just "make it small" is load-bearing for
 # the DOM-id guard -- drop one and the guard silently stops covering the ids
