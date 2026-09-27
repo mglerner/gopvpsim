@@ -71,6 +71,33 @@ def test_the_ml_tail_fallback_is_within_headroom_of_its_measurement():
         f"2026-09-22.")
 
 
+@pytest.mark.parametrize('bucket', ['gl_full', 'ul_full', 'forretress'])
+def test_the_bucket_fallbacks_sit_between_their_warm_and_cold_measurements(
+        bucket):
+    """Same idea as the ml_tail pin, for the dive buckets.
+
+    Pre-fix values (until 2026-09-27): ul_full 25.0 (3.7x the 09-26 warm
+    awake median of 6.7 m) and forretress 10.0 (3.6x of 2.8 m). The 09-26
+    run was warm, so its per-slug seeds were off and 60 UL dives x 25 m put
+    ~25 h of phantom time into a ~32 h ETA. A [1x, 5x] band would not have
+    caught that, hence 2.5x (the ml_tail fallback's headroom).
+
+    The lower bound keeps the fallback honest for the other regime it
+    serves -- a cold run's never-seen slug -- against the 09-20 cold median.
+    """
+    warm = oe.BUCKET_MEASUREMENTS['warm']['median_min'][bucket]
+    cold = oe.BUCKET_MEASUREMENTS['cold']['median_min'][bucket]
+    assert oe.BUCKET_MEASUREMENTS['warm']['hit_ratio'] > oe.WARM_RUN_HIT_RATIO
+    assert oe.BUCKET_MEASUREMENTS['cold']['hit_ratio'] <= oe.WARM_RUN_HIT_RATIO
+    fallback = oe.FALLBACKS[bucket]
+    assert warm <= fallback <= 2.5 * warm, (
+        f'{bucket} fallback {fallback}m is not within [1x, 2.5x] of the '
+        f'2026-09-26 warm awake median ({warm}m)')
+    assert fallback >= 0.75 * cold, (
+        f'{bucket} fallback {fallback}m under-reports the 2026-09-20 cold '
+        f'awake median ({cold}m) by more than 25%')
+
+
 def test_a_historyless_machine_gets_the_fallback_not_a_phantom_tail(tmp_path):
     """The path that made the wrong constant visible, end to end.
 
