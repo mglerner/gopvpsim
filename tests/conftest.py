@@ -103,6 +103,37 @@ def load_script(name):
     return mod
 
 
+# ---------------------------------------------------------------------------
+# Replay-blob lookup (was open-coded in five test modules until 2026-09-27)
+# ---------------------------------------------------------------------------
+
+def replay_dirs():
+    """Where replay blobs may live: this clone, then a sibling checkout.
+
+    A working clone of this repo shares the machine's blob store with the
+    main checkout rather than duplicating 9 GB of pickles.
+    """
+    return [REPO_ROOT / 'userdata' / 'replay',
+            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
+
+
+def find_blob(name):
+    """Path to replay blob ``name``, or None when it is not on this machine."""
+    for d in replay_dirs():
+        p = d / name
+        if p.exists():
+            return p
+    return None
+
+
+def require_blob(name):
+    """Path to replay blob ``name``; skips the test when it is absent."""
+    p = find_blob(name)
+    if p is None:
+        pytest.skip(f"{name} is not on this machine")
+    return p
+
+
 # Flags for the smallest dive that still renders EVERY conditional piece of
 # page chrome. Each entry that is not just "make it small" is load-bearing for
 # the DOM-id guard -- drop one and the guard silently stops covering the ids

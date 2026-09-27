@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import require_blob
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
 ENGINE_JS = SCRIPTS_DIR / 'deep_dive_engine.js'
@@ -40,14 +42,6 @@ import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
 import deep_dive_brief as B  # noqa: E402
 import deep_dive_matchup_clusters as MC  # noqa: E402
-
-
-def require_blob(name):
-    for d in (REPO_ROOT / 'userdata' / 'replay',
-              REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay'):
-        if (d / name).exists():
-            return d / name
-    pytest.skip(f"{name} is not on this machine")
 
 
 @pytest.fixture(scope='module')
