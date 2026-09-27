@@ -95,7 +95,7 @@ mismatching; it was 25 of 165 on the 9ac12a2754a1 bake) to close the loop.
   preserves the shipped bytes and documents it). Rebuilding with the
   current kit fixes both -- republishing is Michael's call.
 - `thresholds/thievul.toml` [cd_prep] retirement rides the
-  post-Worlds bundle (see the Worlds checklist below).
+  post-Worlds bundle (see the Worlds "dormant until 2027" section below).
 
 ## Cramorant -- open items (record: CHANGELOG 2026-08-24..27, 2026-09-10..12, 2026-09-12, 2026-09-15, 2026-09-27)
 
@@ -236,6 +236,10 @@ a revival: `docs/worlds_prep_plan.md`. Still open:
   `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
   hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
   new-mechanics bake.
+- **Standing Worlds bake/publish rules (carry into any revival):** publish
+  only on Michael's explicit per-instance go; long bakes detached and
+  run-to-completion; Worlds modules never touch the sweep cache (pinned by
+  `tests/test_worlds_bake_guards.py`); no `*_great.toml` from a Worlds bake.
 
 DECISIONS / EDITORIAL for Michael:
 
@@ -562,7 +566,7 @@ before any `--jobs` default above 1.
    preflight hard-fails when `jobs x per-guide workers > cores`. Also pointless
    now: the whole ML tail measured **3.9 min** for 60 guides on 2026-09-12
    (48 profiles x 60 opponents at `DEFAULT_IV_FLOOR = 12`, vs 4096 IVs x 76
-   opponents x 9 scenarios for a GL dive). See the ml_tail note below.
+   opponents x 9 scenarios for a GL dive); 204 s on the 2026-09-26/27 bake.
 6. **Memory IS the constraint** (see "The risk" above): cap concurrency by
    measured peak RSS, not core count; the old "0.8 GB per dive" figure is
    wrong by 3-15x.
