@@ -1956,7 +1956,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             return cm_orig_idx[_gulp_slot]
 
     # Aegislash Shield form: farm energy before throwing charged moves.
-    # PvPoke ActionLogic.js:957-961: delay unless the move would KO.
+    # PvPoke ActionLogic.js:1014-1022: delay unless the move would KO.
+    # cm_dmgs is priced at the Blade atk (BattlePokemon._charged_atk_base).
     if (attacker._form_change is not None
             and attacker._form_change.forms[attacker._form_idx].species_id == 'aegislash_shield'
             and attacker.energy < 100 - (fast_energy / 2)):
@@ -3010,6 +3011,43 @@ class BattlePokemon:
         self._cm_mega_mults = [mega_multiplier(cm, lvl)
                                for cm in self.charged_moves]
 
+    def _charged_atk_base(self) -> float:
+        """Pre-stage attack for this mon's CHARGED-move damage (fast moves
+        always use ``self.atk``). The ONE source for all three charged-damage
+        builders (_ensure_dmg_cache, _ensure_dp_init_cache, the buff-delta
+        stage rows in _ensure_dp_cache) so they cannot drift.
+
+        When the CURRENT form's trigger is 'activate_charged' (only
+        aegislash_shield in the gamemaster), every charged throw changes form
+        BEFORE damage resolves (simulate()'s trigger site), so the throw
+        always lands with the target form's attack. Estimate it that way
+        too: PvPoke DamageCalculator.js:43-50 (battle path;
+        damageByStats:82-85 is the same rule, generic on the trigger). Before
+        2026-09-27 we priced Shield-form charged moves with the Shield atk
+        (~half), so the farm gate, the DP plan and bandaid[918] passed up
+        guaranteed KOs (the six Aegislash x Azumarill oracle cells).
+
+        STAGE (deliberate deviation): callers multiply this by the CURRENT
+        atk-stage multiplier. PvPoke substitutes the raw Blade atk with NO
+        stage, although its own throw (changeForm keeps statBuffs) does
+        apply it -- so after an opponent's atk debuff (Rock Tomb, Icy
+        Wind, ...) PvPoke over-estimates. Ours equals the damage our
+        resolver will deal. The choice is NOT invisible: it decides 15 of
+        1080 sampled GL cells (4 winner flips, mixed direction) and the
+        cradily_vs_aegislash_blade oracle xfails (DEVELOPER_NOTES "Form
+        change gotchas").
+
+        Cache keys need no change: the value depends only on the form index,
+        and every form change (apply_form_change, reset_for_battle)
+        invalidates these caches.
+        """
+        fc = self._form_change
+        if fc is not None:
+            fd = fc.forms[self._form_idx]
+            if fd.trigger == 'activate_charged':
+                return fc.forms[fd.target_idx].atk
+        return self.atk
+
     def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
         """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
         at the current stat stages, if not already valid."""
@@ -3017,7 +3055,9 @@ class BattlePokemon:
                 and self._dmg_cache_atk_stage == self.atk_stage
                 and self._dmg_cache_def_stage == defender.def_stage):
             return
-        atk_eff = self.atk * _stat_stage_mult(self.atk_stage)
+        _stage_mult = _stat_stage_mult(self.atk_stage)
+        atk_eff = self.atk * _stage_mult
+        cm_atk_eff = self._charged_atk_base() * _stage_mult
         def_eff = defender.def_ * _stat_stage_mult(defender.def_stage)
         my_types  = self.types
         opp_types = defender.types
@@ -3027,7 +3067,7 @@ class BattlePokemon:
             fm['type'], my_types, opp_types, self._fm_mega_mult,
         )
         self._cached_charged_dmgs = [
-            calc_damage(cm['power'], atk_eff, def_eff,
+            calc_damage(cm['power'], cm_atk_eff, def_eff,
                         cm['type'], my_types, opp_types, mm)
             for cm, mm in zip(self.charged_moves, self._cm_mega_mults)
         ]
@@ -3090,7 +3130,7 @@ class BattlePokemon:
         # again at each self form change (that moment's stat stage).
         my_types  = self.types
         opp_types = defender.types
-        atk_init = self.atk * _stat_stage_mult(self.atk_stage)
+        atk_init = self._charged_atk_base() * _stat_stage_mult(self.atk_stage)
         def_init = defender.def_ * _stat_stage_mult(defender.def_stage)
         dmg_init = [calc_damage(cm['power'], atk_init, def_init,
                                 cm['type'], my_types, opp_types, mm)
@@ -3287,6 +3327,7 @@ class BattlePokemon:
             has_neg = any(d < 0 for d in cm_buff_delta)
             def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
             atk_base = self.atk
+            cm_atk_base = self._charged_atk_base()
             atk_types = self.types
             def_types = defender.types
             fm_power = self.fast_move['power']
@@ -3307,8 +3348,9 @@ class BattlePokemon:
                     continue
                 _s = _s_off - 4
                 _atk_eff = atk_base * _stat_stage_mult(_s)
+                _cm_atk_eff = cm_atk_base * _stat_stage_mult(_s)
                 cm_dmgs_by_stage.append([
-                    calc_damage(cm['power'], _atk_eff, def_eff_val,
+                    calc_damage(cm['power'], _cm_atk_eff, def_eff_val,
                                 cm['type'], atk_types, def_types, mm)
                     for cm, mm in zip(cms, cms_mega)
                 ])
@@ -3476,15 +3518,16 @@ def _apply_move_buffs(
 # Core simulation
 # ---------------------------------------------------------------------------
 #
-# EXPERIMENTAL TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP
-# turn system; live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026).
+# TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP turn system;
+# live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026). The default
+# since 2026-09-09.
 #
-#   *** UNVALIDATED -- there is NO PvPoke reference for this mode. ***
-#   PvPoke still implements the legacy turn system, so the 'new' branch is
-#   coded from the published spec alone and cross-checked only against our
-#   own spec-derived unit tests (tests/test_new_turn_mechanics.py), never
-#   against an external oracle. Treat all 'new'-mode breakpoint/CMP output
-#   as experimental.
+#   Cross-checked against PvPoke master, which implements this system since
+#   2026-09-09: scripts/audit_oracle_harness.py --mechanics new matches it
+#   on every oracle cell except the documented divergences on its MATCHUPS
+#   entries. Before that merge the 'new' branch was coded from the published
+#   spec alone and checked only by our spec-derived unit tests
+#   (tests/test_new_turn_mechanics.py).
 #
 # The spec lists five changes. Mapping to this engine:
 #

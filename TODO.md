@@ -1104,29 +1104,27 @@ the default flip, PvPoke shipping to master, the oracle / test / pool
 re-baseline, the tripwire re-pin) and the 2026-09-22 legacy guard are in
 CHANGELOG 2026-09-02..03 and 2026-09-09..10. Open:
 
-- **Aegislash x Azumarill, 6 oracle cells** (`scripts/mechanics_notice.py`
-  is the canonical wording: 237 of 243 cells match PvPoke master). One
-  form-change interaction: `aegislash_vs_azumarill (1,1) (2,1)`,
-  `aegislash_blade_vs_azumarill (1,0) (2,0)`,
-  `azumarill_vs_aegislash_shield (1,1) (1,2)`. Two flip `log_ok=False`;
-  `aegislash_blade_vs_azumarill (1,0)` diverges 570/429 vs 712/287, the
-  widest gap on the grid. Traced 2026-09-09, timeboxed -- symptom found,
-  root cause NOT: our Aegislash farms in SHIELD form for 43 turns at 1
-  damage per Psycho Cut, banks the full 100 energy, then form-changes to
-  Blade on T44 and throws Shadow Ball for 91; PvPoke's Aegislash is very
-  likely committing earlier. Next probe: PvPoke's chargedLog side by side
-  with ours. (The SHADOW_BALL 100 -> 90 hypothesis is dead, b0c4fb0.)
-  Excluding Aegislash from the pools is no escape hatch: both forms come
-  out of the AUTO recipe and both are dive focals.
-  - When resolved: delete `scripts/mechanics_notice.py` and its call sites
-    (`deep_dive.py`, `scripts/battle.py`, `deep_dive_brief.py`); its own
-    docstring states that deletion condition.
-- **Un-xfail candidates:** 3 documented divergences VANISHED in the
-  2026-09-09 re-measure (2 aegislash_blade, 1
-  corviknight_vs_moltres_galarian). Do not un-xfail them piecemeal before
-  the Aegislash cluster is understood; they may be the same root cause
-  moving. (The 13 strict xfails in `tests/test_battle.py` became real pins on
-  2026-09-25; see that file's Aegislash / Moltres-G block comments.)
+- **Aegislash x Azumarill, 6 oracle cells -- RESOLVED 2026-09-27** (our
+  bug: Shield-form charged moves were priced at the Shield atk; PvPoke uses
+  the Blade atk the throw lands with). Root cause, pre/post values, the
+  1080-cell sample, the deliberate atk-stage deviation and the cache
+  predicate are in CHANGELOG 2026-09-27; `scripts/mechanics_notice.py` is
+  deleted and the three VANISHED un-xfail candidates are all cleared.
+  Still open from that work:
+  - **Re-bake / page caveat:** both Aegislash GL dives and every GL dive's
+    Aegislash opponent rows were baked with the bug (published, un-flagged).
+    Migrate with `aegislash_blade_atk_20260927`; the push is Michael's call.
+  - **`deep_dive_brief.py` G-caveat:** `CAVEAT_SPECIES = ('Aegislash',)`
+    still stamps "(engine divergence vs PvPoke)" on Aegislash cells and
+    excludes them from floors/rungs; the divergence it discloses is fixed.
+    Retiring it changes published prose (and its test pins) -- decide with
+    the re-bake.
+  - Follow-ups F1-F4 from the diagnosis, each its own item: farm-gate
+    ordering vs PvPoke's farm-down early return (decide only now that the
+    damage fix is in; its touched set is also "Aegislash either side");
+    the residual non-Aegislash-cause cells in the 1080 sample (Pachirisu
+    level cap, Moltres-G, Thievul, ...); Blade Gyro-Ball-into-shield
+    first-throw log differences; Registeel (2,1) log-only residual.
 - **Threshold-TOML prose (3b(c) of the 2026-09-09 re-vet):** 182
   descriptions cited a decimal number in prose; each one whose underlying
   threshold moved is now a wrong published sentence. d363b1d has since
@@ -1144,9 +1142,6 @@ CHANGELOG 2026-09-02..03 and 2026-09-09..10. Open:
   Re-deriving would overwrite the record of what was published under the
   engine that produced it. Un-skip when the 2027 Worlds cycle starts, or
   earlier if the IV-robustness work needs them.
-- **Next engine-hash bump:** `src/gopvpsim/battle.py:3424-3427` still calls
-  `mechanics='new'` "EXPERIMENTAL" / "UNVALIDATED"; fix the comment only on
-  a bump that is happening anyway (the file is engine-hashed).
 
 DUP DOM IDS: measured 2026-09-10, NOT a blocker, but the de-dupe item that
 the pre-dive checklist says "TODO carries" is no longer in this file, so it is
