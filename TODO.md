@@ -1144,9 +1144,6 @@ CHANGELOG 2026-09-02..03 and 2026-09-09..10. Open:
   Re-deriving would overwrite the record of what was published under the
   engine that produced it. Un-skip when the 2027 Worlds cycle starts, or
   earlier if the IV-robustness work needs them.
-- **Next engine-hash bump:** `src/gopvpsim/battle.py:3424-3427` still calls
-  `mechanics='new'` "EXPERIMENTAL" / "UNVALIDATED"; fix the comment only on
-  a bump that is happening anyway (the file is engine-hashed).
 
 DUP DOM IDS: measured 2026-09-10, NOT a blocker, but the de-dupe item that
 the pre-dive checklist says "TODO carries" is no longer in this file, so it is

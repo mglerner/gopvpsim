@@ -250,12 +250,14 @@ def _cram_0v1_surf_gate_20260927(f, c):
 
 def _aegislash_blade_atk_20260927(f, c):
     """Shield-form charged estimate at the Blade atk (pin --from-engine
-    32a20be48379 -> addf7deb49d7; slayer --from-engine 9b90c8d8b434 ->
-    93bbb87f64b2).
+    32a20be48379 -> 45cf73a2d23d; slayer --from-engine 9b90c8d8b434 ->
+    0c54e07bc21b).
 
     The ENTIRE delta is in battle.py: a new BattlePokemon._charged_atk_base
     feeds the charged-move rows of _ensure_dmg_cache, _ensure_dp_init_cache
-    and the buff-delta stage rows of _ensure_dp_cache; the rest is comments.
+    and the buff-delta stage rows of _ensure_dp_cache; the rest is comments
+    (including the separate commit rewording the stale "EXPERIMENTAL /
+    UNVALIDATED" mechanics='new' header -- comment-only, in this delta).
     It returns something other than ``self.atk`` only when the mon's CURRENT
     form's trigger is 'activate_charged' -- in the gamemaster, only
     aegislash_shield. So the change lives inside the damage caches OF a
