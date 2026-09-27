@@ -14,11 +14,17 @@ steps make either event a procedure instead of a scramble.
        cp -al ~/.cache/gopvpsim/sweep ~/.cache/gopvpsim/sweep_pre_<season>
 
    `migrate_cache.py` unlinks the `.npz` **score planes**, not just the
-   `.json` sidecars (`scripts/migrate_cache.py:604-612`), and those
+   `.json` sidecars (`scripts/migrate_cache.py:886-893`), and those
    planes ARE the per-spread pre-rebalance scores. Blessed columns are
    untouched; the *affected* ones are deleted -- and those are exactly
    the columns a before/after "who won and lost" comparison needs.
-   Hardlinks, so it costs seconds and near-zero disk. The window exists
+   Hardlinks, so it costs seconds and near-zero disk AT CREATION -- but
+   every plane a later migration or GC unlinks from the live cache stays
+   alive in the snapshot, so its unique footprint grows with each migration
+   it outlives: the 2026-09-15 `sweep_pre_aegislash_20260915` snapshot held
+   44.6 GB unique when it was deleted on 2026-09-25 (slayer twin 1.36 GB;
+   docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md "Results").
+   Delete it once the before/after comparison is done. The window exists
    only between "the rebalanced gamemaster is fetched" and "`--apply`
    runs"; after the unlink, recovering those numbers means re-simming
    the pre-rebalance meta from the archived blob (hours).
