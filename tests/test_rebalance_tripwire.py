@@ -109,4 +109,4 @@ def test_pvpoke_engine_matches_last_vetted_commit():
         f"docs/validations/2026-09-02_new_mechanics_oracle_ab.md: re-port "
         f"the turn loop against the merged reference, drive "
         f"`audit_oracle_harness.py --mechanics new` to zero, then flip "
-        f"the default and delete scripts/mechanics_notice.py.")
+        f"the default.")

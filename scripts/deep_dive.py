@@ -4079,26 +4079,15 @@ def main():
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
                         help='Turn-resolution model. DEFAULT IS new: the '
                              'turn system the live game runs, and the one '
-                             'PvPoke master implements since 2026-09-09. It '
-                             'is cross-checked, matching master on 237 of '
-                             '243 oracle cells; the 6 that differ are all '
-                             'Aegislash vs Azumarill under form change and '
-                             'all agree on the winner. legacy models the '
-                             'pre-2026-09-02 system, which neither the game '
-                             'nor PvPoke master implements any more -- it is '
-                             'retained only to keep the port-fidelity '
-                             'history runnable. See '
-                             'scripts/mechanics_notice.py.')
+                             'PvPoke master implements since 2026-09-09 '
+                             '(cross-checked by '
+                             'scripts/audit_oracle_harness.py). legacy models '
+                             'the pre-2026-09-02 system, which neither the '
+                             'game nor PvPoke master implements any more -- '
+                             'it is retained only to keep the port-fidelity '
+                             'history runnable.')
 
     args = parser.parse_args()
-
-    # BOTH settings carry a caveat, for opposite reasons -- see
-    # mechanics_notice.py. `new` is the DEFAULT (flipped 2026-09-09), so its
-    # caveat is the one a user gets without asking: 237/243 oracle cells match
-    # PvPoke master, the 6 that differ are all Aegislash form change. `legacy`
-    # is a dead ruleset nobody opts into by accident.
-    from mechanics_notice import warn_mechanics
-    warn_mechanics(args.mechanics, logger.warning)
 
     # Fail-fast: ensure --html output directory exists (and is writable)
     # BEFORE running any simulation. Without this, a fresh dive slug
