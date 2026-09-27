@@ -73,6 +73,33 @@ Completed/shipped work, reverse chronological.
 - **Process:** "charger connected" added to the pre-dive triggers
   (caffeinate cannot hold off sleep on battery).
 
+## 2026-08-31..09-25 -- Worlds 2026 post-event: publish path unblocked; code dormant until 2027
+
+Closed out of TODO's post-Worlds checklist 2026-09-27.
+
+- **08-31 (Michael):** the Worlds surfaces retire with the Twilight Trails
+  site update. `verify_worlds.py` left the ship-gate roster (5985777) -- it
+  failed from main on all six gamemaster stamps and, the roster being
+  shared, blocked every publish path; the publish-time Worlds re-render
+  became opt-in (`WORLDS_RERENDER=1`). The pinned `gopvpsim-worlds` worktree
+  was removed after its one delta (`scripts/worlds_meta.py`) was verified
+  byte-identical to main. The `.cards_rerender_pending` sentinel set that
+  day (L51 dead-tooltip fix 061d93c; the cup banner's false "dated archive"
+  claim) cleared with the September full re-renders.
+- **09-10:** the three Worlds artifact tests marked dormant, not broken
+  (066e528). **09-20:** the deferred cmp_atk 1-ULP shadow-tie fix landed on
+  its own hash bump (ebf5944; pin now
+  `test_cmp_shadow_roundtrip_artifact_no_longer_reaches_cmp`). **09-22:**
+  nothing is hardcoded to legacy mechanics, Worlds included (4b6342b).
+- **Aegislash rebake question: moot.** Cramorant was not Worlds-legal
+  (eligible 09-01), the surface retired, and Aegislash was fixed and rebaked
+  site-wide (CHANGELOG 2026-09-12/15).
+- **09-25 (Michael, perf-doc Q4):** do NOT execute the retire/delete pass;
+  the Worlds code stays dormant until 2027. The pages are off the live
+  site (absent from `userdata/website/`, which publish rsyncs with
+  `--delete`); the exact publish that removed them is not recorded. Open
+  residue stays in TODO.
+
 ## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
 
 - **What changed:** the `_cached_damage` memo that our port of PvPoke's

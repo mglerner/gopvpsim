@@ -215,75 +215,27 @@ Cramorant (GL rank 13) enters `gl_top50_plus_cs.txt` / `ul_top60.txt`
 as an OPPONENT for other species' dives -- is a Michael curation call;
 until then no shipped dive sims against it.
 
-## Worlds 2026 -- surfaces FROZEN through Aug 30; post-Worlds checklist
+## Worlds 2026 -- code DORMANT until 2027 (record: CHANGELOG 2026-08-10..27, 2026-08-31..09-25)
 
-Worlds is Aug 28-30. The full arc (sessions 1-5, the 08-14 publish,
-the Thievul moveset fork, the robustness/mirror deep pages, Greninja +
-Annihilape, verify_worlds green at 555 pair pages / 0 deferred) is
-recorded in CHANGELOG 2026-08-10..27 and docs/TODO_archive.md; plan of
-record: docs/worlds_prep_plan.md.
+Worlds (Aug 28-30) is over. Michael 2026-09-25 (perf-doc Q4 "no"): the
+Worlds code, tests and `worlds/planes` stay in the repo DORMANT until 2027
+-- no retire/delete pass now. The pages are off the site (no `worlds*.html`
+in `userdata/website/`; publish rsyncs with `--delete`). Plan of record for
+a revival: `docs/worlds_prep_plan.md`. Still open:
 
-STANDING RULES while the surface lives: publish only with Michael's
-explicit per-instance go; long bakes detached + run-to-completion;
-legacy engine only, both bait modes, never the sweep cache, no
-`*_great.toml`; before ANY Worlds render, re-pin the gamemaster:
-`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
-~/Documents/gopvpsim_cache/gamemaster.json` (the cache currently holds
-the LIVE blob, restored + hash-verified 2026-08-27; while a pin is up:
-no Cramorant sims, and ~63 Cramorant-family test failures are expected
-pin artifacts).
-
-POST-WORLDS checklist (after 08-30):
-
-- DECIDED (Michael, 2026-08-31): the Worlds surfaces **RETIRE at the
-  Twilight Trails site update** -- "I don't think anyone will ever look
-  at it post-Worlds." Publish-path unblocking is DONE ahead of that:
-  `verify_worlds.py` is out of the `run_ship_gates.py` roster (it
-  failed from main on all six stamps, and because the roster is shared
-  by all four entry points it blocked EVERY publish path, not just a
-  Worlds one), and the `publish_website.sh` Worlds re-render is now
-  opt-in behind `WORLDS_RERENDER=1`. The 593 pages stay published
-  exactly as shipped until the retire lands; `scripts/verify_worlds.py`
-  is unchanged, so a rebake can still run it by hand.
-  Correction to the old note here: the pinned worktree did NOT green
-  the gate either -- the gamemaster stamp reads the machine-level
-  cache, which holds the live blob. There was no clean publish path
-  from any tree.
-  NB the next publish must carry a full dive-page re-render -- the
-  publish gate sentinel `userdata/.cards_rerender_pending` is SET as of
-  2026-08-31 and blocks it until then. Two render-only fixes are
-  waiting: (a) dead tooltips on the shipped pages' best-buddy L51 half
-  (hydration bug fixed 061d93c); (b) the cup dive banner's false "this
-  dive is kept as a dated archive" claim, removed from deep_dive.py
-  2026-08-31 -- the 5 shipped *-equinox-cup pages still render it.
-  Neither touched file is engine-hashed, so there is no sim cost.
-  BEFORE re-rendering, settle the vintage question: the render path
-  reads LIVE gamemaster/rankings while scores come frozen from the
-  blob, so re-rendering a page that advertises "snapshot as of
-  2026-08-26" against today's gamemaster mixes vintages.
-- Worktree `gopvpsim-worlds`: REMOVED 2026-08-31. Its only working-tree
-  delta was `scripts/worlds_meta.py`, verified byte-identical to
-  `main` before removal (the Greninja/Annihilape editorial was already
-  committed); the three symlinks were unlinked individually first so
-  nothing could follow them into the main repo.
-- Retire together: `thresholds/thievul.toml` [Thievul.cd_prep], the
-  worlds/meta.toml `injected_move_ids` declarations + their on-page
-  disclosures (build_worlds_pages.py:569-660), and the 4 injection
-  guards in tests/test_worlds_bake_guards.py (3 currently
-  auto-skipping under the live gamemaster, as designed).
-- Aegislash rebake decision: the Cramorant port changes
-  aegislash_shield modeling (161 measured cell flips vs Shadow
-  Sableye; cold rebake = 57h). LEGALITY INPUT (verified 2026-08-27,
-  Play! handbook second-Tuesday rule): Cramorant debuted 08-18 ->
-  eligible 09-01 -> NOT Worlds-legal, so the question is purely
-  Aegislash sim fidelity; if the surface retires after 08-30 the
-  rebake case is weak. (Thievul's Icy Wind: eligible 08-25 -> legal;
-  meta.toml's conclusion stands.)
-- cmp_atk 1-ULP shadow-tie fix (deferred past Worlds; Michael
-  2026-08-10): carry pre-shadow atk on BattlePokemon; own hash bump +
-  a test recording the pre-fix values + a no-shadow-either-side
-  migration predicate -- do NOT fold into a neutral batch. Pinned by
-  tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real.
+- **Retire-together bundle (rides the 2027 decision):** `thresholds/thievul.toml`
+  `[Thievul.cd_prep]` (still present 2026-09-27), the `worlds/meta.toml`
+  `injected_move_ids` declarations + their on-page disclosures in
+  `build_worlds_pages.py`, and the injection guards in
+  `tests/test_worlds_bake_guards.py`.
+- **Before ANY Worlds re-render:** re-pin the gamemaster the pages were baked
+  at (`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
+  ~/Documents/gopvpsim_cache/gamemaster.json`), restore the live blob after;
+  the render path reads live gamemaster/rankings while scores come frozen
+  from the blob. `WORLDS_RERENDER=1` is the opt-in in `publish_website.sh`;
+  `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
+  hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
+  new-mechanics bake.
 
 DECISIONS / EDITORIAL for Michael:
 
@@ -308,14 +260,11 @@ DECISIONS / EDITORIAL for Michael:
   25-vs-12 wording, CSV dropped-row accounting, raw key fragments in
   the answers dump, sim-count phrasing.
 
-Non-gating polish (open): (a) a11y -- badge text 4.36:1 in
-pokemon-dark; hub matrix mini-grids are color-only (cheat sheets are
-the text alternative); (b) optional session-6 survival strip (scoped
-2026-08-11: tied to the reach table's LIVE plan only, one row per
-attainable incoming fast tier, fast-pressure-only arithmetic
-labeled, own adversarial round before ship); (c) optional
-pooled-usage display (usage_recent_pooled_pct in meta.toml, unshown).
-Planning artifacts preserved in userdata/worlds_planning/.
+Non-gating polish, dormant with the rest: a11y (badge text 4.36:1 in
+pokemon-dark; hub mini-grids color-only), the optional session-6 survival
+strip (scoped 2026-08-11), the optional pooled-usage display
+(`usage_recent_pooled_pct`, unshown). Planning artifacts:
+`userdata/worlds_planning/`.
 
 ## Condensed-meta funnel bundle (queued 2026-08-19, Michael)
 
