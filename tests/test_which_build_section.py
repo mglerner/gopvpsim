@@ -52,6 +52,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import replay_dirs, require_blob
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
 GUIDES_DIR = REPO_ROOT / 'guides'
@@ -74,18 +76,6 @@ import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
 import deep_dive_brief as B  # noqa: E402
 import deep_dive_builds as builds_mod  # noqa: E402
-
-
-def _replay_dirs():
-    return [REPO_ROOT / 'userdata' / 'replay',
-            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
-
-
-def require_blob(name):
-    for d in _replay_dirs():
-        if (d / name).exists():
-            return d / name
-    pytest.skip(f"{name} is not on this machine")
 
 
 # ---------------------------------------------------------------------------
@@ -2264,7 +2254,7 @@ def _candidate_blobs():
     for name in _LINE_ARM_HINTS:
         seen.add(name)
         out.append(name)
-    for d in _replay_dirs():
+    for d in replay_dirs():
         if d.is_dir():
             for name in sorted(q.name for q in d.glob('*.replay.pkl.gz')):
                 if name not in seen:
@@ -2284,7 +2274,7 @@ def _arm_with_a_line_and_an_empty_scenario():
     """
     tried = 0
     for name in _candidate_blobs():
-        path = next((d / name for d in _replay_dirs() if (d / name).exists()),
+        path = next((d / name for d in replay_dirs() if (d / name).exists()),
                     None)
         if path is None:
             continue
@@ -6164,7 +6154,7 @@ _ATTACK_PAIRED_BLOBS = [
 
 def _first_present(names):
     for name in names:
-        for d in _replay_dirs():
+        for d in replay_dirs():
             if (d / name).exists():
                 return d / name
     pytest.skip("no attack-paired replay blob on this machine")

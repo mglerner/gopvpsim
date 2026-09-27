@@ -35,6 +35,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tests.conftest import find_blob, require_blob
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
 SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
@@ -160,31 +162,6 @@ def test_the_frozen_species_still_exist_in_the_live_rankings():
     for sid in ('annihilape', 'melmetal', 'charjabug', 'snorlax'):
         assert sid in live, f"{sid} is gone from the live rankings"
     assert len(live) >= 1000, 'positive control: the cache is a real ranking'
-
-
-def _replay_dirs():
-    """Where replay blobs may live: this clone, then a sibling checkout.
-
-    A working clone of this repo shares the machine's blob store with the
-    main checkout rather than duplicating 9 GB of pickles.
-    """
-    return [REPO_ROOT / 'userdata' / 'replay',
-            REPO_ROOT.parent / 'gopvpsim' / 'userdata' / 'replay']
-
-
-def find_blob(name):
-    for d in _replay_dirs():
-        p = d / name
-        if p.exists():
-            return p
-    return None
-
-
-def require_blob(name):
-    p = find_blob(name)
-    if p is None:
-        pytest.skip(f"{name} is not on this machine")
-    return p
 
 
 # ---------------------------------------------------------------------------
