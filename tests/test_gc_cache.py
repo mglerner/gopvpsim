@@ -4,7 +4,6 @@ Pins decision D (2026-06-27): keep the current gamemaster vintage plus the
 N-1 most-recent other vintages; drop the rest. The current vintage is always
 kept regardless of recency.
 """
-import importlib.util
 import json
 import os
 import sys
@@ -14,17 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 
-def _load(name):
-    spec = importlib.util.spec_from_file_location(
-        name, REPO_ROOT / "scripts" / f"{name}.py")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-sweep_cache = sys.modules.get("sweep_cache") or _load("sweep_cache")
-gc_cache = sys.modules.get("gc_cache") or _load("gc_cache")
+from tests.conftest import load_script  # noqa: E402
+sweep_cache = load_script("sweep_cache")
+gc_cache = load_script("gc_cache")
 
 
 def _make_vintage(sweep_dir, name, gm, mtime):
