@@ -97,59 +97,15 @@ mismatching; it was 25 of 165 on the 9ac12a2754a1 bake) to close the loop.
 - `thresholds/thievul.toml` [cd_prep] retirement rides the
   post-Worlds bundle (see the Worlds checklist below).
 
-## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
+## Cramorant -- open items (record: CHANGELOG 2026-08-24..27, 2026-09-10..12, 2026-09-12, 2026-09-15, 2026-09-27)
 
-The 2026-09-12..15 reinvestigation record (Aegislash reuse-leak fix, sheet
-v6 certified 90/90 and merged, the 2026-09-15 merges + cache migrations
-and the gamemaster-vintage swap recipe) is in CHANGELOG 2026-09-12 and
-2026-09-15.
+The 2026-09-10..27 narrative (rebalance re-verify, deep re-verification
+campaign, stale-article audit, sheet v6 -> v7, certification + publish
+guard) is closed and condensed in CHANGELOG. What stays here is the standing
+runbook and the genuinely open items.
 
-**Michael's three open decisions** (leave as-is until answered):
-
-- **Guzzlord 2v2: documented cost or target?** Shipped: -1559 win-cells,
-  +72.6 mean on GL Dive+Fly 2v2 nobait -- the rush pads rating onto lost
-  fights (258 -> 420) and pays with 504-519 razor wins. RECOMMENDATION:
-  documented cost. It passes the bar (both slice metrics positive), every
-  gate retune that removes it fails the UL Dive+Fly holdout by -320..-830
-  net, and it is one opponent. If "target": the only lever is the 2v2 gate
-  (M5 in the deep-vet doc), which means a GL-only conditional and a new
-  campaign; nothing in v6 changes.
-- **Gate-column refactor.** The referee re-derived that `gate on iff
-  opp_start_shields >= my_start_shields` reproduces all 9 rows.
-  RECOMMENDATION: yes, but as a behaviour-neutral hygiene commit AFTER v6
-  ships (own engine-hash bump with an always-true blessing predicate, like
-  `neutral_batch_20260810`), together with deleting the three dead
-  constants (`_POGODIVES_GATE_DPT_MAX`, `_POGODIVES_GATE_MIN_ENERGY`,
-  `_POGODIVES_TANK_CHEAP_FRAC`) and their `cmp_dpt`/`cmp_dpt_e`/
-  `cmp_ready_dpt`/`cheap` branches; needs `tests/test_pogodives.py`'s
-  synthetic rows and `cramorant_sensitivity.py` updated. If "no": nothing
-  changes; the sheet stays a 9-row table with per-row gate strings.
-- **Report 9 (PvPoke `hasActed` survives `Pokemon.reset()`).** Draft text:
-  `docs/pvpoke_bug_reports.md` Report 9; a standalone copy is in
-  `~/coding/reports/pvpoke-report9-hasacted-2026-09-15.html` (card on
-  pogo-reports.html). RECOMMENDATION: file it -- browser-verified,
-  one-line fix, and it plausibly explains Report 3's unresolved 429-vs-510
-  from July. If filed: note the issue number in `docs/pvpoke_bug_reports.md`
-  and, once PvPoke fixes it, the Lapras page-level pin (446) in
-  `tests/test_pvpoke_sandbox.py` and the article test's run1==run2 gate
-  start failing -- delete the pin and keep the gate. If not filed: nothing
-  changes; our verifier already emulates the page.
-  Michael 2026-09-12: "make report 9 a TODO for later". Follow that file's
-  filing conventions; check the issue tracker for a duplicate first.
-
-**Lens-grid item, OPEN: the data-cache TTL keeper.** A launch-time
-preflight should refuse a bare `run_website_dives.py` run without the TTL
-keeper, or the runner should own the keeper. 88bec7b (2026-09-20) pins the
-data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
-a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
-letting the live gamemaster refresh mid-bake -- is still unpinned.
-
-**Post-bake Cramorant verification -- DONE 2026-09-27** (CHANGELOG 2026-09-27
-"PoGoDives sheet v7"): the certifier found one uncertified page (GL Peck /
-Fly + Surf, entered via the 09-17 pool regeneration), sheet v7 fixed its 0v1
-row, both pages were re-dived and re-certified (720 cells, 0 failures,
-selftest 5/5 exact), the strategy article re-rendered, and the site published
-2026-09-27 18:4x. Standing runbook after every bake that touches Cramorant:
+**Standing runbook after every bake that touches Cramorant** (post-bake
+verification last DONE 2026-09-27, sheet v7; the site published 2026-09-27):
 
     python scripts/cramorant_certify.py --league both --selftest 5 --out \
         userdata/certify/cramorant_record.json
@@ -160,197 +116,75 @@ selftest 5/5 exact), the strategy article re-rendered, and the site published
 `publish_website.sh` runs the last check itself and refuses to publish a
 rendered Cramorant page that is missing from, or differs from, the record.
 
-- **DEEP RE-VERIFICATION CAMPAIGN (started 2026-09-12, Fable's first look
-  at the strat; Michael: "we're free to vet things deeply").** Instruments:
-  `scripts/cramorant_certify.py` (strict bar over the FULL 720-cell grid
-  from the dive tensors, seconds; `--selftest N` proves the tensors are
-  today's engine) and `scripts/cramorant_mini_sweep.py` (one tensor slice
-  re-simmed through the production path with knob / sheet-row overrides;
-  `--check-tensor` must be integer-exact at shipped knobs before any
-  variant is trusted; coprime `--stride` for screens, 1 for certification).
-  First full-grid read (GL page baked 2026-09-12, UL page 2026-09-11, both
-  new engine): 716/720 cells pass, 4 FAIL -- GL Peck/Hydro Pump+Surf 2v2
-  no-bait (both opp-IV modes, both caps), mean -3.3/-4.2, driven by
-  Corviknight (-3835 flips, -324 mean) and Shadow Corviknight; the v5
-  certification never had that build in GL. The UL 0v1 Dondozo "-2" does
-  NOT exist at full resolution (only Jellicent is negative there, on
-  rating); it was a single-spread artefact of the PvPoke-default IV run.
-  Sequence: (1) mechanism-trace the failures and the big hidden
-  per-opponent losers (GL 1v1 Mandibuzz/Umbreon on Dive+HP, GL 1v2
-  Snorlax / Shadow Corviknight, UL 1v1 Snorlax / Miltank), (2) propose
-  mechanism-not-names row changes, screen at coprime stride, (3) certify
-  changed rows at stride 1 once the rebake frees the cores, (4) THEN new
-  showcases and the article prose pass. Full-res compute waits for the
-  rebake; tensor reads and stride screens do not.
+**Michael's open decisions** (leave as-is until answered):
 
-  **STATUS 2026-09-12 late: sheet v6 IMPLEMENTED on the branch** (13-agent
-  campaign; record: `docs/validations/2026-09-12_cramorant_deep_vet.md`).
-  Two row changes -- (1,0) `lead_ready_ko` (terminal-KO guard), (2,2)
-  `lead_ready_chip` (last-shield "can they chip us" guard, division-free);
-  everything else kept, 2v1 stays exempt, Dondozo documented as a boundary
-  cost (19/4096 razor ties, 0 net flips), not an exception. Stride-13 screen
-  of the changed rows over all 160 slices: 0 bar failures, the 4 failing GL
-  cells go -3.36/-4.27 -> +3.05/+3.35 mean, every top-SP lens >= 0 (worst
-  2v2 +1.65, 1v0 +0.03); 2v2 total net +77,153 -> +77,243, 1v0 unchanged.
-  Stride-61 adjacency: all 560 slices of the 7 unchanged rows identical to
-  shipped. Costs to disclose: UL Peck/Surf 2v2 net +1057 -> +911 (mean
-  -0.7), UL HP/Surf 2v2 bait -154 net, GL Dive+Fly 2v2 mean -0.003; the KO
-  guard is NOT a perfect GL no-op when threaded (GL 1v0 Dive+Surf / HP+Surf
-  mean -0.008 / -0.006, net unchanged) -- wrapper-to-threaded drift, as the
-  playbook warns. Stride-1 on the 15 priority slices (both failing GL
-  cells, GL top-SP margins, all 8 UL HP+Surf 2v2 slices, UL 1v0 lenses):
-  15/15 pass, failing cells -3.3/-4.2 -> +3.09/+3.24 mean, cost = UL
-  HP+Surf 2v2 bait mode -1200..-2000 win-cells/slice (mean flat).
-  REMAINING: (a) stride-1 re-certification of the other 75 changed-row
-  slices (`cramorant_recertify.py --scenarios 2v2,1v0
-  --stride 1`, ~4-6 h serial under load; parallelise once the rebake frees
-  cores); (b) merge order after the rebake is published: Aegislash fix
-  (2e8d36b, predicate species-startswith-Aegislash), then the v6 rule
-  commit (Cramorant-only, predicate = the pogodives case registry), each
-  alone on its hash bump; (c) rebake the Cramorant pages and run
-  `cramorant_certify.py --league both` as the ship gate; (d) THEN new
-  showcases (the renderer re-picks from the survivors automatically) and
-  Michael's prose pass; (e) hygiene commit deleting the three dead
-  constants (needs test_pogodives synthetic rows + cramorant_sensitivity
-  updated). MICHAEL'S CALLS: Guzzlord 2v2 and the gate column are the
-  open decisions above; P-C (KO guard at 1v1, measured positive in GL)
-  and P-D (constant-free 1v2 `lead_drained`, costs most of the row)
-  next cycle.
-- **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
-  2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
-  links showed the same 642 win. Audit
-  (`userdata/analysis/2026-09-12_cramorant_showcase_audit/` in the clone):
-  the ENGINE is fine -- our plain-PvPoke sim reproduces PvPoke's AI exactly
-  on all four showcase cells (481 / 642 / 427 / 297) -- the ARTICLE is stale
-  in three independent ways: (1) the four sandbox links were hardcoded
-  2026-08-27 with the pre-e6827a0 turn clock, so on today's pvpoke.com they
-  replay 634 / 642 / 493 (a LOSS) / 614 instead of the advertised 674 / 666
-  / 541 / 573; (2) the Jellicent 2-1 premise is gone -- PvPoke's own plan
-  now WINS it (Shadow Ball 100->90) and the sheet exempts (2,1), so "our
-  line" IS PvPoke's there; (3) Blastoise's PvPoke default moveset moved
-  Rollout -> Bite, so that showcase simmed an off-meta fight. Fixed in the
-  renderer (computed + gated showcases, see the encoder note below; GL
-  replacement = Mandibuzz 1-1, 460 -> 686, PROPOSED, Michael to confirm or
-  pick another from the candidate list in the audit dir). STILL STALE and
-  NOT touched (ship-mode prose, Michael's editorial pass): the cheat-sheet
-  2-1 row (describes the retired ready-nuke window; the sheet now plays
-  plain PvPoke there), the 1-1/1-2 row's "lead of 40+ percentage points"
-  (constant is inert), the hero's "certified never worse ... in any of the
-  nine shield scenarios ... on both win rate and average battle rating"
-  (UL 0v1 is -2 win cells, the accepted Dondozo exception), the Methods
-  "no negative cell shipped", and the UL "honest flags" paragraph's 2-1
-  headroom framing. Per the 2026-08-31 rule (no staleness markers; a
-  no-regen article is REMOVED), the live page should either be re-rendered
-  after Michael's prose pass or taken down until then. Re-render also
-  refreshes every tensor-derived number from the rebaked dives.
+- **Guzzlord 2v2: documented cost or target?** GL Dive+Fly 2v2 nobait:
+  -1559 win-cells, +72.6 mean (the rush pads rating onto lost fights and
+  pays with 504-519 razor wins). RECOMMENDATION: documented cost -- it
+  passes the bar, and every gate retune that removes it fails the UL
+  Dive+Fly holdout by -320..-830 net. "Target" means a GL-only 2v2 gate
+  conditional (M5 in `docs/validations/2026-09-12_cramorant_deep_vet.md`)
+  and a new campaign.
+- **Gate-column refactor.** `gate on iff opp_start_shields >=
+  my_start_shields` reproduces all 9 rows. RECOMMENDATION: yes, as a
+  behaviour-neutral hygiene commit on its own engine-hash bump
+  (always-true blessing predicate, like `neutral_batch_20260810`), together
+  with deleting the three dead constants (`_POGODIVES_GATE_DPT_MAX`,
+  `_POGODIVES_GATE_MIN_ENERGY`, `_POGODIVES_TANK_CHEAP_FRAC`; still in
+  `src/gopvpsim/battle.py` and `scripts/cramorant_sensitivity.py` as of
+  2026-09-27) and their `cmp_dpt`/`cmp_dpt_e`/`cmp_ready_dpt`/`cheap`
+  branches; needs `tests/test_pogodives.py`'s synthetic rows and
+  `cramorant_sensitivity.py` updated.
+- **P-C / P-D, next cycle** (deep-vet doc): P-C = the KO guard at 1v1
+  (measured positive in GL); P-D = the constant-free 1v2 `lead_drained`
+  (costs most of the row).
+- **Jumpluff / Kingdra at 0v1 (sheet v7's accepted cost, CHANGELOG
+  2026-09-27).** v7's `surf_gate_dpe` 2.25 excludes the two-type-step ratios
+  (~2.65-2.75) that let the (0,1) tier throw a resisted Surf into Araquanid;
+  Jumpluff and Kingdra sit in the same ratio band, so they now fall back to
+  plain (about -165 rating on fights Cramorant loses anyway, 0 flips; page
+  mean +12.5 -> +10.5). Accept as documented, or look for a discriminator
+  that separates them from Araquanid (Mirror Coat) -- a new campaign, not a
+  retune.
+- **Article prose pass (ship-mode, Michael's).** The 2026-09-27 re-render
+  refreshed every tensor-derived number, but the fixed prose in
+  `scripts/render_pogodives_strategy_article.py` still carries claims the
+  2026-09-12 audit flagged: the hero's "certified never worse ... in any of
+  the nine shield scenarios ... on both win rate and average battle rating",
+  the 1-1/1-2 row's "lead of 40+ percentage points" (the LEAD constant is
+  inert, 460a63e), the 2-1 cheat-sheet row, Methods' "no negative cell
+  shipped", and the UL "honest flags" 2-1 headroom framing. The audit's
+  counter-example to the hero and Methods claims (UL 0v1 Dondozo -2) was a
+  single-spread artefact at full resolution (deep-vet doc), and the
+  2026-09-27 certification reads 0 bar failures over 720 cells, so those two
+  may now be defensible; re-read them against that record, not this note.
+  Per the 2026-08-31 rule, stale public prose gets fixed or the page comes
+  down. Outside this repo: the `~/coding/reports/pogo-reports.html`
+  Cramorant card still states the v4 "every start scenario >= 0" claim.
+- **PvPoke Reports 8 and 9 -- drafted, NOT FILED**
+  (`docs/pvpoke_bug_reports.md`). Report 9 (`hasActed` survives
+  `Pokemon.reset()`; Michael 2026-09-12: "make report 9 a TODO for later";
+  standalone copy `~/coding/reports/pvpoke-report9-hasacted-2026-09-15.html`)
+  plausibly also explains Report 3's unresolved 429-vs-510. Report 8 = the
+  two `move.moveID` typos (the draft cites ActionLogic.js:368 and :1239;
+  on the local pvpoke checkout, 78b1e66db, they sit at :368 and :1255 --
+  the latter makes defenders never shield a lethal Cramorant Dive). Both
+  bugs are still present there. Check the
+  tracker for duplicates first; if Report 9 is fixed upstream, the Lapras
+  page-level pin (446) in `tests/test_pvpoke_sandbox.py` and the article
+  test's run1==run2 gate start failing -- delete the pin, keep the gate.
 
-  SECOND FINDING, same day, browser-verified: pvpoke.com runs a sandbox
-  link's battle TWICE (runSandboxSim, then startBattle's setTimeout) and
-  `Pokemon.reset()` never clears `hasActed`, so the Pokemon that acted on
-  run 1's KO turn loses its turn-1 action in run 2 and every scripted
-  action on the old parity is dropped. Our verify_url gate ran the engine
-  ONCE, so it passed links the site renders differently (Azumarill 690
-  -> site 547; Blastoise 624 -> 515; the 09-10 Lapras "fixed" link 662 ->
-  site 446, a loss). verify_url now emulates the page (two runs) by
-  default (`page=False` = engine-level); the Lapras test pins BOTH
-  numbers so a PvPoke fix is noticed; upstream draft = Report 9 in
-  docs/pvpoke_bug_reports.md (NOT filed; likely also explains Report 3's
-  unresolved 429-vs-510). Showcases were re-picked from the cells that
-  survive the faithful gate (scan_candidates_faithful.py in the audit
-  dir): GL Toxapex 0-0, GL Feraligatr 1-1, UL Shadow Feraligatr 2-2, UL
-  Talonflame 1-2 -- all PROPOSED, Michael to confirm. All eight links were
-  opened on pvpoke.com in Chrome on 2026-09-12 and show the advertised
-  numbers (630/478, 630/492, 598/477, 573/297).
+**Lens-grid item, OPEN: the data-cache TTL keeper.** A launch-time
+preflight should refuse a bare `run_website_dives.py` run without the TTL
+keeper, or the runner should own the keeper. 88bec7b (2026-09-20) pins the
+data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
+a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
+letting the live gamemaster refresh mid-bake -- is still unpinned.
 
-  Three more things the adversarial pass (5 agents + critic) turned up:
-
-  * HOT -- the rebake running in the MAIN tree re-rendered the article at
-    10:23 on 2026-09-12 from main's renderer, i.e. WITH the stale hardcoded
-    block. `publish_website.sh` after this bake would republish the broken
-    links. Land `cramorant-reinvestigate` (or at least its renderer +
-    driver commits) and re-render the article before any publish that
-    includes it; or exclude the article from the publish.
-  * The article's NUMBERS were rendered under `mechanics='legacy'`: its
-    surviving values (494/674, 427/541, 297/573) are today's legacy-clock
-    values byte-for-byte, and none of showcase 1's or 3's moves changed
-    in the rebalance. The default flipped to 'new' on 2026-09-09 (7e6a82b),
-    13 days after the block was hardcoded. So EVERY number on the page
-    (ledger tables, deltas, correlations, staircases) is a legacy-clock
-    number; the re-render from the rebaked (new-clock) dive pages fixes
-    all of them at once. The links, by contrast, broke because of PvPoke's
-    post-charge cooldown (on master since the 2026-09-08 Twilight Trails
-    merge acb3ce461, 500 ms), and Jellicent because of Shadow Ball 100->90
-    (same merge).
-  * ENCODER RULE CORRECTED (scripts/pvpoke_sandbox.py, timeline_to_actions):
-    the 2026-09-10 fix shifted by the COUNT of prior charged actions, but
-    Battle.js:540 applies ONE 500 ms cooldown per ROUND with any charged
-    move, so a same-turn pair (CMP double throw) over-shifted everything
-    after it by +1 -- 17/17 such cells mis-encoded (Cramorant vs Swampert
-    UL 0-0: sim 703, link 815). Now shifts by DISTINCT prior resolved
-    turns; pinned by test_same_turn_charged_pair_shifts_one_turn_not_two.
-    None of the four showcases had a same-turn pair, so no published link
-    was wrong because of this.
-  * CERTIFICATION TOOL WAS BROKEN IN GL: `cramorant_policy_lab.load_pool(
-    'great')` raised AttributeError on the two Thievul `charged=` rows
-    added 2026-09-10 (the parser returns a list; the lab split it as a
-    string). Fixed + tests/test_cramorant_policy_lab_pool.py. Note for the
-    reinvestigation: the 2026-09-10 re-verify covered ONE moveset
-    (Peck/Dive+Fly) and ONE IV spread (PvPoke default) against a GL pool
-    that has since changed (rank cut 50->60, megas admitted, Thievul split),
-    while the article claims certification over all five movesets x 4096
-    spreads. Re-certifying at the article's own resolution is the first
-    task of the reinvestigation once the rebake frees the cores.
-  * Other stale surfaces found: ~/coding/reports/pogo-reports.html's
-    Cramorant card and gopvpsim-cramorant-pogodives-vs-pvpoke-2026-08-25.html
-    still claim "certified, no negative cells" (UL 0v1 Dondozo says
-    otherwise); the article's meta.toml description says "All numbers
-    recomputed from the dive tensors at render time" (true only once the
-    branch lands). Dive pages carry no sandbox links and no prose claims,
-    so they self-heal on rebake.
-- REBALANCE re-verify: **RUN 2026-09-10; failed, then FIXED (option A).**
-  (2,1) is exempt again -- every firing setting was negative, and exempting
-  is strictly better than the v4 rule (same total wins, better mean).
-  ONE ACCEPTED EXCEPTION remains: UL 0v1 is -2 win cells (both Dondozo) with
-  +8.3 mean, kept because the -2 is exactly offset by +2 in GL.
-
-  CORRECTED 2026-09-10: this is PRE-EXISTING, not a rebalance regression, and
-  an earlier note here wrongly blamed the turn ordering. Measured: the cell is
-  byte-identical under legacy and new mechanics; neither side's kit changed in
-  any sim-relevant field (Cramorant's only Gulp Missile diff is an `unlisted`
-  display flag); and the whole slice is the SAME -2 against the June 2026 pool
-  that predates the August campaign. The strat simply turns a 515 win into a
-  500/500 tie vs Dondozo -- a standing cost of dive-early into a bulky
-  opponent. NOT a re-fit input. Original failure notes:
-- REBALANCE re-verify: **RUN 2026-09-10, and it FAILED the bar.** Still
-  net-positive overall (+76 win-cells vs baseline) but UL 2v1 is NEGATIVE
-  (-1.325 mean, all of it Jellicent) and UL 0v1 loses two win cells (both
-  Dondozo). Separately the LEAD constant is now inert -- lead 30/35/40/45 and
-  a static control differ in 12 of 2,394 cells, so the fitted 40 in the
-  shipped sheet buys nothing. Sheet v5's certification does NOT carry over;
-  do not re-publish on the old bar. Full writeup + the caveat that I did not
-  reproduce their exact margin metric:
-  `docs/validations/2026-09-10_cramorant_strat_reverify.md`. Original note:
-- REBALANCE re-verify (Michael 2026-08-25): a big move rebalance is
-  expected ~2 weeks post-Worlds. When it lands: gamemaster-delta
-  migration as usual, PLUS re-run the policy-lab verification corpus
-  (~10 min) -- the strat's fitted constants were tuned on
-  pre-rebalance move data, and the EDGE constants (0.022 DPT, 1v0
-  aggr 2.0, 2v1 dpt_max 0.0155, 55-energy one-opponent patch)
-  re-verify at FULL resolution with a worst-slice margin target of
-  +0.5 (disclosures: docs/validations/cramorant_strict_bar_2026_08_26
-  .md). This is also the standing argument for mechanism-not-names
-  round-6 discriminators (they re-derive from new numbers at battle
-  time).
 - OPEN VALUE (next campaign): UL Dive+Surf 2v2 under the OLD tank was
   +15-21k flips at passing rating; a per-build tank discriminator
   would recover it (sheet v5 ships zero there).
-- Upstream bug-report candidates (pvpoke): the two `move.moveID`
-  typos (ActionLogic.js:368, :1239 -- the latter makes opponents
-  never shield a lethal Dive, plausibly inflating published Cramorant
-  scores; H4 in docs/cramorant_policy_plan.md measures it). Draft
-  after checking whether the campaign produced the H4 numbers;
-  follows docs/pvpoke_bug_reports.md conventions.
-- Hard-counters lists: RE-DERIVE from the sheet-v5 rebaked tensors
+- Hard-counters lists: RE-DERIVE from the current-sheet (v7) tensors
   before any public surface carries one. Both earlier rosters (the
   static-tank "five losers" and the lead40-derived set) predate the
   shipped sheet.
