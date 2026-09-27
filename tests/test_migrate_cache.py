@@ -726,3 +726,26 @@ def test_cached_damage_refresh_20260925_predicate():
     # Fail-safe: an unreadable moveset is AFFECTED, never blessed.
     assert p({'species': 'x'}, azu) is True
     assert p(None, azu) is True
+
+
+def test_cram_0v1_surf_gate_20260927_predicate():
+    """Sheet v7 (engine 5a813036625c -> 32a20be48379): only pogodives columns
+    whose focal Cramorant carries SURF plus a non-DIVE, non-SURF move can
+    move. Pre-fix there was no predicate: the bump was a cold re-dive."""
+    p = migrate_cache.PREDICATES['cram_0v1_surf_gate_20260927']
+    pg = {'species': 'Araquanid', 'policy': 'pogodives'}
+    plain = {'species': 'Araquanid'}
+    fly_surf = {'species': 'Cramorant', 'charged': ['FLY', 'SURF']}
+    hp_surf = {'species': 'Cramorant', 'charged': ['HYDRO_PUMP', 'SURF']}
+    assert p(fly_surf, pg) is True and p(hp_surf, pg) is True
+    assert p(fly_surf, plain) is False                       # base tier
+    for ch in (['DIVE', 'FLY'], ['DIVE', 'SURF'], ['SURF'], ['DIVE']):
+        assert p({'species': 'Cramorant', 'charged': ch}, pg) is False, ch
+    # Non-Cram focal vs a Cramorant opponent: the opponent plays pvpoke_dp.
+    azu = {'species': 'Azumarill', 'charged': ['ICE_BEAM', 'PLAY_ROUGH']}
+    assert p(azu, {'species': 'Cramorant', 'policy': 'pogodives'}) is False
+    # Slayer mirror scenarios carry no 'policy': fully blessing.
+    assert p(fly_surf, fly_surf) is False
+    # Fail-safe.
+    assert p(None, pg) is True and p({'species': 'Cramorant'}, pg) is True
+    assert p(fly_surf, None) is True
