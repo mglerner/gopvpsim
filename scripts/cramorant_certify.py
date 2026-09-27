@@ -30,6 +30,21 @@ with the tensor -- the instrument check (stride screens alias the sta
 axis, so full tensors are the only complete data; but a tensor is only
 as good as its provenance, and this proves it is today's engine).
 Exit code 1 if any cell fails the bar or the exemption check.
+
+PUBLISH GUARD (2026-09-27; a new moveset page must not ship uncertified):
+--out also records every certified page as "<league>/<file>" -> the page's
+sha256 and moveset label. --check-record JSON then certifies NOTHING; it
+re-globs the rendered pages and exits 1 unless every current page
+(cramorant-<league>-league/index*.html) has a record entry with the SAME
+sha256, and the record itself is clean (0 bar failures, 0 exemption
+violations, 0 selftest mismatches). Contract: a passing check means "the
+exact bytes a reader would be served were certified against the strict
+bar". It says nothing about whether the tensors are today's engine --
+that is --selftest's job, run when the record is written (the record
+carries 'selftest_n' so a publisher can see whether it was).
+
+    python scripts/cramorant_certify.py --out REC.json [--selftest N]
+    python scripts/cramorant_certify.py --check-record REC.json
 """
 from __future__ import annotations
 
@@ -37,6 +52,7 @@ import argparse
 import base64
 import glob
 import gzip
+import hashlib
 import json
 import re
 import sys
@@ -202,6 +218,43 @@ def selftest(path, league, n, seed=0):
     return bad
 
 
+def page_key(path):
+    """Record key for a rendered page: '<league>/<file name>'."""
+    path = Path(path)
+    league = path.parent.name.removeprefix('cramorant-').removesuffix('-league')
+    return f'{league}/{path.name}'
+
+
+def page_sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def check_record(record, website, leagues):
+    """Problems (list of strings; empty = pass) with publishing the pages
+    currently rendered under ``website`` on the strength of ``record``."""
+    probs = []
+    for k in ('bar_failures', 'exemption_violations', 'selftest_mismatches'):
+        if record.get(k, 1):
+            probs.append(f'record is not clean: {k} = {record.get(k)}')
+    certified = record.get('pages')
+    if not isinstance(certified, dict):
+        return probs + ['record has no page hashes (written before the '
+                        'publish guard); re-run the certifier with --out']
+    n = 0
+    for league in leagues:
+        for p in sorted(glob.glob(f'{website}/cramorant-{league}-league/index*.html')):
+            n += 1
+            key = page_key(p)
+            rec = certified.get(key)
+            if rec is None:
+                probs.append(f'{key}: rendered page has no certification entry')
+            elif rec.get('sha256') != page_sha256(p):
+                probs.append(f'{key}: page changed since it was certified')
+    if n == 0:
+        probs.append(f'no rendered cramorant pages under {website}')
+    return probs
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -210,16 +263,30 @@ def main():
     ap.add_argument('--out', default=None, help='JSON path for the full cell list')
     ap.add_argument('--selftest', type=int, default=0, metavar='N',
                     help='re-sim N random cells per page against the tensor')
+    ap.add_argument('--check-record', default=None, metavar='JSON',
+                    help='publish guard: verify every rendered page is in this '
+                         '--out record, unchanged, and the record is clean')
     args = ap.parse_args()
     leagues = ['great', 'ultra'] if args.league == 'both' else [args.league]
+    if args.check_record:
+        probs = check_record(json.loads(Path(args.check_record).read_text()),
+                             args.website, leagues)
+        for pr in probs:
+            print(f'  UNCERTIFIED: {pr}')
+        print('certification record check: '
+              + ('FAIL' if probs else 'OK (every rendered page certified)'))
+        sys.exit(1 if probs else 0)
     exempt = exempt_scenarios()
-    cells, selftest_bad = [], 0
+    cells, selftest_bad, page_hashes = [], 0, {}
     for league in leagues:
         pages = sorted(glob.glob(f'{args.website}/cramorant-{league}-league/index*.html'))
         if not pages:
             raise SystemExit(f'no rendered cramorant-{league}-league pages under {args.website}')
         for p in pages:
-            cells.extend(certify_page(p, league, exempt))
+            page_cells = certify_page(p, league, exempt)
+            cells.extend(page_cells)
+            page_hashes[page_key(p)] = {'sha256': page_sha256(p),
+                                  'moveset': page_cells[0]['moveset']}
             if args.selftest:
                 selftest_bad += selftest(p, league, args.selftest)
 
@@ -256,7 +323,8 @@ def main():
         Path(args.out).write_text(json.dumps(
             {'cells': cells, 'exempt': sorted(exempt),
              'bar_failures': len(fails), 'exemption_violations': len(exempt_fails),
-             'selftest_mismatches': selftest_bad}, indent=1))
+             'selftest_mismatches': selftest_bad,
+             'selftest_n': args.selftest, 'pages': page_hashes}, indent=1))
         print(f'\nwrote {args.out}')
     sys.exit(1 if (fails or exempt_fails or selftest_bad) else 0)
 
