@@ -264,3 +264,18 @@ total). Corpus-wide that is the ~2.6 h "pre-sim sweep setup" row of the
 2026-09-20 attribution minus one iv_rank pass per opponent per dive, so
 roughly 2-2.4 h per bake off the single-core column. Replay renders on the
 merged tree are byte-identical to the 2026-09-27 main baseline.
+
+## Addendum: Cramorant certification, sheet v7, and the publish guard (2026-09-27)
+
+The post-bake certification (owed since 09-20) failed one cell: GL Peck /
+Fly + Surf 0v1 vs Araquanid, PoGoDives -1,971 net. Not a regression -- that
+page first existed in the 09-20 bake (the 09-17 pool regeneration changed the
+moveset screen) and had never been certified. Cause: the (0,1) CMP dive-gate
+threshold 3.0 was fitted to Fly vs Dive and, with a Surf gulp, admitted
+two-type-step ratios. Sheet v7 (dfebbd8): `surf_gate_dpe` 2.25 on row (0,1),
+read only for a Surf gulp; stride-1 recert PASS (+11 / +0 net), Dive pages
+byte-identical; engine 32a20be48379, predicate applied (796 columns re-sim).
+Re-dived both Cramorant pages (5.9 + 10.5 min), re-rendered the strategy
+article, re-certified: 720 cells, 0 bar failures, 0 exemption violations,
+selftest 5/5 exact on every page. `cramorant_certify.py --check-record` is now
+a publish gate (record at userdata/certify/cramorant_record.json).
