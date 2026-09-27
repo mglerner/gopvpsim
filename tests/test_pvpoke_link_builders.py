@@ -25,7 +25,6 @@ tests/test_js_mirror_cmp_rule.py.
 import importlib.util
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -150,7 +149,7 @@ def test_python_url_drops_the_trailing_zero_on_whole_levels(monkeypatch):
     assert "azumarill-40.5-" in _python_url(monkeypatch, focal_level=40.5)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_engine_js_url_matches_python(monkeypatch):
     data = {
         "cpCap": "10000",
@@ -175,7 +174,7 @@ def test_engine_js_url_matches_python(monkeypatch):
     assert _node(program) == _python_url(monkeypatch)
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_ml_guide_js_url_matches_python(monkeypatch):
     cmpdata = {
         "focalLink": {"id": _FOCAL_ID, "moves": _FOCAL_MOVES},

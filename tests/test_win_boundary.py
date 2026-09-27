@@ -546,6 +546,7 @@ def test_dive_bakes_win_rating_into_data(small_dive_html):
     assert data['winRating'] == WIN_RATING
 
 
+@pytest.mark.node
 def test_js_helpers_agree_with_python_is_win():
     """Run the shipped JS helpers under node and compare to is_win().
 
@@ -554,8 +555,6 @@ def test_js_helpers_agree_with_python_is_win():
     when node is unavailable (same pattern as tests/test_js_wire_contract.py).
     """
     node = shutil.which('node')
-    if node is None:
-        pytest.skip('node not installed')
     src = (SCRIPTS / 'cmp_panels.js').read_text()
     block = re.search(
         r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',
@@ -581,6 +580,7 @@ def test_js_helpers_agree_with_python_is_win():
     assert out['tie'] == [s == WIN_RATING for s in scores]
 
 
+@pytest.mark.node
 def test_js_helpers_fall_back_without_data():
     """No DATA (or a blob predating winRating) -> the pinned fallback, no throw.
 
@@ -589,8 +589,6 @@ def test_js_helpers_fall_back_without_data():
     and take the whole compare box down.
     """
     node = shutil.which('node')
-    if node is None:
-        pytest.skip('node not installed')
     src = (SCRIPTS / 'cmp_panels.js').read_text()
     block = re.search(
         r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',

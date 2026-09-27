@@ -2,12 +2,35 @@
 Shared fixtures for gopvpsim tests.
 """
 import importlib.util
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 import gopvpsim
 import gopvpsim.data as data_module
+
+
+# ---------------------------------------------------------------------------
+# @pytest.mark.node -- the ONE "skip if node is missing" rule
+# ---------------------------------------------------------------------------
+# Tests that run shipped JS under node carry this marker instead of each
+# re-implementing the check (there were ~30 open-coded skipifs and imperative
+# skips before 2026-09-27). The skip stays per test, as the 2026-08-09 review
+# decided; scripts/verify_tests.py is what makes a node-less SHIP machine loud.
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        'markers', 'node: runs JS under node; skips (reason "node not '
+                   'installed") when node is not on PATH')
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    # tryfirst: skip before fixture setup, so a module fixture that shells
+    # out to node is never entered on a node-less machine.
+    if item.get_closest_marker('node') and shutil.which('node') is None:
+        pytest.skip('node not installed')
 
 # ---------------------------------------------------------------------------
 # Shared scripts/deep_dive.py loader (DRY review 2026-08-05 entry 12, T8)

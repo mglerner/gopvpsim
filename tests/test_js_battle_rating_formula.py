@@ -82,20 +82,14 @@ def test_harness_comment_cites_pokemon_js_not_ranker(name):
         f'{name}: score formula must cite Pokemon.js:2124 getBattleRating')
 
 
-def _node():
-    exe = shutil.which('node')
-    if exe is None:
-        pytest.skip('node not installed')
-    return exe
-
-
+@pytest.mark.node
 def test_the_two_formulas_actually_disagree():
     """Discriminating case (Forretress vs Corsola-G / Clodsire GL 2-0):
     health = 1, damage = 46/125. Sum-then-scale -> 683, scale-then-sum ->
     684. If JS ever stopped disagreeing here, the pins above would be
     guarding nothing."""
     out = subprocess.run(
-        [_node(), '-e',
+        [shutil.which('node'), '-e',
          'const h=1,d=46/125;'
          'process.stdout.write(JSON.stringify(['
          'Math.floor((h+d)*500), Math.floor((500*d)+(500*h))]))'],
