@@ -372,6 +372,13 @@ overrides). Record: CHANGELOG 2026-09-02.
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
+**Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
+first -- measure the sped-up render layer on its own; this note is the only
+written record of that call). Verified
+2026-09-27: no population-sweep code has landed on main since c2bd1e9
+(09-22), so the prerequisite below is still unbuilt and still gates the
+next bake that carries it.
+
 **Clones cleaned up 2026-09-22:** the seeded-lattice and mirror-proto
 prototypes now live as branches `experiment/seeded-lattice-2026-09-17` and
 `experiment/mirror-proto-2026-09-21` in this repo (local only); the three
