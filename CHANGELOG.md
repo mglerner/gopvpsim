@@ -2,6 +2,28 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-26/27 -- Bake on the sped-up render layer: 2.0x awake, 2.8x single-core
+
+- **Chain** `overnight_20260926_102139.log`, launched 09-26 10:21 after the
+  pre-dive checklist (smoke dive, pools fresh, gamemaster stamp matching
+  every cached column, engine 5a813036625c), SUCCESS 09-27 16:37. Every
+  morning-check gate green; the new sleep check red by design (12.1 h of
+  battery sleep, resolution recorded in docs/chain_resolutions.toml).
+- **Measured, like-for-like over the same 136 dives, sleep subtracted:**
+  35.9 h -> 17.9 h awake (2.01x). Single-core (the layer R1-R4 targeted)
+  19.0 h -> 6.9 h (2.76x); pool sims 16.9 h -> 11.0 h (1.53x, cache hit
+  61% -> 72%). Great League 2.44x, Ultra League 1.64x (its pool only 1.16x:
+  the 42,594 self-debuff columns unlinked by the 09-25 migration re-simmed
+  here and are warm now). Ship-gate step 885 s -> 317 s (concurrent roster);
+  ML tail 204 s.
+- **Cramorant certification (owed since 09-20, run now):** 8 bar failures,
+  all one cell -- GL PECK / FLY, SURF 0v1 vs Araquanid, PoGoDives tier
+  -1,971 net wins / -156 mean vs plain across all 8 slices. Byte-identical in
+  the 09-20 tensors, so it predates this bake and the 09-25 engine change;
+  Michael's call (strat sheet / exemption / page).
+- **Process:** "charger connected" added to the pre-dive triggers
+  (caffeinate cannot hold off sleep on battery).
+
 ## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
 
 - **What changed:** the `_cached_damage` memo that our port of PvPoke's

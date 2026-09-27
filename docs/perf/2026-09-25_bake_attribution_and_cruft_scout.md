@@ -218,3 +218,30 @@ noise. Engine hash d78c67fd06a7 -> 5a813036625c (slayer b22f67b6ca64 ->
 d3ce425c2ce4); migration predicate `cached_damage_refresh_20260925`:
 sweep 196,497 blessed / 42,594 re-sim (17.8%), slayer 137 / 13. Full
 record: CHANGELOG 2026-09-25.
+
+## Measured: the 2026-09-26/27 bake (chain overnight_20260926_102139.log)
+
+Launched 2026-09-26 10:21 EDT after the pre-dive checklist; SUCCESS
+2026-09-27 16:37. Dive step 108,358 s = 30.1 h wall, of which 11.8 h was
+system sleep: the laptop ran on battery from ~22:20 and macOS overrode
+caffeinate (which only holds off sleep on AC). The keeper's clock-jump
+WARN (34 lines) and verify_overnight's pmset check both caught it; the
+timing report subtracts the pmset windows. Lesson for the checklist:
+"charger connected" is a pre-launch trigger next to "lid open".
+
+Like-for-like over the same 136 dives, sleep subtracted (pmset windows for
+this bake, the >600 s heuristic for 09-20), buckets from
+bake_timing_report's per-dive classification:
+
+| block        | awake 09-20 | awake now | x     | pool sims x | single-core x | cache hit  |
+| ------------ | ----------- | --------- | ----- | ----------- | ------------- | ---------- |
+| Great League | 20.0 h      | 8.2 h     | 2.44x | 2.03x       | 2.97x         | 67% -> 74% |
+| Ultra League | 15.8 h      | 9.7 h     | 1.64x | 1.16x       | 2.54x         | 57% -> 69% |
+| all dives    | 35.9 h      | 17.9 h    | 2.01x | 1.53x       | 2.76x         | 61% -> 72% |
+
+Single-core (the layer this work targeted): 19.0 h -> 6.9 h. Pool sims are
+cache warmth, untouched by the code changes; Ultra's 1.16x is the 42,594
+self-debuff columns the 09-25 migration unlinked (warm next bake). Tail
+steps: ML guides 204 s; ship gates 317 s (concurrent roster) vs 885 s.
+Next lever, already built on `swing/sweep-ivrank-memo`: the sweep-side
+rank-1 IV memo (the ~2.6 h "pre-sim sweep setup" row of the attribution).
