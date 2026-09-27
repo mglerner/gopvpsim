@@ -32,20 +32,30 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->3032<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3035<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
-against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->27<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->226<!-- /sync --> exact on score+winner+chargedLog, 17 cells =
-documented divergences, each traced to a mechanism: the near-KO
-plan-choice cluster, the deeper half of PvPoke bug #3, and bug #8 Hangry
-stickiness; per-cell reasons live on the MATCHUPS entries in the audit
-script). Historical
+against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->31<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->279<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->268<!-- /sync --> exact on score+winner+chargedLog, 11 cells =
+documented divergences, each traced to a mechanism: 8 are bug #8 Hangry
+stickiness, 3 are our deliberate Shield-form Aegislash estimate-stage
+choice ("Form change gotchas" item 6); per-cell reasons live on the
+MATCHUPS entries in the audit script). Historical
 note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 (`bestChargedMove` selection, resolved then).
+
+**2026-09-27: 243 cells -> 279, 8 divergences + 3.** The six Aegislash x
+Azumarill cells that stayed open after the 09-09 new-mechanics re-baseline
+(`aegislash_vs_azumarill` (1,1)/(2,1), `aegislash_blade_vs_azumarill`
+(1,0)/(2,0), `azumarill_vs_aegislash_shield` (1,1)/(1,2)) were our bug:
+Shield-form charged moves were priced at the Shield atk (CHANGELOG
+2026-09-27, "Form change gotchas" item 6). All 243 pre-existing cells now
+match except the 8 Morpeko bug-#8 cells. Four non-Azumarill Aegislash
+opponent rows were added (36 cells): 33 exact, 3 Cradily cells the
+deliberate stage deviation.
 
 **2026-09-02: 208+35 -> 226+17**, in three steps, none of them a rebalance.
 The whole Aegislash divergence cluster is now closed -- all 18 cells across
@@ -593,6 +603,15 @@ we now MATCH this (divergence #3 freeze); the NB-1 sweep showed our old
 per-turn recompute was NOT reliably better, so consistency wins.
 
 ### 3. Aegislash selects Gyro Ball over Shadow Ball
+
+**FIXED UPSTREAM** in pvpoke `574aeb0da` (`ActionLogic.js:954`,
+`!selfBuffing` -> `!selfDebuffing`; see "Current status", 2026-09-02):
+PvPoke master throws 0 Gyro Balls in 76 Aegislash charged throws across
+the 36 pre-09-27 Aegislash oracle cells (three Azumarill matchups + UL
+Tinkaton; re-counted 2026-09-27). Kept for the record (and the bug
+count). The Shield-form damages quoted below (49 / 39) were OUR
+under-estimate, not the damage a Shield-form throw deals -- it resolves in
+Blade form ("Form change gotchas" item 6).
 
 **File**: `ActionLogic.js` (near-KO DP or bestChargedMove selection)
 
@@ -1195,6 +1214,41 @@ Engine migration predicate: `cramorant_port_20260824` (Cramorant or
 Aegislash either side). The three-tier policy campaign (PvPoke default /
 never-bait / the "PoGoDives strat" overlay) is planned in
 docs/cramorant_policy_plan.md.
+
+**6. Shield-form Aegislash prices its CHARGED moves at the Blade atk
+(FIXED 2026-09-27).** Every Shield-form charged throw changes form
+(`activate_charged`) BEFORE damage resolves, so it always lands with Blade
+stats. PvPoke's estimate knows this (`DamageCalculator.js:43-50`
+substitutes `getFormStats("aegislash_blade").atk` for charged moves when
+the attacker is `aegislash_shield`); ours used the Shield atk (82.85 vs
+172.93 for 4/14/15 in GL: Shadow Ball estimated 44 vs Azumarill, dealt
+91). Every consumer -- the farm gate, the DP plan, bandaid[918], TTL, the
+opponent's would_shield -- then passed up KOs PvPoke takes: the six
+Aegislash x Azumarill cells open since 09-09. The fix moves 153 of 1080
+sampled GL cells, 149 of them onto PvPoke's value. Fixed in `BattlePokemon._charged_atk_base`, the ONE source for
+the charged rows of all three damage builders (a gate-only fix fixes 0/6;
+the fix must live in the caches). Keyed on the current form's trigger, so
+Blade form and every other species take `self.atk` unchanged; fast moves
+always use the current form's atk. Pinned by
+`test_aegislash_shield_charged_estimate_uses_blade_atk` (tests/test_battle.py).
+
+DELIBERATE DEVIATION -- the atk STAGE. We multiply the Blade atk by the
+CURRENT atk-stage multiplier; PvPoke uses the raw, stage-blind Blade atk,
+although its own throw (changeForm keeps statBuffs) does apply the stage.
+So after an opponent's atk debuff (Rock Tomb, Icy Wind, Chilling Water,
+Lunge, Breaking Swipe, ...) PvPoke over-estimates (Shadow Ball 91 at -1
+where 73 is dealt) and ours equals what our resolver deals. This is NOT
+invisible: in the 1080-cell sample (Shield + Blade 4/14/15 vs the top-60
+GL at 15/15/15, 9 scenarios) it decides 15 cells per seat, 4 of them
+winner flips (3 in Aegislash's favour under ours, 1 under PvPoke's), net
++209 rating to Aegislash under ours; and it is the whole of the
+`cradily_vs_aegislash_blade` oracle xfails (1,1)/(1,2)/(2,2) (a
+stage-blind variant reproduces PvPoke on all three; pinned at our value by
+`test_cradily_vs_aegislash_blade_estimate_stage_divergence` in
+tests/test_form_change_oracle.py, and by the stage -1 leg of the estimate
+pin). Kept because PvPoke's choice is internally inconsistent (estimate !=
+its own dealt damage) and not demonstrably better on outcomes; revisit if
+that changes. Listed as docs/pvpoke_divergences.md item 7.
 
 ## Active alt-moveset opponent variants
 
