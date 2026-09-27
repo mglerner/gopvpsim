@@ -2,6 +2,66 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-27 -- Shield-form Aegislash prices charged moves at the Blade atk (03993a4)
+
+- **Symptom:** six Aegislash x Azumarill oracle cells open since the 09-09
+  new-mechanics re-baseline, same winner, 50-142 rating points apart:
+  `aegislash_vs_azumarill` (1,1) 564 and (2,1) 550 vs PvPoke 618;
+  `aegislash_blade_vs_azumarill` (1,0) 570/429 vs 712/287 and (2,0)
+  580/419 vs 655/344; `azumarill_vs_aegislash_shield` (1,1) 435/564 and
+  (1,2) 449/550 vs 381/618. Framed for weeks as an open turn-system
+  question ("farming in Shield is the species' gimmick", mechanics_notice);
+  it was an engine bug on our side.
+- **Root cause:** every Shield-form charged throw changes form
+  (`activate_charged`) before damage resolves, so it lands with Blade stats,
+  and PvPoke's estimate knows it (`DamageCalculator.js:43-50`). Our
+  `_ensure_dmg_cache`, `_ensure_dp_init_cache` and the buff-delta stage
+  rows priced charged moves with the Shield atk: Shadow Ball / Gyro Ball
+  estimated at 44 / 39 vs Azumarill, dealt 91 / 81. The farm gate, the DP
+  plan and bandaid[918] all read the estimate, so our Aegislash farmed past
+  a guaranteed KO, bled 15-30 HP more and twice burned a shield for
+  nothing. A gate-only fix moves 0/6 cells (gate + bandaid[918] gives 6/6
+  scores but 0/6 logs -- score coincidence); the fix has to live in the
+  caches. It became six cells on 09-09 because PvPoke's SHADOW_BALL 100 ->
+  90 (2ab0fc395) moved Azumarill's HP into the window between the two
+  estimates; b0c4fb0 was right that the nerf does not change move
+  selection, but it was the trigger.
+- **Fix:** `BattlePokemon._charged_atk_base`, one helper for all three
+  sites: when the current form's trigger is `activate_charged` (only
+  aegislash_shield) charged moves use the target form's atk; fast moves and
+  every other form/species are unchanged. Estimate pin: [44, 39] ->
+  [91, 81], and equal to the dealt damage at atk stage -1 ([73, 65]). All
+  six cells now match PvPoke on score, winner and chargedLog; failing-first
+  verified against main's battle.py (7 failures).
+- **Stage decision (deliberate divergence):** we apply the current atk stage
+  to the Blade atk; PvPoke uses the raw, stage-blind Blade atk although its
+  own throw applies the stage. The diagnosis expected this to be
+  oracle-invisible; it is not. Against atk debuffers it decides 15/1080
+  sampled cells (4 winner flips, 3 in Aegislash's favour under ours, net
+  +209 rating to Aegislash) and three `cradily_vs_aegislash_blade` oracle
+  cells, now pinned at our value (DEVELOPER_NOTES "Form change gotchas" 6,
+  docs/pvpoke_divergences.md item 7).
+- **Measured:** full oracle audit 243 cells, 8 documented Morpeko
+  divergences, 0 new, 0 vanished (was 14 diverging). Four new non-Azumarill
+  Aegislash opponent rows (69b9212: Electrode-H, Mimikyu, Clodsire, Cradily;
+  pre-fix 8/36 diverged incl. 4 winner flips): 33/36 exact + the 3 Cradily
+  stage cells; 279 cells total. 1080-cell sample (Shield + Blade 4/14/15 vs
+  top-60 GL at 15/15/15, 9 scenarios, both seats): matches PvPoke on
+  score+winner 887 -> 1035 (1050 with PvPoke's stage-blind variant); 153
+  cells move, 149 onto PvPoke; 8 winner flips, all to PvPoke; 1 cell that
+  matched before no longer does (Shield vs Cradily 2-2, the stage choice).
+- **Cache:** engine 32a20be48379 -> 45cf73a2d23d (slayer 9b90c8d8b434 ->
+  0c54e07bc21b; includes 654061d, a comment-only rewording of the stale
+  "EXPERIMENTAL / UNVALIDATED" mechanics='new' header). Predicate
+  `aegislash_blade_atk_20260927` (89cb264): affected iff either side's
+  species starts with Aegislash (Blade starts revert to Shield; the other
+  side's would_shield / TTL read the Aegislash's estimates); slayer mirrors
+  iff the scenario species does. Both Aegislash GL dives and every GL dive's
+  Aegislash opponent rows were baked with the bug.
+- **Cleanup:** `scripts/mechanics_notice.py` deleted with its call sites and
+  the tests that pinned its wording (24971d9); the stale blade xfails
+  {(1,1),(1,2)} cleared (69b9212).
+
 ## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (dfebbd8)
 
 - **Finding:** the post-bake Cramorant certification (owed since 09-20, run
