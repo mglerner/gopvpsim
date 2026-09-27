@@ -1677,13 +1677,6 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
     )
 
 
-# Aegislash (1,1) and (2,1): OPEN divergence cells, pinned to OUR value (see
-# the test docstring). Value = PvPoke master's Aegislash score for the same
-# cell, from docs/validations/2026-09-09_oracle_new_vs_master_raw.txt, carried
-# into the assertion message so a failure shows both sides.
-_AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
-
-
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_a,shields_z,expected_aegi_score,expected_log", [
     # Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13, Great League
@@ -1699,6 +1692,11 @@ _AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
     # 2026-09-25 six of the nine were strict xfails asserting April-2026
     # legacy values (Gyro Ball logs, 374/640/376) that neither sim
     # produces any more, so they pinned nothing.
+    #
+    # 2026-09-27: all nine are now PvPoke-exact (score, winner, chargedLog).
+    # (1,1) and (2,1) were the last two divergences; the cause was our
+    # Shield-form charged-move ESTIMATE using the Shield atk (see
+    # test_aegislash_shield_charged_estimate_uses_blade_atk).
     (0, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (0, 1, 348, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                  'Aegislash (Blade): Shadow Ball (shielded)',
@@ -1709,9 +1707,8 @@ _AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
                  'Aegislash (Blade): Shadow Ball (shielded)',
                  'Azumarill: Ice Beam']),
     (1, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    # DIVERGENCE PIN (ours 564, PvPoke master 618, same winner). Score is
-    # OURS; the chargedLog matches PvPoke's (oracle log_ok=True).
-    (1, 1, 564, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+    # Pre-fix (before 2026-09-27) ours was 564, same chargedLog.
+    (1, 1, 618, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                  'Aegislash (Blade): Shadow Ball (shielded)',
                  'Aegislash (Blade): Shadow Ball',
                  'Azumarill: Ice Beam (shielded)',
@@ -1721,13 +1718,12 @@ _AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
                  'Aegislash (Blade): Shadow Ball (shielded)',
                  'Aegislash (Blade): Shadow Ball']),
     (2, 0, 751, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    # DIVERGENCE PIN (ours 550, PvPoke master 618, same winner). Score AND
-    # chargedLog are OURS: the oracle reports log_ok=False for this cell.
-    (2, 1, 550, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+    # Pre-fix (before 2026-09-27) ours was 550 with an extra
+    # 'Azumarill: Play Rough (shielded)' before the final Shadow Ball.
+    (2, 1, 618, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                  'Aegislash (Blade): Shadow Ball (shielded)',
                  'Aegislash (Blade): Shadow Ball',
                  'Azumarill: Ice Beam (shielded)',
-                 'Azumarill: Play Rough (shielded)',
                  'Aegislash (Blade): Shadow Ball']),
     (2, 2, 382, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
                  'Aegislash (Blade): Shadow Ball (shielded)',
@@ -1737,16 +1733,12 @@ _AEGI_OPEN_DIVERGENCE_PVPOKE = {(1, 1): 618, (2, 1): 618}
 def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
                                             expected_aegi_score, expected_log):
     """
-    OPEN DIVERGENCE, 2026-09-09: two of these nine cells pin OUR value
-    where PvPoke master says something else -- (1,1) and (2,1), where we
-    score 564/435 and 550/449 against PvPoke's 618/381. Both agree on the
-    WINNER; the gap is that our Aegislash banks 100 energy in Shield form
-    and throws on T44 where PvPoke commits on T30. Which is right is
-    unresolved (see scripts/mechanics_notice.py). Those two are pinned so
-    a CHANGE is caught, not because the value is certified; PvPoke's
-    value rides in the failure message (_AEGI_OPEN_DIVERGENCE_PVPOKE).
-    The other seven cells match PvPoke master exactly on score, winner
-    and chargedLog (docs/validations/2026-09-09_oracle_new_vs_master_raw.txt).
+    All nine cells match PvPoke master exactly on score, winner and
+    chargedLog (oracle harness, 2026-09-27). Until then (1,1) and (2,1)
+    diverged (ours 564/435 and 550/449 vs PvPoke 618/381): our Shield-form
+    Aegislash priced its charged moves at the Shield atk (~half the damage
+    the Blade-form throw actually deals), so its farm gate held to 100
+    energy instead of taking a KO PvPoke takes (DamageCalculator.js:43-50).
 
     Aegislash form change: Shield<->Blade on charged move / shield use.
 
@@ -1769,17 +1761,64 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
                       charged_policy_1=pvpoke_dp,
                       log=True)
     score = round(result.pvpoke_score(0))
-    pvpoke = _AEGI_OPEN_DIVERGENCE_PVPOKE.get((shields_a, shields_z))
-    note = ("" if pvpoke is None else
-            f" [divergence pin: expected is OUR value; PvPoke master "
-            f"scores {pvpoke}]")
     assert score == expected_aegi_score, (
         f"{shields_a}v{shields_z}: expected Aegislash score={expected_aegi_score}, "
-        f"got {score} (delta={score - expected_aegi_score:+d}){note}"
+        f"got {score} (delta={score - expected_aegi_score:+d})"
     )
     assert _extract_battle_log(result) == expected_log, (
-        f"{shields_a}v{shields_z}: chargedLog mismatch vs pinned log{note}"
+        f"{shields_a}v{shields_z}: chargedLog mismatch vs pinned log"
     )
+
+
+def test_aegislash_shield_charged_estimate_uses_blade_atk():
+    """Shield-form Aegislash prices CHARGED moves at the Blade atk.
+
+    Every Shield-form charged throw changes form BEFORE damage resolves, so
+    the throw always lands with Blade stats; PvPoke estimates it that way
+    (DamageCalculator.js:43-50). Until 2026-09-27 our caches used the Shield
+    atk (82.85 vs Blade 172.93 here), so the farm gate / DP plan /
+    bandaid[918] saw ~half the real damage and passed up KOs. The score pins
+    above accept any Blade-SIZED atk (x0.95 and x1.05 both pass them), so
+    the estimate itself is pinned here.
+
+    Oracle IVs: Aegislash 4/14/15 vs Azumarill 4/15/13, Great League.
+    """
+    def mk():
+        a = _make_battle_pokemon(
+            'Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+            ['SHADOW_BALL', 'GYRO_BALL'], 'great', 1, 4, 14, 15)
+        z = _make_battle_pokemon(
+            'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+            'great', 1, 4, 15, 13)
+        return a, z
+
+    a, z = mk()
+    assert a.active_form_sid == 'aegislash_shield'
+    assert [m['moveId'] for m in a.charged_moves] == ['SHADOW_BALL',
+                                                      'GYRO_BALL']
+    # Pre-fix: [44, 39] (Shield atk). Fast move is untouched (power 0 -> 1).
+    assert [a.charged_move_damage(m, z) for m in a.charged_moves] == [91, 81]
+    assert a.fast_move_damage(z) == 1
+    # The frozen move-selection cache and the DP root row read the same
+    # helper. Pre-fix raw dpe was [0.88, 0.78].
+    init = a._ensure_dp_init_cache(z)
+    assert init['cm_dpe'] == [91 / 50, 81 / 50]
+    assert a._ensure_dp_cache(z)['cm_dmgs_root'] == [91, 81]
+
+    # The estimate equals what the throw deals once the form has changed.
+    a.change_form(z)
+    assert a.active_form_sid == 'aegislash_blade'
+    assert [a.charged_move_damage(m, z) for m in a.charged_moves] == [91, 81]
+
+    # Stage (deliberate deviation from PvPoke, which uses the RAW Blade atk
+    # and would still say 91): the current atk stage applies, so at -1 the
+    # estimate equals the damage our resolver then deals (73, not 91).
+    a, z = mk()
+    a.atk_stage = -1
+    est = [a.charged_move_damage(m, z) for m in a.charged_moves]
+    a.change_form(z)
+    dealt = [a.charged_move_damage(m, z) for m in a.charged_moves]
+    assert est == dealt == [73, 65]
 
 
 @pytest.mark.integration
@@ -2289,10 +2328,13 @@ def test_disguise_break_uses_only_pre_shuffle_cheapest_move():
         # Minimal protect-form stub: the disguise branch reads
         # _form_change.effect and _form_disguise_active; since the
         # Cramorant port, _holding_prey also reads forms[_form_idx]
-        # .species_id on any defender carrying a _form_change.
+        # .species_id on any defender carrying a _form_change, and since
+        # 2026-09-27 the damage caches read forms[_form_idx].trigger
+        # (BattlePokemon._charged_atk_base).
         dfn._form_change = SimpleNamespace(
             effect='protect',
-            forms=(SimpleNamespace(species_id='mimikyu'),))
+            forms=(SimpleNamespace(species_id='mimikyu',
+                                   trigger='charged_move_damage'),))
         dfn._form_disguise_active = True
         return att, dfn
 
