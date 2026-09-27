@@ -320,7 +320,18 @@ _POGODIVES_SHEET = {
     # UL top-100-SP net-negative (-48 -> +30), GL not regressed.
     (0, 0): {'gate': 'cmp_e_or_dive', 'tank_aggr': None,
              'tank_rule': 'lead'},
-    (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
+    # v7 (2026-09-27): 'surf_gate_dpe' is the gate threshold used INSTEAD
+    # of _POGODIVES_DIVE_GATE_DPE when the gulp move is SURF (read only
+    # then, so Dive-gulp pages are byte-identical by construction). The
+    # 3.0 was derived for Fly vs DIVE: neutral Fly/Dive DPE ratio 1.42,
+    # one type step (x1.6) ~2.28 admitted, two steps ~3.64 excluded. With
+    # SURF the neutral Fly/Surf ratio is 1.07, so one step is ~1.71 and
+    # two steps ~2.65-2.75 -- which 3.0 wrongly admitted (Araquanid 2.65:
+    # a resisted Surf into a kept shield, then two Mirror Coats; the only
+    # cramorant_certify GL bar failure, Peck / Fly + Surf 0v1, -1,971 net
+    # / -155.7 mean). Surf-normalized: 3.0 x 1.07 / 1.42 = 2.25.
+    (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead',
+             'surf_gate_dpe': 2.25},
     (0, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     # v5: the loaded-opponent tank ported from 2v2, at aggressive 1.9
     # (probe + skeptic 2026-08-26): the loaded condition separates the
@@ -394,13 +405,18 @@ _POGODIVES_SHEET = {
 POGODIVES_CASE_SPECIES_PREFIXES = ('Cramorant',)
 
 
-def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
+def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None,
+                        gulp_move_id=None):
     """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier.
     Under pogodives: the per-start-scenario sheet's gate condition.
     ``gulp_dmg``/``nongulp_dmg`` are the caller's stage-fresh charged
     damages; the 0v0 'cmp_e_or_dive' mode reads ``gulp_dmg`` (the
     'draw' candidate that read both was measured and rejected
-    2026-08-26).
+    2026-08-26). ``gulp_move_id`` is the gulp slot's moveId: when it is
+    'SURF' and the row carries 'surf_gate_dpe', that value replaces
+    _POGODIVES_DIVE_GATE_DPE wherever the row would return it (v7, row
+    (0,1) only; the 3.0 was fitted to Fly vs DIVE). A DIVE gulp -- or a
+    caller that passes no id -- never reads the field.
     All inputs (both sides' stats, moves, max HP, start shields, and
     live in-fight state like defender.energy) are dedup-signature
     functions per the pinned constraint below."""
@@ -409,8 +425,11 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
         if entry is None:
             return _CRAM_DIVE_GATE_DPE
         gate = entry['gate']
+        pg = _POGODIVES_DIVE_GATE_DPE
+        if gulp_move_id == 'SURF' and 'surf_gate_dpe' in entry:
+            pg = entry['surf_gate_dpe']
         if gate == 'always':
-            return _POGODIVES_DIVE_GATE_DPE
+            return pg
         if gate == 'off':
             return _CRAM_DIVE_GATE_DPE
         if gate == 'cmp_e_or_dive':
@@ -424,7 +443,7 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
                             for c in defender.charged_moves), default=100)
             if (attacker.atk >= defender.atk
                     and cheapest >= _POGODIVES_GATE_0V0_MIN_ENERGY):
-                return _POGODIVES_DIVE_GATE_DPE
+                return pg
             if gulp_dmg is not None:
                 missile = int(_POGODIVES_GATE_MISSILE_FRAC
                               * defender.max_hp) + 1
@@ -432,7 +451,7 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
                 if (gulp_dmg >= _POGODIVES_GATE_MISSILE_FRAC
                         * defender.max_hp
                         and missile >= _POGODIVES_GATE_MISSILE_FAST * fast):
-                    return _POGODIVES_DIVE_GATE_DPE
+                    return pg
             return _CRAM_DIVE_GATE_DPE
         # cmp family: the forced early Dive only pays when we win CMP.
         if attacker.atk < defender.atk:
@@ -459,7 +478,7 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
             if (cheapest < _POGODIVES_GATE_MIN_ENERGY
                     or defender.energy < cheapest):
                 return _CRAM_DIVE_GATE_DPE
-        return _POGODIVES_DIVE_GATE_DPE
+        return pg
     return _CRAM_DIVE_GATE_DPE
 
 
@@ -1924,7 +1943,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and (cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot]
                      < _cram_dive_gate_dpe(attacker, defender,
                                            gulp_dmg=cm_dmgs[_gulp_slot],
-                                           nongulp_dmg=cm_dmgs[_nongulp_slot]))
+                                           nongulp_dmg=cm_dmgs[_nongulp_slot],
+                                           gulp_move_id=cms[_gulp_slot]
+                                           .get('moveId')))
                 and not (_CRAM_DELAY_GORGING
                          and attacker.hp / attacker.max_hp > 0.5)):
             if _policy_debug:
