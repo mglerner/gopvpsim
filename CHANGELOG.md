@@ -225,6 +225,41 @@ hash impact: computed + page-verified article showcases (6f79ab9, 258e11b),
 instruments (9dd51f5, c926558), lab loader fix (dcf33a1), docs (491f819,
 0397089).
 
+## 2026-09-10..12 -- Cramorant: rebalance re-verify, deep re-verification, stale-article audit
+
+Closed out of TODO 2026-09-27 (every thread below finished with the sheet v7
+re-dive, re-certification and article re-render, entry 2026-09-27).
+
+- **Rebalance re-verify (09-10):** sheet v5 FAILED the bar under the new
+  move data (d492963): UL 2v1 -1.325 mean (all Jellicent), UL 0v1 -2 win
+  cells (Dondozo). The LEAD constant is inert (460a63e: lead 30-45 vs static
+  differ in 12 of 2,394 cells). Fix option A: (2,1) re-exempted (f116674);
+  the UL 0v1 -2 is pre-existing, byte-identical under legacy and new
+  mechanics and against the June pool (8c5c219) -- a standing dive-early
+  cost, kept as the one accepted exception (the 09-12 full-resolution read
+  then found the -2 was a single-spread artefact of the PvPoke-default IV
+  run). Writeup:
+  `docs/validations/2026-09-10_cramorant_strat_reverify.md`.
+- **Deep re-verification (09-12):** instruments `cramorant_certify.py`
+  (strict bar over the full 720-cell grid from the dive tensors;
+  `--selftest N`) and `cramorant_mini_sweep.py` (`--check-tensor`,
+  coprime `--stride`) plus a changed-row recert driver (9dd51f5, c926558).
+  First full-grid read 716/720; the 4 failures (GL Peck/Hydro Pump+Surf 2v2
+  nobait, Corviknight-driven) led to sheet v6 (entry below; stride-1 15/15
+  priority slices fbbc213, 90/90 changed rows 09-15).
+- **Live article stale (09-12 audit):** the four hardcoded 08-27 sandbox
+  links replayed differently after PvPoke's post-charge cooldown (Twilight
+  Trails merge acb3ce461), Jellicent's 2-1 premise died with Shadow Ball
+  100->90, Blastoise's default moved Rollout -> Bite, and every number on the
+  page was a legacy-clock value. Fixes: showcases computed and page-verified
+  at render time (6f79ab9); `verify_url` emulates pvpoke.com's double run of
+  a sandbox link (`hasActed` survives `Pokemon.reset()`, PvPoke Report 9
+  drafted, 491f819) and the encoder shifts by DISTINCT prior resolved turns,
+  not charged-action count (17/17 same-turn-pair cells had been mis-encoded;
+  258e11b); the policy lab's GL pool loads again (dcf33a1). The article was
+  re-rendered from rebaked new-clock pages 2026-09-27; its fixed prose pass
+  stays open in TODO.
+
 ## 2026-09-11..12 -- Moveset rules merged; dives-only rebake
 
 Michael 09-11: the old movesets, meta and mechanics are dead; "bake" means
