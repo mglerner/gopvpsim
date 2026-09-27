@@ -252,12 +252,15 @@ def load_gamemaster():
     return _fetch_json("gamemaster")
 
 
-def _fetch_bytes(key, url, subdir="sprites", ttl=CACHE_TTL):
+def _fetch_bytes(key, url, subdir="sprites", ttl=CACHE_TTL, errors=None):
     """Binary sibling of _fetch_json: TTL-cache an arbitrary asset under
     CACHE_DIR/<subdir>/<key>. Returns bytes, or None on any failure
     (callers degrade gracefully rather than crash a render). Reuses the
     same certifi SSL context + atomic tmp+os.replace write + stale
-    fallback as _fetch_json, but reads/writes bytes (no JSON parse)."""
+    fallback as _fetch_json, but reads/writes bytes (no JSON parse).
+
+    A fetch failure is appended to ``errors`` (a list) when given, for the
+    caller to report; this function never prints."""
     d = CACHE_DIR / subdir
     d.mkdir(exist_ok=True, parents=True)
     cache_file = d / key
@@ -281,16 +284,46 @@ def _fetch_bytes(key, url, subdir="sprites", ttl=CACHE_TTL):
         os.replace(tmp, cache_file)
         return data
     except Exception as e:  # noqa: BLE001
-        print(f"Sprite fetch error for {key}: {e}")
+        if errors is not None:
+            errors.append(f"{url}: {e}")
     if cache_file.exists():
         try:
-            return cache_file.read_bytes()
+            stale = cache_file.read_bytes()
+            if errors:
+                errors[-1] += " (served the stale cached copy)"
+            return stale
         except OSError:
             pass
     return None
 
 
-def sprite_data_uri(species_name, shadow=False):
+def _sprite_sources(species_name):
+    """-> [(cache_key, url), ...] to try in order for the species' sprite.
+
+    pokemondb's GO set first; its HOME set as the fallback, cached under a
+    distinct name so a later GO-set addition can supersede it by cache
+    expiry. Both use the same speciesId-derived slug."""
+    slug = species_id(species_name, shadow=False).replace('_', '-')
+    return [
+        (f"{slug}.png",
+         f"https://img.pokemondb.net/sprites/go/normal/{slug}.png"),
+        # pokemondb's GO set lags new-to-GO species (Cramorant: 404 in
+        # go/normal 2026-08 and still on the 2026-09-26 re-dive, present in
+        # home/normal). The HOME render is a different art style, far
+        # better than the letter-block degradation.
+        (f"{slug}-home.png",
+         f"https://img.pokemondb.net/sprites/home/normal/{slug}.png"),
+    ]
+
+
+# species slug -> data URI (or None), per process. A dive renders the card
+# once per split page, so without this every render re-tried a failing URL
+# and printed the error again: 15 lines for Cramorant's three dives on the
+# 2026-09-26 chain (5 pages each), 5 for Spidops.
+_SPRITE_MEMO = {}
+
+
+def sprite_data_uri(species_name, shadow=False, warn=None):
     """Return a self-contained ``data:image/png;base64,...`` URI for the
     species' Pokemon-GO sprite, or None if it can't be fetched (the dive
     card then degrades to a typing-colored CSS block).
@@ -303,26 +336,37 @@ def sprite_data_uri(species_name, shadow=False):
     Best-effort: for non-base forms the speciesId-derived slug may not match
     pokemondb's path, in which case the fetch 404s and the caller degrades to
     the typing-colored CSS block (returns None here).
+
+    Memoized per process, so a missed source is reported once: ``warn``
+    (e.g. the dive's structured ``logger.warning``; default: this module's
+    stdlib logger) gets ONE message on the first lookup when a source
+    failed -- saying whether the HOME fallback covered it -- and nothing on
+    later lookups. Never prints.
     """
     slug = species_id(species_name, shadow=False).replace('_', '-')
-    data = _fetch_bytes(
-        f"{slug}.png",
-        f"https://img.pokemondb.net/sprites/go/normal/{slug}.png",
-    )
-    if not data:
-        # pokemondb's GO set lags new-to-GO species (Cramorant 2026-08:
-        # 404 in go/normal, present in home/normal). Fall back to the
-        # HOME render -- different art style, far better than the
-        # letter-block degradation. Cached under a distinct name so a
-        # later GO-set addition can supersede it by cache expiry.
-        data = _fetch_bytes(
-            f"{slug}-home.png",
-            f"https://img.pokemondb.net/sprites/home/normal/{slug}.png",
-        )
-    if not data:
-        return None
-    import base64
-    return "data:image/png;base64," + base64.b64encode(data).decode('ascii')
+    if slug in _SPRITE_MEMO:
+        return _SPRITE_MEMO[slug]
+    errors = []
+    data = used = None
+    for key, url in _sprite_sources(species_name):
+        data = _fetch_bytes(key, url, errors=errors)
+        if data:
+            used = url
+            break
+    uri = None
+    if data:
+        import base64
+        uri = "data:image/png;base64," + base64.b64encode(data).decode('ascii')
+    if errors:
+        if warn is None:
+            import logging
+            warn = logging.getLogger(__name__).warning
+        outcome = (f"sprite from {used}" if uri else
+                   "dive card falls back to the typing-colored block")
+        warn(f"sprite for {slug}: {len(errors)} source(s) failed "
+             f"({'; '.join(errors)}); {outcome}")
+    _SPRITE_MEMO[slug] = uri
+    return uri
 
 
 def load_rankings(league):

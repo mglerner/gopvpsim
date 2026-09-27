@@ -2701,7 +2701,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             try:
                 _mon = find_pokemon_entry(species)
                 _types = parse_types(_mon) if _mon else []
-                _sprite = sprite_data_uri(species, shadow=shadow)
+                _sprite = sprite_data_uri(species, shadow=shadow,
+                                          warn=logger.warning)
             except Exception as _e:  # noqa: BLE001
                 logger.warning(f"  dive card: type/sprite lookup failed ({_e})")
                 _types, _sprite = [], None

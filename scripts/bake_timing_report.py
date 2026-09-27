@@ -98,7 +98,12 @@ class _Buckets:
         # correct -- every interval was still counted once -- but the
         # per-dive breakdown silently merged two different dives.
         lg = re.search(r'--league (\w+)', line)
-        cur = f'{d.group(1)} [{lg.group(1)[:2]}]' if lg else d.group(1)
+        # And on --shadow (2026-09-27): a shadow and a non-shadow dive of
+        # one species+league are different dives, not a '#2' re-run.
+        # Anchored so '--union-with-form shadow' does not match.
+        sh = re.search(r'(?:^|\s)--shadow(?=\s|$)', line)
+        tag = ' '.join(t for t in (lg and lg.group(1)[:2], sh and 'sh') if t)
+        cur = f'{d.group(1)} [{tag}]' if tag else d.group(1)
         # Same species+league can legitimately appear twice (a re-run, or
         # the split-moveset passes), so disambiguate rather than merge.
         if cur in self.seen_keys:

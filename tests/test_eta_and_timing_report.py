@@ -71,6 +71,33 @@ def test_the_ml_tail_fallback_is_within_headroom_of_its_measurement():
         f"2026-09-22.")
 
 
+@pytest.mark.parametrize('bucket', ['gl_full', 'ul_full', 'forretress'])
+def test_the_bucket_fallbacks_sit_between_their_warm_and_cold_measurements(
+        bucket):
+    """Same idea as the ml_tail pin, for the dive buckets.
+
+    Pre-fix values (until 2026-09-27): ul_full 25.0 (3.7x the 09-26 warm
+    awake median of 6.7 m) and forretress 10.0 (3.6x of 2.8 m). The 09-26
+    run was warm, so its per-slug seeds were off and 60 UL dives x 25 m put
+    ~25 h of phantom time into a ~32 h ETA. A [1x, 5x] band would not have
+    caught that, hence 2.5x (the ml_tail fallback's headroom).
+
+    The lower bound keeps the fallback honest for the other regime it
+    serves -- a cold run's never-seen slug -- against the 09-20 cold median.
+    """
+    warm = oe.BUCKET_MEASUREMENTS['warm']['median_min'][bucket]
+    cold = oe.BUCKET_MEASUREMENTS['cold']['median_min'][bucket]
+    assert oe.BUCKET_MEASUREMENTS['warm']['hit_ratio'] > oe.WARM_RUN_HIT_RATIO
+    assert oe.BUCKET_MEASUREMENTS['cold']['hit_ratio'] <= oe.WARM_RUN_HIT_RATIO
+    fallback = oe.FALLBACKS[bucket]
+    assert warm <= fallback <= 2.5 * warm, (
+        f'{bucket} fallback {fallback}m is not within [1x, 2.5x] of the '
+        f'2026-09-26 warm awake median ({warm}m)')
+    assert fallback >= 0.75 * cold, (
+        f'{bucket} fallback {fallback}m under-reports the 2026-09-20 cold '
+        f'awake median ({cold}m) by more than 25%')
+
+
 def test_a_historyless_machine_gets_the_fallback_not_a_phantom_tail(tmp_path):
     """The path that made the wrong constant visible, end to end.
 
@@ -104,6 +131,44 @@ def test_timing_report_separates_the_same_species_in_two_leagues(tmp_path):
     assert len(rows) == 2, f'GL and UL collapsed into: {list(rows)}'
     assert any('gr' in k for k in rows), list(rows)
     assert any('ul' in k for k in rows), list(rows)
+
+
+_SH_OPTS = '--union-with-form plain --shield-scenario 1,1 --shadow --opp-ivs both'
+_PLAIN_OPTS = '--union-with-form shadow --shield-scenario 1,1 --opp-ivs both'
+
+
+def test_timing_report_keys_a_shadow_dive_apart_without_a_rerun_suffix(
+        tmp_path):
+    """Shadow and non-shadow dives of one species+league, as the 2026-09-26
+    chain ran them (real CLI option order; the plain dive carries
+    '--union-with-form shadow', which must NOT read as --shadow).
+
+    Pre-fix (until 2026-09-27) the keys were 'Ninetales [gr]' and
+    'Ninetales [gr]#2' -- distinct only via the re-run suffix."""
+    for classify, path in (
+            (btr.classify, tmp_path / 'chain.log'),
+            (lambda p: btr.classify_dive_logs([p]), tmp_path / 'dive.log')):
+        if classify is btr.classify:
+            path.write_text(
+                f'[10:00:00] CLI: python scripts/deep_dive.py Ninetales '
+                f'--league great {_SH_OPTS}\n'
+                '[10:00:10] Writing HTML...\n'
+                f'[10:01:00] CLI: python scripts/deep_dive.py Ninetales '
+                f'--league great {_PLAIN_OPTS}\n'
+                '[10:01:10] Writing HTML...\n'
+                '[10:02:00] Done.\n')
+        else:
+            _dive_log(path, [
+                ('10:00:00', f'CLI: python scripts/deep_dive.py Ninetales '
+                             f'--league great {_SH_OPTS}'),
+                ('10:00:10', 'Writing HTML...'),
+                ('10:01:00', f'CLI: python scripts/deep_dive.py Ninetales '
+                             f'--league great {_PLAIN_OPTS}'),
+                ('10:01:10', 'Writing HTML...'),
+                ('10:02:00', 'Done.')])
+        keys = list(classify(path))
+        assert keys == ['Ninetales [gr sh]', 'Ninetales [gr]'], keys
+        assert not any('#' in k for k in keys), keys
 
 
 def test_timing_report_totals_survive_the_key_change(tmp_path):
