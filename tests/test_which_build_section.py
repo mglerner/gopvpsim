@@ -108,7 +108,7 @@ def test_glossary_anchors_point_at_real_guide_headings():
     build uses, so a renamed heading fails here rather than shipping a link
     that scrolls nowhere.
     """
-    markdown = pytest.importorskip('markdown')
+    import markdown
     for term, anchor in glossary.ANCHORS.items():
         slug, _, frag = anchor.partition('#')
         body = GUIDES_DIR / slug / 'body.md'
