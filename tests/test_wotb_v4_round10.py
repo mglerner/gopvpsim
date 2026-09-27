@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import require_blob
+from tests.conftest import prepared_blob
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
@@ -48,9 +48,7 @@ _TAGS = re.compile(r'<[^>]+>')
 
 
 def _load(name):
-    path = require_blob(name)
-    state = B.load_blob(str(path))
-    return W.prepare(state, str(path))
+    return prepared_blob(name)[1]
 
 
 @pytest.fixture(scope='module')

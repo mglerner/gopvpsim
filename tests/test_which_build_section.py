@@ -52,7 +52,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import replay_dirs, require_blob
+from tests.conftest import prepared_blob, replay_dirs, require_blob
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
@@ -1336,9 +1336,7 @@ def test_section_is_omitted_without_a_blob_path():
 
 @pytest.fixture(scope='module')
 def shadow_sableye():
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    return state, W.prepare(state, str(path)), str(path)
+    return prepared_blob(SABLEYE_SHADOW)
 
 
 @pytest.mark.local_artifacts
@@ -1666,9 +1664,7 @@ def test_a_real_no_line_moveset_renders_the_negative_section():
     negative summary strings, the two-view selector and the negative compare
     prefill would only ever have run against a hand-built fact dict.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     no_line = [i for i, f in enumerate(all_facts) if f['floor'] is None]
     assert no_line, 'this blob no longer carries a no-line moveset'
     arm = no_line[0]
@@ -2321,9 +2317,7 @@ def test_the_negative_page_carries_the_control_and_its_captions(
     at what value) moves whenever PvPoke re-ranks the meta. Pinning Melmetal
     arm 2 made the 2026-09-15 rankings refresh look like a code failure.
     """
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     neg = next((f for f in all_facts if f['floor'] is None), None)
     assert neg is not None, 'this blob no longer carries a no-line moveset'
     arm = neg['header']['arm']
@@ -2438,9 +2432,7 @@ SABLEYE_PLAIN = '20260911_051621_Sableye_great.replay.pkl.gz'
 
 @pytest.fixture(scope='module')
 def sableye_plain():
-    path = require_blob(SABLEYE_PLAIN)
-    state = B.load_blob(str(path))
-    return state, W.prepare(state, str(path)), str(path)
+    return prepared_blob(SABLEYE_PLAIN)
 
 
 @pytest.mark.local_artifacts
@@ -2460,9 +2452,7 @@ def test_every_scenario_ladder_is_one_axis_and_nests(blob):
     counts: this is the invariant the encoding rests on.
     """
     import numpy as np
-    path = require_blob(blob)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(blob)
     seen_multi = 0
     for arm, facts in enumerate(all_facts):
         _scores, meta = B.arm_view(state, arm, 'pvpoke', level='l50')
@@ -2566,9 +2556,7 @@ def test_no_shipped_closest_rule_is_one_every_spread_clears(blob):
     a threshold nobody can miss. Those are dropped from the candidate pool
     now; the caption says which side of the band the survivor missed on.
     """
-    path = require_blob(blob)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(blob)
     n_iv = int(all_facts[0]['header']['n_iv'])
     seen = 0
     for facts in all_facts:
@@ -3152,9 +3140,7 @@ def test_a_negative_page_bridges_its_summary_to_its_builds():
     """The v3 "zero matchups wide" sentence is about TOTAL wins and stays
     (Michael's call). Standing alone beside a builds table guaranteeing 29
     of 51 decision matchups it read as a contradiction."""
-    path = require_blob(MELMETAL)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    state, all_facts, path = prepared_blob(MELMETAL)
     arm = next(i for i, f in enumerate(all_facts) if f['floor'] is None)
     ab = all_facts[arm]['_builds']
     assert ab and ab['presets'], 'this arm no longer builds anything'
@@ -3616,16 +3602,10 @@ def test_each_build_carries_a_drawable_plane_or_says_it_cannot(
 # ---------------------------------------------------------------------------
 
 
-_FACTS_CACHE = {}
-
-
 def _facts_for(name):
-    """(state, all_facts) for one blob, loaded once per test session."""
-    if name not in _FACTS_CACHE:
-        path = require_blob(name)
-        state = B.load_blob(str(path))
-        _FACTS_CACHE[name] = (state, W.prepare(state, str(path)))
-    return _FACTS_CACHE[name]
+    """(state, all_facts) for one blob, via the session memo in conftest."""
+    state, all_facts, _path = prepared_blob(name)
+    return state, all_facts
 
 
 def test_the_builds_caption_explains_every_marker_the_view_draws():

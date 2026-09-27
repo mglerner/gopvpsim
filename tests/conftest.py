@@ -134,6 +134,36 @@ def require_blob(name):
     return p
 
 
+# ``deep_dive_which_build.prepare`` at its defaults (pvpoke, l50), once per
+# blob per session. prepare() is the expensive step (13.8 s on the Shadow
+# Sableye blob, 7.5 s on Melmetal, against 1-2 s for load_blob), and the
+# which-build tests asked for the SAME three blobs (Sableye shadow/plain,
+# Melmetal GL) from module fixtures, parametrized tests and three separate
+# modules -- about 17 prepare() calls where 3 do (those three modules' full
+# run: 242 s -> 99 s, 2026-09-27). Memory is not new: the module-level
+# ``_facts_for`` cache in test_which_build_section.py already held exactly
+# these three (state, facts) pairs for the rest of the session; this memo
+# replaces it and lets the module fixtures share it instead of holding their
+# own copies. Consumers must treat the result as read-only (a probe on
+# 2026-09-27 found all three fact sets pickle-identical at the end of a full
+# run of their consumers).
+_PREPARED = {}
+
+
+def prepared_blob(name):
+    """``(state, all_facts, path_str)`` for replay blob ``name``, memoised."""
+    if name not in _PREPARED:
+        path = str(require_blob(name))
+        for p in (REPO_ROOT / 'src', SCRIPTS_DIR):
+            if str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+        import deep_dive_brief as B
+        import deep_dive_which_build as W
+        state = B.load_blob(path)
+        _PREPARED[name] = (state, W.prepare(state, path), path)
+    return _PREPARED[name]
+
+
 # ---------------------------------------------------------------------------
 # strip_js -- the tests' shared JS scrubber. Moved here from
 # test_win_boundary.py on 2026-09-27 (a dozen modules imported it from that
