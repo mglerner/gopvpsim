@@ -94,7 +94,11 @@ jellicent_ultra 395 / 6.3 GB, guzzlord_great 923 / 5.5 GB, melmetal_great
 ------------------------
 The dive's no-JS "+N more" expanders get page-unique ids from two
 module-global counters that are never reset:
-    deep_dive_rendering._flip_toggle_seq -> ids 'flip<N>', 'fdet<N>'
+    deep_dive_rendering._flip_toggle_seq -> ids 'flip<N>', 'fdet<N>',
+                                            'fcard<N>', 'fcardsp<N>'
+                                            (the last two from the
+                                            dive card's flip lines,
+                                            deep_dive_card._flip_html)
     deep_dive_card._toggle_seq           -> ids 'sb<N>',   'cm<N>'
 (markup from deep_dive_rendering.cover_toggle_html: id="X" on the checkbox,
 for="X" on its label). So a change that skips or reorders a render pass
@@ -153,9 +157,16 @@ NORMALIZERS = [
 _NORMALIZERS_RE = [(n, re.compile(p), r, why) for n, p, r, why in NORMALIZERS]
 
 # Counter-based toggle-id prefixes (see module docstring, --normalize-ids).
-ID_PREFIXES = ('flip', 'fdet', 'sb', 'cm')
+# No single source to derive these from: they are string literals at the
+# emitter call sites (deep_dive_rendering.prose_flip_summary's id_prefix
+# default and callers, deep_dive_card._flip_html's _flip_prose calls, and
+# the f'sb{..}' / f'cm{..}' cids in deep_dive_card). tests/
+# test_replay_render_diff.py AST-scans those emitters and fails if one
+# emits a prefix missing here, so add new prefixes in this tuple.
+ID_PREFIXES = ('flip', 'fdet', 'fcard', 'fcardsp', 'sb', 'cm')
 _ID_RE = re.compile(
-    rb'(\b(?:id|for)=\\?")(' + b'|'.join(p.encode() for p in ID_PREFIXES)
+    rb'(\b(?:id|for)=\\?")('
+    + b'|'.join(p.encode() for p in sorted(ID_PREFIXES, key=len, reverse=True))
     + rb')(\d+)(\\?")')
 
 DIFF_EXCERPT_LINES = 40

@@ -81,10 +81,22 @@ from pathlib import Path
 # puts it in ul_full. Bounded impact on the whole-script ETA; fix only
 # if a future chain's Blade-like dive count grows. The summarizer's more
 # precise taxonomy lives in scripts/summarize_perf.py.
+#
+# RECALIBRATED 2026-09-27: ul_full 25.0 -> 13.0, forretress 10.0 -> 5.0
+# (gl_full 11.0 kept). On 2026-09-26 the watcher printed 'ul_full=25m
+# (fallback)' and a ~32 h ETA while GL dives were measuring ~8 m. That run
+# hit 0.72 of its sweep-cache columns, i.e. WARM_RUN_HIT_RATIO calls it a
+# warm run, so the per-slug seeds were switched off and every bucket with
+# no completion yet in THIS run fell to these constants: 60 UL dives x 25 m
+# ~= 25 h, against a measured awake median of 6.7 m. The fallback serves
+# two regimes -- a warm run's empty buckets (seeds off) and a cold run's
+# never-seen slugs -- so it is set between the two measured awake medians
+# in BUCKET_MEASUREMENTS below (within 2x of the warm one, not under ~0.8x
+# of the cold one). Pinned by tests/test_eta_and_timing_report.py.
 FALLBACKS = {
     'gl_full':    11.0,
-    'ul_full':    25.0,
-    'forretress': 10.0,
+    'ul_full':    13.0,
+    'forretress': 5.0,
     'post_dive':  5.0,   # comparison renders + matchup web + index + verify (steps 4-9, sans ML)
     # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides).
     #
@@ -115,6 +127,28 @@ ML_TAIL_MEASUREMENT = {
     'minutes':    3.9,
     'guides_ok':  60,
     'guides_bad': 0,
+}
+
+# The measurements FALLBACKS['gl_full' / 'ul_full' / 'forretress'] are
+# calibrated against: per-dive "Done in X min" from the chain log, median per
+# classify() bucket, AWAKE dives only (a dive whose per-dive log span
+# overlaps a `pmset -g log` sleep window is excluded -- 3 UL dives on 09-26,
+# 1 GL + 1 UL on 09-20; the pmset log starts 2026-09-20 18:54, so the first
+# 9 dives of the 09-20 chain could not be checked). 'hit_ratio' is the run's
+# _agg_hit_ratio(): above WARM_RUN_HIT_RATIO is the warm regime.
+BUCKET_MEASUREMENTS = {
+    'warm': {
+        'chain_log': 'overnight_20260926_102139.log',
+        'hit_ratio': 0.72,
+        'median_min': {'gl_full': 5.5, 'ul_full': 6.7, 'forretress': 2.8},
+        'n': {'gl_full': 72, 'ul_full': 56, 'forretress': 5},
+    },
+    'cold': {
+        'chain_log': 'overnight_20260920_164044.log',
+        'hit_ratio': 0.42,
+        'median_min': {'gl_full': 13.1, 'ul_full': 13.0, 'forretress': 4.5},
+        'n': {'gl_full': 71, 'ul_full': 58, 'forretress': 5},
+    },
 }
 
 
