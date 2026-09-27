@@ -20,15 +20,13 @@ smaller change, it also covers a malformed CSV row (cp 0 from a bad export is
 equally unknown), and it needs no per-record provenance flag.
 """
 import re
-import sys
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / 'tests'))
 
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 JS_PATH = REPO / 'scripts' / 'deep_dive_engine.js'
 

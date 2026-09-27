@@ -22,9 +22,8 @@ import pytest
 
 REPO = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO / 'scripts'))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from test_win_boundary import strip_js  # noqa: E402
+from tests.conftest import strip_js  # noqa: E402
 
 JS_PATH = REPO / 'scripts' / 'worlds_iv_explorer.js'
 POGO_JS = REPO / 'scripts' / 'deep_dive_user_collection.js'

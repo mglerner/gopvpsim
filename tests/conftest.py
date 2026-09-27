@@ -134,6 +134,89 @@ def require_blob(name):
     return p
 
 
+# ---------------------------------------------------------------------------
+# strip_js -- the tests' shared JS scrubber. Moved here from
+# test_win_boundary.py on 2026-09-27 (a dozen modules imported it from that
+# test module); its self-test, test_strip_js_detects_only_real_code, stays
+# there.
+# ---------------------------------------------------------------------------
+
+# Characters after which a `/` starts a regex literal rather than a division.
+_RE_PRECEDERS = set('(,=:[!&|?{};+-*%~^<>\n')
+
+
+def strip_js(text):
+    """Blank out JS comments, string literals and regex literals.
+
+    Removed regions are replaced by spaces so line numbers and columns are
+    preserved for reporting. Handles ``//`` line comments, ``/* */`` block
+    comments, ``'``/``"``/`` ` `` strings with backslash escapes, and regex
+    literals (disambiguated from division by the previous significant char).
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    prev_sig = '\n'   # last significant (non-space) code character
+
+    def blank(a, b):
+        for k in range(a, b):
+            if out[k] != '\n':
+                out[k] = ' '
+
+    while i < n:
+        c = text[i]
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            j = text.find('\n', i)
+            j = n if j < 0 else j
+            blank(i, j)
+            i = j
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            j = text.find('*/', i + 2)
+            j = n if j < 0 else j + 2
+            blank(i, j)
+            i = j
+            continue
+        if c in '\'"`':
+            j = i + 1
+            while j < n:
+                if text[j] == '\\':
+                    j += 2
+                    continue
+                if text[j] == c:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'   # a string is a value, like an identifier
+            i = j
+            continue
+        if c == '/' and prev_sig in _RE_PRECEDERS:
+            j, in_class = i + 1, False
+            while j < n:
+                ch = text[j]
+                if ch == '\\':
+                    j += 2
+                    continue
+                if ch == '\n':
+                    break            # not a regex after all; bail
+                if ch == '[':
+                    in_class = True
+                elif ch == ']':
+                    in_class = False
+                elif ch == '/' and not in_class:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'
+            i = j
+            continue
+        if not c.isspace():
+            prev_sig = c
+        i += 1
+    return ''.join(out)
+
+
 # Flags for the smallest dive that still renders EVERY conditional piece of
 # page chrome. Each entry that is not just "make it small" is load-bearing for
 # the DOM-id guard -- drop one and the guard silently stops covering the ids

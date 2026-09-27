@@ -71,7 +71,8 @@ def test_no_bare_print_in_iv_envelope():
 def test_print_scanner_sees_the_shapes_the_old_substring_pin_did_not():
     """Scanner self-test: without it, a scan that stopped matching would leave
     the guard above green forever (the anti-vacuity companion pattern of
-    tests/test_win_boundary.py:380-437)."""
+    tests/test_win_boundary.py's test_emitted_scan_finds_code_but_not_comments
+    through test_emitters_are_actually_covered_by_the_emitted_scan)."""
     src = (
         "# never call print() here\n"                 # 1: comment, not a call
         "'''docstring naming print(x)'''\n"           # 2: string, not a call
