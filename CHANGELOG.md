@@ -118,6 +118,37 @@ Completed/shipped work, reverse chronological.
   unchanged iff neither side owns one; same Zap-Cannon-mutation caveat
   as `self_debuff_either_side`, measured harmless 2026-07-03).
 
+## 2026-09-23..25 -- Signature dedup made exact (a4ca14e); migrations applied
+
+- **Found 2026-09-23** by the statfx lab, which re-sims plain PvPoke for every
+  cell it touches: on 25 of 165 class pages (engine 9ac12a2754a1, the bake
+  stamp) 1-92 cells per page (~0.01-0.1%) did not reproduce, e.g. Florges GL
+  vs Shadow Annihilape (an exact-CMP-tie spread's score rows swapped) and
+  Zygarde (Complete) UL vs Mimikyu (1044 1v1/2v1 = 325/337 vs 400/414).
+- **Root cause (a617f98):** `deep_dive_signature.py` dedup was not exact.
+  Dedup ON reproduced the tensors, OFF (per-profile truth) did not: 396 /
+  774 / 6 cells on Florges, Zygarde, Blastoise UL vs Forretress. Two gaps:
+  (1) the CMP column divided shadow attack by 1.2 -- the lossy round trip
+  ebf5944 had removed from the engine -- so exact CMP ties vs a shadow side
+  were signed win/loss; (2) `movable_axes` missed the attack axis that
+  `pvpoke_dp`'s `_cm_buff_delta` moves for a chance-1 opponent-DEFENSE
+  debuff (Sand Tomb, Bulldoze), so `atk*1.25/def` vs `atk/(def*0.8)` floored
+  differently at rare boundaries.
+- **Fix (a4ca14e):** `cmp_atk = (base atk + atk IV) * CPM` like the engine's
+  `raw_atk`; def-debuff charged moves make the owner's atk axis movable.
+  Failing-first tests on the three pairs; two pins that encoded gap 2
+  corrected with pre-fix values recorded. Dedup ON == OFF on all three
+  pages; `verify_signature_dedup.py` default corpus EXACT MATCH.
+- **Cache:** the signature module is in the sweep engine hash, so the hash
+  moved 9ac12a2754a1 -> d78c67fd06a7 (every column a safe miss). Predicates
+  (b6e369a): `signature_regroup_20260923` (old grouping rebuilt from a frozen
+  pre-fix module, matched 1,504/1,504 sampled columns) and
+  `signature_fix_slayer_20260923`; the unsafe `legacy_guard_20260922` was
+  removed unrun. Applied by hand 2026-09-25: sweep 239,091 blessed / 43,077
+  unlinked, slayer 150 / 0 (docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md
+  "Results"). The corrected tensors reached the site with the 2026-09-26/27
+  bake and the 2026-09-27 publish.
+
 ## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
 
 - **Shadow Sableye GL "the bands are wild"** (reminder 2438093, 09-11):

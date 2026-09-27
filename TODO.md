@@ -65,75 +65,13 @@ general slug with the old one redirecting. Toggle copy is already approved
 (plan doc, "Page copy"); the page should also state the shield-prediction
 dependence (the fragility results).
 
-## OPEN: published dive tensors that do not reproduce (found 2026-09-23)
+## Dive tensors vs per-profile truth -- residue (record: CHANGELOG 2026-09-23..25)
 
-The statfx lab re-sims plain PvPoke for every cell it touches and checks it
-against the page tensor. On **25 of 165** class pages (engine hash
-`9ac12a2754a1`, same as the bake stamp) 1-92 cells per page (~0.01-0.1%)
-differ. The mismatched cells are NOT a lab artifact: rebuilt through the
-dive's own `build_battle_pair` path, reused across scenarios OR fresh per
-scenario, they match the lab and not the tensor. Examples:
-
-- Florges GL vs Shadow Annihilape: spreads 3161/3190 (atk 123.3775648 = an
-  exact CMP tie with the opponent) and 3973/4002 (atk 123.178, loses CMP)
-  appear with their score rows SWAPPED in the tensor.
-- Zygarde (Complete) UL vs Mimikyu: 92 cells, e.g. spread 1044 1v1/2v1 =
-  325/337 in the tensor vs 400/414 re-simmed.
-- Not all CMP-related: Forretress, Giratina, Snorlax, Araquanid opponents too.
-
-**ROOT CAUSE (diagnosed 2026-09-23): signature dedup is not exact.** On
-all three probed pairs, `deep_dive.iv_sweep` with signature dedup ON
-reproduces the published tensor exactly, and dedup OFF (per-profile ground
-truth) differs: Florges GL vs Shadow Annihilape 396 cells, Zygarde UL vs
-Mimikyu 774, Blastoise UL vs Forretress 6 (full 4096-spread columns; the
-lab's stride-29 sample understated this). The columns were freshly simmed
-at the bake on the current engine hash, so this is not a stale-cache or
-migration problem. Two gaps in `scripts/deep_dive_signature.py`:
-
-1. **Shadow CMP strip (line ~291).** The CMP sign is computed as
-   `atk / 1.2` for shadow sides -- the exact lossy round trip `ebf5944`
-   (2026-09-20) removed from the engine (`cmp_atk` now carries `raw_atk`).
-   An exact CMP tie against a shadow side is signed as a win/loss, so the
-   spread is grouped with, and given the fight of, a non-tie spread.
-2. **Missing attack axis for the DP's debuff projection.** `_cm_buff_delta`
-   (PvPoke's `attackMult -= buffs[1]`) models a chance-1 opponent-DEFENSE
-   debuff (Sand Tomb, Bulldoze, ...) as +stages on the ATTACKER's attack
-   inside `pvpoke_dp`, and the DP reads damage at those attack stages.
-   `movable_axes` does not count that as making the attacker's attack
-   movable, so those damages are never tabulated; `atk*1.25/def` vs
-   `atk/(def*0.8)` then floors differently at rare boundaries and two
-   "identical" spreads plan differently. Forretress (opponent side) and
-   Zygarde (focal side, Bulldoze vs Mimikyu) both trace to this.
-
-**Code FIXED 2026-09-23 (a4ca14e)**: both gaps closed; failing-first tests
-on the three pairs; dedup ON == OFF on all three real pages; the default
-`verify_signature_dedup.py` corpus EXACT MATCH.
-
-**Cache: correctness already protected.** `deep_dive_signature.py` IS in
-the sweep engine hash (`sweep_cache.engine_hash()` adds it; the slayer stamp
-builds on that), so a4ca14e moved the hash 9ac12a2754a1 -> d78c67fd06a7 and
-every cached column is now a safe miss. (An earlier note in this session
-said the opposite; it was wrong.) The published site still shows the old
-cells until the next bake + publish.
-
-**Cache migration: BUILT + dry-run, NOT applied (b6e369a, 2026-09-23).**
-Run these before the next bake (both default to dry-run; `--apply` writes):
-
-    direnv exec . python scripts/migrate_cache.py --from-engine 9ac12a2754a1 \
-        --predicate signature_regroup_20260923 --apply
-    direnv exec . python scripts/migrate_cache.py --slayer --from-engine 9ac12a2754a1 \
-        --predicate signature_fix_slayer_20260923 --apply
-
-Dry-run results: sweep 239,091 blessed / 43,077 deleted-to-re-sim (15.3%;
-26 min single-threaded); slayer 150 blessed / 0 deleted. Old-grouping
-reconstruction matched the real pre-fix module on 1,504/1,504 sampled
-columns. `legacy_guard_20260922` was removed unrun (unsafe: same delta).
-Do NOT land another engine-hashed change before applying these, or the
-predicates' from->to delta no longer covers everything.
-
-**Bake estimate:** ~35-40 h migrated vs ~57 h cold (the 09-20 chain took
-37.7 h: sweep pool sims 15.4 h (cache only 42% warm after the ebf5944
-shadow bump) plus 1.4 h mirror-slayer). Run the pre-dive checklist first.
+The signature-dedup exactness fix (a4ca14e), its migrations (b6e369a,
+applied 2026-09-25) and the 2026-09-26/27 bake + 2026-09-27 publish are done.
+Still open: no re-run of the statfx lab's plain-PvPoke cross-check against
+the 09-26/27 tensors is recorded -- run it once (expect 0 of 165 class pages
+mismatching; it was 25 of 165 on the 9ac12a2754a1 bake) to close the loop.
 
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
