@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import require_blob
+from tests.conftest import prepared_blob
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
@@ -39,15 +39,12 @@ sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 import glossary  # noqa: E402
 import deep_dive_which_build as W  # noqa: E402
-import deep_dive_brief as B  # noqa: E402
 import deep_dive_matchup_clusters as MC  # noqa: E402
 
 
 @pytest.fixture(scope='module')
 def shadow_section():
-    path = require_blob(SABLEYE_SHADOW)
-    state = B.load_blob(str(path))
-    all_facts = W.prepare(state, str(path))
+    _state, all_facts, _path = prepared_blob(SABLEYE_SHADOW)
     return W.section_html(all_facts, 0)
 
 
