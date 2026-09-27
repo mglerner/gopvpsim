@@ -66,6 +66,12 @@ Engine predicates (PROVEN, not guessed):
                 tests/test_migrate_cache.py and the engine A/B regression in
                 tests/test_bandaid910_bestcm.py.
 
+  cram_0v1_surf_gate_20260927 -- sheet v7: the (0,1) row's Surf-normalized
+                gate (--from-engine 5a813036625c). Affected iff a pogodives
+                column whose FOCAL is Cramorant with SURF plus a non-DIVE,
+                non-SURF charged move; slayer fully blesses. Proof in the
+                predicate's docstring.
+
   neutral_batch_20260810 — the 2026-08-10 behavior-neutral bump
                 (--from-engine 1415857072fa): comment rewording + the
                 parse_types relocation into moves.py. Blesses everything
@@ -184,6 +190,55 @@ def _cached_damage_refresh_20260925(f, c):
     full battle tier. Fail-safe: unreadable movesets -> affected.
     """
     return _self_debuff_either_side(f, c)
+
+
+def _cram_0v1_surf_gate_20260927(f, c):
+    """Sheet v7 Surf-normalized 0v1 gate (pin --from-engine 5a813036625c ->
+    32a20be48379; slayer --from-engine d3ce425c2ce4 -> 9b90c8d8b434).
+
+    The ENTIRE delta is in battle.py: row (0,1) of _POGODIVES_SHEET gains
+    'surf_gate_dpe': 2.25, _cram_dive_gate_dpe gains a ``gulp_move_id``
+    kwarg that substitutes that value for _POGODIVES_DIVE_GATE_DPE when the
+    id is 'SURF', and pvpoke_dp's Cramorant gulp-prep site passes
+    ``cms[_gulp_slot]['moveId']``. Nothing else changed.
+
+    Reachability: _cram_dive_gate_dpe's sheet branch runs only under
+    ``attacker._pogodives`` and is called only when the ATTACKER is in
+    Cramorant form. In a sweep column only the FOCAL side gets the
+    pogodives policy (deep_dive_lib/sweep.py; the opponent plays
+    pvpoke_dp, so an opponent Cramorant is unmarked and gets 1.5 as
+    before). So a column can change only if (a) policy == 'pogodives' and
+    (b) the focal species is a Cramorant.
+
+    Moveset narrowing, from the focal meta's stored 'charged' list: the new
+    value is read only when the gulp slot (first charged move that is DIVE
+    or SURF) is SURF. (c) no SURF -> never read. (d) SURF present but every
+    other charged move is DIVE or SURF -> either the gulp slot is DIVE
+    (field not read) or it is SURF and the non-gulp slot (PvPoke's typo'd
+    predicate: first move != DIVE) is also SURF, so the compared DPE ratio
+    is exactly 1.0, below both 1.5 and 2.25 -- same verdict. Hence affected
+    iff Cramorant focal AND pogodives column AND SURF in the focal's charged
+    moves AND some focal charged move is neither DIVE nor SURF (e.g. Fly +
+    Surf, Hydro Pump + Surf; the latter over-deletes safely -- its Hydro
+    Pump / Surf ratio is ~1.07, never near 2.25).
+
+    Slayer mirrors are simmed with pvpoke_dp on both sides (never
+    pogodives; no 'policy' in the scenario), so affected(scen, scen) is
+    False and the slayer side fully blesses. Fail-safe: missing focal or
+    column fields, or an unreadable focal moveset -> AFFECTED when the
+    column is (or may be) a pogodives column.
+    """
+    if c is None or c.get('policy') != 'pogodives':
+        return c is None
+    if not f:
+        return True
+    sp = f.get('species')
+    ch = f.get('charged')
+    if not isinstance(sp, str) or not isinstance(ch, list):
+        return True
+    if not sp.startswith('Cramorant'):
+        return False
+    return 'SURF' in ch and any(m not in ('DIVE', 'SURF') for m in ch)
 
 
 def _neutral_batch_20260810(f, c):
@@ -520,6 +575,7 @@ PREDICATES = {
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
     'self_debuff_either_side': _self_debuff_either_side,
     'cached_damage_refresh_20260925': _cached_damage_refresh_20260925,
+    'cram_0v1_surf_gate_20260927': _cram_0v1_surf_gate_20260927,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'cramorant_port_20260824': _cramorant_port_20260824,
     # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):

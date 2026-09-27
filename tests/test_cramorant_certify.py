@@ -11,7 +11,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 
-from cramorant_certify import cell_stats, per_opponent  # noqa: E402
+from cramorant_certify import (cell_stats, check_record, page_key,  # noqa: E402
+                               page_sha256, per_opponent)
 
 
 def _pair(n_opp=3):
@@ -55,3 +56,36 @@ def test_per_opponent_lists_only_negative_opponents_worst_first():
     offs = per_opponent(pv, pg, ['A', 'B', 'C'], 8)
     assert [o['opp'] for o in offs] == ['A', 'C']
     assert offs[0]['net'] == -20 and offs[1]['net'] == -5
+
+
+def test_check_record_publish_guard(tmp_path):
+    """Publish guard (2026-09-27): every rendered page must be in the
+    certification record with an unchanged sha256, and the record must be
+    clean. Pre-guard a fifth moveset page could ship with no certification
+    (check_record did not exist)."""
+    gl = tmp_path / 'cramorant-great-league'
+    gl.mkdir()
+    a, b = gl / 'index.html', gl / 'index_m4_peck_fly_surf.html'
+    a.write_text('page a')
+    b.write_text('page b')
+    assert page_key(b) == 'great/index_m4_peck_fly_surf.html'
+    clean = {'bar_failures': 0, 'exemption_violations': 0,
+             'selftest_mismatches': 0,
+             'pages': {page_key(a): {'sha256': page_sha256(a)},
+                       page_key(b): {'sha256': page_sha256(b)}}}
+    assert check_record(clean, str(tmp_path), ['great']) == []
+    # A new, never-certified moveset page.
+    (gl / 'index_m5_peck_new.html').write_text('page c')
+    probs = check_record(clean, str(tmp_path), ['great'])
+    assert len(probs) == 1 and 'index_m5_peck_new.html' in probs[0]
+    (gl / 'index_m5_peck_new.html').unlink()
+    # A re-rendered page (different bytes) is uncertified.
+    b.write_text('page b, re-baked')
+    assert any('changed' in p for p in check_record(clean, str(tmp_path), ['great']))
+    b.write_text('page b')
+    # A dirty or pre-guard record never passes.
+    assert check_record({**clean, 'bar_failures': 8}, str(tmp_path), ['great'])
+    assert check_record({k: v for k, v in clean.items() if k != 'pages'},
+                        str(tmp_path), ['great'])
+    # No rendered pages at all is a failure, not a vacuous pass.
+    assert check_record(clean, str(tmp_path / 'nowhere'), ['great'])
