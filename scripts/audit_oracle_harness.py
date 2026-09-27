@@ -123,19 +123,18 @@ MATCHUPS = [
     # Blade-as-focal: exercises the Blade->Shield reversion-on-shielding
     # path in battle (the 07c6388 clamp fix only tested the level math).
     # Reversion itself verified identical to PvPoke (both swap stats AND
-    # the fast move per Pokemon.js changeForm:2386-2394). xfails, traced
-    # 2026-06-12: (1,2) is PvPoke bug #3 (its Aegislash throws Gyro Ball
-    # where ours throws strictly-better Shadow Ball); (1,1) is the
-    # near-KO plan-choice cluster — PvPoke banks 100 energy in safe
-    # Shield form then double-Shadow-Balls (T44/T45) and WINS the cell;
-    # ours throws at 50, re-Blades into paper form early, dies to chip.
-    # PvPoke's plan is better in this cell, but the cluster is closed
-    # as not-fixing (matching inverts the 6:1 cluster ratio — see
-    # DEVELOPER_NOTES 'Near-KO DP plan choice').
+    # the fast move per Pokemon.js changeForm:2386-2394). All nine cells
+    # EXACT since 2026-09-27. History: the 2026-06-12 legacy xfails
+    # (1,1)/(1,2) had long since VANISHED ((1,1) matched at the first
+    # new-mechanics measurement, (1,2) at f1ff911); (1,0)/(2,0) then
+    # diverged because our Shield-form charged-move ESTIMATE used the
+    # Shield atk, so the reverted Shield form farmed past a KO PvPoke
+    # takes -- fixed by pricing it at the Blade atk
+    # (BattlePokemon._charged_atk_base, DamageCalculator.js:43-50).
     dict(label='aegislash_blade_vs_azumarill_form_change',
          p1=P('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_blade'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
-         xfail_cells={(1, 1), (1, 2)}),
+         xfail_cells=set()),
     # Opponent-side form change: expands the single 0v0 cell (the "773"
     # oracle pin in test_dive_worker_form_change) to the full grid —
     # every GL dive carries Aegislash opponent rows in all 9 scenarios.
@@ -155,6 +154,41 @@ MATCHUPS = [
          # Ball where PvPoke's was Shadow Ball -- both shielded, hence
          # score-neutral and invisible to a score-only oracle).
          xfail_cells=set()),
+    # Non-Azumarill Aegislash OPPONENT rows (2026-09-27): every prior GL
+    # Aegislash row faced Azumarill, and the Shield-form charged-estimate
+    # fix (BattlePokemon._charged_atk_base) moved Aegislash opponent rows
+    # across the GL meta, including winner flips (1080-cell sample vs
+    # 15/15/15 opponents: 8 flips, all to PvPoke's answer, all reproduced
+    # seat-swapped). One row per flip opponent the scouting named,
+    # Aegislash on the p2 (opponent) side, both start forms. Opponent
+    # movesets = get_default_moveset (PvPoke rankings); IVs = gamemaster
+    # defaultIVs cp1500 (Aegislash 4/14/15). At these default IVs the fix
+    # moved Mimikyu (0,x) and Clodsire (1,2)/(2,2) onto PvPoke (winner
+    # flips at Mimikyu (0,1)/(0,2) and Clodsire (1,2)); Electrode-H was
+    # already exact before it and is kept as plain coverage.
+    dict(label='electrode_hisuian_vs_aegislash_shield_form_change',
+         p1=P('Electrode (Hisuian)', 'THUNDER_SHOCK', ['WILD_CHARGE', 'ENERGY_BALL'], (5, 13, 14), 'electrode_hisuian'),
+         p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield')),
+    dict(label='mimikyu_vs_aegislash_shield_form_change',
+         p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (4, 14, 15), 'mimikyu'),
+         p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield')),
+    dict(label='clodsire_vs_aegislash_blade_form_change',
+         p1=P('Clodsire', 'POISON_STING', ['EARTHQUAKE', 'STONE_EDGE'], (4, 14, 10), 'clodsire'),
+         p2=P('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_blade')),
+    dict(label='cradily_vs_aegislash_blade_form_change',
+         p1=P('Cradily', 'ACID', ['ROCK_TOMB', 'GRASS_KNOT'], (4, 14, 14), 'cradily'),
+         p2=P('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_blade'),
+         # DELIBERATE divergence, traced 2026-09-27: the Shield-form
+         # charged-move estimate STAGE choice (BattlePokemon._charged_atk_base;
+         # DEVELOPER_NOTES 'Form change gotchas'). Cradily's Rock Tomb drops
+         # Aegislash's atk; PvPoke still prices the reverted Shield form's
+         # throws at the raw, stage-blind Blade atk, ours applies the stage
+         # (= the damage the throw really deals). Making ours stage-blind
+         # reproduces PvPoke on all three cells. (1,1) is a WINNER flip in
+         # Aegislash's favour (ours 301/w1 vs PvPoke 545/w0 for Cradily);
+         # (1,2) and (2,2) keep the winner (ours 301 vs 240, and 363 on both
+         # sides with the last two Aegislash throws in swapped order).
+         xfail_cells={(1, 1), (1, 2), (2, 2)}),
     # Disguise vs fast-move pressure (Azumarill's Bubble is slow; Counter
     # chips the disguise differently and CMP differs).
     dict(label='mimikyu_vs_medicham_form_change',

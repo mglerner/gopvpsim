@@ -65,10 +65,14 @@ AEGI_SHIELD_UL = ('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
     (0, 0, 321, 678, 1, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough']),
     (0, 1, 86, 913, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
     (0, 2, 86, 913, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Play Rough']),
-    (1, 0, 570, 429, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball']),
+    # (1,0)/(2,0) PvPoke-exact since 2026-09-27 (Shield-form charged
+    # estimate at Blade atk). Pre-fix ours: (1,0) 570/429 with an extra
+    # 'Azumarill: Ice Beam' before the last Shadow Ball; (2,0) 580/419
+    # with an extra 'Azumarill: Ice Beam (shielded)'.
+    (1, 0, 712, 287, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (1, 1, 528, 471, 0, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (1, 2, 361, 638, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
-    (2, 0, 580, 419, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 655, 344, 0, ['Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 1, 514, 485, 0, ['Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 2, 183, 816, 1, ['Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)']),
 ])
@@ -94,8 +98,11 @@ def test_aegislash_blade_focal_vs_azumarill(s1, s2, score0, score1,
     (0, 1, 248, 751, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (0, 2, 248, 751, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (1, 0, 651, 348, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam']),
-    (1, 1, 435, 564, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
-    (1, 2, 449, 550, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    # (1,1)/(1,2) PvPoke-exact since 2026-09-27 (Shield-form charged
+    # estimate at Blade atk). Pre-fix ours: (1,1) 435/564, same log;
+    # (1,2) 449/550 with an extra 'Azumarill: Play Rough (shielded)'.
+    (1, 1, 381, 618, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
+    (1, 2, 381, 618, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 0, 887, 112, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam']),
     (2, 1, 617, 382, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
     (2, 2, 617, 382, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball']),
@@ -103,13 +110,56 @@ def test_aegislash_blade_focal_vs_azumarill(s1, s2, score0, score1,
 def test_azumarill_vs_aegislash_shield_opponent_side(s1, s2, score0,
                                                      score1, winner, log):
     """Opponent-side Aegislash across the full grid (every GL dive
-    carries these rows). Divergent cells are PvPoke bug #3 seen from
-    the opponent side; Azumarill's own move choices agree everywhere."""
+    carries these rows). All nine cells PvPoke-exact (2026-09-27)."""
     ss0, ss1, sw, slog = _run((*AZU, 4, 15, 13),
                               (*AEGI_SHIELD, 4, 14, 15), s1, s2)
     assert (ss0, ss1, sw) == (score0, score1, winner), \
         f"{s1}v{s2}: scores/winner moved"
     assert slog == log, f"{s1}v{s2}: chargedLog moved"
+
+
+CRADILY = ('Cradily', 'ACID', ['ROCK_TOMB', 'GRASS_KNOT'], 'great')
+_RT_GB = ['Aegislash (Blade): Gyro Ball (shielded)',
+          'Cradily: Rock Tomb (shielded)', 'Cradily: Rock Tomb',
+          'Cradily: Rock Tomb']
+
+
+@pytest.mark.parametrize("s1,s2,score0,score1,winner,log,pvpoke", [
+    (1, 1, 301, 698, 1,
+     _RT_GB + ['Aegislash (Blade): Gyro Ball',
+               'Aegislash (Blade): Shadow Ball'], (545, 454, 0)),
+    (1, 2, 301, 698, 1,
+     _RT_GB + ['Aegislash (Blade): Gyro Ball',
+               'Aegislash (Blade): Shadow Ball'], (240, 759, 1)),
+    (2, 2, 363, 636, 1,
+     _RT_GB + ['Aegislash (Blade): Gyro Ball (shielded)',
+               'Cradily: Rock Tomb (shielded)',
+               'Aegislash (Blade): Shadow Ball',
+               'Aegislash (Blade): Gyro Ball'], (363, 636, 1)),
+])
+def test_cradily_vs_aegislash_blade_estimate_stage_divergence(
+        s1, s2, score0, score1, winner, log, pvpoke):
+    """DIVERGENCE PIN (our value; PvPoke's rides in the message).
+
+    Rock Tomb drops Aegislash's atk stage. After its shielded Gyro Ball
+    reverts it to Shield form, PvPoke prices the Shield form's charged moves
+    at the raw, stage-blind Blade atk; we apply the current stage, so our
+    estimate equals the damage the throw really deals (BattlePokemon.
+    _charged_atk_base; DEVELOPER_NOTES "Form change gotchas" item 6). PvPoke's
+    choice is internally inconsistent and not better on outcomes (in the
+    1080-cell sample the stage choice decides 15 cells, 3 of 4 winner flips
+    in Aegislash's favour under ours), so we keep ours. A stage-blind variant
+    reproduces PvPoke's score, winner and chargedLog on all three cells
+    (audit_oracle_harness.py cradily_vs_aegislash_blade_form_change xfails).
+    Before the 2026-09-27 estimate fix these cells were (1,1)/(1,2) the
+    same and (2,2) 367/632.
+    """
+    ss0, ss1, sw, slog = _run((*CRADILY, 4, 14, 14),
+                              (*AEGI_BLADE, 4, 14, 15), s1, s2)
+    note = f" [divergence pin: PvPoke master gives {pvpoke}]"
+    assert (ss0, ss1, sw) == (score0, score1, winner), \
+        f"{s1}v{s2}: scores/winner moved{note}"
+    assert slog == log, f"{s1}v{s2}: chargedLog moved{note}"
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [

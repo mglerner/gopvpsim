@@ -37,10 +37,12 @@ the default since 2026-09-09.
    check from `selfBuffing` to `selfDebuffing`, and PvPoke now throws Shadow
    Ball there too: the affected oracle cells match on score and on the
    charged-move log, and reverting that one check in a copy of PvPoke's JS
-   brings the old difference back (DEVELOPER_NOTES "Current status"). Six
-   Aegislash x Azumarill form-change cells still differ under the new turn
-   system; that is an open investigation in TODO.md, not a documented
-   divergence.
+   brings the old difference back (DEVELOPER_NOTES "Current status"). The
+   six Aegislash x Azumarill form-change cells that still differed under the
+   new turn system were resolved on 2026-09-27, on our side: we priced
+   Shield-form charged moves at the Shield form's Attack, while PvPoke
+   (correctly) uses the Blade form's, which is what the throw lands with.
+   They now match PvPoke on score, winner and charged-move log.
 4. **Near-KO plan choice: one big self-debuffing move vs a chain of cheaper
    moves -- RESOLVED 2026-09-25, we now match PvPoke.** In a shields-down
    endgame PvPoke swaps a self-debuffing nuke for a chain of cheaper
@@ -66,6 +68,18 @@ the default since 2026-09-09.
    into the shield, a strictly worse line. This only affects bait-off analysis
    (the oracle runs bait-on and never sees it); ours keeps those matchups honest
    (traced: Malamar vs Furret 1-1, ours 769 vs PvPoke's 237).
+7. **Shield-form Aegislash's charged-move estimate keeps its Attack stage.**
+   Following PvPoke, Aegislash in Shield form estimates its charged moves
+   with the Blade form's Attack (the throw changes form before it lands). We
+   also apply Aegislash's current Attack stage to that number; PvPoke uses
+   the unstaged Blade Attack, although the throw it then resolves does apply
+   the stage. The two agree unless an opponent has lowered Aegislash's Attack
+   (Rock Tomb, Icy Wind, ...); then ours estimates exactly the damage the
+   throw deals. In a 1080-cell Great League sample this decides 15 cells,
+   with winner changes going both ways (3 of 4 favour Aegislash under ours).
+   Pinned in `tests/test_form_change_oracle.py`
+   (`test_cradily_vs_aegislash_blade_estimate_stage_divergence`) and
+   DEVELOPER_NOTES "Form change gotchas" item 6.
 
 We also deliberately do NOT replicate one block of PvPoke's decision code (its
 non-guaranteed-buff "needsBoost" plan selection): that code is disabled

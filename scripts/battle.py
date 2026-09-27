@@ -134,14 +134,13 @@ def main():
                         help='Charged move policy for both sides (default: pvpoke_ai)')
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
                         help='Turn-resolution model. DEFAULT IS new: the turn '
-                             'system the live game runs, matching PvPoke master '
-                             'on 237 of 243 oracle cells (the 6 that differ are '
-                             'all Aegislash form-change, same winner). legacy = '
+                             'system the live game runs and PvPoke master '
+                             'implements (cross-checked by '
+                             'scripts/audit_oracle_harness.py). legacy = '
                              'the pre-2026-09-02 system, which neither the game '
                              'nor PvPoke master implements any more; it is '
                              'retained only to keep the port-fidelity history '
-                             'runnable. Both print a caveat at runtime; see '
-                             'scripts/mechanics_notice.py')
+                             'runnable.')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
     parser.add_argument('--pvpoke-scores', action='store_true',
@@ -168,11 +167,6 @@ def main():
                              '(useful for adding to tests)')
 
     args = parser.parse_args()
-
-    import sys as _sys
-    from mechanics_notice import warn_mechanics
-    warn_mechanics(args.mechanics,
-                   lambda m: print(f'WARNING: {m}', file=_sys.stderr))
 
     # Parse positional args: accept 2, 4, 5, or 6 positional args.
     #   2: species1 species2                    (both use default moves)
