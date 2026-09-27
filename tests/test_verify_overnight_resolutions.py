@@ -70,6 +70,11 @@ def test_shipped_entries_match_a_line_their_gate_reports():
     overnight_20260920_164044.log) matches a WARNING line, not a [FAIL] one.
     Pre-fix this test read only ``"[FAIL]" in ln`` and failed on it.
     """
+    import datetime
+    import re
+
+    import pmset_sleep
+
     for res in vo.load_resolutions():
         log = next(vo.LOGS.glob(f"*/{res['chain_log']}"), None)
         if log is None:
@@ -78,6 +83,24 @@ def test_shipped_entries_match_a_line_their_gate_reports():
         reported = ([ln for ln in text.splitlines() if "[FAIL]" in ln]
                     + vo.scan_narrative_warnings(text)
                     + vo.scan_which_build_omissions(text))
+        # The gate's fourth reportable line (2026-09-25): system sleep inside
+        # the chain window, from `pmset -g log`. Rebuilt the way main() does
+        # it -- chain start from the log's filename stamp, end from its
+        # mtime. pmset is a rolling ~1-week window, so once it no longer
+        # covers the chain the report is SKIP and a "system slept" entry can
+        # no longer be checked here (spent history, like an aged-out log);
+        # an OK verdict, though, means the entry names a sleep that did not
+        # happen, which is exactly the typo this test exists to catch.
+        m = re.search(r"overnight_(\d{8})_(\d{6})", res["chain_log"])
+        if m:
+            start = datetime.datetime.strptime(
+                m.group(1) + m.group(2), "%Y%m%d%H%M%S").timestamp()
+            verdict, msg = vo.chain_sleep_report(
+                pmset_sleep.read_pmset_log(), start, log.stat().st_mtime)
+            if verdict == "ERR":
+                reported.append(msg)
+            elif res["step"] == "system slept" and verdict == "SKIP":
+                continue
         assert reported, f"{res['chain_log']}: nothing reported to match"
         assert vo.stale_resolutions([res], res["chain_log"], reported) == [], (
             f"{res['chain_log']}: step {res['step']!r} matches no line the "
