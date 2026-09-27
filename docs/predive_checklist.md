@@ -226,9 +226,10 @@ auditing or whether anyone remembers the lens.
   a gate that goes RED on docs drift (sentinel vs live counts). Add
   "sentinels green NOW" as an explicit pre-launch trigger -- on
   2026-08-06 a 1-count drift would have killed the chain at hour ~20;
-  the gate caught it pre-launch. NB overnight_redive.sh's step-9 label
-  still says "(link + dash)" -- update it when the chain is NOT
-  running (editing a mid-execution bash script corrupts it).
+  the gate caught it pre-launch. (The step-9 label now reads "Running
+  ship gates (roster: run_ship_gates.py)", fixed in aa41f9b. Standing
+  rule: never edit overnight_redive.sh while a chain is running --
+  editing a mid-execution bash script corrupts it.)
 
 ## Added after the 2026-08-06/08 bake (the 18h sleep stall)
 

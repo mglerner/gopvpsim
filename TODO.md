@@ -28,8 +28,8 @@ branches** (2026-09-25); none touches an engine-hashed file:
 
 Every render change ships behind the `scripts/replay_render_diff.py`
 byte-diff. Not ranked: `--jobs N` dive overlap (the "parallelize the dive
-step" plan below assumes 0.8 GB per dive; the scout saw 2.5-8.5 GB RSS,
-unverified).
+step" plan below, re-scoped 2026-09-27 for the measured 4.9-11.6 GB peak RSS
+per render).
 
 **Storage and cache, DONE 2026-09-25** (commands and counts in the doc's
 "Results" section): the two pre-Aegislash snapshots deleted (~46 GB), both
@@ -65,75 +65,13 @@ general slug with the old one redirecting. Toggle copy is already approved
 (plan doc, "Page copy"); the page should also state the shield-prediction
 dependence (the fragility results).
 
-## OPEN: published dive tensors that do not reproduce (found 2026-09-23)
+## Dive tensors vs per-profile truth -- residue (record: CHANGELOG 2026-09-23..25)
 
-The statfx lab re-sims plain PvPoke for every cell it touches and checks it
-against the page tensor. On **25 of 165** class pages (engine hash
-`9ac12a2754a1`, same as the bake stamp) 1-92 cells per page (~0.01-0.1%)
-differ. The mismatched cells are NOT a lab artifact: rebuilt through the
-dive's own `build_battle_pair` path, reused across scenarios OR fresh per
-scenario, they match the lab and not the tensor. Examples:
-
-- Florges GL vs Shadow Annihilape: spreads 3161/3190 (atk 123.3775648 = an
-  exact CMP tie with the opponent) and 3973/4002 (atk 123.178, loses CMP)
-  appear with their score rows SWAPPED in the tensor.
-- Zygarde (Complete) UL vs Mimikyu: 92 cells, e.g. spread 1044 1v1/2v1 =
-  325/337 in the tensor vs 400/414 re-simmed.
-- Not all CMP-related: Forretress, Giratina, Snorlax, Araquanid opponents too.
-
-**ROOT CAUSE (diagnosed 2026-09-23): signature dedup is not exact.** On
-all three probed pairs, `deep_dive.iv_sweep` with signature dedup ON
-reproduces the published tensor exactly, and dedup OFF (per-profile ground
-truth) differs: Florges GL vs Shadow Annihilape 396 cells, Zygarde UL vs
-Mimikyu 774, Blastoise UL vs Forretress 6 (full 4096-spread columns; the
-lab's stride-29 sample understated this). The columns were freshly simmed
-at the bake on the current engine hash, so this is not a stale-cache or
-migration problem. Two gaps in `scripts/deep_dive_signature.py`:
-
-1. **Shadow CMP strip (line ~291).** The CMP sign is computed as
-   `atk / 1.2` for shadow sides -- the exact lossy round trip `ebf5944`
-   (2026-09-20) removed from the engine (`cmp_atk` now carries `raw_atk`).
-   An exact CMP tie against a shadow side is signed as a win/loss, so the
-   spread is grouped with, and given the fight of, a non-tie spread.
-2. **Missing attack axis for the DP's debuff projection.** `_cm_buff_delta`
-   (PvPoke's `attackMult -= buffs[1]`) models a chance-1 opponent-DEFENSE
-   debuff (Sand Tomb, Bulldoze, ...) as +stages on the ATTACKER's attack
-   inside `pvpoke_dp`, and the DP reads damage at those attack stages.
-   `movable_axes` does not count that as making the attacker's attack
-   movable, so those damages are never tabulated; `atk*1.25/def` vs
-   `atk/(def*0.8)` then floors differently at rare boundaries and two
-   "identical" spreads plan differently. Forretress (opponent side) and
-   Zygarde (focal side, Bulldoze vs Mimikyu) both trace to this.
-
-**Code FIXED 2026-09-23 (a4ca14e)**: both gaps closed; failing-first tests
-on the three pairs; dedup ON == OFF on all three real pages; the default
-`verify_signature_dedup.py` corpus EXACT MATCH.
-
-**Cache: correctness already protected.** `deep_dive_signature.py` IS in
-the sweep engine hash (`sweep_cache.engine_hash()` adds it; the slayer stamp
-builds on that), so a4ca14e moved the hash 9ac12a2754a1 -> d78c67fd06a7 and
-every cached column is now a safe miss. (An earlier note in this session
-said the opposite; it was wrong.) The published site still shows the old
-cells until the next bake + publish.
-
-**Cache migration: BUILT + dry-run, NOT applied (b6e369a, 2026-09-23).**
-Run these before the next bake (both default to dry-run; `--apply` writes):
-
-    direnv exec . python scripts/migrate_cache.py --from-engine 9ac12a2754a1 \
-        --predicate signature_regroup_20260923 --apply
-    direnv exec . python scripts/migrate_cache.py --slayer --from-engine 9ac12a2754a1 \
-        --predicate signature_fix_slayer_20260923 --apply
-
-Dry-run results: sweep 239,091 blessed / 43,077 deleted-to-re-sim (15.3%;
-26 min single-threaded); slayer 150 blessed / 0 deleted. Old-grouping
-reconstruction matched the real pre-fix module on 1,504/1,504 sampled
-columns. `legacy_guard_20260922` was removed unrun (unsafe: same delta).
-Do NOT land another engine-hashed change before applying these, or the
-predicates' from->to delta no longer covers everything.
-
-**Bake estimate:** ~35-40 h migrated vs ~57 h cold (the 09-20 chain took
-37.7 h: sweep pool sims 15.4 h (cache only 42% warm after the ebf5944
-shadow bump) plus 1.4 h mirror-slayer). Run the pre-dive checklist first.
+The signature-dedup exactness fix (a4ca14e), its migrations (b6e369a,
+applied 2026-09-25) and the 2026-09-26/27 bake + 2026-09-27 publish are done.
+Still open: no re-run of the statfx lab's plain-PvPoke cross-check against
+the 09-26/27 tensors is recorded -- run it once (expect 0 of 165 class pages
+mismatching; it was 25 of 165 on the 9ac12a2754a1 bake) to close the loop.
 
 ## Thievul CD -- residue (shipped record: CHANGELOG 2026-08-15/16 + TODO_archive)
 
@@ -157,61 +95,17 @@ shadow bump) plus 1.4 h mirror-slayer). Run the pre-dive checklist first.
   preserves the shipped bytes and documents it). Rebuilding with the
   current kit fixes both -- republishing is Michael's call.
 - `thresholds/thievul.toml` [cd_prep] retirement rides the
-  post-Worlds bundle (see the Worlds checklist below).
+  post-Worlds bundle (see the Worlds "dormant until 2027" section below).
 
-## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
+## Cramorant -- open items (record: CHANGELOG 2026-08-24..27, 2026-09-10..12, 2026-09-12, 2026-09-15, 2026-09-27)
 
-The 2026-09-12..15 reinvestigation record (Aegislash reuse-leak fix, sheet
-v6 certified 90/90 and merged, the 2026-09-15 merges + cache migrations
-and the gamemaster-vintage swap recipe) is in CHANGELOG 2026-09-12 and
-2026-09-15.
+The 2026-09-10..27 narrative (rebalance re-verify, deep re-verification
+campaign, stale-article audit, sheet v6 -> v7, certification + publish
+guard) is closed and condensed in CHANGELOG. What stays here is the standing
+runbook and the genuinely open items.
 
-**Michael's three open decisions** (leave as-is until answered):
-
-- **Guzzlord 2v2: documented cost or target?** Shipped: -1559 win-cells,
-  +72.6 mean on GL Dive+Fly 2v2 nobait -- the rush pads rating onto lost
-  fights (258 -> 420) and pays with 504-519 razor wins. RECOMMENDATION:
-  documented cost. It passes the bar (both slice metrics positive), every
-  gate retune that removes it fails the UL Dive+Fly holdout by -320..-830
-  net, and it is one opponent. If "target": the only lever is the 2v2 gate
-  (M5 in the deep-vet doc), which means a GL-only conditional and a new
-  campaign; nothing in v6 changes.
-- **Gate-column refactor.** The referee re-derived that `gate on iff
-  opp_start_shields >= my_start_shields` reproduces all 9 rows.
-  RECOMMENDATION: yes, but as a behaviour-neutral hygiene commit AFTER v6
-  ships (own engine-hash bump with an always-true blessing predicate, like
-  `neutral_batch_20260810`), together with deleting the three dead
-  constants (`_POGODIVES_GATE_DPT_MAX`, `_POGODIVES_GATE_MIN_ENERGY`,
-  `_POGODIVES_TANK_CHEAP_FRAC`) and their `cmp_dpt`/`cmp_dpt_e`/
-  `cmp_ready_dpt`/`cheap` branches; needs `tests/test_pogodives.py`'s
-  synthetic rows and `cramorant_sensitivity.py` updated. If "no": nothing
-  changes; the sheet stays a 9-row table with per-row gate strings.
-- **Report 9 (PvPoke `hasActed` survives `Pokemon.reset()`).** Draft text:
-  `docs/pvpoke_bug_reports.md` Report 9; a standalone copy is in
-  `~/coding/reports/pvpoke-report9-hasacted-2026-09-15.html` (card on
-  pogo-reports.html). RECOMMENDATION: file it -- browser-verified,
-  one-line fix, and it plausibly explains Report 3's unresolved 429-vs-510
-  from July. If filed: note the issue number in `docs/pvpoke_bug_reports.md`
-  and, once PvPoke fixes it, the Lapras page-level pin (446) in
-  `tests/test_pvpoke_sandbox.py` and the article test's run1==run2 gate
-  start failing -- delete the pin and keep the gate. If not filed: nothing
-  changes; our verifier already emulates the page.
-  Michael 2026-09-12: "make report 9 a TODO for later". Follow that file's
-  filing conventions; check the issue tracker for a duplicate first.
-
-**Lens-grid item, OPEN: the data-cache TTL keeper.** A launch-time
-preflight should refuse a bare `run_website_dives.py` run without the TTL
-keeper, or the runner should own the keeper. 88bec7b (2026-09-20) pins the
-data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
-a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
-letting the live gamemaster refresh mid-bake -- is still unpinned.
-
-**Post-bake Cramorant verification -- DONE 2026-09-27** (CHANGELOG 2026-09-27
-"PoGoDives sheet v7"): the certifier found one uncertified page (GL Peck /
-Fly + Surf, entered via the 09-17 pool regeneration), sheet v7 fixed its 0v1
-row, both pages were re-dived and re-certified (720 cells, 0 failures,
-selftest 5/5 exact), the strategy article re-rendered, and the site published
-2026-09-27 18:4x. Standing runbook after every bake that touches Cramorant:
+**Standing runbook after every bake that touches Cramorant** (post-bake
+verification last DONE 2026-09-27, sheet v7; the site published 2026-09-27):
 
     python scripts/cramorant_certify.py --league both --selftest 5 --out \
         userdata/certify/cramorant_record.json
@@ -222,197 +116,75 @@ selftest 5/5 exact), the strategy article re-rendered, and the site published
 `publish_website.sh` runs the last check itself and refuses to publish a
 rendered Cramorant page that is missing from, or differs from, the record.
 
-- **DEEP RE-VERIFICATION CAMPAIGN (started 2026-09-12, Fable's first look
-  at the strat; Michael: "we're free to vet things deeply").** Instruments:
-  `scripts/cramorant_certify.py` (strict bar over the FULL 720-cell grid
-  from the dive tensors, seconds; `--selftest N` proves the tensors are
-  today's engine) and `scripts/cramorant_mini_sweep.py` (one tensor slice
-  re-simmed through the production path with knob / sheet-row overrides;
-  `--check-tensor` must be integer-exact at shipped knobs before any
-  variant is trusted; coprime `--stride` for screens, 1 for certification).
-  First full-grid read (GL page baked 2026-09-12, UL page 2026-09-11, both
-  new engine): 716/720 cells pass, 4 FAIL -- GL Peck/Hydro Pump+Surf 2v2
-  no-bait (both opp-IV modes, both caps), mean -3.3/-4.2, driven by
-  Corviknight (-3835 flips, -324 mean) and Shadow Corviknight; the v5
-  certification never had that build in GL. The UL 0v1 Dondozo "-2" does
-  NOT exist at full resolution (only Jellicent is negative there, on
-  rating); it was a single-spread artefact of the PvPoke-default IV run.
-  Sequence: (1) mechanism-trace the failures and the big hidden
-  per-opponent losers (GL 1v1 Mandibuzz/Umbreon on Dive+HP, GL 1v2
-  Snorlax / Shadow Corviknight, UL 1v1 Snorlax / Miltank), (2) propose
-  mechanism-not-names row changes, screen at coprime stride, (3) certify
-  changed rows at stride 1 once the rebake frees the cores, (4) THEN new
-  showcases and the article prose pass. Full-res compute waits for the
-  rebake; tensor reads and stride screens do not.
+**Michael's open decisions** (leave as-is until answered):
 
-  **STATUS 2026-09-12 late: sheet v6 IMPLEMENTED on the branch** (13-agent
-  campaign; record: `docs/validations/2026-09-12_cramorant_deep_vet.md`).
-  Two row changes -- (1,0) `lead_ready_ko` (terminal-KO guard), (2,2)
-  `lead_ready_chip` (last-shield "can they chip us" guard, division-free);
-  everything else kept, 2v1 stays exempt, Dondozo documented as a boundary
-  cost (19/4096 razor ties, 0 net flips), not an exception. Stride-13 screen
-  of the changed rows over all 160 slices: 0 bar failures, the 4 failing GL
-  cells go -3.36/-4.27 -> +3.05/+3.35 mean, every top-SP lens >= 0 (worst
-  2v2 +1.65, 1v0 +0.03); 2v2 total net +77,153 -> +77,243, 1v0 unchanged.
-  Stride-61 adjacency: all 560 slices of the 7 unchanged rows identical to
-  shipped. Costs to disclose: UL Peck/Surf 2v2 net +1057 -> +911 (mean
-  -0.7), UL HP/Surf 2v2 bait -154 net, GL Dive+Fly 2v2 mean -0.003; the KO
-  guard is NOT a perfect GL no-op when threaded (GL 1v0 Dive+Surf / HP+Surf
-  mean -0.008 / -0.006, net unchanged) -- wrapper-to-threaded drift, as the
-  playbook warns. Stride-1 on the 15 priority slices (both failing GL
-  cells, GL top-SP margins, all 8 UL HP+Surf 2v2 slices, UL 1v0 lenses):
-  15/15 pass, failing cells -3.3/-4.2 -> +3.09/+3.24 mean, cost = UL
-  HP+Surf 2v2 bait mode -1200..-2000 win-cells/slice (mean flat).
-  REMAINING: (a) stride-1 re-certification of the other 75 changed-row
-  slices (`cramorant_recertify.py --scenarios 2v2,1v0
-  --stride 1`, ~4-6 h serial under load; parallelise once the rebake frees
-  cores); (b) merge order after the rebake is published: Aegislash fix
-  (2e8d36b, predicate species-startswith-Aegislash), then the v6 rule
-  commit (Cramorant-only, predicate = the pogodives case registry), each
-  alone on its hash bump; (c) rebake the Cramorant pages and run
-  `cramorant_certify.py --league both` as the ship gate; (d) THEN new
-  showcases (the renderer re-picks from the survivors automatically) and
-  Michael's prose pass; (e) hygiene commit deleting the three dead
-  constants (needs test_pogodives synthetic rows + cramorant_sensitivity
-  updated). MICHAEL'S CALLS: Guzzlord 2v2 and the gate column are the
-  open decisions above; P-C (KO guard at 1v1, measured positive in GL)
-  and P-D (constant-free 1v2 `lead_drained`, costs most of the row)
-  next cycle.
-- **LIVE ARTICLE STALE -- needs Michael's regen-vs-remove call (found
-  2026-09-12).** Michael clicked the GL-vs-Jellicent showcase pair and both
-  links showed the same 642 win. Audit
-  (`userdata/analysis/2026-09-12_cramorant_showcase_audit/` in the clone):
-  the ENGINE is fine -- our plain-PvPoke sim reproduces PvPoke's AI exactly
-  on all four showcase cells (481 / 642 / 427 / 297) -- the ARTICLE is stale
-  in three independent ways: (1) the four sandbox links were hardcoded
-  2026-08-27 with the pre-e6827a0 turn clock, so on today's pvpoke.com they
-  replay 634 / 642 / 493 (a LOSS) / 614 instead of the advertised 674 / 666
-  / 541 / 573; (2) the Jellicent 2-1 premise is gone -- PvPoke's own plan
-  now WINS it (Shadow Ball 100->90) and the sheet exempts (2,1), so "our
-  line" IS PvPoke's there; (3) Blastoise's PvPoke default moveset moved
-  Rollout -> Bite, so that showcase simmed an off-meta fight. Fixed in the
-  renderer (computed + gated showcases, see the encoder note below; GL
-  replacement = Mandibuzz 1-1, 460 -> 686, PROPOSED, Michael to confirm or
-  pick another from the candidate list in the audit dir). STILL STALE and
-  NOT touched (ship-mode prose, Michael's editorial pass): the cheat-sheet
-  2-1 row (describes the retired ready-nuke window; the sheet now plays
-  plain PvPoke there), the 1-1/1-2 row's "lead of 40+ percentage points"
-  (constant is inert), the hero's "certified never worse ... in any of the
-  nine shield scenarios ... on both win rate and average battle rating"
-  (UL 0v1 is -2 win cells, the accepted Dondozo exception), the Methods
-  "no negative cell shipped", and the UL "honest flags" paragraph's 2-1
-  headroom framing. Per the 2026-08-31 rule (no staleness markers; a
-  no-regen article is REMOVED), the live page should either be re-rendered
-  after Michael's prose pass or taken down until then. Re-render also
-  refreshes every tensor-derived number from the rebaked dives.
+- **Guzzlord 2v2: documented cost or target?** GL Dive+Fly 2v2 nobait:
+  -1559 win-cells, +72.6 mean (the rush pads rating onto lost fights and
+  pays with 504-519 razor wins). RECOMMENDATION: documented cost -- it
+  passes the bar, and every gate retune that removes it fails the UL
+  Dive+Fly holdout by -320..-830 net. "Target" means a GL-only 2v2 gate
+  conditional (M5 in `docs/validations/2026-09-12_cramorant_deep_vet.md`)
+  and a new campaign.
+- **Gate-column refactor.** `gate on iff opp_start_shields >=
+  my_start_shields` reproduces all 9 rows. RECOMMENDATION: yes, as a
+  behaviour-neutral hygiene commit on its own engine-hash bump
+  (always-true blessing predicate, like `neutral_batch_20260810`), together
+  with deleting the three dead constants (`_POGODIVES_GATE_DPT_MAX`,
+  `_POGODIVES_GATE_MIN_ENERGY`, `_POGODIVES_TANK_CHEAP_FRAC`; still in
+  `src/gopvpsim/battle.py` and `scripts/cramorant_sensitivity.py` as of
+  2026-09-27) and their `cmp_dpt`/`cmp_dpt_e`/`cmp_ready_dpt`/`cheap`
+  branches; needs `tests/test_pogodives.py`'s synthetic rows and
+  `cramorant_sensitivity.py` updated.
+- **P-C / P-D, next cycle** (deep-vet doc): P-C = the KO guard at 1v1
+  (measured positive in GL); P-D = the constant-free 1v2 `lead_drained`
+  (costs most of the row).
+- **Jumpluff / Kingdra at 0v1 (sheet v7's accepted cost, CHANGELOG
+  2026-09-27).** v7's `surf_gate_dpe` 2.25 excludes the two-type-step ratios
+  (~2.65-2.75) that let the (0,1) tier throw a resisted Surf into Araquanid;
+  Jumpluff and Kingdra sit in the same ratio band, so they now fall back to
+  plain (about -165 rating on fights Cramorant loses anyway, 0 flips; page
+  mean +12.5 -> +10.5). Accept as documented, or look for a discriminator
+  that separates them from Araquanid (Mirror Coat) -- a new campaign, not a
+  retune.
+- **Article prose pass (ship-mode, Michael's).** The 2026-09-27 re-render
+  refreshed every tensor-derived number, but the fixed prose in
+  `scripts/render_pogodives_strategy_article.py` still carries claims the
+  2026-09-12 audit flagged: the hero's "certified never worse ... in any of
+  the nine shield scenarios ... on both win rate and average battle rating",
+  the 1-1/1-2 row's "lead of 40+ percentage points" (the LEAD constant is
+  inert, 460a63e), the 2-1 cheat-sheet row, Methods' "no negative cell
+  shipped", and the UL "honest flags" 2-1 headroom framing. The audit's
+  counter-example to the hero and Methods claims (UL 0v1 Dondozo -2) was a
+  single-spread artefact at full resolution (deep-vet doc), and the
+  2026-09-27 certification reads 0 bar failures over 720 cells, so those two
+  may now be defensible; re-read them against that record, not this note.
+  Per the 2026-08-31 rule, stale public prose gets fixed or the page comes
+  down. Outside this repo: the `~/coding/reports/pogo-reports.html`
+  Cramorant card still states the v4 "every start scenario >= 0" claim.
+- **PvPoke Reports 8 and 9 -- drafted, NOT FILED**
+  (`docs/pvpoke_bug_reports.md`). Report 9 (`hasActed` survives
+  `Pokemon.reset()`; Michael 2026-09-12: "make report 9 a TODO for later";
+  standalone copy `~/coding/reports/pvpoke-report9-hasacted-2026-09-15.html`)
+  plausibly also explains Report 3's unresolved 429-vs-510. Report 8 = the
+  two `move.moveID` typos (the draft cites ActionLogic.js:368 and :1239;
+  on the local pvpoke checkout, 78b1e66db, they sit at :368 and :1255 --
+  the latter makes defenders never shield a lethal Cramorant Dive). Both
+  bugs are still present there. Check the
+  tracker for duplicates first; if Report 9 is fixed upstream, the Lapras
+  page-level pin (446) in `tests/test_pvpoke_sandbox.py` and the article
+  test's run1==run2 gate start failing -- delete the pin, keep the gate.
 
-  SECOND FINDING, same day, browser-verified: pvpoke.com runs a sandbox
-  link's battle TWICE (runSandboxSim, then startBattle's setTimeout) and
-  `Pokemon.reset()` never clears `hasActed`, so the Pokemon that acted on
-  run 1's KO turn loses its turn-1 action in run 2 and every scripted
-  action on the old parity is dropped. Our verify_url gate ran the engine
-  ONCE, so it passed links the site renders differently (Azumarill 690
-  -> site 547; Blastoise 624 -> 515; the 09-10 Lapras "fixed" link 662 ->
-  site 446, a loss). verify_url now emulates the page (two runs) by
-  default (`page=False` = engine-level); the Lapras test pins BOTH
-  numbers so a PvPoke fix is noticed; upstream draft = Report 9 in
-  docs/pvpoke_bug_reports.md (NOT filed; likely also explains Report 3's
-  unresolved 429-vs-510). Showcases were re-picked from the cells that
-  survive the faithful gate (scan_candidates_faithful.py in the audit
-  dir): GL Toxapex 0-0, GL Feraligatr 1-1, UL Shadow Feraligatr 2-2, UL
-  Talonflame 1-2 -- all PROPOSED, Michael to confirm. All eight links were
-  opened on pvpoke.com in Chrome on 2026-09-12 and show the advertised
-  numbers (630/478, 630/492, 598/477, 573/297).
+**Lens-grid item, OPEN: the data-cache TTL keeper.** A launch-time
+preflight should refuse a bare `run_website_dives.py` run without the TTL
+keeper, or the runner should own the keeper. 88bec7b (2026-09-20) pins the
+data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
+a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
+letting the live gamemaster refresh mid-bake -- is still unpinned.
 
-  Three more things the adversarial pass (5 agents + critic) turned up:
-
-  * HOT -- the rebake running in the MAIN tree re-rendered the article at
-    10:23 on 2026-09-12 from main's renderer, i.e. WITH the stale hardcoded
-    block. `publish_website.sh` after this bake would republish the broken
-    links. Land `cramorant-reinvestigate` (or at least its renderer +
-    driver commits) and re-render the article before any publish that
-    includes it; or exclude the article from the publish.
-  * The article's NUMBERS were rendered under `mechanics='legacy'`: its
-    surviving values (494/674, 427/541, 297/573) are today's legacy-clock
-    values byte-for-byte, and none of showcase 1's or 3's moves changed
-    in the rebalance. The default flipped to 'new' on 2026-09-09 (7e6a82b),
-    13 days after the block was hardcoded. So EVERY number on the page
-    (ledger tables, deltas, correlations, staircases) is a legacy-clock
-    number; the re-render from the rebaked (new-clock) dive pages fixes
-    all of them at once. The links, by contrast, broke because of PvPoke's
-    post-charge cooldown (on master since the 2026-09-08 Twilight Trails
-    merge acb3ce461, 500 ms), and Jellicent because of Shadow Ball 100->90
-    (same merge).
-  * ENCODER RULE CORRECTED (scripts/pvpoke_sandbox.py, timeline_to_actions):
-    the 2026-09-10 fix shifted by the COUNT of prior charged actions, but
-    Battle.js:540 applies ONE 500 ms cooldown per ROUND with any charged
-    move, so a same-turn pair (CMP double throw) over-shifted everything
-    after it by +1 -- 17/17 such cells mis-encoded (Cramorant vs Swampert
-    UL 0-0: sim 703, link 815). Now shifts by DISTINCT prior resolved
-    turns; pinned by test_same_turn_charged_pair_shifts_one_turn_not_two.
-    None of the four showcases had a same-turn pair, so no published link
-    was wrong because of this.
-  * CERTIFICATION TOOL WAS BROKEN IN GL: `cramorant_policy_lab.load_pool(
-    'great')` raised AttributeError on the two Thievul `charged=` rows
-    added 2026-09-10 (the parser returns a list; the lab split it as a
-    string). Fixed + tests/test_cramorant_policy_lab_pool.py. Note for the
-    reinvestigation: the 2026-09-10 re-verify covered ONE moveset
-    (Peck/Dive+Fly) and ONE IV spread (PvPoke default) against a GL pool
-    that has since changed (rank cut 50->60, megas admitted, Thievul split),
-    while the article claims certification over all five movesets x 4096
-    spreads. Re-certifying at the article's own resolution is the first
-    task of the reinvestigation once the rebake frees the cores.
-  * Other stale surfaces found: ~/coding/reports/pogo-reports.html's
-    Cramorant card and gopvpsim-cramorant-pogodives-vs-pvpoke-2026-08-25.html
-    still claim "certified, no negative cells" (UL 0v1 Dondozo says
-    otherwise); the article's meta.toml description says "All numbers
-    recomputed from the dive tensors at render time" (true only once the
-    branch lands). Dive pages carry no sandbox links and no prose claims,
-    so they self-heal on rebake.
-- REBALANCE re-verify: **RUN 2026-09-10; failed, then FIXED (option A).**
-  (2,1) is exempt again -- every firing setting was negative, and exempting
-  is strictly better than the v4 rule (same total wins, better mean).
-  ONE ACCEPTED EXCEPTION remains: UL 0v1 is -2 win cells (both Dondozo) with
-  +8.3 mean, kept because the -2 is exactly offset by +2 in GL.
-
-  CORRECTED 2026-09-10: this is PRE-EXISTING, not a rebalance regression, and
-  an earlier note here wrongly blamed the turn ordering. Measured: the cell is
-  byte-identical under legacy and new mechanics; neither side's kit changed in
-  any sim-relevant field (Cramorant's only Gulp Missile diff is an `unlisted`
-  display flag); and the whole slice is the SAME -2 against the June 2026 pool
-  that predates the August campaign. The strat simply turns a 515 win into a
-  500/500 tie vs Dondozo -- a standing cost of dive-early into a bulky
-  opponent. NOT a re-fit input. Original failure notes:
-- REBALANCE re-verify: **RUN 2026-09-10, and it FAILED the bar.** Still
-  net-positive overall (+76 win-cells vs baseline) but UL 2v1 is NEGATIVE
-  (-1.325 mean, all of it Jellicent) and UL 0v1 loses two win cells (both
-  Dondozo). Separately the LEAD constant is now inert -- lead 30/35/40/45 and
-  a static control differ in 12 of 2,394 cells, so the fitted 40 in the
-  shipped sheet buys nothing. Sheet v5's certification does NOT carry over;
-  do not re-publish on the old bar. Full writeup + the caveat that I did not
-  reproduce their exact margin metric:
-  `docs/validations/2026-09-10_cramorant_strat_reverify.md`. Original note:
-- REBALANCE re-verify (Michael 2026-08-25): a big move rebalance is
-  expected ~2 weeks post-Worlds. When it lands: gamemaster-delta
-  migration as usual, PLUS re-run the policy-lab verification corpus
-  (~10 min) -- the strat's fitted constants were tuned on
-  pre-rebalance move data, and the EDGE constants (0.022 DPT, 1v0
-  aggr 2.0, 2v1 dpt_max 0.0155, 55-energy one-opponent patch)
-  re-verify at FULL resolution with a worst-slice margin target of
-  +0.5 (disclosures: docs/validations/cramorant_strict_bar_2026_08_26
-  .md). This is also the standing argument for mechanism-not-names
-  round-6 discriminators (they re-derive from new numbers at battle
-  time).
 - OPEN VALUE (next campaign): UL Dive+Surf 2v2 under the OLD tank was
   +15-21k flips at passing rating; a per-build tank discriminator
   would recover it (sheet v5 ships zero there).
-- Upstream bug-report candidates (pvpoke): the two `move.moveID`
-  typos (ActionLogic.js:368, :1239 -- the latter makes opponents
-  never shield a lethal Dive, plausibly inflating published Cramorant
-  scores; H4 in docs/cramorant_policy_plan.md measures it). Draft
-  after checking whether the campaign produced the H4 numbers;
-  follows docs/pvpoke_bug_reports.md conventions.
-- Hard-counters lists: RE-DERIVE from the sheet-v5 rebaked tensors
+- Hard-counters lists: RE-DERIVE from the current-sheet (v7) tensors
   before any public surface carries one. Both earlier rosters (the
   static-tank "five losers" and the lead40-derived set) predate the
   shipped sheet.
@@ -443,75 +215,31 @@ Cramorant (GL rank 13) enters `gl_top50_plus_cs.txt` / `ul_top60.txt`
 as an OPPONENT for other species' dives -- is a Michael curation call;
 until then no shipped dive sims against it.
 
-## Worlds 2026 -- surfaces FROZEN through Aug 30; post-Worlds checklist
+## Worlds 2026 -- code DORMANT until 2027 (record: CHANGELOG 2026-08-10..27, 2026-08-31..09-25)
 
-Worlds is Aug 28-30. The full arc (sessions 1-5, the 08-14 publish,
-the Thievul moveset fork, the robustness/mirror deep pages, Greninja +
-Annihilape, verify_worlds green at 555 pair pages / 0 deferred) is
-recorded in CHANGELOG 2026-08-10..27 and docs/TODO_archive.md; plan of
-record: docs/worlds_prep_plan.md.
+Worlds (Aug 28-30) is over. Michael 2026-09-25 (perf-doc Q4 "no"): the
+Worlds code, tests and `worlds/planes` stay in the repo DORMANT until 2027
+-- no retire/delete pass now. The pages are off the site (no `worlds*.html`
+in `userdata/website/`; publish rsyncs with `--delete`). Plan of record for
+a revival: `docs/worlds_prep_plan.md`. Still open:
 
-STANDING RULES while the surface lives: publish only with Michael's
-explicit per-instance go; long bakes detached + run-to-completion;
-legacy engine only, both bait modes, never the sweep cache, no
-`*_great.toml`; before ANY Worlds render, re-pin the gamemaster:
-`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
-~/Documents/gopvpsim_cache/gamemaster.json` (the cache currently holds
-the LIVE blob, restored + hash-verified 2026-08-27; while a pin is up:
-no Cramorant sims, and ~63 Cramorant-family test failures are expected
-pin artifacts).
-
-POST-WORLDS checklist (after 08-30):
-
-- DECIDED (Michael, 2026-08-31): the Worlds surfaces **RETIRE at the
-  Twilight Trails site update** -- "I don't think anyone will ever look
-  at it post-Worlds." Publish-path unblocking is DONE ahead of that:
-  `verify_worlds.py` is out of the `run_ship_gates.py` roster (it
-  failed from main on all six stamps, and because the roster is shared
-  by all four entry points it blocked EVERY publish path, not just a
-  Worlds one), and the `publish_website.sh` Worlds re-render is now
-  opt-in behind `WORLDS_RERENDER=1`. The 593 pages stay published
-  exactly as shipped until the retire lands; `scripts/verify_worlds.py`
-  is unchanged, so a rebake can still run it by hand.
-  Correction to the old note here: the pinned worktree did NOT green
-  the gate either -- the gamemaster stamp reads the machine-level
-  cache, which holds the live blob. There was no clean publish path
-  from any tree.
-  NB the next publish must carry a full dive-page re-render -- the
-  publish gate sentinel `userdata/.cards_rerender_pending` is SET as of
-  2026-08-31 and blocks it until then. Two render-only fixes are
-  waiting: (a) dead tooltips on the shipped pages' best-buddy L51 half
-  (hydration bug fixed 061d93c); (b) the cup dive banner's false "this
-  dive is kept as a dated archive" claim, removed from deep_dive.py
-  2026-08-31 -- the 5 shipped *-equinox-cup pages still render it.
-  Neither touched file is engine-hashed, so there is no sim cost.
-  BEFORE re-rendering, settle the vintage question: the render path
-  reads LIVE gamemaster/rankings while scores come frozen from the
-  blob, so re-rendering a page that advertises "snapshot as of
-  2026-08-26" against today's gamemaster mixes vintages.
-- Worktree `gopvpsim-worlds`: REMOVED 2026-08-31. Its only working-tree
-  delta was `scripts/worlds_meta.py`, verified byte-identical to
-  `main` before removal (the Greninja/Annihilape editorial was already
-  committed); the three symlinks were unlinked individually first so
-  nothing could follow them into the main repo.
-- Retire together: `thresholds/thievul.toml` [Thievul.cd_prep], the
-  worlds/meta.toml `injected_move_ids` declarations + their on-page
-  disclosures (build_worlds_pages.py:569-660), and the 4 injection
-  guards in tests/test_worlds_bake_guards.py (3 currently
-  auto-skipping under the live gamemaster, as designed).
-- Aegislash rebake decision: the Cramorant port changes
-  aegislash_shield modeling (161 measured cell flips vs Shadow
-  Sableye; cold rebake = 57h). LEGALITY INPUT (verified 2026-08-27,
-  Play! handbook second-Tuesday rule): Cramorant debuted 08-18 ->
-  eligible 09-01 -> NOT Worlds-legal, so the question is purely
-  Aegislash sim fidelity; if the surface retires after 08-30 the
-  rebake case is weak. (Thievul's Icy Wind: eligible 08-25 -> legal;
-  meta.toml's conclusion stands.)
-- cmp_atk 1-ULP shadow-tie fix (deferred past Worlds; Michael
-  2026-08-10): carry pre-shadow atk on BattlePokemon; own hash bump +
-  a test recording the pre-fix values + a no-shadow-either-side
-  migration predicate -- do NOT fold into a neutral batch. Pinned by
-  tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real.
+- **Retire-together bundle (rides the 2027 decision):** `thresholds/thievul.toml`
+  `[Thievul.cd_prep]` (still present 2026-09-27), the `worlds/meta.toml`
+  `injected_move_ids` declarations + their on-page disclosures in
+  `build_worlds_pages.py`, and the injection guards in
+  `tests/test_worlds_bake_guards.py`.
+- **Before ANY Worlds re-render:** re-pin the gamemaster the pages were baked
+  at (`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
+  ~/Documents/gopvpsim_cache/gamemaster.json`), restore the live blob after;
+  the render path reads live gamemaster/rankings while scores come frozen
+  from the blob. `WORLDS_RERENDER=1` is the opt-in in `publish_website.sh`;
+  `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
+  hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
+  new-mechanics bake.
+- **Standing Worlds bake/publish rules (carry into any revival):** publish
+  only on Michael's explicit per-instance go; long bakes detached and
+  run-to-completion; Worlds modules never touch the sweep cache (pinned by
+  `tests/test_worlds_bake_guards.py`); no `*_great.toml` from a Worlds bake.
 
 DECISIONS / EDITORIAL for Michael:
 
@@ -536,14 +264,11 @@ DECISIONS / EDITORIAL for Michael:
   25-vs-12 wording, CSV dropped-row accounting, raw key fragments in
   the answers dump, sim-count phrasing.
 
-Non-gating polish (open): (a) a11y -- badge text 4.36:1 in
-pokemon-dark; hub matrix mini-grids are color-only (cheat sheets are
-the text alternative); (b) optional session-6 survival strip (scoped
-2026-08-11: tied to the reach table's LIVE plan only, one row per
-attainable incoming fast tier, fast-pressure-only arithmetic
-labeled, own adversarial round before ship); (c) optional
-pooled-usage display (usage_recent_pooled_pct in meta.toml, unshown).
-Planning artifacts preserved in userdata/worlds_planning/.
+Non-gating polish, dormant with the rest: a11y (badge text 4.36:1 in
+pokemon-dark; hub mini-grids color-only), the optional session-6 survival
+strip (scoped 2026-08-11), the optional pooled-usage display
+(`usage_recent_pooled_pct`, unshown). Planning artifacts:
+`userdata/worlds_planning/`.
 
 ## Condensed-meta funnel bundle (queued 2026-08-19, Michael)
 
@@ -651,6 +376,13 @@ overrides). Record: CHANGELOG 2026-09-02.
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
+**Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
+first -- measure the sped-up render layer on its own; this note is the only
+written record of that call). Verified
+2026-09-27: no population-sweep code has landed on main since c2bd1e9
+(09-22), so the prerequisite below is still unbuilt and still gates the
+next bake that carries it.
+
 **Clones cleaned up 2026-09-22:** the seeded-lattice and mirror-proto
 prototypes now live as branches `experiment/seeded-lattice-2026-09-17` and
 `experiment/mirror-proto-2026-09-21` in this repo (local only); the three
@@ -715,213 +447,98 @@ Shape (bake-side, changes the blob schema -- own bake, own hash bump):
   that the per-scenario mirror-vs-population numbers reproduce from the
   stored scores; the vintage stamp covers it.
 
-## BUILD BRIEF (2026-09-12): decisions taken, what is next, Cramorant hand-off
+## "Which one to build?" -- what is next (record: CHANGELOG 2026-09-12..22)
 
-Status: `scripts/deep_dive_brief.py` + tests merged to main (b6e6263), standalone
-only (HTML + JSON + sweep under `userdata/analysis/2026-09-12_build_brief/`).
-Report: `~/coding/reports/gopvpsim-build-brief-2026-09-12.html`. Design of
-record: `docs/expert_verdict_plan.md`.
+Design of record: `docs/expert_verdict_plan.md`. The build brief (v2/v3),
+the spread-sets and builds-lattice analyses and the section's v4 (rounds
+1-10) are shipped; see CHANGELOG. Open:
 
-Michael's answers, 2026-09-12 evening:
+- **Retire the flavor guide's `[Recommended]` badge AND the "almost any will
+  do" catch phrase** (Michael 2026-09-12, D10: two separate commits "when the
+  brief ships"). NOT done: both still in `scripts/deep_dive_narrative.py`
+  (:52, :1368, :1399) and the badge is on all 136 local dive pages
+  (2026-09-27).
+- **Shield scenarios in the section:** the v4 Build-criteria presets (all
+  nine equal / even shields / 1v1 only) partly cover follow-up (1); a
+  section-own selector over any one of the nine scenarios is not built.
+  Follow-up (2), a usage prior over shield states (lead / safe swap /
+  closer), needs an expert-supplied or usage-derived prior the sim does not
+  have ("lead-and-closer" placeholder was skipped in v4).
+- **Spread sets** (report `~/coding/reports/gopvpsim-spread-sets-2026-09-15.html`):
+  (1) the per-arm set-keeping cut (18 per arm) still uses the old interest
+  score; adopt the material-cells ranking and re-run the corpus (~2.5 h,
+  nice'd); (2) extend the score column to the corpus; (3) export explicit
+  IV lists to gobattlekit behind its four-target cap (the color-group plot
+  half of this shipped as v4). Not re-verified item by item after v4:
+  `deep_dive_builds.py` still ranks kept sets by `rank_interest`, and the
+  gobattlekit export had not been run as of 2026-09-22.
+- **Builds lattice** (report `~/coding/reports/gopvpsim-builds-lattice-2026-09-16.html`):
+  (1) the lattice searches only the 18 named sets per arm (a hand-built
+  (Def, HP) box out-guarantees every lattice region on 45 arms: the
+  generators are the binding constraint); (2) decide the material /
+  all-modes bars for headlines (the median build guarantees ZERO cells
+  that are both material and survive all opponent IV/bait modes); (3)
+  objective B under the prior needs the per-scenario win cube. Item (4),
+  the product, shipped as v4.
+- **Rankings-vintage sensitivity** (9adc094, e9c70ed): opponent PvPoke
+  ranks are a LIVE read at render time (`build_opp_meta_ranks` ->
+  `get_rankings_for`), so a rankings refresh can change a page's verdict
+  with no sim change (2026-09-15: Charjabug 60 -> 41 deleted Melmetal's
+  floor). Bakes now see one vintage via the chain's data-cache pin
+  (88bec7b; the direct-launch gap is the TTL-keeper item in the Cramorant
+  section). Proper fix still open: stamp opponent facts (ranks, default
+  builds) into the blob at dive time (expert_verdict_plan Phase 0 "blob
+  stamping") so replay re-renders cannot drift; other test modules that read
+  live rankings were not audited.
 
-1. **Bulk floors (Def / HP lines) = v3, standalone, before integration.** Same
-   three primitives (exact / one-sided gate / near-exact) on Def and HP with
-   bulkpoint mechanism labels. Altaria (Def >= 148.29 vs 2v2 Clodsire) and
-   Furret (Def >= 102.06 vs 1v1 Lapras) are the acceptance cases.
-2. **Placement (D11): split by outcome.** Above the scatter as the first IV
-   Recommendations block when a line (or a cost-demoted line) exists; inside
-   the collapsed Dive Analysis block on pure negatives.
-3. **Flavor guide (D10): retire BOTH** the `[Recommended]` badge and the
-   "almost any will do" catch phrase when the brief ships, as separate commits.
-4. **Sequencing: Cramorant first.** Page integration of the brief WAITS until
-   the Cramorant strategy reinvestigation lands. v3 (standalone) may proceed.
-
-Naming + spread visibility (Michael, 2026-09-13): the section is called
-**"Which one to build?"** (not "build brief"; "verdict" and "recommended"
-stay reserved). Collapsed by default; the summary line is the question plus
-the headline's first sentence. Integration must make the line VISIBLE AS
-SPREADS: (1) example spreads in the first sentence ("... 148.10 attack, which
-6/9/7 at L50, 10/13/11 at L45.5 and 2218 other spreads reach"); (2) hover/tap
-on the number lists the top spreads by stat product with a "show all N"
-expander (reuse the flavor guide's Member IVs pattern); (3) a small in-section
-plot (SP rank vs wins; at-or-above-the-line filled, bulk alternative in its
-own color, rest muted; hover = IVs/level/stats/side of the line), drawn
-client-side like the cluster panels; plus the main scatter's color mode.
-
-Shield scenarios in "Which one to build?" (Michael, 2026-09-13): accepted
-as a middle point that the section is inert to the main plot's Shields
-dropdown (every fact in it is scenario-tagged and the floor is chosen across
-all nine; the y-axis is wins of 684). Follow-ups, in order: (1) a "scenario"
-control on the section's OWN selector (filter rungs to one scenario, y-axis
-= that scenario's wins, summary reworded), never coupled to the main plot's
-dropdowns; (2) the real synthesis: a usage prior over shield states (lead /
-safe swap / closer) so floor selection can weight cells and the headline can
-say "in the shield states Sableye usually sees". (2) needs an expert-supplied
-or usage-derived prior; the sim does not have one.
-
-SPREAD-SETS ANALYSIS DONE (2026-09-15; report
-`~/coding/reports/gopvpsim-spread-sets-2026-09-15.html`, artifacts + 112
-per-blob fact files with explicit member lists under
-`userdata/analysis/2026-09-15_spread_sets/`, ~246 MB, gitignored, not to
-keep forever). Michael's framing: SETS of spreads are the primitive (users
-check their mons against a set on the plot; gobattlekit gets explicit IV
-lists); descriptions are labels. Findings on the deduplicated corpus (108
-dives / 448 arms / 7944 named sets, pvpoke mode, L50):
-- Two-/three-stat structure beyond every single-stat threshold (atk, def,
-  hp AND stat product): 88% of arms have at least one such top-50 cell, but
-  the MAGNITUDE is small: 3.8% of decision cells, 1.8% after a materiality
-  bar (best single-stat rule wins the cell <= 95%). With only the four
-  brief-specified generators (no S5 boxes): 32% of arms.
-- Plain Sableye: the 863-spread 0v1 cluster wins Annihilape AND
-  Aegislash-Shield for every member; "atk >= 123.4 and HP >= 118" does NOT
-  (55%); the exact description is atk-floor + a Def-vs-HP staircase; the
-  genre's linear form "atk >= 123.4 and Def + 1.15*HP >= 255.88" fits at
-  J=0.98. Shadow Sableye's strongest cluster IS the floor set (2220).
-- Description shapes: 11% single threshold, 36% two-stat box, 15%
-  atk-floor + staircase, 36% list-only (at 95% fidelity 830 of those
-  rescued). The linear Def + k*HP family fits exactly 82 sets, 4% of the
-  hard sets at 99%, 14% at 95%: the list stays the primitive.
-- Frontier slope (corpus): median 0.54 Def per HP (q 0.36-0.80); the "1 HP
-  for 2 Def" ratio was Michael's paraphrase, not a RyanSwag quote; the
-  SHAPE is the genre's, the ratio is species-specific.
-- Score-only structure ("do better or worse"), ten dives: 12 of 486
-  (set, cell) pairs have non-overlapping p5-p95 score bands with no result
-  flip; strict separation never occurs.
-- gobattlekit: no schema change; `ivs = [[a,d,s],...]` already exists;
-  floors express lower bounds only, so 59% of sets need the explicit list;
-  the list is lossless only under the L50 cap; MAX_TARGETS=4 and file size
-  are the real constraints.
-OPEN: (1) the per-arm set-keeping cut (18 per arm) still uses the old
-interest score; adopt the material-cells ranking in spread_sets.py and
-re-run the corpus (~2.5 h, nice'd); (2) extend the score column to the
-corpus; (3) product: plot the named sets as color groups in "Which one to
-build?" with the collection overlay (the sets JSON is the input), and an
-export of explicit lists to gobattlekit behind the four-target cap.
-
-BUILDS LATTICE DONE (2026-09-16; report
-`~/coding/reports/gopvpsim-builds-lattice-2026-09-16.html`, artifacts under
-`userdata/analysis/2026-09-16_builds/`, 17 MB, re-runnable from the blobs in
-~5 min via builds_lattice.py; verify_builds.py re-derives 12 arms from the
-blobs with zero mismatches). "Builds, not lines": per (dive, moveset) the
-lattice of intersections (<= 4) of the top-8 named sets from the
-2026-09-15 spread-sets analysis; 2-3 builds per moveset = the region
-guaranteeing the most decision cells (primary), a FORK (disjoint region
-whose guaranteed cells differ, Jaccard < 0.8), and the rank-1 region
-(constructed as a (Def, HP) box when no lattice region holds rank-1).
-Corpus (108 dives / 448 arms / 993 builds): best region beats best single
-set by a median 6 guaranteed decision cells (88% of arms gain; 26% gain
->= 10); 79% of arms name a fork; the fork is the textbook "bulk side
-holding rank-1" on only 20% of fork arms (26% both sides carry an attack
-floor); the two objectives (region guaranteeing the most cells vs the
-single most-winning spread) pick different builds on 41% of arms, by a
-median 4 matchups vs 4.5 cells; 54% of builds are rule-quotable (30%
-two-stat box, 23% attack floor + printed Def-vs-HP staircase, 18%
-three-stat box), 23% list-only. Honesty: 23% of guaranteed (build, cell)
-pairs are cells the rest of the grid wins > 90% anyway; the median build
-guarantees ZERO cells that are both material and survive all opponent
-IV/bait modes -- one of those two bars must loosen before a headline.
-A shield-scenario prior (an explicit flat-defaulted knob) re-weights
-objective A directly: even-shields changes the leading build on 16% of
-multi-build arms, 1v1-only on 24% (partly size tie-breaks among tiny
-counts). Sableye shadow: primary atk >= 150.24 + Def >= d(HP) (61
-spreads, 55 cells) vs fork def >= 101.4 & HP >= 125 (114, 41 cells,
-holds rank-1); the grid's most-winning spread 7/2/14 is in neither.
-OPEN: (1) the lattice searches only the 18 named sets per arm (a
-hand-built (Def, HP) box out-guarantees every lattice region on 45 arms:
-the generators are the binding constraint); (2) decide the material /
-all-modes bars for headlines; (3) objective B under the prior needs the
-per-scenario win cube; (4) product: this is the v4 input for "Which one
-to build?" (builds as color groups + UpSet panel + explicit lists +
-collection overlay + gobattlekit targets).
-
-"WHICH ONE TO BUILD?" v4 + BUILD CRITERIA KNOB (Michael, 2026-09-16; in
-progress on branch wotb-v4 in the clone): the section shows 2-3 BUILDS
-(primary / fork / rank-1 region from the intersection lattice), not one
-line. A "Build criteria" dropdown in the scatter controls strip with THREE
-presets and no free weights: "All shields, equal" (default), "Even shields
-(0v0, 1v1, 2v2)", "1v1 only (open GBL lead)". The knob drives exactly three
-surfaces and the page says so: the section (ranking, selection, summary,
-headline, plot, UpSet), the Matchup clusters "all scenarios" partition
-(one precomputed per preset), and a NEW Shields entry "All (by build
-criteria)" (weighted wins); the old 'avg' entry is renamed "All (equal
-weight)" and never changes. All other sections stay all-nine-equal, with a
-one-line caption saying so. Section text self-labels the preset
-("[even shields]"). Preset persists in the URL hash. gobattlekit export
-stays at the default preset. Placeholder "lead-and-closer" prior: skipped.
-Gate before the rebake: Michael reviews the preview renders (Sableye pair
-+ Melmetal) and says go.
-
-RANKINGS-VINTAGE SENSITIVITY (found 2026-09-16 fixing test drift on wotb-v4,
-commit 9adc094): opponent PvPoke ranks are a LIVE read at render time
-(build_opp_meta_ranks -> get_rankings_for). The 2026-09-15 refresh moved
-Annihilape 30 -> 31 and Charjabug 60 -> 41; with RANK_GATE = 50 the newly
-eligible Charjabug cells deleted Melmetal's floor. So a rankings refresh can
-change a page's verdict with no change in sim data. Tests now freeze a
-rankings fixture (tests/fixtures/pvpoke_rankings_20260908.json, great+ultra
-only; cups raise loudly). For the next rebake: run through the chain wrapper
-/ TTL keeper so all 135 pages see ONE rankings vintage (the direct
-run_website_dives.py launch on 2026-09-12 did not). Proper fix, before the
-bake after this one: stamp opponent facts (ranks, default builds) into the
-blob at dive time (expert_verdict_plan Phase 0 "blob stamping", deferred), so
-replay re-renders cannot drift. Other test modules that read live rankings
-were not audited.
-
-Cramorant reinvestigation hand-off (for the session that picks it up):
-
-- Work in a LOCAL CLONE on a branch (`git clone ~/coding/gopvpsim
-  ~/coding/gopvpsim-cramorant`, branch `cramorant-reinvestigate`), the way
-  the moveset-rules and build-brief work was done. Read blobs / policy-lab
-  corpus from the main repo by absolute path; write outputs under the clone's
-  own `userdata/`. Python: `/Users/mglerner/coding/gopvpsim/.venv/bin/python`
-  run from the clone (direnv is not loaded there).
-- The strat lives in engine-hashed code. Do NOT edit engine files in the main
-  tree while a bake runs (mixed-vintage bake). Merge engine changes only after
-  the current rebake is published, then decide migration (localized predicate
-  vs cold re-dive) per the CLAUDE.md cache rules.
-- CPU: the dive rebake launched 2026-09-12 18:02 uses all cores
-  (`userdata/logs/2026-09/rebake_movesets_20260912.log`). Reading, analysis
-  and small lab runs are fine; full-resolution policy-lab corpus runs should
-  wait for it to finish.
-- Start from the Cramorant section above, `docs/strat_development_playbook.md`,
-  `docs/cramorant_policy_plan.md`, and
-  `docs/validations/2026-09-10_cramorant_strat_reverify.md`.
-
-## HIGH PRIORITY: parallelize the dive step (~13h/bake on the table)
+## PLAN ONLY: parallelize the dive step (re-scoped 2026-09-27: <=6.9 h ceiling, memory-bound)
 
 **PLAN ONLY -- do not implement without Michael's go** (his call 2026-09-12:
-"make a plan for it, but don't implement").
+"make a plan for it, but don't implement"). Was "HIGH PRIORITY, ~13h/bake";
+the 2026-09-25 render speedups (R1-R4, R3, the sweep-side rank-1 memo
+ea32bd9) shrank the serial tail this plan targets, so the prize is now
+smaller and the memory risk is the gating question.
 
-### Measured, on the completed 2026-09-10/12 Twilight Trails bake
+### Measured, on the 2026-09-26/27 bake (current numbers)
 
-`scripts/bake_timing_report.py <chain log>` over all 135 dives:
+`docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md` "Measured" (chain
+`overnight_20260926_102139.log`, 136 dives, pmset sleep windows subtracted):
+dive step **17.9 h awake**, of which the single-core render/analysis bucket is
+**6.9 h -> serial share 39%** (6.9 / 17.9); pool sims 11.0 h. The
+2026-09-12 version of this section reported 13.4 h serial / 32% of a 41.8 h
+step, from the old marker-inheriting report, which undercounted serial time
+(on the 09-20 bake it read 15.5 h serial vs 18.6 h by per-dive attribution,
+per 1f9ba3c) -- compare absolute hours, not shares. Absolute serial time fell
+from 19.0 h (09-20, same 136 dives) to 6.9 h, and the sweep-side memo
+(ea32bd9, merged after that bake, not yet in a measured bake) should take
+roughly another 2-2.4 h off it. `run_website_dives.py:304` still launches
+each dive with a blocking `subprocess.run` in a loop -- strictly serial, no
+`--jobs` -- so during those hours 17 of 18 cores idle.
 
-| bucket                | time      |
-| --------------------- | --------- |
-| parallel (sweeps)     | 28.4h     |
-| serial (render tails) | **13.4h** |
-| **serial share**      | **32%**   |
-
-Totals reconcile with the step's own 150,385s = 41.8h, so the split is
-trustworthy. Two hard CPU readings behind the buckets: a sweep phase showed a
-20-process tree at 1626% CPU (~16.3 of 18 cores, 0% system idle); a render
-tail showed the parent alone at 99-100% with no workers alive.
-
-`run_website_dives.py:278` launches each dive with a blocking
-`subprocess.run` in a loop -- strictly serial, no `--jobs`. So for ~13.4h of a
-41.8h bake, 17 of 18 cores idle.
-
-Report caveats (fix while you are in there): rows are keyed by species NAME,
-so a species with both a GL and a UL dive collapses into one summed row (81
-rows for 135 dives) -- totals are right, per-dive rows are not. And intervals
-inherit the last marker seen, so the unclassified bucket is near-zero by
-construction and is NOT evidence the markers are healthy.
+The 2026-09-12 report caveats are fixed: GL + UL rows of one species no
+longer merge (3c299aa keys on species + league), and 1f9ba3c attributes
+from the per-dive ms logs with a sleep bucket instead of inheriting chain-log
+markers.
 
 ### The prize
 
 Overlapping 2-3 dives fills each other's render tails. Ceiling is the serial
-share: ~13h off a 41.8h dive step, so roughly 28-30h instead of 41.8h. Not the
-"~5h" an earlier estimate here claimed -- that was computed against a projected
-17h dive step, and the real one ran 41.8h.
+bucket: 6.9 h measured; ~4.5-5 h once the ea32bd9 memo lands in a bake
+(projection, not measured), so roughly 13 h instead of 17.9 h awake --
+about a third of the "~13 h" this section claimed on 2026-09-12.
+
+### The risk: memory, not cores
+
+The 2026-09-12 plan said "0.8 GB per dive process, 64 GB machine". That is
+contradicted by two measurements: the 2026-09-25 scout saw 2.5-8.5 GB RSS per
+dive's render state, and `scripts/replay_render_diff.py`'s harness measured
+4.9-11.6 GB **peak RSS per render** (tinkaton_great 4.9, melmetal_great 4.9,
+guzzlord_great 5.5, jellicent_ultra 6.3, cramorant_ultra 11.6 GB; measured
+at `--jobs 5` on a shared machine, 2026-09-25). Three concurrent
+Cramorant-sized render tails would reach ~35 GB before the sweep pools' own
+footprint, on a 64 GB machine. Needs a measured concurrent-RSS probe and a
+lens-grid review (`docs/predive_checklist.md`, resource/concurrency lens)
+before any `--jobs` default above 1.
 
 ### Implementation plan
 
@@ -931,7 +548,7 @@ share: ~13h off a 41.8h dive step, so roughly 28-30h instead of 41.8h. Not the
    `[N/M] slug` banners and `Done in X.X min` markers. Give each dive its own
    file, then have the parent emit the banner lines itself.
 2. **Split `--reserve-cpus` across workers.** The chain passes
-   `--reserve-cpus 0` and `sweep.py:798` computes
+   `--reserve-cpus 0` and `deep_dive_lib/sweep.py:833` computes
    `min(cpu_count() - reserve, len(chunks))`, so each dive asks for all 18.
    Three concurrent dives would ask for 54. Divide the budget by the job count
    (18 cores / 3 jobs -> `--reserve-cpus 12` each), and note the render tail
@@ -939,7 +556,7 @@ share: ~13h off a 41.8h dive step, so roughly 28-30h instead of 41.8h. Not the
 3. **Add `--jobs N` to `run_website_dives.py`**, defaulting to 1 so nothing
    changes until asked for. A small process pool over the DIVES list.
 4. **Verify cache safety before trusting it.** `put_column`'s sidecar write is
-   atomic (tmp + `os.replace`, `sweep_cache.py:202-210`) but the tmp filename
+   atomic (tmp + `os.replace`, `sweep_cache.py:208-215`) but the tmp filename
    is FIXED (`<name>.tmp`), so two writers to the SAME column collide.
    Concurrent dives have different focals -> different columns -> safe today.
    Confirm that still holds for the mirror-slayer and signature-dedup paths,
@@ -949,8 +566,10 @@ share: ~13h off a 41.8h dive step, so roughly 28-30h instead of 41.8h. Not the
    preflight hard-fails when `jobs x per-guide workers > cores`. Also pointless
    now: the whole ML tail measured **3.9 min** for 60 guides on 2026-09-12
    (48 profiles x 60 opponents at `DEFAULT_IV_FLOOR = 12`, vs 4096 IVs x 76
-   opponents x 9 scenarios for a GL dive). See the ml_tail note below.
-6. **Memory is not a constraint:** 0.8 GB per dive process, 64 GB machine.
+   opponents x 9 scenarios for a GL dive); 204 s on the 2026-09-26/27 bake.
+6. **Memory IS the constraint** (see "The risk" above): cap concurrency by
+   measured peak RSS, not core count; the old "0.8 GB per dive" figure is
+   wrong by 3-15x.
 
 ### Measurement pitfall
 

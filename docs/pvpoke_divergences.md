@@ -10,7 +10,8 @@ Our scores match PvPoke's almost everywhere (the oracle audit in
 log for the large majority of its cells). The simulator is a faithful port;
 the handful of intentional differences below each have a reason and a pinned
 test or documented guard, and the full root-cause writeups live in
-`DEVELOPER_NOTES.md`. These all apply to the default (legacy) turn mechanics.
+`DEVELOPER_NOTES.md`. These all apply to the current (new) turn mechanics,
+the default since 2026-09-09.
 
 1. **The one dpe site kept fresh: the don't-bait dpeRatio carve-out.** We now
    FREEZE move selection exactly like PvPoke (ordering, each move's raw dpe,
@@ -27,9 +28,19 @@ test or documented guard, and the full root-cause writeups live in
    gamemaster entry, toggles Full Belly <-> Hangry after each charged move.
    PvPoke changes it one way and then sticks in Hangry. Ours matches verified
    in-game behavior.
-3. **Aegislash throws Shadow Ball where PvPoke throws Gyro Ball.** Same energy
-   cost, but Shadow Ball does strictly more damage against Azumarill, so
-   PvPoke's Gyro Ball pick scores lower for itself.
+3. **Aegislash's Shadow Ball vs Gyro Ball pick -- RESOLVED upstream
+   2026-08-31; we match PvPoke.** Our Aegislash (Shield) threw Shadow Ball
+   where PvPoke threw Gyro Ball (same energy, and Shadow Ball does strictly
+   more damage against Azumarill). We reported it as pvpoke/pvpoke#378.
+   PvPoke's own generalization of its move logic for third charged moves
+   (`574aeb0da`) changed the shields-up "prefer the non-debuffing move"
+   check from `selfBuffing` to `selfDebuffing`, and PvPoke now throws Shadow
+   Ball there too: the affected oracle cells match on score and on the
+   charged-move log, and reverting that one check in a copy of PvPoke's JS
+   brings the old difference back (DEVELOPER_NOTES "Current status"). Six
+   Aegislash x Azumarill form-change cells still differ under the new turn
+   system; that is an open investigation in TODO.md, not a documented
+   divergence.
 4. **Near-KO plan choice: one big self-debuffing move vs a chain of cheaper
    moves -- RESOLVED 2026-09-25, we now match PvPoke.** In a shields-down
    endgame PvPoke swaps a self-debuffing nuke for a chain of cheaper
@@ -61,29 +72,28 @@ non-guaranteed-buff "needsBoost" plan selection): that code is disabled
 upstream and never runs, so copying it would make us diverge from PvPoke's
 actual behavior rather than match it.
 
-The experimental `mechanics='new'` mode (the 2026-06-23 in-game turn changes)
-is OFF by default, and everything above and every published score uses the
-legacy turn system.
-
-A reference DOES now exist (corrected 2026-08-31): PvPoke implemented the new
-turn system on `origin/new-mechanics` (`041d8c722`..`a1b3ebd95`, 2026-08-23..26),
-merged into `origin/twilight-trails` but not into `origin/master`. Our `'new'`
-branch has not been cross-checked against it. Note the consequence for the
-sentence above: legacy matches *PvPoke master*, and matched the live game only
-through 2026-08-30 -- the old battle system was retired at the end of Worlds.
+Turn system: the in-game turn changes (`mechanics='new'`) are the default
+everywhere since 2026-09-09 (7e6a82b), the day PvPoke merged its own
+implementation to master; every published score since the 2026-09-10/12
+bake uses them, and `simulate()` refuses the retired legacy system unless
+explicitly opted in (2615c6e). The oracle audit is cross-checked against
+PvPoke master under the new system (CHANGELOG 2026-09-09..10).
 
 ## Keeping this list current
 
 - **When you add or remove a divergence, update this document and
   `DEVELOPER_NOTES.md` together.** The `CLAUDE.md` policy ("When our sim
-  diverges from PvPoke") already requires every divergence to carry an xfail
-  test with a specific reason and an inline code comment; this document is the
+  diverges from PvPoke") requires every divergence to carry a test with a
+  specific reason and an inline code comment (since 9f1da69, 2026-09-25,
+  `tests/test_battle.py`'s divergence cells are real pins at our value with
+  PvPoke's value in the message, not xfails); this document is the
   human-readable index of those.
-- **Re-vet against PvPoke upstream periodically.** PvPoke's battle logic lives
-  in `Battle.js`, `ActionLogic.js`, and `DamageCalculator.js`. We last vetted
-  against pvpoke commit `bc532fbda` (2026-06-06; see the "PvPoke re-vetting
-  log" in `DEVELOPER_NOTES.md`). On a regular cadence, and before any release
-  that quotes PvPoke parity, diff those three files against the last vetted
-  commit; if the battle logic changed, re-run the oracle audit
-  (`scripts/audit_oracle_harness.py`), then update this list and the
-  re-vetting log.
+- **Re-vet against PvPoke upstream when the tripwire fires.** PvPoke's battle
+  logic lives in `Battle.js`, `actions/ActionLogic.js`, `DamageCalculator.js`
+  and `pokemon/Pokemon.js`. `tests/test_rebalance_tripwire.py` pins their
+  sha256 in `tests/fixtures/pvpoke_engine_digests.json` (last re-vetted
+  2026-09-10) and fails when the `../pvpoke` checkout drifts; the procedure
+  is `docs/rebalance_checklist.md` section B -- read the upstream commits,
+  re-run the oracle audit (`scripts/audit_oracle_harness.py`), then update
+  this list, the re-vetting log in `DEVELOPER_NOTES.md`, and the digest
+  fixture.
