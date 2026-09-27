@@ -2,6 +2,19 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-27 -- Sweep-side rank-1 IV memo (ea32bd9), no CACHE_VERSION bump
+
+- `deep_dive_lib.opponents.resolve_opp_ivs` is memoized per process
+  (species, league, shadow, base opp-IV mode; cleared by
+  `gopvpsim.invalidate_caches()`); the render-side memo from R1 (dc34ab0)
+  is removed as redundant. Michael reversed the 09-25 Q2 ruling on 09-26:
+  no CACHE_VERSION bump, because the function is parent-side and
+  `tests/test_resolve_opp_ivs_memo.py` proves output identity over all 104
+  pool species x both modes x both shadow states plus column-key identity.
+- Measured (Miltank UL smoke dive): rank-1 sweep setup 3.9-4.1 s -> 0.13 s
+  for every sweep after the first in a dive; ~2-2.4 h per bake off the
+  single-core column. Replay renders byte-identical to the 09-27 baseline.
+
 ## 2026-09-26/27 -- Bake on the sped-up render layer: 2.0x awake, 2.8x single-core
 
 - **Chain** `overnight_20260926_102139.log`, launched 09-26 10:21 after the

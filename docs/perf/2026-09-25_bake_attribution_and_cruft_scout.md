@@ -245,3 +245,22 @@ self-debuff columns the 09-25 migration unlinked (warm next bake). Tail
 steps: ML guides 204 s; ship gates 317 s (concurrent roster) vs 885 s.
 Next lever, already built on `swing/sweep-ivrank-memo`: the sweep-side
 rank-1 IV memo (the ~2.6 h "pre-sim sweep setup" row of the attribution).
+
+## Addendum: sweep-side rank-1 IV memo (merged 2026-09-27, ea32bd9)
+
+Michael reversed the Q2 ruling on 2026-09-26: the `resolve_opp_ivs` memo
+lands in `deep_dive_lib/opponents.py` with NO CACHE_VERSION bump (a bump
+re-keys every focal dir = a cold ~24 h bake). Justification: the function
+runs in the parent at pool-load time, and `tests/test_resolve_opp_ivs_memo.py`
+proves output identity over all 104 pool species x both IV modes x both
+shadow states (306 cases) plus column-key identity, so every cached column
+keys exactly as before. The render-side memo from R1 is removed (redundant).
+
+Measured on the Miltank UL smoke dive (63 opponents, 2 movesets, 6 sweeps),
+parent-side setup = the gap from "Running <moveset>..." to the sweep-cache
+line: pre-memo 3.9-4.1 s on every rank-1 sweep (16.2 s total); post-memo the
+FIRST rank-1 sweep still pays 3.8 s and every later one is 0.13 s (4.5 s
+total). Corpus-wide that is the ~2.6 h "pre-sim sweep setup" row of the
+2026-09-20 attribution minus one iv_rank pass per opponent per dive, so
+roughly 2-2.4 h per bake off the single-core column. Replay renders on the
+merged tree are byte-identical to the 2026-09-27 main baseline.
