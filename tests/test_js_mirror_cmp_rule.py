@@ -17,7 +17,6 @@ Pattern mirrors tests/test_js_score_key_parity.py; the node half skips
 if node is absent.
 """
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -49,7 +48,7 @@ def test_raw_epsilon_compare_is_gone():
     assert not re.search(r"cohort\[\w+\]\s*-\s*1e-\d", _source())
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.node
 def test_helper_semantics_in_node():
     m = re.search(r"function _atkBeats\(a, b\)\s*\{.*?\n\}", _source(), re.S)
     assert m

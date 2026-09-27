@@ -20,7 +20,6 @@ tests/test_js_mirror_cmp_rule.py).
 """
 import importlib.util
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -32,8 +31,6 @@ from gopvpsim.user_collection import ivs_to_stats_at_cap
 _REPO = Path(__file__).resolve().parents[1]
 _JS = _REPO / "scripts" / "deep_dive_user_collection.js"
 
-needs_node = pytest.mark.skipif(shutil.which("node") is None,
-                                reason="node not installed")
 
 
 _HARNESS = None
@@ -119,7 +116,7 @@ def _species_ivs(canon, species):
 # entry 10 -- the per-target gender rule
 # ---------------------------------------------------------------------------
 
-@needs_node
+@pytest.mark.node
 @pytest.mark.integration
 def test_gender_rule_agrees_and_is_not_vacuous():
     py, js = _both_sides(_GENDER_CSV, _GENDER_THRESHOLDS,
@@ -133,7 +130,7 @@ def test_gender_rule_agrees_and_is_not_vacuous():
     assert len(py["Tinkaton"]) == 2
 
 
-@needs_node
+@pytest.mark.node
 @pytest.mark.integration
 def test_bare_male_target_alone_still_rejects_female():
     """The male branch keys off the '(Female)' sibling existing in the
@@ -146,7 +143,7 @@ def test_bare_male_target_alone_still_rejects_female():
     assert _species_ivs(py, "Oinkologne") == [(5, 11, 15), (7, 7, 7)]
 
 
-@needs_node
+@pytest.mark.node
 @pytest.mark.integration
 def test_require_gender_matches_python_prefilter():
     """opts.requireGender is the one deliberate JS-only extension: an
@@ -165,7 +162,7 @@ def test_require_gender_matches_python_prefilter():
 # entry 9 -- league-derived level ceilings
 # ---------------------------------------------------------------------------
 
-@needs_node
+@pytest.mark.node
 @pytest.mark.integration
 def test_match_mons_default_max_level_agrees():
     """Both ports resolve maxLevel=None from the league (great -> 50.0)."""
@@ -179,7 +176,7 @@ def test_match_mons_default_max_level_agrees():
     assert [r["stats"]["level"] for r in py_bb["Lechonk"]] == [51, 51]
 
 
-@needs_node
+@pytest.mark.node
 def test_ivs_to_stats_at_cap_default_ceiling_agrees():
     """ivsToStatsAtCap has no league argument, so both ports derive the
     ceiling from the CP cap. No gamemaster needed: base stats are passed

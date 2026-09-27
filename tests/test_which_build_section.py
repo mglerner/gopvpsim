@@ -46,7 +46,6 @@ import html as _html
 import importlib.util
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -677,7 +676,7 @@ def _engine():
     return strip_js(ENGINE_JS.read_text())
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_engine_js_parses():
     subprocess.run(['node', '--check', str(ENGINE_JS)], check=True,
                    capture_output=True)
@@ -1115,7 +1114,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_section_grouping_logic_runs(tmp_path):
     """Run the panel's grouping code for real, on a 6-spread synthetic grid.
 
@@ -1284,7 +1283,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_builds_view_logic_runs(tmp_path):
     """Run the builds view's own code for real, on a 6-spread synthetic grid.
 
@@ -5053,7 +5052,7 @@ console.log('OK');
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_the_wide_region_rings_every_member_and_draws_underneath(tmp_path):
     """Run the ring code on a synthetic grid whose wide region CONTAINS
     Build 1 -- the shape the round-6 trace could not draw.
@@ -5544,7 +5543,7 @@ console.log(JSON.stringify({
 """
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
+@pytest.mark.node
 def test_the_panel_height_is_measured_from_the_legend_not_counted(tmp_path):
     """Round 8 review, the major finding -- executed, not source-pinned.
 
