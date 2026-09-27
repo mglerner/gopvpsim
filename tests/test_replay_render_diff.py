@@ -148,3 +148,104 @@ def test_out_dir_inside_repo_is_refused(tmp_path):
     (tmp_path / 'foreign' / 'f').write_text('x')
     with pytest.raises(SystemExit):
         rrd._check_out_dir(tmp_path / 'foreign')
+
+
+def test_canonicalize_ids_covers_the_card_flip_prefixes():
+    """'fcard' / 'fcardsp' (the dive card's two flip lines) share the
+    rendering module's _flip_toggle_seq, so a skipped render pass
+    renumbers them too. Before 2026-09-27 ID_PREFIXES lacked both (n was
+    0 here) and a no-op best-buddy page could not be proven equal."""
+    base = _toggle('fcardsp1') + _toggle('fcard2') + _toggle('fcardsp3')
+    shifted = _toggle('fcardsp40') + _toggle('fcard41') + _toggle('fcardsp44')
+    cb, nb = rrd.canonicalize_ids(base)
+    cs, ns = rrd.canonicalize_ids(shifted)
+    assert nb == ns == 3
+    assert cb == cs
+    # 'fcardsp' is its own prefix, not 'fcard' + junk: counted separately.
+    assert b'id="fcardsp1"' in cb and b'id="fcardsp2"' in cb
+    assert b'id="fcard1"' in cb
+
+
+def _import_emitters():
+    import sys
+    for p in (REPO_ROOT / 'scripts', REPO_ROOT / 'src'):
+        if str(p) not in sys.path:
+            sys.path.insert(0, str(p))
+    import deep_dive_card
+    import deep_dive_rendering
+    return deep_dive_card, deep_dive_rendering
+
+
+def test_card_flip_lines_really_emit_fcard_and_fcardsp_ids():
+    """Positive control on the real emitter: the dive card's flip lines
+    (deep_dive_card._flip_html, SP1 != PvPoke default) emit one
+    'fcardsp<N>' and one 'fcard<N>' toggle, and mode B canonicalizes
+    both."""
+    import re
+    from types import SimpleNamespace
+    deep_dive_card, _ = _import_emitters()
+    gains = [{'opponent': f'Opp{i}', 'scenario': '1v1',
+              'iv_score': 600 + i, 'ref_score': 400} for i in range(5)]
+    fd = {'gains': gains, 'losses': []}
+    s = SimpleNamespace(flip_fd=fd, flip_fd_sp=fd, flip_has_bait=False,
+                        is_sp1=False, is_pvpoke=False)
+    html = deep_dive_card._flip_html(s, False, '1/2/3', '4/5/6').encode()
+    assert re.search(rb'id="fcardsp\d+"', html)
+    assert re.search(rb'id="fcard\d+"', html)
+    out, n = rrd.canonicalize_ids(html)
+    assert n == 2
+    assert b'id="fcardsp1"' in out and b'for="fcardsp1"' in out
+    assert b'id="fcard1"' in out and b'for="fcard1"' in out
+
+
+def _emitted_id_prefixes():
+    """AST-scan the toggle-id emitters for every prefix they can emit:
+    string literals passed as / defaulted for an ``id_prefix`` parameter
+    (keyword, or positional into a same-module function that has one), and
+    the literal head of an f-string assigned to ``cid``."""
+    import ast
+    import inspect
+    found = set()
+    for mod in _import_emitters():
+        tree = ast.parse(inspect.getsource(mod))
+        idx_by_fn = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                names = [a.arg for a in node.args.args]
+                if 'id_prefix' in names:
+                    i = names.index('id_prefix')
+                    idx_by_fn[node.name] = i
+                    defaults = node.args.defaults
+                    j = i - (len(names) - len(defaults))
+                    if j >= 0 and isinstance(defaults[j], ast.Constant):
+                        found.add(defaults[j].value)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                for kw in node.keywords:
+                    if (kw.arg == 'id_prefix'
+                            and isinstance(kw.value, ast.Constant)):
+                        found.add(kw.value.value)
+                fn = getattr(node.func, 'id', None)
+                i = idx_by_fn.get(fn)
+                if (i is not None and len(node.args) > i
+                        and isinstance(node.args[i], ast.Constant)):
+                    found.add(node.args[i].value)
+            if (isinstance(node, ast.Assign)
+                    and any(getattr(t, 'id', None) == 'cid'
+                            for t in node.targets)
+                    and isinstance(node.value, ast.JoinedStr)
+                    and node.value.values
+                    and isinstance(node.value.values[0], ast.Constant)):
+                found.add(node.value.values[0].value)
+    return found
+
+
+def test_id_prefixes_cover_every_emitter_prefix():
+    """ID_PREFIXES is hand-maintained (no single source); this scan fails
+    when an emitter grows a prefix the harness would not canonicalize."""
+    found = _emitted_id_prefixes()
+    # Floor below today's count (6) so a scanner that stops seeing the
+    # emitters fails instead of passing vacuously.
+    assert len(found) >= 5, found
+    assert {'fcard', 'fcardsp', 'sb', 'cm'} <= found, found
+    assert found <= set(rrd.ID_PREFIXES), found - set(rrd.ID_PREFIXES)
