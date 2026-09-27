@@ -11,8 +11,8 @@ lines of mostly-completed chronological batches. -->
 Plan of record, with file:line evidence and the verified attribution of the
 2026-09-20 chain's 37.7 h: `docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md`.
 More than half of that bake ran on one core of 18 (the two render passes
-alone were 12.4 h). Ranked options, all **in progress on `swing/*`
-branches** (2026-09-25); none touches an engine-hashed file:
+alone were 12.4 h). Ranked options, all **MERGED 2026-09-25** (R1-R6; plus the sweep-side
+memo ea32bd9 on 09-27); none touches an engine-hashed file:
 
 - R1 -- memoize the rank-1 `iv_rank` lookup render-side (`_opp_link_data`,
   per Michael's Q2 ruling; ~1.7 h/bake).
@@ -27,7 +27,8 @@ branches** (2026-09-25); none touches an engine-hashed file:
   sleep bucket in `bake_timing_report.py`, log all-miss sweeps (`0/n`).
 
 Every render change ships behind the `scripts/replay_render_diff.py`
-byte-diff. Not ranked: `--jobs N` dive overlap (the "parallelize the dive
+byte-diff. Measured on the 2026-09-26/27 bake: 2.01x awake, 2.76x
+single-core (docs/perf/... 'Measured'; CHANGELOG 2026-09-26/27). Not ranked: `--jobs N` dive overlap (the "parallelize the dive
 step" plan below, re-scoped 2026-09-27 for the measured 4.9-11.6 GB peak RSS
 per render).
 
