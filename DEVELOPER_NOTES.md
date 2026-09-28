@@ -30,22 +30,30 @@ below; Michael verified in-game that Morpeko enters every battle in Full Belly
 and toggles after each charged move). Pinned by a chargedLog assertion on the
 Morpeko test + known-divergence marks in the audit script.
 
-## Current status (updated 2026-09-27)
+## Current status (updated 2026-09-28)
 
-<!-- sync:test_count -->3052<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3054<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
-against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->31<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->279<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->268<!-- /sync --> exact on score+winner+chargedLog, 11 cells =
+against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->33<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->297<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->277<!-- /sync --> exact on score+winner+chargedLog, 20 cells =
 documented divergences, each traced to a mechanism: 8 are bug #8 Hangry
 stickiness, 3 are our deliberate Shield-form Aegislash estimate-stage
-choice ("Form change gotchas" item 6); per-cell reasons live on the
+choice ("Form change gotchas" item 6), 9 are the #10 first-throw slot
+quirk (Aegislash-S vs Moltres-G, all nine cells; its GB-first positive
+control row is 9/9 exact); per-cell reasons live on the
 MATCHUPS entries in the audit script). Historical
 note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 (`bestChargedMove` selection, resolved then).
+
+**2026-09-28: 279 cells -> 297, 11 divergences + 9.** Two Aegislash-S vs
+Moltres-G rows were added to pin "PvPoke bugs found" #10: the default
+[SHADOW_BALL, GYRO_BALL] input (all nine cells the documented first-throw
+quirk) and its [GYRO_BALL, SHADOW_BALL] positive control (all nine exact).
+The 279 prior cells were unchanged (full audit, 0 new, 0 vanished).
 
 **2026-09-27: 243 cells -> 279, 8 divergences + 3.** The six Aegislash x
 Azumarill cells that stayed open after the 09-09 new-mechanics re-baseline
@@ -573,7 +581,7 @@ pinned exactly in `tests/test_js_shadow_constants.py`.
 
 ## PvPoke bugs found
 
-<!-- sync:pvpoke_bugs_documented -->6<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9 —
+<!-- sync:pvpoke_bugs_documented -->7<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9, 10 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
 and is excluded from the count). **FILED UPSTREAM 2026-07-16** as pvpoke/pvpoke issues: #378 (our §3
 Gyro Ball), #379 (§8 Morpeko), #380 (§1 dead pruning), #381 (the
@@ -621,6 +629,10 @@ Tinkaton; re-counted 2026-09-27). Kept for the record (and the bug
 count). The Shield-form damages quoted below (49 / 39) were OUR
 under-estimate, not the damage a Shield-form throw deals -- it resolves in
 Blade form ("Form change gotchas" item 6).
+
+The residual Gyro-Ball-vs-Shadow-Ball first-throw differences found
+2026-09-28 are NOT #3: they are its inverse (ours picks Gyro Ball, PvPoke
+Shadow Ball), from a different mechanism -- see #10 ("F3").
 
 **File**: `ActionLogic.js` (near-KO DP or bestChargedMove selection)
 
@@ -755,6 +767,69 @@ Not filed upstream yet.
 **Related non-bug (stat display convention)**: PvPoke floors displayed
 atk/def to 1 decimal (`PokeSelect.js:75`), our cards round
 (`deep_dive_engine.js:3838`). Cosmetic only (120.5 vs 120.6).
+
+### 10. Shield-start Aegislash's first throw follows the input order (quirk, not ported)
+
+**Files**: `Pokemon.js:757-763` (shuffle clause 1), `:790-796` (clause 4;
+`resetMoves` at `:711` re-pushes the same move objects and never clears
+it), `resetMoves` callers incl. `Pokemon.js:420` (initialize), `:1288`
+(addNewMove), `:1939` (reset), `Battle.js:113` (setNewPokemon); ours
+`battle.py:1502-1506` (clause 1), `:1546-1559` (clause 4 stamp),
+`:2969/2976` (`reset_for_battle` -> `_restore_shuffle_stamp`). Found
+2026-09-28 (the "F3" follow-up of the 2026-09-27 Aegislash diagnosis).
+
+**Mechanism.** PvPoke's `resetMoves()` priority shuffle has a clause 1
+(same energy: move the buffing or higher-damage move to slot 0), gated on
+`!selfDebuffing`, and a clause 4 that, in `aegislash_shield` form, stamps
+every charged move `selfDebuffing = true` IN PLACE on the move objects.
+That stamp is never undone, and `resetMoves()` runs several times before
+a fight starts (initialize, move selection, setNewPokemon). So by the time
+the opponent-aware reset runs, both of Shield-form Aegislash's moves are
+already self-debuffing, clause 1 is dead, and slot 0 is simply the order
+the user typed the moves in. Ours snapshots the stamp and
+`reset_for_battle` restores the pristine move dicts (needed: without it a
+reused Blade inherited the stamp, the 2026-09-12 leak), so at the
+battle's first Shield shuffle clause 1 is live and, with default
+[SHADOW_BALL, GYRO_BALL], puts the move that does more damage vs the
+current opponent in slot 0 -- Gyro Ball against Fairy/Rock/Ice types, or
+wherever Ghost is resisted (Dark: Moltres-G, Guzzlord).
+
+**Consequences** (1080-cell GL sample, Aegislash 4/14/15 both start
+forms vs 15/15/15 top-60 opponents, both seats): 52 cells differ only in
+chargedLog (Gyro Ball vs Shadow Ball into a shield, 1 damage either way);
+5 differ in score -- Moltres-G (0,0)/(0,1)/(1,1)/(2,1) and Guzzlord
+(0,0) -- and in all 5 ours is about +100 for Aegislash (Aegislash-S vs
+Moltres-G (0,0): ours 408/591, PvPoke 308/691; PvPoke's last-gasp throw
+is the resisted Shadow Ball).
+
+**Proofs.**
+
+- *Forward:* PvPoke run with `--p1-charged GYRO_BALL,SHADOW_BALL`
+  reproduces ours exactly on Florges (0,1), Moltres-G (0,0) and Guzzlord
+  (0,0). The audit's `aegislash_shield_gb_first_vs_moltres_galarian_form_change`
+  row keeps this as a standing positive control (all nine cells exact).
+- *Reverse:* emulating the persisted stamp in ours (stamp the moves
+  before the first Shield-form shuffle) makes all 52 log-only cells
+  exact and moves exactly those 5 score cells to PvPoke's values, with
+  no cell lost; 9 already-mismatched cells (Thievul (2,x), Cradily
+  Shield-start) change chargedLog only and stay mismatched. The 279-cell
+  oracle audit is unchanged under the emulation.
+
+**Caveat, stated honestly.** Ours is order-invariant only at the first
+Shield-form throw. After that the stamp persists within the battle in
+BOTH engines (clause 1 is dead for later shuffles on either side), so the
+input order still matters in the Blade phase: a Gyro-Ball-first input
+changes 196/1080 sample cells versus Shadow-Ball-first in ours.
+
+**Verdict: not ported.** PvPoke's slot 0 here is an artifact of how many
+times `resetMoves()` ran, i.e. of the user's typing order, and where it
+changes the score it throws the resisted move and loses about 100 points.
+It passes none of the three "When our sim diverges" tests. Pinned in
+`tests/test_form_change_oracle.py`
+(`test_aegislash_shield_vs_moltres_g_first_throw_divergence`, PvPoke's
+308/691 in the message, plus the GB-first positive control) and as nine
+xfail cells on `aegislash_shield_vs_moltres_galarian_form_change` in
+`scripts/audit_oracle_harness.py`.
 
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 

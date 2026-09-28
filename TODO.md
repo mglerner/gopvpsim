@@ -1125,6 +1125,49 @@ CHANGELOG 2026-09-02..03 and 2026-09-09..10. Open:
     the residual non-Aegislash-cause cells in the 1080 sample (Pachirisu
     level cap, Moltres-G, Thievul, ...); Blade Gyro-Ball-into-shield
     first-throw log differences; Registeel (2,1) log-only residual.
+    2026-09-28 status: F3 (the first-throw differences, incl. Moltres-G
+    and Guzzlord) is DOCUMENTED, not ported ("PvPoke bugs found" #10);
+    F2 split into F2a (Pachirisu, a sampler artifact) and F2b (next item,
+    which also closes F4).
+- **DP farm-down insertion order (port gap, Michael's call).** PvPoke
+  inserts the farm-down state INSIDE the per-move loop, before each move's
+  expansion (`ActionLogic.js:508`, ahead of the ready branch at `:563`);
+  we insert it once, AFTER all expansions (`_dp_jit.py:334-366` and the
+  pure-Python copy `battle.py:2210-2218`). The two orders only differ on
+  a same-turn tie, which needs `fm_to_ko * fast_turns == 1` (a 1-turn fast
+  move whose single hit KOs): there PvPoke pops the farm-down state first
+  and we pop the charged state first.
+  - *Measured* (counterfactual patch, 1080-cell Aegislash sample): moves
+    exactly 7/1080 cells, all to PvPoke-exact on score and log -- Blade vs
+    Corviknight (1,1) 434 -> 444 and (1,2) 104 -> 114 for Aegislash, Blade
+    vs Kingdra (2,2) 173 -> 191, and 4 Dunsparce log-only cells -- and
+    closes F4 (Registeel (2,1)'s trailing Flash
+    Cannon; Lock On is 1-turn). 0 regressions; the 279-cell oracle audit
+    is unchanged.
+  - *Trade-off:* ours scores the thrower higher in the 1v1 (Corviknight
+    565 vs PvPoke's 555: the dying Aegislash's last fast move is denied).
+    PvPoke's order keeps the energy for multi-mon carry-over and is
+    consistent with its own `ActionLogic.js:221` rule (don't throw when a
+    fast move KOs). Ours is accidental port order, not a defended
+    deviation -- so the default is to port unless Michael prefers the 1v1
+    number.
+  - *Cache predicate if ported:* either side (incl. form-change alt forms)
+    has a 1-turn fast move. That is so broad it is effectively a cold
+    re-dive; batch it with the next broad engine change.
+  - *F2a (Pachirisu) was a sampler artifact:* production dives use L50;
+    the sampler's `_make_battle_pokemon` default is `max_level=51`. Not
+    an engine divergence.
+  - *Still undetermined in the 1080 sample* (fwd seat, after emulating
+    both #10 and F2b; score mismatches unless marked log): Aegislash-S vs
+    Thievul (2,0) log, (2,1), (2,2); Feraligatr (1,2); Rillaboom (1,1),
+    (2,1); Dewgong (2,2); Seismitoad (1,1), (2,1); Cradily (0,0), (1,0),
+    (1,1), (2,0), (2,1), (2,2); Aegislash-B vs Deoxys-D (2,2);
+    Electrode-H (2,1), (2,2); Turtonator (1,0), (2,0); Cradily (1,1),
+    (2,1); Seismitoad (1,0), (2,0), (2,1); Stunfisk-G (2,2); Morpeko
+    Full Belly (Blade (2,1) score; Shield (1,x)/(2,x) and Blade (2,0)/(2,2)
+    log). Plausible but UNTRACED attributions: Morpeko cells = bug #8,
+    Cradily cells = the deliberate estimate-stage choice (the audited
+    Cradily row uses 4/14/14, the sample 15/15/15).
 - **Threshold-TOML prose (3b(c) of the 2026-09-09 re-vet):** 182
   descriptions cited a decimal number in prose; each one whose underlying
   threshold moved is now a wrong published sentence. d363b1d has since
