@@ -582,7 +582,10 @@ triggers your missile.</p>
 <tr><td class="sc">0-0, 0-1</td>
 <td>Dive-rush <b>only if you win CMP</b> (your Attack stat is higher
  -  the dive pages mark this per IV). If you lose CMP, play normal
-PvPoke move choices: bank Fly.</td>
+PvPoke move choices: bank Fly. At 0-1 with Surf as the prey move,
+against an opponent where Fly deals 2.25x or more of Surf's damage per
+energy (e.g. Araquanid, Jumpluff, Kingdra), Surf-rush only while your HP
+percentage is below theirs.</td>
 <td>You have no shields; nothing to decide.</td></tr>
 <tr><td class="sc">0-2</td>
 <td>Dive-rush always.</td>
