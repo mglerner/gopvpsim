@@ -79,6 +79,12 @@ Engine predicates (PROVEN, not guessed):
                 affected iff the scenario species does. Proof in the
                 predicate's docstring.
 
+  cram_0v1_rule_r_20260928 -- sheet v8 rule R: the (0,1) Surf gate keeps
+                3.0 while behind on HP fraction (--from-engine 20d9f018970b,
+                re-pin at merge; slayer 5dfdafc264f6). Same affected set as
+                cram_0v1_surf_gate_20260927 (a superset of what can move);
+                slayer fully blesses. Proof in the predicate's docstring.
+
   inhash_deadcode_20260928 -- zero-caller dead-code deletions in the
                 engine-hashed files (--from-engine 45cf73a2d23d; slayer
                 0c54e07bc21b). Blesses everything; the proof (zero-reader
@@ -252,6 +258,37 @@ def _cram_0v1_surf_gate_20260927(f, c):
     if not sp.startswith('Cramorant'):
         return False
     return 'SURF' in ch and any(m not in ('DIVE', 'SURF') for m in ch)
+
+
+def _cram_0v1_rule_r_20260928(f, c):
+    """Sheet v8 rule R (pin --from-engine 20d9f018970b -> 7adb40d78629;
+    slayer 5dfdafc264f6 -> bd256d71092d -- both re-pinned at merge if
+    another engine bump lands first: the from-engine hash is the CLI's
+    --from-engine argument, not baked in here).
+
+    The ENTIRE delta is in battle.py: row (0,1) of _POGODIVES_SHEET gains
+    'surf_early_when_behind': True, and _cram_dive_gate_dpe, inside the
+    existing ``gulp_move_id == 'SURF' and 'surf_gate_dpe' in entry`` branch,
+    skips the 2.25 substitution (keeping _POGODIVES_DIVE_GATE_DPE 3.0) when
+    that key is set and attacker.hp / attacker.max_hp < defender.hp /
+    defender.max_hp. Nothing else changed (the rest is comments/docstring).
+
+    Touched set is a SUBSET of cram_0v1_surf_gate_20260927's: the new
+    condition sits strictly inside the branch that predicate's proof
+    characterizes (reachable only under ``attacker._pogodives``, attacker in
+    Cramorant form, which in a sweep column means a pogodives column with a
+    Cramorant focal; and the branch is entered only when the gulp slot is
+    SURF, which with the typo'd non-gulp predicate needs SURF plus a
+    non-DIVE, non-SURF charged move to compare anything other than a ratio
+    of exactly 1.0). Outside that branch v7 and v8 return the same value, so
+    the v7 predicate's affected set covers every column v8 can move. It
+    over-deletes safely: HP + Surf columns (same-type ratio ~1.07, below
+    both 2.25 and 3.0) cannot actually move. Slayer mirrors use pvpoke_dp on
+    both sides, so the slayer side fully blesses. Fail-safe as the v7
+    predicate (unreadable fields -> affected for a possible pogodives
+    column). One-shot; never re-run against another --from-engine hash.
+    """
+    return _cram_0v1_surf_gate_20260927(f, c)
 
 
 def _aegislash_blade_atk_20260927(f, c):
@@ -683,6 +720,7 @@ PREDICATES = {
     'cached_damage_refresh_20260925': _cached_damage_refresh_20260925,
     'cram_0v1_surf_gate_20260927': _cram_0v1_surf_gate_20260927,
     'aegislash_blade_atk_20260927': _aegislash_blade_atk_20260927,
+    'cram_0v1_rule_r_20260928': _cram_0v1_rule_r_20260928,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'inhash_deadcode_20260928': _inhash_deadcode_20260928,
     'cramorant_port_20260824': _cramorant_port_20260824,
