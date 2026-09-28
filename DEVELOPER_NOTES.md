@@ -1186,6 +1186,14 @@ PvPoke uses three different insertion strategies in the DP queue:
 The `<` for not-ready states is critical — it produced 2 exact PvPoke
 matches and several closer scores for Azu vs Forretress.
 
+Order within one pop: the farm-down state goes in FIRST, before the
+charged-move expansions (PvPoke inserts it inside the per-move loop, ahead of
+each move; once is equivalent). Until 2026-09-28 we inserted it after them;
+the two orders differ only on a same-turn tie with a ready move
+(`fm_to_ko * fast_turns == 1`, a 1-turn fast move whose single hit KOs),
+where the farm-down state now pops first, as in PvPoke. Pinned by
+`tests/test_farmdown_order_port.py`.
+
 ### CMP tie resolution: exact ties fall to player index (PROP-1)
 
 Charge-move priority (CMP) orders two same-turn charged moves by
