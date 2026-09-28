@@ -4020,6 +4020,92 @@ def _mirror_preset_html(mf, bl, facts):
             + _esc(' '.join(mirror_sentences(mf, bl, facts))) + '</p>')
 
 
+# ---- "The mirror", population version (TODO.md "NEXT BAKE: mirror
+# population") ------------------------------------------------------------
+# Where the blob carries ``state['mirror_population']``, the paragraph reads
+# it INSTEAD of the cohort: per build, how many of the mirrors a reader will
+# meet its members beat in one shield scenario, and how many they out-
+# prioritise. The population is labelled in two parts, as the decision
+# record asks -- PvPoke's IV rank list (the common builds) and this page's
+# own picks (what readers build once the page exists) -- and every number is
+# a count off the stored per-(spread, scenario, member) scores
+# (``deep_dive_builds.population_facts``). Blobs without the key render the
+# cohort paragraph above, unchanged.
+#
+# Every sentence is data-driven template text: the fixed words below plus
+# counts, a species name, a scenario label and build names.
+
+POP_LEAD_RANK = "Against the top {n} spreads on PvPoke's IV rank list for {name}"
+POP_LEAD_PAGE = ("Against this page's own picks for {name} ({n} {spreads}: "
+                 "each build's most-winning member and SP1)")
+
+
+def _pop_share(k, n, as_pct):
+    return brief.pct(k / n, dp=0) if as_pct else f"{brief._n(k)} of {brief._n(n)}"
+
+
+def _pop_build_clause(name, r, as_pct):
+    """One build's clause: median member's wins in the scenario, the weakest
+    member's where it differs, and the median member's CMP wins."""
+    n = r['n']
+    med, lo = r['beat_si']
+    out = f"{name} beats {_pop_share(med, n, as_pct)}"
+    if lo < med:
+        out += f" (every member at least {_pop_share(lo, n, as_pct)})"
+    cmed = r['cmp'][0]
+    return (out + " and wins charge-move priority against "
+            + _pop_share(cmed, n, as_pct))
+
+
+def population_group_sentence(pf, group, bl, name):
+    """One group's sentence: the lead, the scenario, one clause per build."""
+    si = pf['si']
+    as_pct = group['key'] != 'page'
+    lead = (POP_LEAD_PAGE if group['key'] == 'page'
+            else POP_LEAD_RANK).format(
+                n=brief._n(group['n']), name=name,
+                spreads='spread' if group['n'] == 1 else 'spreads')
+    clauses = []
+    for i, r in enumerate(group['builds']):
+        clauses.append(_pop_build_clause(
+            role_short(bl['builds'][i], i), dict(r, beat_si=r['beat'][si]),
+            as_pct))
+    return f"{lead}, in the {pf['scenario']}: {'; '.join(clauses)}."
+
+
+def population_cut_sentence(group):
+    """The a_50 / a_75 CMP cuts off the rank list, strict engine rule."""
+    clause = mirror_cut_clause({'cmp': group['cmp']})
+    if clause.startswith('attack'):
+        return f"An {clause}."
+    return clause[0].upper() + clause[1:] + '.'
+
+
+def population_sentences(pf, bl, facts):
+    """The paragraph: rank list (focal form), its CMP cuts, the other form's
+    rank list when it was swept, and this page's picks when they match."""
+    focal = brief.focal_name(facts['header'])
+    other = (pf['species'] if pf['shadow']
+             else f"{pf['species']} (Shadow)")
+    out = []
+    for g in pf['groups']:
+        if g['key'] == 'rank':
+            out.append(population_group_sentence(pf, g, bl, focal))
+            out.append(population_cut_sentence(g))
+        elif g['key'] == 'rank_other':
+            out.append(population_group_sentence(pf, g, bl, other))
+        else:
+            out.append(population_group_sentence(pf, g, bl, focal))
+    return out
+
+
+def _population_preset_html(pf, bl, facts):
+    if not pf or not bl or not bl['builds']:
+        return ''
+    return ('<p class="wb-mirror">'
+            + _esc(' '.join(population_sentences(pf, bl, facts))) + '</p>')
+
+
 def mirror_block_html(facts, arm_builds):
     """The mirror paragraph, or '' when this arm has no mirror.
 
@@ -4028,7 +4114,17 @@ def mirror_block_html(facts, arm_builds):
     per setting. Sentence one does not vary with the setting, but it is the
     premise of sentence two -- splitting the pair to print it once would put
     the cohort and what to do about it in two different boxes.
+
+    The population paragraph wins where the blob carries a population
+    (``arm_builds['population']``, empty on every older blob); the cohort
+    paragraph is the fallback.
     """
+    pops = ((arm_builds or {}).get('population')) or {}
+    if pops:
+        return _preset_blocks(
+            arm_builds,
+            lambda key: _population_preset_html(
+                pops.get(key), arm_builds['presets'].get(key), facts))
     mirrors = ((arm_builds or {}).get('mirror')) or {}
     if not mirrors:
         return ''
