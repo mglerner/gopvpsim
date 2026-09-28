@@ -16,7 +16,10 @@ Pinned here, all without a blob:
 - the per-build numbers REPRODUCE from the stored scores by an independent
   recount (plain loops, ``battle.is_win``, pre-shadow attack from
   ``Pokemon.at_best_level``), on a surface where they are not trivial;
-- the rendered sentences' numbers, on a synthetic facts dict;
+- ties (a score of exactly 500) and losses reproduce too, off one actual
+  typical member per build;
+- the rendered block (Michael's 2026-09-28 pick: the V4 lead sentence plus
+  the V2 table), word for word per lead trigger, on a synthetic facts dict;
 - a blob WITHOUT the key renders the cohort paragraph unchanged;
 - ``iv_sweep(opp_ivs=...)`` puts the explicit IVs on the opponent.
 """
@@ -123,7 +126,9 @@ def _block():
 
 
 def _ctx(state, mode='pvpoke'):
+    fast, charged = get_default_moveset(SPECIES, LEAGUE)
     return {'state': state, 'arm': 0, 'mode': mode, 'n_iv': N_IV,
+            'label': f"{fast} / {', '.join(charged)}",
             'n_sc': len(SCENS), 'meta': META, 'atk': META[:, 5].copy(),
             'scen_labels': SCEN_LABELS}
 
@@ -220,11 +225,19 @@ def _recount(state, block, cols_of, mode_tag):
     for b in block['builds']:
         idx = np.flatnonzero(b['_mask'])
         cols = cols_of
-        per_scen = []
+        per_scen, ties, losses = [], [], []
         for si in range(len(SCENS)):
             counts = sorted(sum(1 for j in cols if is_win(int(sc[i, si, j])))
                             for i in idx)
             per_scen.append([counts[(len(counts) - 1) // 2], counts[0]])
+            # The typical member: the lower middle by (wins, ties).
+            wt = sorted((sum(1 for j in cols if is_win(int(sc[i, si, j]))),
+                         sum(1 for j in cols if int(sc[i, si, j]) == 500))
+                        for i in idx)
+            w, t = wt[(len(wt) - 1) // 2]
+            ties.append([t, min(x[1] for x in wt)])
+            losses.append([len(cols) - w - t,
+                           max(len(cols) - x[0] - x[1] for x in wt)])
         opp_raw = [pop['members'][a['members'][j]]['raw_atk'] for j in cols]
         cmp_counts = []
         for i in idx:
@@ -232,7 +245,7 @@ def _recount(state, block, cols_of, mode_tag):
                                       league=LEAGUE)
             cmp_counts.append(sum(1 for r in opp_raw if f.raw_atk > r))
         cmp_counts.sort()
-        out.append({'beat': per_scen,
+        out.append({'beat': per_scen, 'tie': ties, 'loss': losses,
                     'cmp': [cmp_counts[(len(cmp_counts) - 1) // 2],
                             cmp_counts[0]]})
     return out
@@ -242,6 +255,10 @@ def _recount(state, block, cols_of, mode_tag):
                                       ('pvpoke:nobait', 'nobait')])
 def test_population_numbers_reproduce_from_stored_scores(mode, tag):
     state, pop = _population()
+    # Ties: the synthetic surface is continuous, so snap the scores near 500
+    # onto it (a real mirror ties often: most of Melmetal's rank list).
+    sc = pop['arms'][0]['scores'][tag]
+    sc[np.abs(sc.astype(int) - 500) <= 25] = 500
     block = _block()
     pf = D.population_facts(_ctx(state, mode), block, 'flat')
     assert pf is not None and pf['page_ok']
@@ -258,7 +275,13 @@ def test_population_numbers_reproduce_from_stored_scores(mode, tag):
         assert groups[key]['n'] == len(cols)
         for w, g in zip(want, got):
             assert g['beat'] == w['beat'], key
+            assert g['tie'] == w['tie'], key
+            assert g['loss'] == w['loss'], key
             assert g['cmp'] == w['cmp'], key
+            # One actual member: wins + ties + losses is the group size.
+            for si in range(len(SCENS)):
+                assert (g['beat'][si][0] + g['tie'][si][0]
+                        + g['loss'][si][0]) == len(cols)
     # Non-trivial: the two builds land on different 1v1 counts, and the
     # counts are neither all-zero nor all-N (the "both empty" failure mode).
     r = groups['rank']['builds']
@@ -268,6 +291,13 @@ def test_population_numbers_reproduce_from_stored_scores(mode, tag):
     flat = [v for b in r for pair in b['beat'] for v in pair]
     assert 0 < max(flat) and min(flat) < len(rank_cols)
     assert r[0]['cmp'][0] > r[1]['cmp'][0]
+    # ...and the ties are not all zero (pre-2026-09-28 they were not carried
+    # at all: a tie was silently a non-win).
+    assert max(v for b in r for pair in b['tie'] for v in pair) > 0
+    # The column moveset is carried per group (the pool's, here the arm's).
+    assert groups['rank']['moveset'] == ('THUNDER_SHOCK',
+                                         ('DOUBLE_IRON_BASH',
+                                          'DYNAMIC_PUNCH'))
 
 
 def test_page_group_is_dropped_when_the_builds_moved():
@@ -294,19 +324,26 @@ def test_no_population_no_facts():
 # the rendered sentences
 # ---------------------------------------------------------------------------
 
-def _pf():
-    rank_rows = [{'role': 'primary', 'size': 400, 'n': 20,
-                  'beat': [[0, 0]] * 4 + [[17, 12]] + [[0, 0]] * 4,
-                  'cmp': [15, 9]},
-                 {'role': 'fork', 'size': 300, 'n': 20,
-                  'beat': [[0, 0]] * 4 + [[8, 8]] + [[0, 0]] * 4,
-                  'cmp': [0, 0]}]
-    page_rows = [{'role': 'primary', 'size': 400, 'n': 3,
-                  'beat': [[0, 0]] * 4 + [[2, 1]] + [[0, 0]] * 4,
-                  'cmp': [2, 1]},
-                 {'role': 'fork', 'size': 300, 'n': 3,
-                  'beat': [[0, 0]] * 4 + [[1, 1]] + [[0, 0]] * 4,
-                  'cmp': [0, 0]}]
+SAME = 'THUNDER_SHOCK / DOUBLE_IRON_BASH, DYNAMIC_PUNCH'
+OTHER = 'THUNDER_SHOCK / DOUBLE_IRON_BASH, THUNDERBOLT'
+POOL = ('THUNDER_SHOCK', ('DOUBLE_IRON_BASH', 'DYNAMIC_PUNCH'))
+
+
+def _rows(counts, n):
+    """Build rows from per-build (wins, ties, CMP wins) in the 1v1 (si 4)."""
+    out = []
+    for (w, t, c), role, size in zip(counts, ('primary', 'fork'), (400, 300)):
+        pad = [[0, 0]] * 4
+        out.append({'role': role, 'size': size, 'n': n,
+                    'beat': pad + [[w, 0]] + pad,
+                    'tie': pad + [[t, 0]] + pad,
+                    'loss': [[n, n]] * 4 + [[n - w - t, n]] + [[n, n]] * 4,
+                    'cmp': [c, 0]})
+    return out
+
+
+def _pf(rank=((0, 13, 4), (1, 0, 20)), page=((2, 0, 2), (1, 1, 0)),
+        arm_label=SAME):
     cmp_rows = [{'q': 0.5, 'T': 119.39, 'line': 119.3913, 'line_printed': 119.39,
                  'line_dp': 2, 'n_beaten': 13, 'n_cohort': 20,
                  'n_grid_strict': 900, 'n_grid_ties': 950},
@@ -314,91 +351,165 @@ def _pf():
                  'line_printed': 119.91, 'line_dp': 2, 'n_beaten': 19,
                  'n_cohort': 20, 'n_grid_strict': 500, 'n_grid_ties': 520}]
     return {'species': 'Melmetal', 'shadow': False, 'scenario': '1v1',
+            'arm_label': arm_label,
             'si': 4, 'n_members': 22, 'page_ok': True,
             'groups': [{'key': 'rank', 'shadow': False, 'n': 20,
                         'atk_lo': 118.86, 'atk_hi': 120.76, 'cmp': cmp_rows,
-                        'builds': rank_rows},
+                        'moveset': POOL, 'builds': _rows(rank, 20)},
                        {'key': 'page', 'shadow': False, 'n': 3, 'cmp': None,
-                        'builds': page_rows}]}
+                        'moveset': POOL, 'builds': _rows(page, 3)}]}
 
 
 BL = {'builds': [{'role': 'primary'}, {'role': 'fork'}]}
 FACTS = {'header': {'species': 'Melmetal', 'shadow': False}}
+CUT = ("An attack of 119.39 and up wins charge-move priority against 13 of "
+       "them, and 119.91 and up against 19.")
 
 
-def test_population_sentences_print_the_counts():
-    out = W.population_sentences(_pf(), BL, FACTS)
-    assert out == [
-        "Against the top 20 spreads on PvPoke's IV rank list for Melmetal, "
-        "in the 1v1: Build 1 beats 85% (every member at least 60%) and wins "
-        "charge-move priority against 75%; Build 2 beats 40% and wins "
-        "charge-move priority against 0%.",
-        "An attack of 119.39 and up wins charge-move priority against 13 of "
-        "them, and 119.91 and up against 19.",
-        "Against this page's own picks for Melmetal (3 spreads: each build's "
-        "most-winning member and SP1), in the 1v1: Build 1 beats 2 of 3 "
-        "(every member at least 1 of 3) and wins charge-move priority "
-        "against 2 of 3; Build 2 beats 1 of 3 and wins charge-move priority "
-        "against 0 of 3.",
-    ]
+@pytest.mark.parametrize('case,rank,label,want', [
+    # (a) the columns run another moveset; every build's typical member
+    # loses all 20 (Melmetal GL Hyper Beam / Rock Slide / Thunderbolt).
+    ('a-all', ((0, 0, 20), (0, 0, 18)), OTHER,
+     "The mirrors you will meet run Thunder Shock / Double Iron Bash, "
+     "Dynamic Punch; with Thunderbolt every build on this page loses the 1v1 "
+     "to all 20 of the top-20 rank list."),
+    # (a) not every build loses all 20: the counts instead (Superpower).
+    ('a-counts', ((1, 0, 4), (0, 0, 20)), OTHER,
+     "The mirrors you will meet run Thunder Shock / Double Iron Bash, "
+     "Dynamic Punch; with Thunderbolt, Build 1 wins 1, ties 0 and loses 19; "
+     "Build 2 wins 0, ties 0 and loses 20 of the top-20 rank list in the "
+     "1v1."),
+    # (b) same moveset, nobody beats more than 2, somebody out-prioritises
+    # at least half (Melmetal GL Dynamic Punch).
+    ('b', ((0, 13, 4), (1, 0, 20)), SAME,
+     "Priority does not win the Melmetal mirror, bulk does: no build on this "
+     "page beats more than 1 of the top-20 rank list in the 1v1."),
+    ('b-zero', ((0, 13, 4), (0, 0, 10)), SAME,
+     "Priority does not win the Melmetal mirror, bulk does: no build on this "
+     "page beats the top-20 rank list in the 1v1."),
+    # (c) same moveset, a build beats at least half.
+    ('c', ((17, 1, 15), (8, 0, 0)), SAME,
+     "Build 1 beats 17 of the top-20 rank list in the 1v1."),
+    # (d) nothing fires: no lead (b fails on CMP: nobody reaches 10 of 20).
+    ('d', ((0, 13, 4), (1, 0, 9)), SAME, None),
+])
+def test_population_lead_triggers(case, rank, label, want):
+    pf = _pf(rank=rank, arm_label=label)
+    assert W.population_lead(pf, BL, FACTS) == want, case
+    html = W._population_preset_html(pf, BL, FACTS)
+    if want is None:
+        assert html.startswith('<div class="tw"><table>')
+    else:
+        assert html.startswith('<p class="wb-mirror">'
+                               + W._esc(want) + '</p><div class="tw">')
+    assert html.endswith('<p class="wb-mirror">' + W._esc(CUT) + '</p>')
+
+
+def test_population_table_cells():
+    pf = _pf()
+    html = W._population_preset_html(pf, BL, FACTS)
+    assert ('<tr><th>Build</th><th>spreads</th><th>vs rank list W / T / L'
+            '</th><th>wins CMP</th><th>vs page picks (3) W / T / L</th>'
+            '<th>wins CMP</th></tr>') in html
+    assert ('<tr><td>Build 1</td><td>400</td><td>0 / 13 / 7</td>'
+            '<td>4 of 20</td><td>2 / 0 / 1</td><td>2 of 3</td></tr>') in html
+    assert ('<tr><td>Build 2</td><td>300</td><td>1 / 0 / 19</td>'
+            '<td>20 of 20</td><td>1 / 1 / 1</td><td>0 of 3</td></tr>') in html
+    cap_counts = ("Counts are each build's typical member in the 1v1: its "
+                  "middle member by wins (then ties) for W / T / L, by CMP "
+                  "wins for wins CMP.")
+    assert W.population_texts(pf, BL, FACTS) == [
+        "Priority does not win the Melmetal mirror, bulk does: no build on "
+        "this page beats more than 1 of the top-20 rank list in the 1v1.",
+        "The mirrors run this page's moveset. " + cap_counts, CUT]
+    assert ('<p class="wb-caption">'
+            + W._esc("The mirrors run this page's moveset. " + cap_counts)
+            + '</p>') in html
+    other = _pf(rank=((0, 0, 20), (0, 0, 18)), arm_label=OTHER)
+    assert W.population_caption(other, other['groups'][0]) == (
+        "The mirrors run PvPoke's default Thunder Shock / Double Iron Bash, "
+        "Dynamic Punch, not Thunderbolt. " + cap_counts)
+    # The page picks moved: their columns go, the rank list's stay.
+    pf['page_ok'] = False
+    html = W._population_preset_html(pf, BL, FACTS)
+    assert 'page picks' not in html
+    assert html.count('<th>') == 4
+    # The other shadow form's rank list: a second table of the same shape.
+    pf = _pf()
+    pf['groups'].insert(1, dict(pf['groups'][0], key='rank_other',
+                                shadow=True, cmp=None))
+    html = W._population_preset_html(pf, BL, FACTS)
+    assert html.count('<table>') == 2
+    assert '<th>vs Melmetal (Shadow) rank list W / T / L</th>' in html
 
 
 def test_one_page_pick_is_one_spread():
     """Every build's most-winning member can BE SP1 (real: Melmetal GL arm
-    1), and the first real render printed "(1 spreads: ...)"."""
-    pf = _pf()
+    1), and the first real render printed "(1 spreads: ...)"; the table
+    names the count once, in its header."""
+    pf = _pf(page=((0, 0, 1), (0, 1, 1)))
     page = pf['groups'][1]
     page['n'] = 1
-    page['builds'] = [dict(r, n=1, beat=[[0, 0]] * 9, cmp=[1, 1])
-                      for r in page['builds']]
-    out = W.population_sentences(pf, BL, FACTS)[-1]
-    assert '(1 spread: ' in out and '1 spreads' not in out
+    page['builds'] = _rows(((0, 0, 1), (0, 1, 1)), 1)
+    html = W._population_preset_html(pf, BL, FACTS)
+    assert '<th>vs page picks (1) W / T / L</th>' in html
+    assert '<td>0 / 0 / 1</td><td>1 of 1</td>' in html
+    assert '<td>0 / 1 / 0</td><td>1 of 1</td>' in html
 
 
-def test_population_replaces_the_cohort_and_old_blobs_keep_it(monkeypatch):
-    monkeypatch.setattr(W, 'RENDER_MIRROR_POPULATION', True)
-    mf = {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
-          'split': None,
-          'cmp': _pf()['groups'][0]['cmp'],
-          'builds': [{'role': 'primary', 'size': 400, 'n_clear': [0, 0],
-                      'atk_max': 119.0},
-                     {'role': 'fork', 'size': 300, 'n_clear': [0, 0],
-                      'atk_max': 118.0}]}
+def _cohort_mf():
+    return {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
+            'split': None,
+            'cmp': _pf()['groups'][0]['cmp'],
+            'builds': [{'role': 'primary', 'size': 400, 'n_clear': [0, 0],
+                        'atk_max': 119.0},
+                       {'role': 'fork', 'size': 300, 'n_clear': [0, 0],
+                        'atk_max': 118.0}]}
+
+
+def test_population_replaces_the_cohort_and_old_blobs_keep_it():
+    mf = _cohort_mf()
     old = {'presets': {'flat': BL}, 'mirror': {'flat': mf}}
     html_old = W.mirror_block_html(FACTS, old)
     assert 'mirror-slayer protocol' in html_old
-    assert "IV rank list" not in html_old
+    assert "rank list" not in html_old
     # The exact pre-population rendering, so an old blob's page is unchanged.
     assert html_old == W._preset_blocks(
         old, lambda k: W._mirror_preset_html(mf, BL, FACTS))
     new = dict(old, population={'flat': _pf()})
     html_new = W.mirror_block_html(FACTS, new)
-    assert "PvPoke&#x27;s IV rank list" in html_new or \
-        "PvPoke's IV rank list" in html_new
     assert 'mirror-slayer protocol' not in html_new
-    assert html_new.count('<p class="wb-mirror">') == 1
+    assert html_new.count('<table>') == 1
+    # The lead and the cut sentence.
+    assert html_new.count('<p class="wb-mirror">') == 2
 
 
-def test_render_gate_keeps_the_cohort_paragraph_until_reviewed():
-    """The gate as shipped (2026-09-28): the population is baked and stored,
-    but a blob that carries one still renders the COHORT paragraph, byte-
-    identical to a blob without one, until RENDER_MIRROR_POPULATION is
-    flipped (the self-mirror probe in deep_dive_which_build's gate comment).
-    Fails the day the gate is opened, which is the point: opening it is a
-    ship decision, and this test is where it gets recorded."""
-    assert W.RENDER_MIRROR_POPULATION is False
-    mf = {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
-          'split': None,
-          'cmp': _pf()['groups'][0]['cmp'],
-          'builds': [{'role': 'primary', 'size': 400, 'n_clear': [0, 0],
-                      'atk_max': 119.0},
-                     {'role': 'fork', 'size': 300, 'n_clear': [0, 0],
-                      'atk_max': 118.0}]}
+def test_render_gate_ships_the_population_block():
+    """The gate, opened 2026-09-28 when Michael picked the wording (the V4
+    lead sentence plus the V2 table). A blob that carries a population
+    renders the new block; a blob without one renders the cohort paragraph
+    byte-identical to what it rendered before; and the switch still restores
+    the cohort paragraph without a re-dive."""
+    assert W.RENDER_MIRROR_POPULATION is True
+    mf = _cohort_mf()
     old = {'presets': {'flat': BL}, 'mirror': {'flat': mf}}
     new = dict(old, population={'flat': _pf()})
     html_old = W.mirror_block_html(FACTS, old)
+    assert html_old == W._preset_blocks(
+        old, lambda k: W._mirror_preset_html(mf, BL, FACTS))
     assert 'mirror-slayer protocol' in html_old
-    assert W.mirror_block_html(FACTS, new) == html_old
+    html_new = W.mirror_block_html(FACTS, new)
+    assert html_new == W._preset_blocks(
+        new, lambda k: W._population_preset_html(_pf(), BL, FACTS))
+    assert '<table>' in html_new and html_new != html_old
+
+
+def test_render_gate_switch_restores_the_cohort(monkeypatch):
+    monkeypatch.setattr(W, 'RENDER_MIRROR_POPULATION', False)
+    mf = _cohort_mf()
+    old = {'presets': {'flat': BL}, 'mirror': {'flat': mf}}
+    new = dict(old, population={'flat': _pf()})
+    assert W.mirror_block_html(FACTS, new) == W.mirror_block_html(FACTS, old)
 
 
 # ---------------------------------------------------------------------------

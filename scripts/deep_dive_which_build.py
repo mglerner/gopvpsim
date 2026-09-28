@@ -4022,55 +4022,147 @@ def _mirror_preset_html(mf, bl, facts):
 
 # ---- "The mirror", population version (TODO.md "NEXT BAKE: mirror
 # population") ------------------------------------------------------------
-# Where the blob carries ``state['mirror_population']``, the paragraph reads
-# it INSTEAD of the cohort: per build, how many of the mirrors a reader will
-# meet its members beat in one shield scenario, and how many they out-
-# prioritise. The population is labelled in two parts, as the decision
-# record asks -- PvPoke's IV rank list (the common builds) and this page's
-# own picks (what readers build once the page exists) -- and every number is
-# a count off the stored per-(spread, scenario, member) scores
+# Where the blob carries ``state['mirror_population']``, the block reads it
+# INSTEAD of the cohort: per build, how the mirrors a reader will meet go in
+# one shield scenario -- wins, ties (a score of exactly 500) and losses of
+# the build's typical member -- and how many of them it out-prioritises.
+# The population is labelled in two parts, as the decision record asks --
+# PvPoke's IV rank list (the common builds) and this page's own picks (what
+# readers build once the page exists) -- and every number is a count off the
+# stored per-(spread, scenario, member) scores
 # (``deep_dive_builds.population_facts``). Blobs without the key render the
 # cohort paragraph above, unchanged.
 #
-# Every sentence is data-driven template text: the fixed words below plus
-# counts, a species name, a scenario label and build names.
+# Shape (Michael, 2026-09-28, from the wording mockups in ~/coding/reports:
+# "V4 lead + V2 table"): one lead sentence chosen by a mechanical trigger
+# (:func:`population_lead`), a table with one row per build
+# (:func:`population_table_html`), a caption naming the moveset the mirror
+# columns run, then the CMP-cut sentence. Every sentence is template text:
+# the fixed words below plus counts, names and move names.
 
-POP_LEAD_RANK = "Against the top {n} spreads on PvPoke's IV rank list for {name}"
-POP_LEAD_PAGE = ("Against this page's own picks for {name} ({n} {spreads}: "
-                 "each build's most-winning member and SP1)")
-
-
-def _pop_share(k, n, as_pct):
-    return brief.pct(k / n, dp=0) if as_pct else f"{brief._n(k)} of {brief._n(n)}"
-
-
-def _pop_build_clause(name, r, as_pct):
-    """One build's clause: median member's wins in the scenario, the weakest
-    member's where it differs, and the median member's CMP wins."""
-    n = r['n']
-    med, lo = r['beat_si']
-    out = f"{name} beats {_pop_share(med, n, as_pct)}"
-    if lo < med:
-        out += f" (every member at least {_pop_share(lo, n, as_pct)})"
-    cmed = r['cmp'][0]
-    return (out + " and wins charge-move priority against "
-            + _pop_share(cmed, n, as_pct))
+POP_LEAD_MOVESET = "The mirrors you will meet run {pool}; with {moves} "
+POP_ALL_LOSE = ("every build on this page loses the 1v1 to all {n} of the "
+                "top-{n} rank list.")
+POP_BULK = ("Priority does not win the {name} mirror, bulk does: no build on "
+            "this page beats {more}the top-{n} rank list in the 1v1.")
+POP_BEATS = "{build} beats {k} of the top-{n} rank list in the 1v1."
+POP_CAP_SAME = "The mirrors run this page's moveset."
+POP_CAP_OTHER = "The mirrors run PvPoke's default {pool}, not {moves}."
+POP_CAP_COUNTS = ("Counts are each build's typical member in the {scen}: its "
+                  "middle member by wins (then ties) for W / T / L, by CMP "
+                  "wins for wins CMP.")
 
 
-def population_group_sentence(pf, group, bl, name):
-    """One group's sentence: the lead, the scenario, one clause per build."""
+def _pop_moveset_text(fast, charged):
+    return display_moveset(f"{fast} / {', '.join(charged)}")
+
+
+def population_moves_differ(pf, group):
+    """The arm's moves the group's mirrors do NOT run, as display names
+    joined with "and"; None when the two movesets are the same.
+
+    Where the arm's moves are a subset of the column's (a one-charged-move
+    arm), there is no single differing move to name, so the arm's whole
+    moveset is named instead.
+    """
+    fast, charged = analysis.parse_moveset_label(pf['arm_label'])
+    pfast, pcharged = group['moveset']
+    if fast == pfast and sorted(charged) == sorted(pcharged):
+        return None
+    diff = (([fast] if fast != pfast else [])
+            + [c for c in charged if c not in pcharged])
+    if not diff:
+        return display_moveset(pf['arm_label'])
+    return ' and '.join(analysis.pretty_name(m) for m in diff)
+
+
+def _pop_typical(pf, r):
+    """(wins, ties, losses, CMP wins) of a build row, in the paragraph's
+    scenario."""
     si = pf['si']
-    as_pct = group['key'] != 'page'
-    lead = (POP_LEAD_PAGE if group['key'] == 'page'
-            else POP_LEAD_RANK).format(
-                n=brief._n(group['n']), name=name,
-                spreads='spread' if group['n'] == 1 else 'spreads')
-    clauses = []
+    return r['beat'][si][0], r['tie'][si][0], r['loss'][si][0], r['cmp'][0]
+
+
+def population_lead(pf, bl, facts):
+    """The lead sentence, or None. The first trigger that fires wins:
+
+    (a) the rank-list mirrors run a moveset other than the arm's: name it,
+        then "every build ... loses ... to all N" when EVERY build's typical
+        member loses all N, else each build's counts;
+    (b) same moveset, no build's typical member beats more than 2 of N, and
+        some build's out-prioritises at least half of N: priority does not
+        win the mirror, bulk does;
+    (c) same moveset, some build's typical member beats at least half of N:
+        name the one that beats the most (the first on a tie);
+    (d) otherwise no lead; the table stands alone.
+    """
+    rank = next((g for g in pf['groups'] if g['key'] == 'rank'), None)
+    if rank is None or not rank['builds']:
+        return None
+    n = rank['n']
+    rows = [_pop_typical(pf, r) for r in rank['builds']]
+    names = [role_short(bl['builds'][i], i)
+             for i in range(len(rank['builds']))]
+    moves = population_moves_differ(pf, rank)
+    if moves is not None:
+        (fast, charged) = rank['moveset']
+        lead = POP_LEAD_MOVESET.format(
+            pool=_pop_moveset_text(fast, charged), moves=moves)
+        if all(l == n for _w, _t, l, _c in rows):
+            return lead + POP_ALL_LOSE.format(n=brief._n(n))
+        counts = '; '.join(
+            f"{nm} wins {brief._n(w)}, ties {brief._n(t)} and loses "
+            f"{brief._n(l)}" for nm, (w, t, l, _c) in zip(names, rows))
+        return (lead.rstrip() + ', ' + counts
+                + f" of the top-{brief._n(n)} rank list in the 1v1.")
+    wins = [w for w, _t, _l, _c in rows]
+    k = max(wins)
+    if k <= 2 and any(2 * c >= n for _w, _t, _l, c in rows):
+        return POP_BULK.format(
+            name=brief.focal_name(facts['header']), n=brief._n(n),
+            more='' if k == 0 else f"more than {brief._n(k)} of ")
+    if 2 * k >= n:
+        return POP_BEATS.format(build=names[wins.index(k)], k=brief._n(k),
+                                n=brief._n(n))
+    return None
+
+
+def population_table_html(pf, bl, group, page=None, head=None):
+    """One row per build: spreads, the typical member's W / T / L and CMP
+    wins against ``group``, and the same against this page's picks when
+    ``page`` is given."""
+    n = group['n']
+    cols = ['Build', 'spreads', head or 'vs rank list W / T / L',
+            'wins CMP']
+    if page is not None:
+        cols += [f"vs page picks ({brief._n(page['n'])}) W / T / L",
+                 'wins CMP']
+    rows = []
     for i, r in enumerate(group['builds']):
-        clauses.append(_pop_build_clause(
-            role_short(bl['builds'][i], i), dict(r, beat_si=r['beat'][si]),
-            as_pct))
-    return f"{lead}, in the {pf['scenario']}: {'; '.join(clauses)}."
+        w, t, l, c = _pop_typical(pf, r)
+        cells = [role_short(bl['builds'][i], i), brief._n(r['size']),
+                 f"{w} / {t} / {l}", f"{brief._n(c)} of {brief._n(n)}"]
+        if page is not None:
+            pw, pt, pl, pc = _pop_typical(pf, page['builds'][i])
+            cells += [f"{pw} / {pt} / {pl}",
+                      f"{brief._n(pc)} of {brief._n(page['n'])}"]
+        rows.append('<tr>' + ''.join(f'<td>{_esc(x)}</td>' for x in cells)
+                    + '</tr>')
+    return ('<div class="tw"><table><tr>'
+            + ''.join(f'<th>{_esc(x)}</th>' for x in cols) + '</tr>'
+            + ''.join(rows) + '</table></div>')
+
+
+def population_caption(pf, group):
+    """The column moveset, then what the counts are."""
+    moves = population_moves_differ(pf, group)
+    if moves is None:
+        first = POP_CAP_SAME
+    else:
+        fast, charged = group['moveset']
+        first = POP_CAP_OTHER.format(pool=_pop_moveset_text(fast, charged),
+                                     moves=moves)
+    return first + ' ' + POP_CAP_COUNTS.format(scen=pf['scenario'])
 
 
 def population_cut_sentence(group):
@@ -4081,49 +4173,58 @@ def population_cut_sentence(group):
     return clause[0].upper() + clause[1:] + '.'
 
 
-def population_sentences(pf, bl, facts):
-    """The paragraph: rank list (focal form), its CMP cuts, the other form's
-    rank list when it was swept, and this page's picks when they match."""
-    focal = brief.focal_name(facts['header'])
-    other = (pf['species'] if pf['shadow']
-             else f"{pf['species']} (Shadow)")
+def population_texts(pf, bl, facts):
+    """Every reader-visible string the block prints, in order (for the word
+    gates and the tests): lead, captions, cut sentence."""
     out = []
+    lead = population_lead(pf, bl, facts)
+    if lead:
+        out.append(lead)
     for g in pf['groups']:
-        if g['key'] == 'rank':
-            out.append(population_group_sentence(pf, g, bl, focal))
-            out.append(population_cut_sentence(g))
-        elif g['key'] == 'rank_other':
-            out.append(population_group_sentence(pf, g, bl, other))
-        else:
-            out.append(population_group_sentence(pf, g, bl, focal))
+        if g['key'] in ('rank', 'rank_other'):
+            out.append(population_caption(pf, g))
+            if g['key'] == 'rank':
+                out.append(population_cut_sentence(g))
     return out
 
 
 def _population_preset_html(pf, bl, facts):
     if not pf or not bl or not bl['builds']:
         return ''
-    return ('<p class="wb-mirror">'
-            + _esc(' '.join(population_sentences(pf, bl, facts))) + '</p>')
+    groups = {g['key']: g for g in pf['groups']}
+    parts = []
+    lead = population_lead(pf, bl, facts)
+    if lead:
+        parts.append(f'<p class="wb-mirror">{_esc(lead)}</p>')
+    rank = groups.get('rank')
+    if rank is not None:
+        page = groups.get('page') if pf['page_ok'] else None
+        parts.append(population_table_html(pf, bl, rank, page=page))
+        parts.append(f'<p class="wb-caption">'
+                     f'{_esc(population_caption(pf, rank))}</p>')
+        parts.append(f'<p class="wb-mirror">'
+                     f'{_esc(population_cut_sentence(rank))}</p>')
+    other = groups.get('rank_other')
+    if other is not None:
+        name = (pf['species'] if pf['shadow']
+                else f"{pf['species']} (Shadow)")
+        parts.append(population_table_html(
+            pf, bl, other, head=f"vs {name} rank list W / T / L"))
+        parts.append(f'<p class="wb-caption">'
+                     f'{_esc(population_caption(pf, other))}</p>')
+    return ''.join(parts)
 
 
-# RENDER GATE (2026-09-28, held for Michael's review). The population is
-# baked and stored, but the paragraph does not ship yet. On the 09-27
-# Melmetal GL blob the as-built sentence reads "Build 1 beats 0%": true, and
-# misleading as worded. Two things the wording hides: (1) "beats" is a
-# strict win, so the bulk build TIES 13 of the top-20 rank list (they are
-# the bulkiest spreads; bulk wins the Melmetal mirror) and the attack build
-# out-prioritises all 20 but loses the fight to 19, a real IV finding the
-# counts flatten; (2) every population column carries the POOL's moveset
-# (Thunder Shock / Double Iron Bash + Dynamic Punch), so on an off-meta arm
-# (Hyper Beam, Rock Slide, Thunderbolt) the "mirror" is a cross-moveset
-# fight and "beats 0%" is a moveset statement, not an IV one. A true
-# self-mirror (same IVs, same moveset, both seats) scores 500 on every arm
-# (probed directly; an earlier note blaming the row/column AI convention
-# was wrong). Until the framing is settled (TODO.md "NEXT BAKE: mirror
-# population", item (g); mockups in ~/coding/reports), the cohort paragraph
-# renders even when the blob carries a population. Flip to True to ship the
-# population paragraph; no re-dive is needed, the data is in the blob.
-RENDER_MIRROR_POPULATION = False
+# RENDER GATE, opened 2026-09-28. The wording was decided that day (Michael,
+# from the mockups in ~/coding/reports: the V4 lead sentence plus the V2
+# table), after the as-built "Build 1 beats 0%" sentence hid two things the
+# new block states outright: ties (a score of exactly 500 is neither a win
+# nor a loss, and on the Melmetal mirror most of the rank list ties) and the
+# column moveset (every population column runs the pool's moveset, so on an
+# off-meta arm the fight is a cross-moveset one; the lead and the caption
+# name it). Kept as a switch so the cohort paragraph can be restored without
+# a re-dive.
+RENDER_MIRROR_POPULATION = True
 
 
 def mirror_block_html(facts, arm_builds):
