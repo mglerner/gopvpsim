@@ -59,8 +59,9 @@ SCRIPTS_DIR = REPO_ROOT / 'scripts'
 GUIDES_DIR = REPO_ROOT / 'guides'
 ENGINE_JS = SCRIPTS_DIR / 'deep_dive_engine.js'
 SABLEYE_SHADOW = '20260911_005150_Sableye_great_shadow.replay.pkl.gz'
-# The 2026-09-13 Aegislash (Shield) bake: the focal IS the G-caveat species,
-# which is what took the section off every Aegislash page before 2026-09-20.
+# The 2026-09-13 Aegislash (Shield) bake: the focal WAS the G-caveat species
+# (until 2026-09-27), which is what took the section off every Aegislash page
+# before 2026-09-20.
 AEGISLASH_SHIELD = '20260913_062354_Aegislash_Shield_great.replay.pkl.gz'
 # A real blob whose arms 1, 2 and 4 carry NO line -- the negative page, which
 # neither Sableye blob reaches.
@@ -6470,8 +6471,12 @@ def test_a_rendered_best_buddy_page_carries_one_live_section_and_one_inert(
 
 @pytest.mark.local_artifacts
 @pytest.mark.slow
-def test_the_aegislash_page_still_gets_a_section():
+def test_the_aegislash_page_still_gets_a_section(monkeypatch):
     """G-caveat's focal exemption, on the blob that lost the section to it.
+
+    Aegislash left ``CAVEAT_SPECIES`` on 2026-09-27 (divergence resolved;
+    CHANGELOG 2026-09-27 'Aegislash'), so this pins the exemption MECHANISM
+    with the pre-retirement list monkeypatched back in.
 
     Pre-fix (2026-09-20) ``prepare()`` on this blob raised ``G-caveat:
     field=all cell=Aegislash printed='No attack, defense or HP threshold
@@ -6481,6 +6486,8 @@ def test_the_aegislash_page_still_gets_a_section():
     NOT off here: a caveat cell inside the page still has to carry the mark,
     which is what ``cell_label_with_caveat`` guarantees.
     """
+    monkeypatch.setattr(B, 'CAVEAT_SPECIES', ('Aegislash',))
+    assert W.brief is B        # the module W reads the list from
     path = require_blob(AEGISLASH_SHIELD)
     state = B.load_blob(str(path))
     all_facts = W.prepare(state, str(path))

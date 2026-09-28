@@ -145,9 +145,16 @@ COGATE_ROW_CAP = 2                # co-gate rows printed per rung
 SP_FLOOR = 0.95                   # stage 8 example rules
 CATCH_TARGETS = (0.50, 0.75)      # D7
 
-# G-caveat. Phase 0 item 3 of the plan moves this to scripts/mechanics_notice.py
-# as CAVEAT_SPECIES; it is defined here so v1 is self-contained.
-CAVEAT_SPECIES = ('Aegislash',)
+# G-caveat: opponent species whose cells carry an OPEN engine divergence
+# against PvPoke. Their cells print with CAVEAT_MARK and are excluded from the
+# floor, the rungs and the cost totals (named under field 13 instead).
+# Empty since 2026-09-27: the one entry, Aegislash, was retired when the
+# Aegislash x Azumarill divergence was resolved (CHANGELOG 2026-09-27
+# 'Aegislash': the Shield-form charged-damage estimate now prices at the
+# Blade attack, as PvPoke does, and every oracle cell matches). The machinery
+# stays for the next documented divergence; every use is an any(...) over
+# this tuple, so empty simply means no cell is a caveat cell.
+CAVEAT_SPECIES = ()
 CAVEAT_MARK = ' (engine divergence vs PvPoke)'
 
 
@@ -2430,9 +2437,9 @@ def scenario_lines(pool, win, planes, triage, contested_cells, ranks, state,
             rows = stage12b_dirty_thresholds(win, planes, cells_here, set(),
                                              ranks, triage, state, top_n=4)
             # G-caveat is an EXCLUSION everywhere else in this module, and a
-            # caption is a reader-facing string: a dirty row naming Aegislash
-            # bare would fail the render gate rather than ship, so the cell is
-            # dropped here the way the clean-cut census drops it.
+            # caption is a reader-facing string: a dirty row naming a caveat
+            # species bare would fail the render gate rather than ship, so
+            # the cell is dropped here the way the clean-cut census drops it.
             rows = [r for r in rows
                     if not any(cs in r['cell'] for cs in CAVEAT_SPECIES)]
             if rows:
@@ -6181,16 +6188,19 @@ def gate_voice(blocks, ctx):
 def gate_caveat(blocks, ctx):
     """G-caveat, at render time: a caveat CELL is never named bare.
 
-    Field 10 says the Aegislash cells are excluded from the cost diff as an
-    open engine divergence; the first build then led field 12's table with
-    one of them and carried no marker across. Any string naming a caveat
-    species must also carry the divergence wording.
+    Field 10 says a caveat species' cells are excluded from the cost diff as
+    an open engine divergence; the first build (when Aegislash was on the
+    list) then led field 12's table with one of them and carried no marker
+    across. Any string naming a caveat species must also carry the
+    divergence wording. With ``CAVEAT_SPECIES`` empty (since 2026-09-27)
+    nothing is watched and the gate passes every block.
 
-    The FOCAL species is exempt (``ctx['focal']``, 2026-09-20). A dive about
-    Aegislash names Aegislash in its headline, its lead and its provenance,
-    and the caveat is about Aegislash as an OPPONENT cell, not about the
-    subject of the page: without the exemption every Aegislash page lost its
-    whole "Which one to build?" section to its own title, unconditionally.
+    The FOCAL species is exempt (``ctx['focal']``, 2026-09-20; written while
+    Aegislash was on the list). A dive about Aegislash names Aegislash in its
+    headline, its lead and its provenance, and the caveat is about Aegislash
+    as an OPPONENT cell, not about the subject of the page: without the
+    exemption every Aegislash page lost its whole "Which one to build?"
+    section to its own title, unconditionally.
     The gate keeps its meaning on those pages through
     :func:`cell_label_with_caveat`, which marks a caveat cell wherever it is
     printed -- the mirror cell on an Aegislash page included. A caller that
