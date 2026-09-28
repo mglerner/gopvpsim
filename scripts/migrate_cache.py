@@ -79,6 +79,12 @@ Engine predicates (PROVEN, not guessed):
                 affected iff the scenario species does. Proof in the
                 predicate's docstring.
 
+  inhash_deadcode_20260928 -- zero-caller dead-code deletions in the
+                engine-hashed files (--from-engine 45cf73a2d23d; slayer
+                0c54e07bc21b). Blesses everything; the proof (zero-reader
+                evidence per symbol + oracle audit + a 60-column cached
+                re-sim) is in the predicate's docstring.
+
   neutral_batch_20260810 — the 2026-08-10 behavior-neutral bump
                 (--from-engine 1415857072fa): comment rewording + the
                 parse_types relocation into moves.py. Blesses everything
@@ -291,6 +297,54 @@ def _aegislash_blade_atk_20260927(f, c):
             return True
         return sp.startswith('Aegislash')
     return _hit(f) or _hit(c)
+
+
+def _inhash_deadcode_20260928(f, c):
+    """Dead-code deletions in the engine-hashed files (pin --from-engine
+    45cf73a2d23d -> 20d9f018970b; slayer --from-engine 0c54e07bc21b ->
+    5dfdafc264f6).
+
+    The ENTIRE engine delta is deletions of code nothing reads, plus
+    comments. Each symbol's zero-reader evidence is an AST scan of src/,
+    scripts/ and tests/ (imports, attribute reads, string constants,
+    keyword args), a repo-wide grep, and ruff F401/F841:
+      * battle.py ``from .moves import type_effectiveness, stab`` -- every
+        other importer takes both from gopvpsim.moves directly; no module
+        reads them via gopvpsim.battle.
+      * battle.py ``pvpoke_shield`` -- no caller; its one reference was an
+        unused name in tests/test_battle.py's import list (removed with it).
+      * battle.py pvpoke_dp local ``best_idx = dp_cache['best_idx']`` --
+        never read; the key is always present (_ensure_dp_cache builds it
+        unconditionally), so dropping the lookup cannot drop a KeyError.
+      * battle.py _ensure_dp_cache local ``n = len(cms)`` -- never read;
+        ``cms`` is a list, so len() has no side effect.
+      * battle.py _resolve_charged parameter ``allow_dead_attacker`` -- both
+        call sites pass the default False, so ``and not allow_dead_attacker``
+        was always True; the guard is now just ``attacker.hp <= 0``.
+      * _dp_jit.py _near_ko_dp_jit parameter ``fast_damage`` (+ its numba
+        signature slot and the ``int(fast_damage)`` argument at the single
+        call site in pvpoke_dp) -- documented "unused, kept for signature
+        stability"; the kernel body never read it. pvpoke_dp's local
+        ``fast_damage`` stays (it has other readers).
+      * pokemon.py ``_LEVEL_CAP_EXCLUSIONS`` -- no reader anywhere.
+      * Comments: the orphaned BattlePokemon "Deferred charged move" field
+        comment (the field is long gone) and the stale "step 1.5 deferred
+        charged" references in simulate(), now "step 2.5".
+    No arithmetic, control-flow or data change anywhere in the hashed
+    closure, so nothing is affected and every column (and slayer entry) is
+    blessed. Proofs, 2026-09-28: (a) the battle tier (test_battle,
+    test_form_change_oracle, test_pogodives*, test_new_turn_mechanics,
+    test_dp_jit_equivalence, test_cramorant) green; (b) the full oracle
+    audit ``audit_oracle_harness.py --mechanics new`` byte-identical to
+    main's output (279 cells, 268 exact, 11 documented, 0 new, 0
+    vanished); (c) 60 cached sweep columns stamped 45cf73a2d23d
+    (stratified over GL/UL x focal shadow x opponent shadow x
+    pvpoke/pogodives policy, bait and nobait) re-simulated at every stored
+    IV row and scenario through deep_dive_lib.sweep.build_battle_pair +
+    the worker's simulate call: 60/60 score AND energy planes exactly equal
+    (2,211,840 cells); (d) profile_slayer A/B within noise. One-shot; never
+    re-run against another --from-engine hash."""
+    return False
 
 
 def _neutral_batch_20260810(f, c):
@@ -630,6 +684,7 @@ PREDICATES = {
     'cram_0v1_surf_gate_20260927': _cram_0v1_surf_gate_20260927,
     'aegislash_blade_atk_20260927': _aegislash_blade_atk_20260927,
     'neutral_batch_20260810': _neutral_batch_20260810,
+    'inhash_deadcode_20260928': _inhash_deadcode_20260928,
     'cramorant_port_20260824': _cramorant_port_20260824,
     # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):
     # module globals defaulting to the exact literals they replaced

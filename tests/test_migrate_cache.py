@@ -760,3 +760,20 @@ def test_aegislash_blade_atk_20260927_predicate():
     # Fail-safe.
     assert p(None, plain) is True and p(plain, None) is True
     assert p({}, plain) is True and p(plain, {'species': ''}) is True
+
+
+def test_inhash_deadcode_20260928_predicate():
+    """Zero-caller dead-code deletions in the engine-hashed files (engine
+    45cf73a2d23d -> 20d9f018970b; slayer 0c54e07bc21b -> 5dfdafc264f6):
+    fully blessing, like neutral_batch_20260810 -- the proof rests on the
+    engine delta alone (see the predicate's docstring), so it reads no
+    column metadata and blesses even unreadable sides."""
+    p = migrate_cache.PREDICATES['inhash_deadcode_20260928']
+    aegi = {'species': 'Aegislash (Shield)', 'charged': ['GYRO_BALL']}
+    cram = {'species': 'Cramorant', 'charged': ['SURF', 'FLY'],
+            'shadow': True}
+    pg = {'species': 'Lapras', 'policy': 'pogodives', 'shadow': True}
+    assert p(aegi, aegi) is False                  # slayer mirror
+    assert p(cram, pg) is False
+    assert p(None, None) is False
+    assert p({}, {'species': 'X'}) is False

@@ -573,15 +573,6 @@ def pvpoke_default_ivs(species_name: str, league: str = 'great',
 # compute_default_ivs — mirrors PvPoke's generateDefaultIVsByPokemon() dev tool
 # ---------------------------------------------------------------------------
 
-# Legendaries whose level cap is NOT 40 in PvPoke (they can be powered past 40)
-_LEVEL_CAP_EXCLUSIONS = frozenset([
-    "melmetal",
-    "thundurus_incarnate", "thundurus_therian",
-    "landorus_incarnate",  "landorus_therian",
-    "tornadus_incarnate",  "tornadus_therian",
-    "rayquaza",
-])
-
 # Hard-coded overrides from PvPoke's generateDefaultIVsByPokemon switch block.
 # Applied after the algorithm runs, keyed by speciesId → cp-key → (level, a, d, s).
 _DEFAULT_IV_EXCEPTIONS: dict[str, dict[str, tuple]] = {
