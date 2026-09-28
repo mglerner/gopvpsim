@@ -239,7 +239,10 @@ def facts_for(name, arm, mode='pvpoke', level='l50'):
         'opponent rankings live, so it is only valid under the '
         '_frozen_rankings fixture (module-scoped to this file)')
     key = str(require_blob(name))
-    ck = (key, arm, mode, level)
+    # CAVEAT_SPECIES is an input too: the G-caveat tests monkeypatch it to
+    # pin the exclusion mechanism on real blobs, and their fact sets must not
+    # be served to (or from) the shipped, empty-tuple ones.
+    ck = (key, arm, mode, level, B.CAVEAT_SPECIES)
     if ck not in _BRIEF_CACHE:
         state, _key = load_blob_cached(name)
         _BRIEF_CACHE[ck] = B.compute_brief(state, arm, key,
@@ -648,42 +651,80 @@ def test_gate_names_rejects_a_miscounted_alternative_list():
 # G-caveat as an exclusion, not only a floor gate
 # ---------------------------------------------------------------------------
 
-def test_gate_caveat_rejects_a_bare_caveat_species_mention():
-    """Field 10 excludes Aegislash cells; every other field must say so too.
+# The shipped CAVEAT_SPECIES is empty since 2026-09-27 (the Aegislash x
+# Azumarill divergence was resolved; CHANGELOG 2026-09-27 'Aegislash'), so
+# the unit tests below pin the MECHANISM on a synthetic caveat species. The
+# pre-fix records in their docstrings are the real Aegislash strings that
+# motivated each fix, kept as history.
+CAVEAT_TEST_SPECIES = ('Testmon',)
+
+
+@pytest.fixture
+def testmon_caveat(monkeypatch):
+    monkeypatch.setattr(B, 'CAVEAT_SPECIES', CAVEAT_TEST_SPECIES)
+
+
+@pytest.fixture
+def aegislash_caveat(monkeypatch):
+    """The pre-2026-09-27 caveat list, for the real-blob mechanism pins.
+
+    A synthetic species never appears in a blob's opponents, so the tests
+    that pin the exclusion on real data put Aegislash back on the list; the
+    ``facts_for`` memo keys on ``CAVEAT_SPECIES``, so these fact sets never
+    mix with the shipped ones.
+    """
+    monkeypatch.setattr(B, 'CAVEAT_SPECIES', ('Aegislash',))
+
+
+def test_gate_caveat_rejects_a_bare_caveat_species_mention(testmon_caveat):
+    """Field 10 excludes caveat cells; every other field must say so too.
 
     Pre-fix, field 12's table led with 'Atk >= 147.56 | 1v1 Aegislash
     (Shield) | rank 72 | 625 -> 924' with no marker, on the same page whose
     field 10 says that cell carries an open engine divergence.
     """
-    B.gate_caveat(["1v1 Aegislash (Shield)" + B.CAVEAT_MARK], CTX)
+    B.gate_caveat(["1v1 Testmon (Shield)" + B.CAVEAT_MARK], CTX)
     with pytest.raises(B.GuardError) as exc:
-        B.gate_caveat(["Atk >= 147.56 | 1v1 Aegislash (Shield) | 625 -> 924"],
+        B.gate_caveat(["Atk >= 147.56 | 1v1 Testmon (Shield) | 625 -> 924"],
                       CTX)
     assert 'G-caveat' in str(exc.value)
-    assert 'Aegislash' in str(exc.value)
+    assert 'Testmon' in str(exc.value)
 
 
-def test_caveat_mark_carries_the_word_the_gate_looks_for():
-    """Positive control: the marker and the gate can never drift apart."""
+def test_caveat_mark_carries_the_word_the_gate_looks_for(monkeypatch):
+    """Positive control: the marker and the gate can never drift apart.
+
+    The shipped list is EMPTY (retired 2026-09-27), which is not "the gate is
+    disabled": the gate still fires for any species put back on the list,
+    and with the shipped empty tuple a bare Aegislash cell -- a hard failure
+    until 2026-09-27 -- now passes.
+    """
     assert 'divergence' in B.CAVEAT_MARK
-    assert B.CAVEAT_SPECIES, "an empty caveat list would disable the gate"
+    bare = ["Atk >= 147.56 | 1v1 Aegislash (Shield) | 625 -> 924"]
+    assert B.CAVEAT_SPECIES == ()
+    B.gate_caveat(bare, CTX)                   # pre-2026-09-27: GuardError
+    assert B.cell_label_with_caveat(bare[0]) == bare[0]
+    monkeypatch.setattr(B, 'CAVEAT_SPECIES', ('Aegislash',))
+    with pytest.raises(B.GuardError) as exc:
+        B.gate_caveat(bare, CTX)
+    assert 'G-caveat' in str(exc.value)
 
 
-def test_gate_caveat_exempts_the_page_its_own_focal_species():
-    """A dive ABOUT Aegislash may name Aegislash in its own headline.
+def test_gate_caveat_exempts_the_page_its_own_focal_species(testmon_caveat):
+    """A dive ABOUT a caveat species may name it in its own headline.
 
     Pre-fix (2026-09-20) the gate carried no focal, so the Aegislash
     (Shield) Great League page failed on its own opening sentence --
     ``G-caveat: field=all cell=Aegislash printed='No attack, defense or HP
     threshold decides a matchup for Aegislash (Shield) runn'`` -- and EVERY
     Aegislash dive shipped without its "Which one to build?" section,
-    unconditionally. The caveat is about Aegislash as an OPPONENT cell; a
+    unconditionally. The caveat is about the species as an OPPONENT cell; a
     cell still carries the mark, through
     :func:`cell_label_with_caveat`.
     """
     headline = ("No attack, defense or HP threshold decides a matchup for "
-                "Aegislash (Shield) running Air Slash on this grid.")
-    B.gate_caveat([headline], dict(CTX, focal='Aegislash (Shield)'))
+                "Testmon (Shield) running Air Slash on this grid.")
+    B.gate_caveat([headline], dict(CTX, focal='Testmon (Shield)'))
     with pytest.raises(B.GuardError) as exc:       # the pre-fix behaviour
         B.gate_caveat([headline], CTX)
     assert 'G-caveat' in str(exc.value)
@@ -693,7 +734,8 @@ def test_gate_caveat_exempts_the_page_its_own_focal_species():
         B.gate_caveat([headline], dict(CTX, focal='Turtonator'))
 
 
-def test_a_caveat_cell_printed_through_the_helper_passes_the_gate():
+def test_a_caveat_cell_printed_through_the_helper_passes_the_gate(
+        testmon_caveat):
     """ONE decorator for every print site (the 2026-09-20 fix, part b).
 
     Pre-fix only the two cost tables appended ``CAVEAT_MARK`` by hand, so an
@@ -701,7 +743,7 @@ def test_a_caveat_cell_printed_through_the_helper_passes_the_gate():
     being marked: the Turtonator arm-1 section died on ``Gives up 3 cells
     the floor guarantees: 0v1 Aegislash (Blade) (unranked), 0v2 Aeg``.
     """
-    bare = '0v1 Aegislash (Blade) (unranked)'
+    bare = '0v1 Testmon (Blade) (unranked)'
     marked = B.cell_label_with_caveat(bare)
     assert marked == bare + B.CAVEAT_MARK
     assert B.cell_label_with_caveat(marked) == marked      # idempotent
@@ -816,10 +858,20 @@ def test_sableye_shadow_level_51_view_prints_its_own_cut(sableye_shadow_facts):
 
 @pytest.mark.local_artifacts
 def test_sableye_shadow_cost_diff_excludes_the_caveat_species(
-        sableye_shadow_facts):
+        sableye_shadow_facts, monkeypatch):
+    """The plan's 38 / 24 oracle is the diff WITH Aegislash excluded.
+
+    Since 2026-09-27 nothing is excluded, so the shipped diff is the plan's
+    own "with them" figure, 40 / 25; the oracle exclusion is re-pinned under
+    the pre-retirement caveat list.
+    """
     _state, facts, _path = sableye_shadow_facts
     d = facts['cost']['diff']
     assert facts['cost']['reverse_cuts'] == 0
+    assert (d['n_gained'], d['n_lost']) == (40, 25)
+    assert d['caveat_excluded'] == 0
+    monkeypatch.setattr(B, 'CAVEAT_SPECIES', ('Aegislash',))
+    d = facts_for(SABLEYE_SHADOW, 0)['cost']['diff']
     assert (d['n_gained'], d['n_lost']) == (38, 24)
     assert (d['n_gained_with_caveat'], d['n_lost_with_caveat']) == (40, 25)
     assert d['caveat_excluded'] == 3
@@ -1272,8 +1324,12 @@ def test_coverage_lines_and_sensitivity_are_valid_selectors(
 
 
 @pytest.mark.local_artifacts
-def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed():
+def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed(
+        aegislash_caveat):
     """G-caveat is an exclusion, not only a floor gate.
+
+    Pinned under the pre-2026-09-27 caveat list (``aegislash_caveat``); the
+    shipped, empty-list page is pinned by the next test.
 
     Pre-fix, field 6 printed "Atk >= 120.83 | 0v0 Aegislash (Shield), 0v2
     Aegislash (Shield)" as an ordinary rung, and because those cells were
@@ -1296,6 +1352,36 @@ def test_furret_aegislash_rung_is_excluded_and_the_caveat_is_printed():
     html = B.render_facts(state, arm, str(path), facts)
     assert 'engine divergence' in html
     assert 'Atk &gt;= 120.83' not in html               # pre-fix string
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.slow
+def test_retired_aegislash_caveat_prints_no_divergence_on_a_real_page():
+    """The Aegislash x Azumarill divergence was resolved 2026-09-27.
+
+    CHANGELOG 2026-09-27 'Aegislash': the Shield-form charged-damage estimate
+    now prices at the Blade attack, as PvPoke does, and every oracle cell
+    matches, so ``CAVEAT_SPECIES`` ships empty. Pre-fix (main 0a05ff1, this
+    blob and arm) the page still printed the divergence wording ('engine
+    divergence' 4 times in the HTML), field 13 carried
+    n_excluded_by_caveat == 3, the census clean_excluded == 3, and no ladder
+    rung named Aegislash -- its cuts were held out of the floor, the rungs
+    and the cost totals.
+    """
+    state, path = load_blob_cached(FURRET)
+    assert any('Aegislash' in n for n in state['opponent_names']), (
+        'positive control: this blob has Aegislash opponents to include')
+    arm = next(i for i in range(len(state['moveset_data']))
+               if facts_for(FURRET, i)['floor'] is None)
+    facts = facts_for(FURRET, arm)
+    assert facts['not_claimed']['n_excluded_by_caveat'] == 0     # pre-fix: 3
+    assert facts['clean_excluded'] == 0                          # pre-fix: 3
+    named = [n for row in facts['rungs_above'] + facts['rungs_below']
+             for n in row['names']]
+    assert any('Aegislash' in n for n in named)             # pre-fix: none
+    html = B.render_facts(state, arm, str(path), facts)
+    assert 'Aegislash' in html
+    assert 'engine divergence' not in html                       # pre-fix: 4
 
 
 @pytest.mark.local_artifacts
@@ -1587,10 +1673,13 @@ def test_cli_requires_an_output_directory():
 
 
 @pytest.mark.local_artifacts
-def test_field_12_marks_a_caveat_row_when_one_is_listed(sableye_shadow_facts,
+def test_field_12_marks_a_caveat_row_when_one_is_listed(aegislash_caveat,
                                                         monkeypatch):
-    """Pre-fix, the 1v1 Aegislash step LED this table with no marker."""
-    _state, facts, _path = sableye_shadow_facts
+    """Pre-fix, the 1v1 Aegislash step LED this table with no marker.
+
+    Pinned under the pre-2026-09-27 caveat list (``aegislash_caveat``).
+    """
+    facts = facts_for(SABLEYE_SHADOW, 0)
     rows = facts['score_only']
     assert rows[0]['caveat'] is False, "a caveat row never leads the table"
     assert any(r['caveat'] for r in rows), "the Aegislash step is still here"
@@ -1962,8 +2051,12 @@ def test_furret_defense_rule_is_the_line_not_the_closest_thing_to_one():
 
 
 @pytest.mark.local_artifacts
-def test_furret_clean_cut_denominators_reconcile():
+def test_furret_clean_cut_denominators_reconcile(aegislash_caveat):
     """Round 2 printed 28, 26 and 28 for one quantity, ten lines apart.
+
+    Pinned under the pre-2026-09-27 caveat list (``aegislash_caveat``): the
+    reconciliation only has two terms to reconcile while something is
+    excluded.
 
     V3: the reconciliation sentence lives in the degradation ladder, which
     only fires on an arm with NO line, so this runs on the Furret arm that
