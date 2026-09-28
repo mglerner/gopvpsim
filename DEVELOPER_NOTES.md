@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-09-28)
 
-<!-- sync:test_count -->3067<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3057<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -1185,6 +1185,14 @@ PvPoke uses three different insertion strategies in the DP queue:
 
 The `<` for not-ready states is critical — it produced 2 exact PvPoke
 matches and several closer scores for Azu vs Forretress.
+
+Order within one pop: the farm-down state goes in FIRST, before the
+charged-move expansions (PvPoke inserts it inside the per-move loop, ahead of
+each move; once is equivalent). Until 2026-09-28 we inserted it after them;
+the two orders differ only on a same-turn tie with a ready move
+(`fm_to_ko * fast_turns == 1`, a 1-turn fast move whose single hit KOs),
+where the farm-down state now pops first, as in PvPoke. Pinned by
+`tests/test_farmdown_order_port.py`.
 
 ### CMP tie resolution: exact ties fall to player index (PROP-1)
 

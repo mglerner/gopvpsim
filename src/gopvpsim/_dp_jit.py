@@ -6,9 +6,9 @@ that numba can compile it ahead of time and cache the result on disk
 (`@njit(cache=True)`).
 
 The JIT function `_near_ko_dp_jit` is a faithful port of the pure-Python
-near-KO loop: it pops the front of a queue, expands each state by every
-charged move (ready → insert AFTER same-turn with dedup; not-ready → insert
-BEFORE same-turn), and adds a farm-down state. The plan summary tracked per
+near-KO loop: it pops the front of a queue, adds a farm-down state, then
+expands the state by every charged move (ready -> insert AFTER same-turn with
+dedup; not-ready -> insert BEFORE same-turn). The plan summary tracked per
 state is a small set of scalars (first thrown move, max-damage move, has-
 debuffing flag, net debuff count) — see `_DPState` in battle.py for the
 rationale.
@@ -189,6 +189,48 @@ def _make_jit():
             stage_row_idx = curr_atk_stg + 4
             curr_fast_dmg = fast_dmg_stage[stage_row_idx]
 
+            # ---- Farm-down state (no new charged move thrown) ----
+            # Inserted BEFORE the charged-move expansions, as in PvPoke
+            # (ActionLogic.js inserts it inside the per-move loop, ahead
+            # of each move's expansion; once here is equivalent -- the
+            # per-move copies are identical and any farm-down pop ends
+            # the search). Only a same-turn tie with a ready move (a
+            # 1-turn fast move whose single hit KOs) sees the order.
+            if curr_fast_dmg > 0 and curr_hp > 0.0:
+                fm_to_ko = int((curr_hp + curr_fast_dmg - 1) // curr_fast_dmg)
+                fd_turn = curr_t + fm_to_ko * fast_turns
+                fd_energy = curr_e + fast_energy * fm_to_ko
+
+                # Insert AFTER same-turn (<=). (PvPoke's blocking check
+                # here is dead code in the JS -- no pruning.)
+                i = 0
+                while i < q_size and q_turn[i] <= fd_turn:
+                    i += 1
+
+                if q_size >= QUEUE_CAP:
+                    overflowed = True
+                else:
+                    for k in range(q_size, i, -1):
+                        q_energy[k]  = q_energy[k - 1]
+                        q_hp[k]      = q_hp[k - 1]
+                        q_turn[k]    = q_turn[k - 1]
+                        q_shields[k] = q_shields[k - 1]
+                        q_first[k]   = q_first[k - 1]
+                        q_max_idx[k] = q_max_idx[k - 1]
+                        q_has_deb[k] = q_has_deb[k - 1]
+                        q_deb_cnt[k] = q_deb_cnt[k - 1]
+                        q_atk_stg[k] = q_atk_stg[k - 1]
+                    q_energy[i]  = fd_energy
+                    q_hp[i]      = 0.0
+                    q_turn[i]    = fd_turn
+                    q_shields[i] = curr_sh
+                    q_first[i]   = curr_first
+                    q_max_idx[i] = curr_max_idx
+                    q_has_deb[i] = curr_has_deb
+                    q_deb_cnt[i] = curr_deb_cnt
+                    q_atk_stg[i] = curr_atk_stg
+                    q_size += 1
+
             for n in range(n_cms):
                 move_dmg_root = cm_dmgs[n]         # for max-dmg ordering
                 move_dmg      = cm_dmgs_stage[stage_row_idx, n]
@@ -328,42 +370,6 @@ def _make_jit():
                         q_deb_cnt[i] = new_deb_cnt
                         q_atk_stg[i] = new_atk_stg
                         q_size += 1
-
-            # ---- Farm-down state (no new charged move thrown) ----
-            if curr_fast_dmg > 0 and curr_hp > 0.0:
-                fm_to_ko = int((curr_hp + curr_fast_dmg - 1) // curr_fast_dmg)
-                fd_turn = curr_t + fm_to_ko * fast_turns
-                fd_energy = curr_e + fast_energy * fm_to_ko
-
-                # Insert AFTER same-turn (<=). (PvPoke's blocking check
-                # here is dead code in the JS — no pruning.)
-                i = 0
-                while i < q_size and q_turn[i] <= fd_turn:
-                    i += 1
-
-                if q_size >= QUEUE_CAP:
-                    overflowed = True
-                else:
-                    for k in range(q_size, i, -1):
-                        q_energy[k]  = q_energy[k - 1]
-                        q_hp[k]      = q_hp[k - 1]
-                        q_turn[k]    = q_turn[k - 1]
-                        q_shields[k] = q_shields[k - 1]
-                        q_first[k]   = q_first[k - 1]
-                        q_max_idx[k] = q_max_idx[k - 1]
-                        q_has_deb[k] = q_has_deb[k - 1]
-                        q_deb_cnt[k] = q_deb_cnt[k - 1]
-                        q_atk_stg[k] = q_atk_stg[k - 1]
-                    q_energy[i]  = fd_energy
-                    q_hp[i]      = 0.0
-                    q_turn[i]    = fd_turn
-                    q_shields[i] = curr_sh
-                    q_first[i]   = curr_first
-                    q_max_idx[i] = curr_max_idx
-                    q_has_deb[i] = curr_has_deb
-                    q_deb_cnt[i] = curr_deb_cnt
-                    q_atk_stg[i] = curr_atk_stg
-                    q_size += 1
 
         if overflowed:
             iters = -1
