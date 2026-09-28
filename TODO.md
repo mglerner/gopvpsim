@@ -378,10 +378,10 @@ overrides). Record: CHANGELOG 2026-09-02.
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
-**BUILT 2026-09-28 (merged to main; bake ON, paragraph render-gated OFF).**
-The prerequisite below is done; what is left is Michael's review of item
-(g) and the wording, then the next bake populates the blobs and a re-render
-opens the gate.
+**BUILT 2026-09-28 (merged to main; bake ON; render gate OPENED the same
+day once Michael picked the wording, item (g)).** The prerequisite below is
+done; what is left is the next bake, which populates the blobs, so a page
+shows the population block from its next dive on.
 
 - Bake side: `scripts/deep_dive_lib/mirror_population.py`, called from
   `deep_dive.main` after every other sweep and before the blob is dumped;
@@ -396,15 +396,19 @@ opens the gate.
   build selection, against a ~4 min budget. The 2026-09-20 estimate of
   ~0.7 s per column-sweep was ~4x high: one `iv_sweep` call covers all of
   an arm's columns.
-- Page side: `deep_dive_builds.population_facts` +
-  `deep_dive_which_build.population_sentences`; the "The mirror" paragraph
-  reads the population where the blob has one and falls back to the cohort
-  paragraph otherwise (old blobs render byte-identical; harness-verified).
+- Page side: `deep_dive_builds.population_facts` (wins, ties, losses per
+  build, the column moveset per group) +
+  `deep_dive_which_build.population_lead` / `population_table_html` /
+  `_population_preset_html`; "The mirror" block reads the population where
+  the blob has one and falls back to the cohort paragraph otherwise (old
+  blobs render byte-identical; harness-verified 2026-09-28 twice, before
+  and after the gate opened).
 - Hash impact: NONE on the engine hash (45cf73a2d23d before and after; no
   engine-hashed file touched). The BLOB schema changed, so a page shows the
   population only after a re-dive; a warm re-dive re-sims just the
   population's columns (~40-50 s per 5-moveset dive, cold).
-- Still open: (a) wording (Michael); (b) one scenario (the 1v1) is printed,
+- Still open: (a) wording (Michael) -- DONE 2026-09-28, see (g); (b) one
+  scenario (the 1v1) is printed,
   all nine are in the facts; (c) league cap only -- a best-buddy (L51)
   section keeps the cohort paragraph; (d) the plot's mirror trace and its
   caption still read the cohort; (e) the thresholds-TOML override list
@@ -415,7 +419,25 @@ opens the gate.
   builds' median member beats 0-5% of the rank list in the 1v1 from the
   focal's seat (the column always baits; no antisymmetry), so the 1v1
   mirror reads as lost for nearly everyone -- worth a look before shipping.
-  **Probed 2026-09-28: the counts are TRUE and the wording hides two
+  **DONE 2026-09-28: wording decided and the gate opened**
+  (`RENDER_MIRROR_POPULATION = True`, pinned by
+  `test_render_gate_ships_the_population_block`). Michael picked the V4 lead
+  sentence plus the V2 table from the mockups: a lead sentence chosen by a
+  mechanical trigger -- (a) the column moveset differs from the arm's: "The
+  mirrors you will meet run {pool moveset}; with {arm's move} every build on
+  this page loses the 1v1 to all N of the top-N rank list." (only when every
+  build's typical member loses all N; else the counts); (b) same moveset, no
+  build's typical member beats more than 2 of N, some build's
+  out-prioritises at least half: "Priority does not win the {species}
+  mirror, bulk does: no build on this page beats more than {k} of the top-N
+  rank list in the 1v1."; (c) same moveset, some build beats at least half:
+  "{Build} beats {k} of the top-N rank list in the 1v1."; (d) otherwise no
+  lead -- then a table (Build | spreads | vs rank list W / T / L | wins CMP
+  | vs page picks (n) W / T / L | wins CMP; the page columns only when the
+  picks match), a caption naming the column moveset, and the CMP-cut
+  sentence. Melmetal GL 09-27 blob: Dynamic Punch -> (b); Hyper Beam, Rock
+  Slide, Thunderbolt -> (a) all-lose; Superpower -> (a) counts. The history
+  that led there: **Probed 2026-09-28: the counts are TRUE and the wording hides two
   things.** (1) "beats" is a strict win, so on the Dynamic Punch arm the
   bulk build (Build 1) TIES 13 of the top-20 rank list and loses 7, and the
   attack build (Build 2) out-prioritises all 20 on CMP but loses the fight
@@ -427,14 +449,9 @@ opens the gate.
   loses 20 of 20: a moveset statement a reader would take for an IV one. A
   true self-mirror (same IVs and moveset, both seats) scores 500 on every
   arm (direct sim); the first note blaming the row/column AI convention was
-  wrong and is retracted. The paragraph is behind
-  `deep_dive_which_build.RENDER_MIRROR_POPULATION = False` (pinned by
-  `test_render_gate_keeps_the_cohort_paragraph_until_reviewed`); the bake
-  stays ON so the next bake stores the data, and opening the gate is a
-  re-render, not a re-dive. **Michael's call on the wording**, mockups in
-  `~/coding/reports` (2026-09-28): wins / ties / losses split, name the
-  column's moveset where it differs from the arm's, a per-preset table
-  instead of a sentence, or the CMP cuts alone.
+  wrong and is retracted. The paragraph was held behind
+  `RENDER_MIRROR_POPULATION = False` until the wording call above; mockups
+  in `~/coding/reports/gopvpsim-mirror-paragraph-mockups-2026-09-28.html`.
 
 **Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
 first -- measure the sped-up render layer on its own; this note is the only
