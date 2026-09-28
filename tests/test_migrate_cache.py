@@ -777,3 +777,38 @@ def test_inhash_deadcode_20260928_predicate():
     assert p(cram, pg) is False
     assert p(None, None) is False
     assert p({}, {'species': 'X'}) is False
+
+
+def test_farmdown_order_20260928_predicate():
+    """DP farm-down insertion order ported to PvPoke's (engine 20d9f018970b
+    -> 9f1947ee5614; slayer 5dfdafc264f6 -> 587f61940e6f): the queue can
+    change only on a same-turn tie that needs a 1-turn fast move on the
+    DP-running side, so a column is affected iff EITHER side's fast move
+    (or its form-change swap) is 1-turn; slayer mirrors iff the scenario's
+    is. Pre-port there was no predicate: the bump was a cold re-dive."""
+    p = migrate_cache.PREDICATES['farmdown_order_20260928']
+    plain = {'species': 'Azumarill', 'fast': 'BUBBLE'}
+    for fid in ('LOCK_ON', 'SAND_ATTACK', 'DRAGON_BREATH', 'BITE', 'LICK'):
+        one = {'species': 'X', 'fast': fid}
+        assert p(one, plain) is True
+        assert p(plain, one) is True
+        assert p(one, one) is True                           # slayer mirror
+    # Multi-turn fast moves on both sides: blessed.
+    assert p(plain, {'species': 'Medicham', 'fast': 'COUNTER'}) is False
+    assert p(plain, plain) is False                          # slayer mirror
+    # Aegislash: neither the stored fast move nor its form-change swap is
+    # 1-turn, in either direction of the map.
+    for fid in ('AEGISLASH_CHARGE_PSYCHO_CUT', 'AEGISLASH_CHARGE_AIR_SLASH',
+                'PSYCHO_CUT', 'AIR_SLASH'):
+        aegi = {'species': 'Aegislash (Shield)', 'fast': fid}
+        assert p(aegi, plain) is False
+        assert p(aegi, aegi) is False
+    # The 1-turn set is derived from the engine (cooldown // 500), not a
+    # hand list; floor below today's 12 moves so gamemaster churn that adds
+    # one does not break the test.
+    assert len(migrate_cache._one_turn_fast_ids()) >= 10
+    assert 'COUNTER' not in migrate_cache._one_turn_fast_ids()
+    # Fail-safe.
+    assert p(None, plain) is True and p(plain, None) is True
+    assert p({}, plain) is True and p(plain, {'fast': None}) is True
+    assert p(plain, {'fast': 'NOT_A_MOVE'}) is True

@@ -85,6 +85,13 @@ Engine predicates (PROVEN, not guessed):
                 evidence per symbol + oracle audit + a 60-column cached
                 re-sim) is in the predicate's docstring.
 
+  farmdown_order_20260928 -- DP farm-down state inserted before the
+                charged-move expansions, PvPoke's order (--from-engine
+                20d9f018970b; slayer 5dfdafc264f6). Affected iff EITHER
+                side's fast move (or its form-change swap) is a 1-turn
+                move; the slayer mirror iff the scenario's is. Proof in the
+                predicate's docstring.
+
   neutral_batch_20260810 — the 2026-08-10 behavior-neutral bump
                 (--from-engine 1415857072fa): comment rewording + the
                 parse_types relocation into moves.py. Blesses everything
@@ -345,6 +352,83 @@ def _inhash_deadcode_20260928(f, c):
     (2,211,840 cells); (d) profile_slayer A/B within noise. One-shot; never
     re-run against another --from-engine hash."""
     return False
+
+
+_ONE_TURN_FAST_IDS = None
+
+
+def _one_turn_fast_ids():
+    """Fast moveIds whose ENGINE turn count is 1: ``cooldown // 500 == 1``,
+    exactly how simulate() and apply_form_change derive ``_turns`` (a missing
+    cooldown defaults to 500, i.e. 1 turn). Memoized; from moves.get_moves()."""
+    global _ONE_TURN_FAST_IDS
+    if _ONE_TURN_FAST_IDS is None:
+        from gopvpsim.moves import get_moves
+        fast, _ = get_moves()
+        _ONE_TURN_FAST_IDS = {mid for mid, m in fast.items()
+                              if m.get('cooldown', 500) // 500 == 1}
+    return _ONE_TURN_FAST_IDS
+
+
+def _farmdown_order_20260928(f, c):
+    """DP farm-down insertion order ported to PvPoke's (pin --from-engine
+    20d9f018970b -> 9f1947ee5614; slayer --from-engine 5dfdafc264f6 ->
+    587f61940e6f).
+
+    The ENTIRE engine delta: in pvpoke_dp's near-KO loop (battle.py) and its
+    numba twin (_dp_jit.py), the farm-down state of a popped state is now
+    inserted BEFORE that state's charged-move expansions instead of after
+    them; the rest is comments. The inserted states and every insertion rule
+    are unchanged, so the resulting queue can differ only in where the
+    farm-down state FD (turn fd = t + fm_to_ko * fast_turns) sits relative
+    to the expansion states X of the same pop:
+      * old order: FD goes after every state with turn <= fd, so X precedes
+        FD iff turn(X) <= fd;
+      * not-ready X (strict-< insert) lands before all same-turn states,
+        FD included, so X precedes FD iff turn(X) <= fd -- identical;
+      * ready X (turn t+1, <= insert, with a dedup scan over turn == t+1)
+        now lands after FD iff fd <= t+1, and its dedup can see FD only if
+        fd == t+1. Both differ from the old order only when fd == t+1.
+    Relative order among non-FD states is untouched (every insertion index
+    is a pure turn comparison). So the DP output can change only when
+    fm_to_ko * fast_turns == 1; fm_to_ko >= 1 (hp > 0), so the DP-running
+    side's fast move must be a 1-turn move. Both sides run pvpoke_dp in
+    a column (and pogodives columns reach the same near-KO loop), so a
+    column is affected iff EITHER side's fast move is 1-turn.
+
+    Form change: apply_form_change swaps in the alt form's fast move, and
+    only Aegislash's differs from the stored one (the CHARGE_* <-> plain
+    Psycho Cut / Air Slash map; Cramorant/Mimikyu/Morpeko keep theirs). The
+    stored fast id is unioned with formchange.form_change_swapped_moves, so
+    any swapped-in fast move is checked too (none of the current swaps is
+    1-turn; this is the conservative reading).
+
+    Slayer: mirrors -> affected(scen, scen) iff the scenario's fast move
+    (or its swap) is 1-turn.
+
+    Measured: the 297-cell oracle audit is byte-identical to main's; the
+    1080-cell Aegislash sample moved 7 cells per seat, all to PvPoke-exact,
+    every one with a 1-turn fast move on the moving side (Sand Attack,
+    Dragon Breath, Dunsparce's Bite; Registeel's Lock On for F4).
+
+    Fail-safe: missing side, missing/non-string fast id, or a fast id the
+    engine cannot resolve -> AFFECTED. One-shot; never re-run against
+    another --from-engine hash.
+    """
+    from gopvpsim.formchange import form_change_swapped_moves
+    from gopvpsim.moves import get_moves
+    known_fast = get_moves()[0]
+    one_turn = _one_turn_fast_ids()
+
+    def _hit(side):
+        if not side:
+            return True
+        fid = side.get('fast')
+        if not isinstance(fid, str) or fid not in known_fast:
+            return True
+        ids = {fid} | form_change_swapped_moves([fid])
+        return bool(ids & one_turn)
+    return _hit(f) or _hit(c)
 
 
 def _neutral_batch_20260810(f, c):
@@ -685,6 +769,7 @@ PREDICATES = {
     'aegislash_blade_atk_20260927': _aegislash_blade_atk_20260927,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'inhash_deadcode_20260928': _inhash_deadcode_20260928,
+    'farmdown_order_20260928': _farmdown_order_20260928,
     'cramorant_port_20260824': _cramorant_port_20260824,
     # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):
     # module globals defaulting to the exact literals they replaced
