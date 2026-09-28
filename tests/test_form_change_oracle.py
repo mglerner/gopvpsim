@@ -162,6 +162,50 @@ def test_cradily_vs_aegislash_blade_estimate_stage_divergence(
     assert slog == log, f"{s1}v{s2}: chargedLog moved{note}"
 
 
+MOLTRES_G = ('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'],
+             'great')
+AEGI_SHIELD_GB_FIRST = ('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+                        ['GYRO_BALL', 'SHADOW_BALL'], 'great')
+_MG_LOG = ['Moltres (Galarian): Fly', 'Moltres (Galarian): Fly',
+           'Aegislash (Blade): Gyro Ball']
+
+
+def test_aegislash_shield_vs_moltres_g_first_throw_divergence():
+    """DIVERGENCE PIN, PvPoke bugs found #10 (our value; PvPoke's rides in
+    the message).
+
+    Shield-start Aegislash, input order [SHADOW_BALL, GYRO_BALL]. Our
+    priority shuffle's clause 1 (same energy -> higher damage to slot 0) is
+    live at the first Shield-form shuffle because reset_for_battle restores
+    clause 4's stamp, so slot 0 is Gyro Ball (Ghost is resisted by Moltres-G).
+    PvPoke's clause-4 stamp persists across its pre-fight resetMoves() calls,
+    clause 1 is dead, and slot 0 is the input order: its last-gasp throw is
+    the resisted Shadow Ball. Arbitrary and worse where it matters; not
+    ported (audit_oracle_harness.py aegislash_shield_vs_moltres_galarian).
+    """
+    ss0, ss1, sw, slog = _run((*AEGI_SHIELD, 4, 14, 15),
+                              (*MOLTRES_G, 15, 15, 15), 0, 0)
+    note = (" [divergence pin: PvPoke master gives 308/691 w1 with "
+            "'Aegislash (Blade): Shadow Ball' as the last throw]")
+    assert (ss0, ss1, sw) == (408, 591, 1), f"0v0: scores/winner moved{note}"
+    assert slog == _MG_LOG, f"0v0: chargedLog moved{note}"
+
+
+def test_aegislash_shield_vs_moltres_g_gb_first_matches_pvpoke():
+    """POSITIVE CONTROL for #10: the same fight with the charged INPUT order
+    swapped to [GYRO_BALL, SHADOW_BALL]. PvPoke's slot 0 is then Gyro Ball
+    as well, and the fight is PvPoke-exact (408/591 w1 and this chargedLog
+    on both engines, harness-verified 2026-09-28; the audit's
+    aegislash_shield_gb_first_vs_moltres_galarian row keeps it verified).
+    If this ever differs from the divergence pin above, the divergence is
+    no longer just the first-throw slot choice.
+    """
+    ss0, ss1, sw, slog = _run((*AEGI_SHIELD_GB_FIRST, 4, 14, 15),
+                              (*MOLTRES_G, 15, 15, 15), 0, 0)
+    assert (ss0, ss1, sw) == (408, 591, 1), "0v0: scores/winner moved"
+    assert slog == _MG_LOG, "0v0: chargedLog moved"
+
+
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
     (0, 0, 929, 70, 0, ['Medicham: Ice Punch', 'Mimikyu (Busted): Play Rough']),
     (0, 1, 873, 126, 0, ['Mimikyu: Shadow Sneak (shielded)', 'Medicham: Ice Punch', 'Mimikyu (Busted): Shadow Sneak']),
