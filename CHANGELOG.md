@@ -2,6 +2,32 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- In-hash dead-code removal, fully-blessing bump (1a05c60)
+
+- **What:** the in_hash=true items from the 2026-09-25 cruft scout that
+  re-verified as zero-caller: battle.py unused imports
+  `type_effectiveness`/`stab`, `pvpoke_shield`, unused locals `best_idx`
+  (pvpoke_dp) and `n` (_ensure_dp_cache), the always-False
+  `_resolve_charged(allow_dead_attacker)` parameter; the unused
+  `fast_damage` parameter of the numba near-KO kernel (`_dp_jit.py`);
+  `pokemon._LEVEL_CAP_EXCLUSIONS`; plus the orphaned "deferred charged"
+  comments.
+- **Kept (have readers):** `use_first_available` (test_battle,
+  test_cramorant, test_new_turn_mechanics), `BattlePokemon._form_is_alt`
+  (test_mimikyu_starts_busted); the `compute_default_ivs` chain and the
+  legacy-mechanics branch were out of scope (product decisions).
+- **Neutrality proof:** battle tier green; `audit_oracle_harness.py
+  --mechanics new` byte-identical to main (279 cells, 268 exact, 11
+  documented, 0 new, 0 vanished); 60 stratified cached sweep columns
+  (GL/UL, shadow/non-shadow both sides, pvpoke/pogodives, bait/nobait)
+  re-simmed at every stored IV row: 60/60 score and energy planes exactly
+  equal (2,211,840 cells); profile_slayer A/B within noise.
+- **Cache:** engine 45cf73a2d23d -> 20d9f018970b, slayer 0c54e07bc21b ->
+  5dfdafc264f6. Migrate warm with `migrate_cache.py --from-engine
+  45cf73a2d23d --predicate inhash_deadcode_20260928` (and `--slayer
+  --from-engine 0c54e07bc21b`); dry-run: 280,018 columns and 151 slayer
+  entries blessed, 0 deleted.
+
 ## 2026-09-27 -- Shield-form Aegislash prices charged moves at the Blade atk (03993a4)
 
 - **Symptom:** six Aegislash x Azumarill oracle cells open since the 09-09

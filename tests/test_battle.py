@@ -8,7 +8,7 @@ Run integration tests with: pytest -m integration
 import pytest
 from gopvpsim.battle import (
     BattlePokemon, BattleResult, is_win,
-    always_shield, never_shield, pvpoke_shield, pvpoke_simulate_shield,
+    always_shield, never_shield, pvpoke_simulate_shield,
     use_first_available, bait_with_cheapest,
     no_bait, pvpoke_ai, pvpoke_dp, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
