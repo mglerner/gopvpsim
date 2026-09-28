@@ -600,7 +600,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
              use_sweep_cache=False, mechanics='new',
              focal_max_level=None, opp_max_level=None, capture_energy=False,
-             capture_metrics=False):
+             capture_metrics=False, opp_ivs=None):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -653,6 +653,15 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     the disk cache: every column stores the energy plane (cache v5), so this
     flag only gates whether energy is returned.
 
+    ``opp_ivs`` (opt-in) is a list parallel to ``opponents`` whose non-None
+    entries are EXPLICIT (atk, def, sta) IVs for that opponent, bypassing the
+    variant / opp-IV-mode resolution (the mirror-population sweep,
+    ``deep_dive_lib/mirror_population.py``: the IVs are the point there, so
+    the opp-IV mode must not touch them). The level is still the opponent's
+    best level under the cap, and the column is keyed on the resolved IVs and
+    level exactly like every other column, so nothing about how existing
+    columns are keyed or computed changes. ``None`` = today's behavior.
+
     Returns (results, n_sims, canonical_scores, canonical_meta, canonical_energy)
     where results is one dict per IV, sorted by avg_score desc, and
     canonical_energy is None unless ``capture_energy``.
@@ -685,10 +694,16 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 
     # Cache opponent stats (BattlePokemon is mutated by simulate, but stats are fixed)
     opp_cache = []
-    for opp_name, (opp_fast, opp_charged) in zip(opponents, opp_movesets):
+    if opp_ivs is not None and len(opp_ivs) != len(opponents):
+        raise ValueError(f"opp_ivs has {len(opp_ivs)} entries for "
+                         f"{len(opponents)} opponents")
+    for oi, (opp_name, (opp_fast, opp_charged)) in enumerate(
+            zip(opponents, opp_movesets)):
         opp_clean, variant, opp_is_shadow = parse_opponent_spec(opp_name)
         variant_iv = variant_ivs(opp_clean, variant, league, threshold_registry)
-        if variant_iv is not None:
+        if opp_ivs is not None and opp_ivs[oi] is not None:
+            oa, od, os_ = (int(v) for v in opp_ivs[oi])
+        elif variant_iv is not None:
             oa, od, os_ = variant_iv
         else:
             oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode_simple)
