@@ -631,3 +631,123 @@ def test_policy_lab_knob_defaults_are_pvpoke(monkeypatch):
     assert pvpoke_dp(cram3, azu) != dive_idx   # default: never dives here
     monkeypatch.setattr(B, '_CRAM_DIVE_GATE_DPE', 100.0)
     assert pvpoke_dp(cram3, azu) == dive_idx   # widened gate: dives ASAP
+
+
+# ---------------------------------------------------------------------------
+# PoGoDives sheet v8 (2026-09-28): rule R, the Surf-gulp 0v1 gate reads HP
+# ---------------------------------------------------------------------------
+# Row (0,1) 'surf_early_when_behind': with a SURF gulp, the early Surf (the
+# 3.0 gate) stays allowed while Cramorant's HP fraction is BELOW the
+# opponent's; level or ahead, the v7 'surf_gate_dpe' 2.25 applies. Cells are
+# built as the dive tensors are (cramorant_mini_sweep.make_focal /
+# cramorant_policy_lab.make_bp with the page's opponent IVs; GL Peck / Fly +
+# Surf page, Cramorant 0/0/0 = page iv index 0, start 0v1).
+#
+# FAILING-FIRST RECORD: on main's engine (sheet v7, engine 20d9f018970b) the
+# Jumpluff and Kingdra cells read PoGoDives == plain (199 / 194 in pvpoke
+# mode, 194 / 191 in rank1 mode) and this test fails; under v8 they recover
+# +162..+170. Araquanid and the Dive-gulp control are unchanged by design.
+
+def _v8_both(league, fast, charged, spread, opp_species, opp_fast,
+             opp_charged, opp_ivs, shields=(0, 1)):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+    from gopvpsim.battle import pogodives_dp
+    from cramorant_mini_sweep import make_focal
+    from cramorant_policy_lab import make_bp
+    cram = make_focal(league, fast, charged, spread, 50)
+    opp = make_bp(opp_species, league, False, opp_fast, opp_charged,
+                  ivs=opp_ivs)
+    out = []
+    for pol in (pvpoke_dp, pogodives_dp):
+        cram.reset_for_battle(shields[0], opp)
+        opp.reset_for_battle(shields[1], cram)
+        out.append(simulate(cram, opp, charged_policy_0=pol,
+                            charged_policy_1=pvpoke_dp).pvpoke_score(0))
+    return tuple(out)
+
+
+_JUMPLUFF = ('Jumpluff', 'FAIRY_WIND', ['ENERGY_BALL', 'ACROBATICS'])
+_KINGDRA = ('Kingdra', 'DRAGON_BREATH', ['SURF', 'SWIFT'])
+_ARAQUANID = ('Araquanid', 'INFESTATION', ['WATER_PULSE', 'MIRROR_COAT'])
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('opp, opp_ivs, want, pre', [
+    # (opponent, page opp IVs by mode, (plain, PoGoDives) v8, v7 PoGoDives)
+    (_JUMPLUFF, (4, 15, 12), (199, 366), 199),   # pvpoke-mode IVs
+    (_JUMPLUFF, (0, 14, 14), (194, 359), 194),   # rank1-mode IVs
+    (_KINGDRA, (5, 15, 12), (194, 364), 194),
+    (_KINGDRA, (0, 15, 13), (191, 358), 191),
+], ids=['jumpluff-pvpoke', 'jumpluff-rank1', 'kingdra-pvpoke', 'kingdra-rank1'])
+def test_v8_rule_r_recovers_jumpluff_kingdra_0v1(opp, opp_ivs, want, pre):
+    """Behind on HP, the loaded missile is insurance that fires on the
+    opponent's lethal move: both fights are lost either way, but the early
+    Surf recovers ~+165 rating. v7's 2.25 gate had sent these cells back to
+    the plain line (PoGoDives == plain == ``pre``)."""
+    got = _v8_both('great', 'PECK', ['FLY', 'SURF'], (0, 0, 0),
+                   opp[0], opp[1], opp[2], opp_ivs)
+    assert got[0] == want[0]
+    assert got[1] == want[1], f'v7 (pre-change) PoGoDives was {pre}, got {got[1]}'
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('opp_ivs, want', [
+    ((5, 15, 14), (670, 670)),     # pvpoke-mode IVs; all-3.0 gave 474
+    ((0, 10, 15), (707, 707)),     # rank1-mode IVs;  all-3.0 gave 528
+], ids=['pvpoke', 'rank1'])
+def test_v8_rule_r_keeps_araquanid_plain_0v1(opp_ivs, want):
+    """Ahead on HP, a resisted Surf only spends the tempo the lethal Fly
+    needed (the Fly KO beats Mirror Coat on CMP): the Araquanid cell stays
+    on the plain-PvPoke line, as under v7. The same cell under an
+    unconditional 3.0 gate (v6) scores 474 / 528, so this is a cell rule R
+    genuinely has to leave shut."""
+    assert _v8_both('great', 'PECK', ['FLY', 'SURF'], (0, 0, 0),
+                    *_ARAQUANID, opp_ivs) == want
+
+
+@pytest.mark.integration
+def test_v8_rule_r_dive_gulp_control_ul_lapras():
+    """Control from a page rule R must not touch: UL Peck / Dive, Fly
+    (index.html), Cramorant 0/15/15 vs Lapras (page pvpoke IVs 4/15/15,
+    Psywave / Sparkling Aria + Ice Beam), 0v1 -- the shipped tensor reads
+    plain 274, PoGoDives 424. Dive is resisted, Fly neutral: the Fly/Dive
+    ratio (~2.28) sits inside [2.25, 3.0), so a rule R that leaked onto
+    DIVE gulps would shut this gate and move the cell."""
+    assert _v8_both('ultra', 'PECK', ['DIVE', 'FLY'], (0, 15, 15),
+                    'Lapras', 'PSYWAVE', ['SPARKLING_ARIA', 'ICE_BEAM'],
+                    (4, 15, 15)) == (274, 424)
+
+
+def test_v8_rule_r_gate_unit_probe():
+    """Unit probe of _cram_dive_gate_dpe: behind on HP fraction keeps the
+    3.0 with a SURF gulp at (0,1); level or ahead gets 2.25; a DIVE gulp,
+    a lost CMP, and every other row are untouched; only (0,1) carries the
+    key."""
+    import gopvpsim.battle as B
+    from .test_battle import make_bp, make_charged, make_fast
+
+    def probe(my_hp, opp_hp, gulp='SURF', start=(0, 1), cram_atk=120):
+        cram = make_bp(atk=cram_atk, hp=130,
+                       fast=make_fast(power=6, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=100, hp=140, fast=make_fast(power=6, energy_gain=8),
+                      charged=[make_charged(power=90, energy=45)])
+        cram._pogodives = True
+        cram._start_shields = start
+        cram.hp, opp.hp = my_hp, opp_hp
+        return B._cram_dive_gate_dpe(cram, opp, gulp_move_id=gulp)
+
+    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
+    SURF = B._POGODIVES_SHEET[(0, 1)]['surf_gate_dpe']
+    assert B._POGODIVES_SHEET[(0, 1)]['surf_early_when_behind'] is True
+    assert probe(60, 140) == PG            # behind (0.46 < 1.0): early Surf
+    assert probe(130, 140) == SURF         # level (1.0 == 1.0): 2.25
+    assert probe(130, 70) == SURF          # ahead: 2.25
+    assert probe(60, 140, gulp='DIVE') == PG
+    assert probe(60, 140, cram_atk=90) == PV     # CMP lost: gate off
+    assert probe(60, 140, start=(1, 1)) == PG    # other rows untouched
+    assert all('surf_early_when_behind' not in row
+               for k, row in B._POGODIVES_SHEET.items()
+               if row is not None and k != (0, 1))
