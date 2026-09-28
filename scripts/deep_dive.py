@@ -99,8 +99,8 @@ from deep_dive_logging import init_logger, get_logger
 # import <name>` or getattr use anywhere). The one unused import kept on
 # purpose is get_rankings_for: tests/test_opp_meta_ranks.py reads it as
 # deep_dive.get_rankings_for.
-from deep_dive_lib import (categories, opponents, render, robustness,
-                           score_pack, sweep)
+from deep_dive_lib import (categories, mirror_population, opponents, render,
+                           robustness, score_pack, sweep)
 
 logger = get_logger()
 
@@ -3596,7 +3596,7 @@ def _which_build_sections(state):
 VINTAGE_FILE = 'vintage.toml'
 
 
-def write_vintage_stamp(html_path, league, cup=None):
+def write_vintage_stamp(html_path, league, cup=None, mirror_population=None):
     """Record WHICH DATA this page was rendered against, beside the page.
 
     Nothing used to. A dive's scores come frozen out of the replay blob, but
@@ -3617,6 +3617,12 @@ def write_vintage_stamp(html_path, league, cup=None):
     would either break the index (missing required keys) or silently change
     how every dive renders on it. Like meta.toml, this file is local-only --
     publish_website.sh excludes it.
+
+    ``mirror_population`` is the blob's ``state['mirror_population']`` when
+    it carries one: its BAKE-time engine and gamemaster hashes are stamped
+    too, so a page whose mirror paragraph was swept under another vintage
+    than the one it is rendered with says so. A blob without one adds
+    nothing, which keeps those pages' stamps unchanged.
 
     Best-effort: a dive that renders is worth more than a dive that dies
     stamping itself, so a failure logs and returns rather than raising.
@@ -3643,6 +3649,13 @@ def write_vintage_stamp(html_path, league, cup=None):
             f'rankings_mtime  = {int(rk.stat().st_mtime) if rk.exists() else -1}',
             f'rendered_at     = "{datetime.datetime.now().isoformat(timespec="seconds")}"',
         ]
+        if mirror_population:
+            lines += [
+                'mirror_population_engine_hash     = '
+                f'"{mirror_population.get("engine_hash")}"',
+                'mirror_population_gamemaster_hash = '
+                f'"{mirror_population.get("gamemaster_hash")}"',
+            ]
         out.write_text('\n'.join(lines) + '\n')
     except Exception as e:                                    # noqa: BLE001
         logger.warning(f"  vintage stamp not written "
@@ -3724,7 +3737,8 @@ def render_dive_html(state):
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
         write_vintage_stamp(state['html_path'], state['league'],
-                            state.get('cup'))
+                            state.get('cup'),
+                            state.get('mirror_population'))
     else:
         if state['split_movesets']:
             logger.warning("--split-movesets: only one moveset surviving - "
@@ -3762,7 +3776,8 @@ def render_dive_html(state):
             which_build_cards_l51=which_build_cards_l51.get(0),
         )
         write_vintage_stamp(state['html_path'], state['league'],
-                            state.get('cup'))
+                            state.get('cup'),
+                            state.get('mirror_population'))
 
 
 def main():
@@ -3957,6 +3972,17 @@ def main():
                              'CMP/wins columns. Results are cached on disk for fast '
                              're-runs. ENABLED by default; pass --no-mirror-slayer '
                              'to skip.')
+    parser.add_argument('--mirror-population', action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='Sweep every moveset against the MIRROR POPULATION '
+                             '(PvPoke\'s top-20 IV rank list for the focal, plus '
+                             'the page\'s own builds\' most-winning members and '
+                             'SP1) as extra opponent columns, both bait modes, '
+                             'and store it in the replay blob for the "Which '
+                             'one to build?" mirror paragraph. ENABLED by '
+                             'default; pass --no-mirror-population to skip it '
+                             '(the paragraph then falls back to the '
+                             'mirror-slayer cohort).')
     parser.add_argument('--mirror-slayer-metric', default='all',
                         choices=['all', 'even', 'even-strict'],
                         help='Slayer iteration metric (graded: per-opponent credit '
@@ -5476,6 +5502,19 @@ def main():
             'cup': args.cup,
             'cup_label': cup_pretty_name(args.cup),
         }
+        # The mirror population (TODO.md "NEXT BAKE: mirror population"):
+        # needs the finished state (it reads the page's own builds off it),
+        # so it runs here, after every other sweep and BEFORE the blob is
+        # dumped and the page rendered. Pvpoke policy tier only, because
+        # that is the mode the "Which one to build?" section reads. Skipped
+        # without a blob: the section is computed FROM the blob, so a
+        # --no-replay-dump render has no reader for the population.
+        if args.mirror_population and not args.no_replay_dump:
+            state['mirror_population'] = mirror_population.bake(
+                state,
+                [(e[0], e[1]) for e in all_moveset_results],
+                {bm: compose_mode('pvpoke', bm) for bm in _bait_modes},
+                iv_sweep, sweep_kwargs)
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
             if _replay_path:
