@@ -289,8 +289,12 @@ python scripts/profile_slayer.py --n-focal 60 --n-opp 20
 | 2026-06-10 | `a57c39f` (re-run, current data)      | 2,255     | Controlled baseline for the regression measurement |
 | 2026-06-10 | `d419306` (pre-fix HEAD)              | 1,121     | The 2.0x regression, root-caused to `141eee1`      |
 | 2026-06-10 | `154536a` (DP setup cache + log gate) | 2,278     | Post-regression-fix baseline                       |
-| 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | **3,160** | **Current baseline** (warm JIT cache; first run    |
+| 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | 3,160     | Previous baseline (warm JIT cache; first run       |
 |            | reachability, DP-cache precompute)    |           | after an engine edit pays ~1-2s compile)           |
+| 2026-09-25 | `6f99b08` (engine `5a813036625c`)     | **5,800** | **Current baseline** (CHANGELOG 2026-09-25;        |
+|            |                                       |           | 5,846 at the parent engine `d78c67fd06a7`). New    |
+|            |                                       |           | turn system, post-2026-09-09 gamemaster: NOT       |
+|            |                                       |           | comparable with the rows above                     |
 
 Gamemaster data changes shift battle lengths and therefore sims/s
 (that's the 3,055 → 2,255 gap on identical code), so when the
