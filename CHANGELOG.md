@@ -71,6 +71,19 @@ Completed/shipped work, reverse chronological.
   monkeypatched species. Furret GL arm 4 pre-fix: 3 cells excluded, 4
   divergence mentions; post-fix 0 / 0 with an Aegislash rung printed.
 
+## 2026-09-27/28 -- Great League re-dive for the Aegislash fix (GL only, 3.5 h)
+
+- 76 GL dives in 209 min under `run_website_dives.py great` + `caffeinate -is`,
+  data cache pinned (same 76: 494 min on 09-26, ~20 h on 09-20). Only the
+  two Aegislash columns per dive were cold after the
+  `aegislash_blade_atk_20260927` migration, so each dive was its render.
+  Ultra pages not re-dived (no Aegislash in that pool; Cramorant UL already
+  at sheet v7). Tail steps by hand; Cramorant certification 720 / 0 / 5-of-5
+  exact; record check OK; ship gates green (2883 passed). Aegislash pages
+  carry no divergence stamp. Awaiting Michael's publish go.
+- Chain note: without `PYTHONUNBUFFERED=1` the dive runner's banners are
+  block-buffered; read per-dive logs for progress.
+
 ## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (dfebbd8)
 
 - **Finding:** the post-bake Cramorant certification (owed since 09-20, run
