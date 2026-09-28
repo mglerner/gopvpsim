@@ -4107,17 +4107,22 @@ def _population_preset_html(pf, bl, facts):
 
 
 # RENDER GATE (2026-09-28, held for Michael's review). The population is
-# baked and stored, but the paragraph does not ship yet: a self-mirror probe
-# on the 09-27 Melmetal GL blob (scratch mp/) put a spread against ITSELF and
-# got 500 in the 1v1 on the Dynamic Punch arm but 363-404 on the Hyper Beam /
-# Rock Slide / Thunderbolt arms, and 248-270 for the builds' own members. An
-# identical Pokemon losing to itself means the "beats N%" figures measure the
-# row-vs-column AI convention (row = pvpoke_dp, column = always baits; no
-# antisymmetry) at least as much as the IV spreads, and a reader takes them
-# as IV statements. Until the framing is settled (TODO.md "NEXT BAKE: mirror
-# population", item (g)), the cohort paragraph renders even when the blob
-# carries a population. Flip to True to ship the population paragraph; no
-# re-dive is needed, the data is in the blob.
+# baked and stored, but the paragraph does not ship yet. On the 09-27
+# Melmetal GL blob the as-built sentence reads "Build 1 beats 0%": true, and
+# misleading as worded. Two things the wording hides: (1) "beats" is a
+# strict win, so the bulk build TIES 13 of the top-20 rank list (they are
+# the bulkiest spreads; bulk wins the Melmetal mirror) and the attack build
+# out-prioritises all 20 but loses the fight to 19, a real IV finding the
+# counts flatten; (2) every population column carries the POOL's moveset
+# (Thunder Shock / Double Iron Bash + Dynamic Punch), so on an off-meta arm
+# (Hyper Beam, Rock Slide, Thunderbolt) the "mirror" is a cross-moveset
+# fight and "beats 0%" is a moveset statement, not an IV one. A true
+# self-mirror (same IVs, same moveset, both seats) scores 500 on every arm
+# (probed directly; an earlier note blaming the row/column AI convention
+# was wrong). Until the framing is settled (TODO.md "NEXT BAKE: mirror
+# population", item (g); mockups in ~/coding/reports), the cohort paragraph
+# renders even when the blob carries a population. Flip to True to ship the
+# population paragraph; no re-dive is needed, the data is in the blob.
 RENDER_MIRROR_POPULATION = False
 
 

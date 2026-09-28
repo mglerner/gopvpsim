@@ -445,21 +445,26 @@ opens the gate.
   builds' median member beats 0-5% of the rank list in the 1v1 from the
   focal's seat (the column always baits; no antisymmetry), so the 1v1
   mirror reads as lost for nearly everyone -- worth a look before shipping.
-  **Probed 2026-09-28, and it is the seat convention, not the spreads:** a
-  spread against ITSELF (same IVs and level both seats) scores 500 in the
-  1v1 on the Dynamic Punch arm but 363-404 on the Hyper Beam, Rock Slide and
-  Thunderbolt arms, and the builds' own members score 248-270 against
-  themselves (the 0v0 self-mirror is 342-390 there too). The optimizing row
-  loses to the always-baiting column with identical stats, so "Build 1 beats
-  0%" is an AI-convention statement a reader would take for an IV one. The
-  paragraph is therefore behind `deep_dive_which_build.RENDER_MIRROR_POPULATION
-  = False` (pinned by `test_render_gate_keeps_the_cohort_paragraph_until_reviewed`);
-  the bake stays ON so the next bake stores the data, and opening the gate
-  is a re-render, not a re-dive. **Michael's call** on the framing: print
-  the self-mirror baseline beside every count, score both seats and print
-  the symmetric mean, sweep the column under pvpoke_dp as well (doubles the
-  ~40 s), or drop the 1v1 sentence for the CMP cuts alone (which are
-  seat-free).
+  **Probed 2026-09-28: the counts are TRUE and the wording hides two
+  things.** (1) "beats" is a strict win, so on the Dynamic Punch arm the
+  bulk build (Build 1) TIES 13 of the top-20 rank list and loses 7, and the
+  attack build (Build 2) out-prioritises all 20 on CMP but loses the fight
+  to 19 -- the rank list is the bulkiest 20 spreads and bulk wins the
+  Melmetal mirror, a real IV finding that "beats 0% / beats 5%" flattens.
+  (2) Every population column carries the POOL's moveset (Thunder Shock /
+  Double Iron Bash + Dynamic Punch), so on the Hyper Beam, Rock Slide and
+  Thunderbolt arms the "mirror" is a cross-moveset fight and every build
+  loses 20 of 20: a moveset statement a reader would take for an IV one. A
+  true self-mirror (same IVs and moveset, both seats) scores 500 on every
+  arm (direct sim); the first note blaming the row/column AI convention was
+  wrong and is retracted. The paragraph is behind
+  `deep_dive_which_build.RENDER_MIRROR_POPULATION = False` (pinned by
+  `test_render_gate_keeps_the_cohort_paragraph_until_reviewed`); the bake
+  stays ON so the next bake stores the data, and opening the gate is a
+  re-render, not a re-dive. **Michael's call on the wording**, mockups in
+  `~/coding/reports` (2026-09-28): wins / ties / losses split, name the
+  column's moveset where it differs from the arm's, a per-preset table
+  instead of a sentence, or the CMP cuts alone.
 
 **Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
 first -- measure the sped-up render layer on its own; this note is the only
