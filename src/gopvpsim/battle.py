@@ -2137,6 +2137,24 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             curr_atk_stage = curr.atk_stage
             stage_row     = cm_dmgs_by_stage[curr_atk_stage + 4]
             curr_fast_dmg = fast_dmg_by_stage[curr_atk_stage + 4]
+
+            # Farm-down state goes in BEFORE the charged-move expansions,
+            # as in PvPoke (ActionLogic.js inserts it inside the per-move
+            # loop, ahead of each move's expansion). Once here is
+            # equivalent: the per-move copies are identical and any
+            # farm-down pop ends the search. The order matters only on a
+            # same-turn tie with a ready move (a 1-turn fast move whose
+            # single hit KOs): the farm-down state then pops first.
+            if curr_fast_dmg > 0 and curr_hp > 0:
+                fm_to_ko  = math.ceil(curr_hp / curr_fast_dmg)
+                fd_turn   = curr_t + fm_to_ko * fast_turns
+                fd_energy = curr_e + fast_energy * fm_to_ko
+                _dp_insert_farm_down(
+                    queue,
+                    _DPState(fd_energy, 0.0, fd_turn, curr_sh,
+                             curr_first, curr_max_idx, curr_has_deb, curr_deb_cnt,
+                             curr_atk_stage))
+
             for n in range(n_cms):
                 move_dmg = stage_row[n]
                 move_e   = cm_energy[n]
@@ -2188,16 +2206,6 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                         _DPState(new_e, new_hp, new_t, new_sh,
                                  new_first, new_max_idx, new_has_deb, new_deb_cnt,
                                  new_atk_stage))
-
-            if curr_fast_dmg > 0 and curr_hp > 0:
-                fm_to_ko  = math.ceil(curr_hp / curr_fast_dmg)
-                fd_turn   = curr_t + fm_to_ko * fast_turns
-                fd_energy = curr_e + fast_energy * fm_to_ko
-                _dp_insert_farm_down(
-                    queue,
-                    _DPState(fd_energy, 0.0, fd_turn, curr_sh,
-                             curr_first, curr_max_idx, curr_has_deb, curr_deb_cnt,
-                             curr_atk_stage))
 
     # ------------------------------------------------------------------ #
     # Select move from plan
