@@ -2,6 +2,45 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF)
+
+- **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
+  built. After the main sweeps and before the blob is dumped, each dive
+  computes the page's own builds (`deep_dive_builds.compute_builds`, the
+  section's mode, league cap) and sweeps every moveset against the MIRROR
+  POPULATION: PvPoke's top-20 IV rank list for the focal (plus the other
+  shadow form's top 20 when the pool carries it) and each named build's
+  most-winning member under every live preset plus SP1 (stat-product rank
+  1), deduplicated, at explicit IVs and best level under the cap, with the
+  pool's moveset for that form, both bait modes. Stored as
+  `state['mirror_population']` (schema v1, int16 scores per arm,
+  4096 x 9 x M); `--no-mirror-population` skips it.
+- **Page:** "The mirror" paragraph under the builds table reads the
+  population where the blob has one: per build, the share of the rank list
+  its median member beats in the 1v1 (with the weakest member where it
+  differs) and out-prioritises on CMP (charge-move priority, strict
+  pre-shadow attack, the engine's rule), the rank list's a_50 / a_75 CMP
+  cuts, and the same counts against the page's own picks, labelled
+  separately. Blobs without the key keep the cohort paragraph, byte-
+  identical. The page-picks sentence is dropped when the bake's tagged
+  members are not the builds the render selects.
+- **Guards:** every swept arm must carry SP1 and the rank list's #1
+  (`PopulationGuardError` at bake time); the per-build numbers are pinned
+  against an independent recount from the stored scores
+  (`tests/test_mirror_population.py`); the vintage stamp gains the
+  population's bake-time engine and gamemaster hashes (only when present).
+- **Cost:** Melmetal GL, 5 movesets: 31 members, 224 column-sweeps, 39-47 s
+  per dive on a loaded machine. Default ON.
+- **Render gate:** `deep_dive_which_build.RENDER_MIRROR_POPULATION = False`.
+  A self-mirror probe on the 09-27 Melmetal GL blob scored a spread against
+  itself at 363-404 (1v1) on three of five arms, so the "beats N%" counts
+  carry the row-vs-column AI convention; the cohort paragraph renders until
+  Michael settles the framing (TODO "NEXT BAKE: mirror population" (g)).
+- **Cache:** engine hash unchanged (45cf73a2d23d); `iv_sweep` gained an
+  opt-in `opp_ivs=`, and the new columns key on their IVs like any other
+  column (CACHE_VERSION unchanged). The blob schema changed, so pages show
+  the population only after a re-dive.
+
 ## 2026-09-28 -- Aegislash first-throw quirk documented as PvPoke #10 (docs + pins, no engine change)
 
 - Shield-start Aegislash's first Shield-form throw: PvPoke's persisted
