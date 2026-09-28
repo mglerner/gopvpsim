@@ -279,3 +279,23 @@ Re-dived both Cramorant pages (5.9 + 10.5 min), re-rendered the strategy
 article, re-certified: 720 cells, 0 bar failures, 0 exemption violations,
 selftest 5/5 exact on every page. `cramorant_certify.py --check-record` is now
 a publish gate (record at userdata/certify/cramorant_record.json).
+
+## Addendum: Great League re-dive for the Aegislash fix (2026-09-27/28)
+
+Launched 20:25 EDT with `run_website_dives.py great --reserve-cpus 0` under
+`caffeinate -is` (the runner has no sleep guard of its own) and the data cache
+pinned; GL only, because the Ultra pool has no Aegislash and Michael expected to
+close the lid in the morning. 76 dives in 209 min (2.8 min/dive): the same 76
+took 494 min on 09-26 (2.36x) and about 20 h on 09-20. Sims were near zero
+(only the two Aegislash columns per dive were cold after the migration), so
+each dive was essentially its render plus the sweep-side memo's saving. Tail
+steps by hand (scratchpad gl_tail.sh mirroring chain steps 2-9 minus ML):
+comparisons, matchup webs, strategy article (rehearsed first), Cramorant
+certification 720 cells / 0 failures / selftest 5/5 exact, guides, index,
+record check OK, ship gates green (2883 passed). All 76 GL dirs fresh at one
+vintage (45cf73a2d23d / 6d6e9a7bc32d); the Aegislash pages carry no
+"(engine divergence vs PvPoke)" stamp any more. Publish on Michael's go.
+
+Lesson for the chain: the dive runner's own stdout is block-buffered without
+PYTHONUNBUFFERED=1 (the chain exports it; a hand launch must too), so ETA
+tooling should read the per-dive logs, not the runner's banners.
