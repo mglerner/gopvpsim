@@ -2,6 +2,33 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- Mirror population block: wording decided, render gate opened
+
+- **What:** TODO "NEXT BAKE: mirror population" item (g). Michael picked
+  the V4 lead sentence plus the V2 table from the 2026-09-28 mockups
+  (`~/coding/reports/gopvpsim-mirror-paragraph-mockups-2026-09-28.html`),
+  and `deep_dive_which_build.RENDER_MIRROR_POPULATION` is now True. The
+  block under the builds table, where the blob carries a population: a
+  lead sentence chosen by a mechanical trigger (column moveset differs from
+  the arm's -> name it, "every build ... loses the 1v1 to all N" only when
+  true of every build's typical member, else the counts; same moveset and
+  no build beats more than 2 while one out-prioritises half -> "Priority
+  does not win the {species} mirror, bulk does"; same moveset and a build
+  beats half -> "{Build} beats k of the top-N"; else no lead), then a table
+  (per build: spreads, the typical member's W / T / L and CMP wins against
+  the rank list and against the page's picks), a caption naming the column
+  moveset, and the CMP-cut sentence.
+- **Facts:** `population_facts` rows carry `tie` (score == 500; `is_win` is
+  strict) and `loss` beside `beat`, off ONE typical member per build (the
+  lower middle by (wins, ties), so w + t + l = N); each group carries its
+  `moveset`, the facts the `arm_label`. `beat` and `cmp` are unchanged.
+- **Old pages:** blobs without a population render byte-identical
+  (replay-render harness, five default blobs, vs a main@3beb843 baseline).
+- **Pins:** `tests/test_mirror_population.py` (recount of ties and losses
+  from the stored scores; each lead trigger word for word; the table
+  cells; the gate test inverted to "population present -> new block,
+  absent -> cohort paragraph byte-identical").
+
 ## 2026-09-28 -- DP farm-down insertion order ported to PvPoke's (engine bump)
 
 - **What:** TODO "DP farm-down insertion order" (F2b of the 2026-09-27
@@ -35,7 +62,7 @@ Completed/shipped work, reverse chronological.
   docstring). Dry run: sweep 155,610 blessed / 124,408 deleted; slayer 112
   blessed / 39 deleted. Not applied.
 
-## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF)
+## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above)
 
 - **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
   built. After the main sweeps and before the blob is dumped, each dive
