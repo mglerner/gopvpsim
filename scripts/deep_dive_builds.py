@@ -2436,11 +2436,27 @@ def focal_raw_atk(ctx):
                      for m in ctx['meta']], dtype=np.float64)
 
 
-def _pop_group_rows(block, win, cols, members, mids, raw_focal):
+def typical_member(wins, ties):
+    """``(wins, ties)`` of a build's TYPICAL member: the lower middle of its
+    members sorted by (wins, ties).
+
+    One actual member, so its wins, ties and losses add up to the group size
+    and the page can print them in one "w / t / l" cell. Its wins are the
+    lower median of the wins (the primary sort key), so ``beat`` below is
+    unchanged by carrying the ties.
+    """
+    pairs = sorted(zip((int(v) for v in wins), (int(v) for v in ties)))
+    return pairs[(len(pairs) - 1) // 2]
+
+
+def _pop_group_rows(block, win, tie, cols, members, mids, raw_focal):
     """Per build: members beaten per scenario and CMP wins, (median, min).
 
     ``cols`` index the arm's score columns, ``mids`` the member table, in
-    the same order.
+    the same order. ``tie`` is the score == 500 cube (``win`` is strict, so
+    a tie is neither). Per scenario, ``tie`` is the typical member's ties
+    and the fewest any member has, and ``loss`` is the typical member's
+    n - wins - ties and the most any member has (:func:`typical_member`).
     """
     n = len(cols)
     pop_raw = np.array([members[m]['raw_atk'] for m in mids])
@@ -2448,6 +2464,10 @@ def _pop_group_rows(block, win, cols, members, mids, raw_focal):
     for b in block['builds']:
         idx = np.flatnonzero(b['_mask'])
         per_scen = win[idx][:, :, cols].sum(axis=2)     # (members, n_sc)
+        tie_scen = tie[idx][:, :, cols].sum(axis=2)
+        loss_scen = n - per_scen - tie_scen
+        typ = [typical_member(per_scen[:, si], tie_scen[:, si])
+               for si in range(per_scen.shape[1])]
         # Strict, the engine's rule: equal pre-shadow attack is no priority.
         cmp_n = (raw_focal[idx][:, None] > pop_raw[None, :]).sum(axis=1)
         out.append({
@@ -2455,9 +2475,23 @@ def _pop_group_rows(block, win, cols, members, mids, raw_focal):
             'beat': [[lower_median(per_scen[:, si]),
                       int(per_scen[:, si].min())]
                      for si in range(per_scen.shape[1])],
+            'tie': [[t, int(tie_scen[:, si].min())]
+                    for si, (_w, t) in enumerate(typ)],
+            'loss': [[n - w - t, int(loss_scen[:, si].max())]
+                     for si, (w, t) in enumerate(typ)],
             'cmp': [lower_median(cmp_n), int(cmp_n.min())],
         })
     return out
+
+
+def group_moveset(members, mids):
+    """``(fast, (charged, ...))`` shared by members ``mids``; raises if they
+    differ (a group is one form, and pool_forms gives a form one moveset)."""
+    sets = {(members[m]['fast'], tuple(members[m]['charged'])) for m in mids}
+    if len(sets) != 1:
+        raise ValueError(f"mirror population group runs {len(sets)} "
+                         f"movesets: {sorted(sets)}")
+    return next(iter(sets))
 
 
 def population_facts(ctx, block, preset, level='l50', raw_focal=None):
@@ -2478,6 +2512,7 @@ def population_facts(ctx, block, preset, level='l50', raw_focal=None):
     pop, a, sc = got
     members = pop['members']
     win = brief.win_cube(sc)
+    tie = sc == 500
     if raw_focal is None:
         raw_focal = focal_raw_atk(ctx)
     focal_shadow = bool(ctx['state']['shadow'])
@@ -2493,14 +2528,18 @@ def population_facts(ctx, block, preset, level='l50', raw_focal=None):
         atks = [members[m]['atk'] for m in mids]
         groups.append({
             'key': key, 'shadow': shadow, 'n': len(cols),
+            # The moveset every member of the group runs: the pool's entry
+            # for that form (mirror_population.pool_forms), which is not
+            # necessarily this arm's.
+            'moveset': group_moveset(members, mids),
             'atk_lo': min(atks), 'atk_hi': max(atks),
             # The a_50 / a_75 cuts, off the focal form's own list only: the
             # printed cut is in the page's attack convention, the shadow-
             # EFFECTIVE attack, so it is a CMP selector only against members
             # of the focal's own form.
             'cmp': mirror_cmp(ctx, atks) if key == 'rank' else None,
-            'builds': _pop_group_rows(block, win, cols, members, mids,
-                                      raw_focal),
+            'builds': _pop_group_rows(block, win, tie, cols, members,
+                                      mids, raw_focal),
         })
     tagged = (a.get('builds') or {}).get(preset)
     meta = ctx['meta']
@@ -2516,11 +2555,13 @@ def population_facts(ctx, block, preset, level='l50', raw_focal=None):
         cols = [pos[m] for m in mids]
         groups.append({'key': 'page', 'shadow': focal_shadow,
                        'n': len(cols), 'cmp': None,
-                       'builds': _pop_group_rows(block, win, cols, members,
-                                                 mids, raw_focal)})
+                       'moveset': group_moveset(members, mids),
+                       'builds': _pop_group_rows(block, win, tie, cols,
+                                                 members, mids, raw_focal)})
     si = (ctx['scen_labels'].index(POP_SCENARIO)
           if POP_SCENARIO in ctx['scen_labels'] else 0)
     return {'species': ctx['state']['species'], 'shadow': focal_shadow,
+            'arm_label': ctx['label'],
             'scenario': ctx['scen_labels'][si], 'si': si,
             'n_members': len(a['members']), 'page_ok': page_ok,
             'groups': groups}
