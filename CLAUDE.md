@@ -142,11 +142,16 @@ Before changing our sim's behavior to match PvPoke's, ask:
    actual fight outcome differ — and if they don't, PvPoke's choice is
    cosmetic.
 2. **Does our deviation have a defensible reason?** Examples of
-   intentional deviations already in the codebase: we recompute
-   `bestChargedMove` per-turn instead of caching it (PvPoke bug #2);
-   we throw self-debuffing moves only when fast-KO won't suffice
-   (battle.py:_optimize_move_timing); we fire SS on the optimal turn
-   for Mimikyu instead of delaying. These are all places we believe
+   intentional deviations already in the codebase: bandaid[929]'s
+   stack-switch is not gated on `bait_shields` (battle.py `pvpoke_dp`;
+   `tests/test_bandaid929_nobait_divergence.py`); bandaid[866] swaps
+   only to a non-self-debuffing move
+   (`tests/test_both_self_debuff_divergence.py`); the post-DP
+   don't-bait dpe ratio uses fresh damages for both moves (the NB-1
+   carve-out, `tests/test_nb1_selection_freeze.py` Group C); Shield-form
+   Aegislash's charged-move estimate keeps its Attack stage (2026-09-27,
+   `tests/test_form_change_oracle.py`). The full current list is
+   `docs/pvpoke_divergences.md`. These are all places we believe
    we're right and PvPoke is wrong or arbitrary.
 3. **Would matching PvPoke make us worse for the actual use case?**
    The use case is breakpoint / bulkpoint analysis for real PvP
@@ -187,10 +192,12 @@ trusted; then re-bake, or bless selectively with `scripts/migrate_cache.py`
 (`--from-engine` for an engine fix, `--from-gamemaster --old-gamemaster-file`
 for a gamemaster/balance patch). The v7 gamemaster hash is NARROWED to
 `md5(pokemon + moves)`, so non-sim gamemaster churn (timestamp/cups/formats/
-rankings) no longer invalidates the cache at all. GC keeps v7 dirs always
-(gamemaster is per-column) and reclaims at column granularity, so cache work
-never deletes your trusted columns. Full mechanics + the warm re-dive recipe:
-DEVELOPER_NOTES "Sweep disk cache".
+rankings) no longer invalidates the cache at all. GC keeps current-schema
+dirs (meta `v` >= `CACHE_VERSION`, now 8; the v7 layout is unchanged at v8)
+always (gamemaster is per-column) and reclaims at column granularity, so cache
+work never deletes your trusted columns. Older-schema dirs, the v7 ones
+included, fall back to legacy vintage pruning (`gc_cache.plan_sweep`). Full
+mechanics + the warm re-dive recipe: DEVELOPER_NOTES "Sweep disk cache".
 
 ### Before a cold re-dive, check for a tractable migration first
 
@@ -357,38 +364,36 @@ names the template tests to copy):
 
 Commands:
 
-- `python -m pytest tests -q -m "not slow"` — the fast tier, **~5 min**
-  (310 s measured 2026-09-22 on an idle 18-core machine: 2,751 passed,
-  8 skipped, 156 deselected, 13 xfailed). This is what the
+- `python -m pytest tests -q -m "not slow"` — the fast tier, **~4-5 min**
+  (314 s in the 2026-09-26 overnight gate: 2,860 passed, 7 skipped, 159
+  deselected, 0 xfailed; 238 s measured 2026-09-28 from a worktree at load
+  ~10-14). This is what the
   `verify_tests.py` ship gate runs, and it is gate 1 of every publish
   path AND the tail of the overnight chain, so budget ~5-7 min at each
   (it was 549 s under load at the 397 s baseline, so assume ~1.4x when
   the machine is busy).
 
-  History: "~36s" until 2026-09-20, then 397 s (the wotb-v4 merge's
-  `tests/test_which_build_section.py` was most of that jump), then 310 s
+  History: "~36s" until 2026-09-20, 397 s after the wotb-v4 merge, 310 s
   on 2026-09-22 when the five fast-tier tests over ~10 s were marked
-  `slow` — the corpus voice gate (35 s), the 4-blob HP-threshold
-  parametrization (~30 s), the two-page Sableye headline pin (10 s), and
-  the two remaining non-slow consumers of
-  `test_which_build_section.py`'s module-scoped `shadow_sableye` blob
-  fixture (20 s, its ~60 other consumers were already slow).
+  `slow`; the 13 xfails were `tests/test_battle.py`'s, converted to real
+  pins 2026-09-25 (`9f1da69`).
 
-  **What is left, and why.** `tests/test_deep_dive_brief.py` is still
-  ~245 s of the 310 — about 170 blob-backed tests at 1-9 s each, none
-  now over ~10 s. Moving the whole module behind `slow` would take the
-  gate to roughly 1 min, but it drops ~170 published-prose contracts out
-  of every publish path, so that is a coverage decision, not a timing
-  one. The other standing cost is the session-scoped `small_dive_html`
-  real render (25 s), shared by five modules; its consumers carry
+  **What is left, and why.** `tests/test_deep_dive_brief.py` is ~108 s
+  of the 238 (230 fast-tier tests, measured alone 2026-09-28; ~134 of
+  them are blob-backed, none now over ~10 s). Moving the whole module
+  behind `slow` would drop ~230 published-prose contracts out of every
+  publish path, so that is a coverage decision, not a timing one. The
+  other standing cost is the session-scoped `small_dive_html` real render
+  (a Marill dive since 2026-09-25; 42 s under load 2026-09-28), shared by
+  eleven modules; its consumers carry
   `@pytest.mark.render`, which the policy above deliberately keeps
   SEPARATE from `slow`, so marking one of them slow only moves the
   render onto the next consumer and saves nothing.
 - `python -m pytest tests -q` — full suite incl. the slow gamemaster
   sweep and the blob-backed render tests, **~16-18 min** (two runs on
   2026-09-20: 960 s and 1,042 s). Was "~80s" here until the same date.
-- `python -m pytest tests/test_battle.py -q` — battle tests only (243
-  passed + 13 strict xfails as of 2026-08-09)
+- `python -m pytest tests/test_battle.py -q` — battle tests only (260
+  passed, 0 xfails, as of 2026-09-28)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 - **Default movesets** — when a test or sim needs "the default moveset" for a
   species in a given league, ALWAYS call `gopvpsim.data.get_default_moveset(
