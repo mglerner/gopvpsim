@@ -2,6 +2,65 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- PoGoDives sheet v8: rule R, the Surf-gulp 0v1 gate reads HP (0a1df03)
+
+- **Why:** sheet v7's `surf_gate_dpe` 2.25 (entry 2026-09-27) fixed the GL
+  Peck / Fly + Surf 0v1 Araquanid bar failure but also sent Jumpluff and
+  Kingdra (same Fly/Surf DPE band, ~2.65-2.75) back to plain: about -165
+  rating per cell on fights Cramorant loses anyway. A read-only probe
+  (2026-09-28) found a principled discriminator; Michael approved it the
+  same day.
+- **Rule R:** row (0,1) gains `surf_early_when_behind: True`. With a SURF
+  gulp (and CMP won, as the row's 'cmp' gate already requires),
+  `_cram_dive_gate_dpe` keeps the 3.0 gate while Cramorant's HP fraction
+  is below the opponent's; level or ahead, v7's 2.25 applies. Behind on HP,
+  the loaded missile is insurance that fires on the opponent's lethal move
+  (Jumpluff, Kingdra); ahead, a resisted Surf only spends the tempo the
+  lethal Fly needed (Araquanid: the Fly KO beats Mirror Coat on CMP). Reads
+  only both sides' hp/max_hp, which are dedup-signature components. Every
+  other row is byte-identical; a DIVE gulp never reads either field. A
+  strategy-sheet change, not a PvPoke divergence (docs/pvpoke_divergences.md
+  untouched).
+- **Probe evidence (not knife-edged):** the DPE band [2.25, 3.0) is reached
+  by exactly three opponents on the GL Fly + Surf page and by none on any
+  other page (Dive gulp, or ratio 1.0 from PvPoke's `moveID` typo). Any lead
+  cutoff in [-0.25, +0.10] is byte-identical (Araquanid's lowest lead +0.13
+  vs Jumpluff/Kingdra's highest -0.27). Ten other candidates were screened
+  (Mirror Coat name check, two-hit KO, HP <= 50%, race count, CMP margin,
+  type steps, ...): the ones that work are knife-edged or name-based; the
+  rest fail on Kingdra or do not separate.
+- **Stride-1 recert, GL Peck / Fly + Surf 0v1, all 8 slices** (319,488
+  cells each; bait/nobait and cap 50/51 give identical numbers):
+  pvpoke net +11 / mean +10.491 (v7) -> +11 / +14.470; rank1 +0 / +13.298
+  -> +0 / +17.487. Only Jumpluff (4,096 pvpoke / 4,050 rank1 cells, smallest
+  gain +163 / +162) and Kingdra (3,456 / 3,968, smallest +166 / +167) move;
+  no moved cell gets worse, 0 win flips; worst opponent unchanged
+  (Jellicent, 0 net, -0.93 / -0.69 mean). Plain-PvPoke tier integer-exact
+  against the tensors throughout.
+- **Controls:** every other page's 0v1 slice at stride 1 with
+  `--check-tensor` (9 pages x 8 slices, 20,545,536 cells) and the Fly + Surf
+  page's other 8 scenarios at stride 13 (64 slices, 1,577,472 cells) are
+  integer-exact against the shipped tensors.
+- **Certification:** `cramorant_certify.py --league both --selftest 5` on a
+  scratch copy of the pages with the Fly + Surf page's 0v1 tensors patched
+  to the recert (62,280 cells): 720 cells, 0 bar failures, 0 exemption
+  violations, selftest 50/50 integer-exact (record kept in scratch only;
+  the real record is written after the re-dive).
+- **Tests:** `tests/test_cramorant.py` v8 block -- Jumpluff/Kingdra 0v1
+  cells recover (pvpoke 199 -> 366 / 194 -> 364, rank1 194 -> 359 /
+  191 -> 358; failing-first against 20d9f018970b), Araquanid pinned at
+  plain 670 / 707 (an unconditional 3.0 gives 474 / 528), a UL Dive + Fly
+  vs Lapras control (274, 424), and a gate unit probe.
+- **Cache:** merged right after the farm-down port, so engine
+  9f1947ee5614 -> 4b42f9d83690 (slayer 587f61940e6f -> 3a2ed21a79ce);
+  predicate `cram_0v1_rule_r_20260928` (same affected set as
+  `cram_0v1_surf_gate_20260927`), applied with `--from-engine
+  9f1947ee5614` (see the migration line below).
+- **Article:** the cheat sheet's 0-0/0-1 row gained the Surf-gulp rule text
+  (v7 + v8), pending Michael's review; not re-rendered.
+- **Still open:** apply the migration, Cramorant GL re-dive, certification
+  record, article re-render, publish on Michael's go.
+
 ## 2026-09-28 -- DP farm-down insertion order ported to PvPoke's (engine bump)
 
 - **What:** TODO "DP farm-down insertion order" (F2b of the 2026-09-27

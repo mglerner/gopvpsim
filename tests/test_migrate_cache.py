@@ -742,6 +742,32 @@ def test_cram_0v1_surf_gate_20260927_predicate():
     assert p(fly_surf, None) is True
 
 
+def test_cram_0v1_rule_r_20260928_predicate():
+    """Sheet v8 rule R (engine 9f1947ee5614 -> 4b42f9d83690): the new HP
+    condition lives inside the v7 Surf-gate branch, so the affected set is
+    the v7 predicate's, verdict for verdict. Pre-fix there was no predicate:
+    the bump was a cold re-dive."""
+    p = migrate_cache.PREDICATES['cram_0v1_rule_r_20260928']
+    v7 = migrate_cache.PREDICATES['cram_0v1_surf_gate_20260927']
+    pg = {'species': 'Araquanid', 'policy': 'pogodives'}
+    plain = {'species': 'Araquanid'}
+    fly_surf = {'species': 'Cramorant', 'charged': ['FLY', 'SURF']}
+    assert p(fly_surf, pg) is True
+    assert p(fly_surf, plain) is False                       # base tier
+    for ch in (['DIVE', 'FLY'], ['DIVE', 'SURF'], ['SURF'], ['DIVE']):
+        assert p({'species': 'Cramorant', 'charged': ch}, pg) is False, ch
+    assert p(fly_surf, fly_surf) is False                    # slayer mirror
+    assert p(None, pg) is True and p(fly_surf, None) is True  # fail-safe
+    azu = {'species': 'Azumarill', 'charged': ['ICE_BEAM', 'PLAY_ROUGH']}
+    sides = [None, {}, pg, plain, fly_surf, azu,
+             {'species': 'Cramorant'},
+             {'species': 'Cramorant', 'charged': ['HYDRO_PUMP', 'SURF']},
+             {'species': 'Cramorant', 'policy': 'pogodives'}]
+    for f in sides:
+        for c in sides:
+            assert p(f, c) is v7(f, c), (f, c)
+
+
 def test_aegislash_blade_atk_20260927_predicate():
     """Shield-form charged estimate at the Blade atk (engine 32a20be48379 ->
     45cf73a2d23d): affected iff an Aegislash (either start form) is on

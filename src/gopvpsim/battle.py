@@ -314,8 +314,18 @@ _POGODIVES_SHEET = {
     # a resisted Surf into a kept shield, then two Mirror Coats; the only
     # cramorant_certify GL bar failure, Peck / Fly + Surf 0v1, -1,971 net
     # / -155.7 mean). Surf-normalized: 3.0 x 1.07 / 1.42 = 2.25.
+    # v8 (2026-09-28, Michael's rule R): 'surf_early_when_behind' keeps the
+    # early Surf (the 3.0 gate) while our HP fraction is BELOW the
+    # opponent's; only when level or ahead does 'surf_gate_dpe' apply.
+    # Behind on HP, the loaded missile is insurance that fires on the
+    # opponent's lethal move (Jumpluff, Kingdra: Cramorant loses either way,
+    # about +165 rating per cell); ahead, a resisted Surf only spends the
+    # tempo the lethal Fly needed (Araquanid: the Fly KO beats Mirror Coat
+    # on CMP). This is our strategy sheet, not a PvPoke divergence. Reads
+    # only both sides' hp/max_hp (dedup-signature components). Not
+    # knife-edged: any lead cutoff in [-0.25, +0.10] is byte-identical.
     (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead',
-             'surf_gate_dpe': 2.25},
+             'surf_gate_dpe': 2.25, 'surf_early_when_behind': True},
     (0, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     # v5: the loaded-opponent tank ported from 2v2, at aggressive 1.9
     # (probe + skeptic 2026-08-26): the loaded condition separates the
@@ -399,8 +409,10 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None,
     2026-08-26). ``gulp_move_id`` is the gulp slot's moveId: when it is
     'SURF' and the row carries 'surf_gate_dpe', that value replaces
     _POGODIVES_DIVE_GATE_DPE wherever the row would return it (v7, row
-    (0,1) only; the 3.0 was fitted to Fly vs DIVE). A DIVE gulp -- or a
-    caller that passes no id -- never reads the field.
+    (0,1) only; the 3.0 was fitted to Fly vs DIVE) -- unless the row also
+    carries 'surf_early_when_behind' and the attacker's HP fraction is
+    below the defender's (v8 rule R), which keeps the 3.0. A DIVE gulp --
+    or a caller that passes no id -- never reads either field.
     All inputs (both sides' stats, moves, max HP, start shields, and
     live in-fight state like defender.energy) are dedup-signature
     functions per the pinned constraint below."""
@@ -411,7 +423,11 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None,
         gate = entry['gate']
         pg = _POGODIVES_DIVE_GATE_DPE
         if gulp_move_id == 'SURF' and 'surf_gate_dpe' in entry:
-            pg = entry['surf_gate_dpe']
+            # v8 rule R: behind on HP fraction keeps the 3.0 gate.
+            if not (entry.get('surf_early_when_behind')
+                    and attacker.hp / attacker.max_hp
+                    < defender.hp / defender.max_hp):
+                pg = entry['surf_gate_dpe']
         if gate == 'always':
             return pg
         if gate == 'off':
