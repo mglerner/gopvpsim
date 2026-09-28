@@ -147,6 +147,37 @@ rendered Cramorant page that is missing from, or differs from, the record.
   mean +12.5 -> +10.5). Accept as documented, or look for a discriminator
   that separates them from Araquanid (Mirror Coat) -- a new campaign, not a
   retune.
+  - *2026-09-28 probe (read-only lab, scratch `cram_0v1/`): a principled
+    discriminator exists.* **Rule R: "row (0,1), Surf gulp: the early Surf
+    (gate 3.0) is allowed only while our HP fraction is below the
+    opponent's; otherwise the gate is `surf_gate_dpe` 2.25."** Behind on
+    HP, the loaded missile is insurance that fires on the opponent's
+    lethal move (Jumpluff, Kingdra: Cramorant loses either way, +165 per
+    cell); ahead, a resisted Surf only spends the tempo the lethal Fly
+    needed (Araquanid: Fly KO beats Mirror Coat on CMP). The DPE band
+    [2.25, 3.0) is reached by exactly three opponents on the GL Peck /
+    Fly + Surf page and by none on any other page (Dive gulp, or ratio
+    1.0 from PvPoke's `moveID` typo), so R is a no-op everywhere else by
+    construction (census-confirmed, both opp-IV modes). Not knife-edged:
+    any lead cutoff in [-0.25, +0.10] is byte-identical (Araquanid's
+    lowest lead +0.13 vs Jumpluff/Kingdra's highest -0.27). Reads only HP
+    fractions, so the dedup signature is unaffected. Ten other
+    candidates were screened (Mirror Coat name check, two-hit KO, HP
+    <= 50%, race count, CMP margin, type steps, ...): the ones that work
+    are knife-edged or name-based; the rest fail on Kingdra or do not
+    separate. Stride-1 numbers, full page (319,488 cells per mode):
+    pvpoke +11 net / +14.470 mean and rank1 0 / +17.487 under R vs v7's
+    +11 / +10.491 and 0 / +13.298; only Jumpluff (4,096 / 4,050 cells,
+    smallest gain +162) and Kingdra (3,456 / 3,968, smallest +166) move,
+    no moved cell gets worse, 0 win flips, worst opponent (Jellicent)
+    unchanged. **Michael's call** (adds an HP term to the sheet on three
+    opponents' evidence; v7 already meets the strict bar). If yes:
+    sheet-row + `_cram_dive_gate_dpe` change in battle.py (engine-hash
+    bump), a failing-first test (Jumpluff/Kingdra recovery + Araquanid
+    stays plain), stride-1 recert of the GL Fly+Surf page's 8 slices with
+    byte-identity controls on every other page, a re-proved
+    `cram_0v1_surf_gate` predicate pinned to from-engine 20d9f018970b,
+    Cramorant GL re-dive, certification record, publish on go.
 - **Article prose pass (ship-mode, Michael's).** The 2026-09-27 re-render
   refreshed every tensor-derived number, but the fixed prose in
   `scripts/render_pogodives_strategy_article.py` still carries claims the
