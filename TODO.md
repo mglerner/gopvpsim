@@ -377,6 +377,43 @@ overrides). Record: CHANGELOG 2026-09-02.
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
+**BUILT 2026-09-28 on branch `swing/mirror-population` (unmerged).** The
+prerequisite below is done; what is left is Michael's review of the wording
+and the next bake that populates the pages.
+
+- Bake side: `scripts/deep_dive_lib/mirror_population.py`, called from
+  `deep_dive.main` after every other sweep and before the blob is dumped;
+  `--mirror-population` / `--no-mirror-population`, default ON (skipped
+  under `--no-replay-dump`, which has no reader for it). Schema in the
+  module docstring, stored as `state['mirror_population']` (version 1).
+  `iv_sweep` gained an opt-in `opp_ivs=` (explicit per-opponent IVs); column
+  keying and computation are unchanged, CACHE_VERSION unchanged.
+- Cost, measured 2026-09-28 on Melmetal GL (5 movesets, a machine at load
+  ~25 shared with other agents): 31 members, 224 column-sweeps (about 22
+  columns x 2 bait modes x 5 movesets), 39-47 s per dive including ~10 s of
+  build selection, against a ~4 min budget. The 2026-09-20 estimate of
+  ~0.7 s per column-sweep was ~4x high: one `iv_sweep` call covers all of
+  an arm's columns.
+- Page side: `deep_dive_builds.population_facts` +
+  `deep_dive_which_build.population_sentences`; the "The mirror" paragraph
+  reads the population where the blob has one and falls back to the cohort
+  paragraph otherwise (old blobs render byte-identical; harness-verified).
+- Hash impact: NONE on the engine hash (45cf73a2d23d before and after; no
+  engine-hashed file touched). The BLOB schema changed, so a page shows the
+  population only after a re-dive; a warm re-dive re-sims just the
+  population's columns (~40-50 s per 5-moveset dive, cold).
+- Still open: (a) wording (Michael); (b) one scenario (the 1v1) is printed,
+  all nine are in the facts; (c) league cap only -- a best-buddy (L51)
+  section keeps the cohort paragraph; (d) the plot's mirror trace and its
+  caption still read the cohort; (e) the thresholds-TOML override list
+  (candidate 3) stays deferred; (f) the population paragraph is NOT gated on
+  the mirror being a decision cell (the cohort paragraph is), so it appears
+  on arms that had no mirror paragraph before (Melmetal GL arms 1-2) --
+  Michael to confirm; (g) first real numbers (Melmetal GL 09-27 blob): most
+  builds' median member beats 0-5% of the rank list in the 1v1 from the
+  focal's seat (the column always baits; no antisymmetry), so the 1v1
+  mirror reads as lost for nearly everyone -- worth a look before shipping.
+
 **Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
 first -- measure the sped-up render layer on its own; this note is the only
 written record of that call). Verified
