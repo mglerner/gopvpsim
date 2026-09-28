@@ -2,6 +2,39 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- DP farm-down insertion order ported to PvPoke's (engine bump)
+
+- **What:** TODO "DP farm-down insertion order" (F2b of the 2026-09-27
+  Aegislash diagnosis; Michael's call: port). PvPoke's DP inserts the
+  farm-down state inside its per-move loop, ahead of each charged move's
+  expansion; we inserted it once after all expansions. Now inserted once,
+  before the expansions, in both `_dp_jit.py` (numba kernel) and the
+  pure-Python loop in `battle.py` `pvpoke_dp` (once is equivalent to
+  PvPoke's per-move copies: they are identical, any farm-down pop ends the
+  search, and the ready-move dedup can never remove the farm-down state).
+  The orders differ only on a same-turn tie with a ready move
+  (`fm_to_ko * fast_turns == 1`: a 1-turn fast move whose single hit KOs),
+  where PvPoke keeps farming. Ours had scored the thrower higher in the
+  1v1 by denying the dying side its last fast move, but that was port
+  order, not a defended deviation.
+- **Effect:** 1080-cell Aegislash sample, both seats: 7 cells per seat
+  move, all to PvPoke-exact on score and log (970 -> 977 exact), 0
+  regressions: Blade vs Corviknight (1,1) 434 -> 444 and (1,2) 104 -> 114,
+  Blade vs Kingdra (2,2) 173 -> 191, 4 Dunsparce log-only cells. Closes F4
+  (Shield Air Slash vs Registeel (2,1): the trailing shielded Flash Cannon
+  is gone, as on PvPoke). The 297-cell oracle audit is byte-identical to
+  main's (277 exact, 20 documented, 0 new, 0 vanished); no existing test
+  pin moved.
+- **Pins:** `tests/test_farmdown_order_port.py`, four cells verified on
+  PvPoke master 78b1e66db via `scripts/pvpoke_trace.js`, each failing on
+  b82ca59 (pre-port values recorded in the test).
+- **Hashes:** engine 20d9f018970b -> 9f1947ee5614; slayer 5dfdafc264f6 ->
+  587f61940e6f.
+- **Cache:** predicate `farmdown_order_20260928` (affected iff either
+  side's fast move, or its form-change swap, is 1-turn; proof in its
+  docstring). Dry run: sweep 155,610 blessed / 124,408 deleted; slayer 112
+  blessed / 39 deleted. Not applied.
+
 ## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF)
 
 - **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
