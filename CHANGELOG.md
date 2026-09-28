@@ -2,6 +2,18 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-09-28 -- Aegislash first-throw quirk documented as PvPoke #10 (docs + pins, no engine change)
+
+- Shield-start Aegislash's first Shield-form throw: PvPoke's persisted
+  clause-4 stamp kills shuffle clause 1, so its slot 0 is the input order;
+  ours picks the higher-damage move (52 log-only + 5 score cells in the
+  1080-cell sample, ours ~+100 for Aegislash in all 5). Not ported
+  (DEVELOPER_NOTES "PvPoke bugs found" #10). Pinned by two Aegislash-S vs
+  Moltres-G audit rows (9 xfail cells + a 9/9-exact GB-first control;
+  audit now 297 cells, 20 documented, 0 new) and two tests in
+  `tests/test_form_change_oracle.py`. The F2b farm-down insertion-order
+  port gap is a TODO decision item.
+
 ## 2026-09-27 -- Shield-form Aegislash prices charged moves at the Blade atk (03993a4)
 
 - **Symptom:** six Aegislash x Azumarill oracle cells open since the 09-09

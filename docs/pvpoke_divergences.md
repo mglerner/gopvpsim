@@ -80,6 +80,26 @@ the default since 2026-09-09.
    Pinned in `tests/test_form_change_oracle.py`
    (`test_cradily_vs_aegislash_blade_estimate_stage_divergence`) and
    DEVELOPER_NOTES "Form change gotchas" item 6.
+8. **Shield-start Aegislash's first charged move doesn't depend on the order
+   the moves were entered.** Both engines order same-energy charged moves so
+   the one that hits harder goes first, and both then mark all of Shield
+   Aegislash's moves as "farm energy, don't throw" -- which also switches that
+   ordering rule off. In PvPoke that marking sticks from the setup steps that
+   run before the fight, so the rule is already off at the start and
+   Aegislash's first throw is simply whichever move was entered first
+   (Shadow Ball in the default moveset). We clear it between fights, so our
+   first throw is the move that does more damage to this opponent: Gyro Ball
+   where Ghost is resisted or Steel hits hard (Moltres-G, Guzzlord, Fairies).
+   Usually that is a shielded throw either way and changes nothing (52 of a
+   1080-cell sample differ only in the log); in 5 cells it is the last
+   unshielded throw and ours scores about 100 points higher for Aegislash.
+   Entering the moves as [Gyro Ball, Shadow Ball] in PvPoke reproduces our
+   fights exactly. A small, understandable setup-order effect rather than a
+   decision anyone made; we keep the damage-first pick. Pinned in
+   `tests/test_form_change_oracle.py`
+   (`test_aegislash_shield_vs_moltres_g_first_throw_divergence` plus its
+   Gyro-Ball-first positive control) and DEVELOPER_NOTES "PvPoke bugs found"
+   #10.
 
 We also deliberately do NOT replicate one block of PvPoke's decision code (its
 non-guaranteed-buff "needsBoost" plan selection): that code is disabled

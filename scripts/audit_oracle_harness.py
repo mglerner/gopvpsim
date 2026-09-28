@@ -189,6 +189,34 @@ MATCHUPS = [
          # (1,2) and (2,2) keep the winner (ours 301 vs 240, and 363 on both
          # sides with the last two Aegislash throws in swapped order).
          xfail_cells={(1, 1), (1, 2), (2, 2)}),
+    # PvPoke bugs found #10 (2026-09-28, DEVELOPER_NOTES): Shield-start
+    # Aegislash's FIRST Shield-form throw. PvPoke's clause-4 stamp
+    # (Pokemon.js:790-796, every Shield-form move selfDebuffing=true)
+    # persists across the resetMoves() calls that run before a fight, so
+    # clause 1 (Pokemon.js:757-763, gated on !selfDebuffing) is dead when the
+    # opponent-aware reset runs and slot 0 is the user's input order (Shadow
+    # Ball here). Ours restores the stamp in reset_for_battle, so clause 1
+    # is live and puts the higher-damage move in slot 0 (Gyro Ball: Ghost is
+    # resisted by Moltres-G's Dark typing). All nine cells differ ONLY in
+    # that first Aegislash throw (Gyro Ball vs Shadow Ball, same position,
+    # rest of the log identical); (0,0)/(0,1)/(1,1)/(2,1) carry it into the
+    # score, ours ~+100 for Aegislash every time (e.g. (0,0) ours 408/591,
+    # PvPoke 308/691: PvPoke's last-gasp throw is the resisted Shadow Ball).
+    # PvPoke's pick is input-order-arbitrary and worse where it matters, so
+    # not ported. Moltres-G is 15/15/15 (the 1080-cell sample's setup; at
+    # its defaultIVs 4/10/15 the same mechanism hits all nine cells too).
+    # Pinned in tests/test_form_change_oracle.py.
+    dict(label='aegislash_shield_vs_moltres_galarian_form_change',
+         p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
+         p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (15, 15, 15), 'moltres_galarian'),
+         xfail_cells={(s1, s2) for s1 in (0, 1, 2) for s2 in (0, 1, 2)}),
+    # Positive control for #10: the same fight with the charged INPUT order
+    # swapped. PvPoke's slot 0 is then Gyro Ball too, and all nine cells
+    # must be EXACT (score, winner and chargedLog). If this row ever
+    # diverges, the #10 attribution above no longer holds.
+    dict(label='aegislash_shield_gb_first_vs_moltres_galarian_form_change',
+         p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['GYRO_BALL', 'SHADOW_BALL'], (4, 14, 15), 'aegislash_shield'),
+         p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (15, 15, 15), 'moltres_galarian')),
     # Disguise vs fast-move pressure (Azumarill's Bubble is slow; Counter
     # chips the disguise differently and CMP differs).
     dict(label='mimikyu_vs_medicham_form_change',
