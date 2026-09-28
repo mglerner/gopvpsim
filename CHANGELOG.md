@@ -61,6 +61,15 @@ Completed/shipped work, reverse chronological.
 - **Cleanup:** `scripts/mechanics_notice.py` deleted with its call sites and
   the tests that pinned its wording (24971d9); the stale blade xfails
   {(1,1),(1,2)} cleared (69b9212).
+- **Brief caveat stamp retired:** `scripts/deep_dive_brief.py`
+  `CAVEAT_SPECIES` is now `()` (branch `swing/retire-aegislash-caveat`), so
+  Aegislash cells no longer print "(engine divergence vs PvPoke)" and
+  re-enter the floor, the rungs and the cost totals from the next bake (the
+  brief is recomputed from the blob whenever `deep_dive.py` renders a page;
+  published pages keep the stamp until then). The G-caveat machinery
+  stays for the next documented divergence; its tests now pin it on a
+  monkeypatched species. Furret GL arm 4 pre-fix: 3 cells excluded, 4
+  divergence mentions; post-fix 0 / 0 with an Aegislash rung printed.
 
 ## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (dfebbd8)
 
