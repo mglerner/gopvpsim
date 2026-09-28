@@ -32,14 +32,11 @@ Completed/shipped work, reverse chronological.
 - **Cost:** Melmetal GL, 5 movesets: 31 members, 224 column-sweeps, 39-47 s
   per dive on a loaded machine. Default ON.
 - **Render gate:** `deep_dive_which_build.RENDER_MIRROR_POPULATION = False`.
-  A self-mirror probe on the 09-27 Melmetal GL blob scored a spread against
-  itself at 363-404 (1v1) on three of five arms, so the "beats N%" counts
-  carry the row-vs-column AI convention; the cohort paragraph renders until
-  Michael settles the framing (TODO "NEXT BAKE: mirror population" (g)).
-- **Cache:** engine hash unchanged (45cf73a2d23d); `iv_sweep` gained an
-  opt-in `opp_ivs=`, and the new columns key on their IVs like any other
-  column (CACHE_VERSION unchanged). The blob schema changed, so pages show
-  the population only after a re-dive.
+  The as-built "Build 1 beats 0%" counts are true but hide that the bulk
+  build TIES most of the rank list (bulk wins the Melmetal mirror) and that
+  every population column carries the pool's moveset, so off-meta arms read
+  a moveset loss as an IV one; the cohort paragraph renders until Michael
+  settles the wording (TODO "NEXT BAKE: mirror population" (g)).
 
 ## 2026-09-28 -- Aegislash first-throw quirk documented as PvPoke #10 (docs + pins, no engine change)
 
