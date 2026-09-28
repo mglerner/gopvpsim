@@ -4106,6 +4106,21 @@ def _population_preset_html(pf, bl, facts):
             + _esc(' '.join(population_sentences(pf, bl, facts))) + '</p>')
 
 
+# RENDER GATE (2026-09-28, held for Michael's review). The population is
+# baked and stored, but the paragraph does not ship yet: a self-mirror probe
+# on the 09-27 Melmetal GL blob (scratch mp/) put a spread against ITSELF and
+# got 500 in the 1v1 on the Dynamic Punch arm but 363-404 on the Hyper Beam /
+# Rock Slide / Thunderbolt arms, and 248-270 for the builds' own members. An
+# identical Pokemon losing to itself means the "beats N%" figures measure the
+# row-vs-column AI convention (row = pvpoke_dp, column = always baits; no
+# antisymmetry) at least as much as the IV spreads, and a reader takes them
+# as IV statements. Until the framing is settled (TODO.md "NEXT BAKE: mirror
+# population", item (g)), the cohort paragraph renders even when the blob
+# carries a population. Flip to True to ship the population paragraph; no
+# re-dive is needed, the data is in the blob.
+RENDER_MIRROR_POPULATION = False
+
+
 def mirror_block_html(facts, arm_builds):
     """The mirror paragraph, or '' when this arm has no mirror.
 
@@ -4116,11 +4131,11 @@ def mirror_block_html(facts, arm_builds):
     the cohort and what to do about it in two different boxes.
 
     The population paragraph wins where the blob carries a population
-    (``arm_builds['population']``, empty on every older blob); the cohort
-    paragraph is the fallback.
+    (``arm_builds['population']``, empty on every older blob) AND
+    ``RENDER_MIRROR_POPULATION`` is on; the cohort paragraph is the fallback.
     """
     pops = ((arm_builds or {}).get('population')) or {}
-    if pops:
+    if pops and RENDER_MIRROR_POPULATION:
         return _preset_blocks(
             arm_builds,
             lambda key: _population_preset_html(

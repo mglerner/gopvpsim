@@ -377,9 +377,10 @@ overrides). Record: CHANGELOG 2026-09-02.
 
 ## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
 
-**BUILT 2026-09-28 on branch `swing/mirror-population` (unmerged).** The
-prerequisite below is done; what is left is Michael's review of the wording
-and the next bake that populates the pages.
+**BUILT 2026-09-28 (merged to main; bake ON, paragraph render-gated OFF).**
+The prerequisite below is done; what is left is Michael's review of item
+(g) and the wording, then the next bake populates the blobs and a re-render
+opens the gate.
 
 - Bake side: `scripts/deep_dive_lib/mirror_population.py`, called from
   `deep_dive.main` after every other sweep and before the blob is dumped;
@@ -413,6 +414,21 @@ and the next bake that populates the pages.
   builds' median member beats 0-5% of the rank list in the 1v1 from the
   focal's seat (the column always baits; no antisymmetry), so the 1v1
   mirror reads as lost for nearly everyone -- worth a look before shipping.
+  **Probed 2026-09-28, and it is the seat convention, not the spreads:** a
+  spread against ITSELF (same IVs and level both seats) scores 500 in the
+  1v1 on the Dynamic Punch arm but 363-404 on the Hyper Beam, Rock Slide and
+  Thunderbolt arms, and the builds' own members score 248-270 against
+  themselves (the 0v0 self-mirror is 342-390 there too). The optimizing row
+  loses to the always-baiting column with identical stats, so "Build 1 beats
+  0%" is an AI-convention statement a reader would take for an IV one. The
+  paragraph is therefore behind `deep_dive_which_build.RENDER_MIRROR_POPULATION
+  = False` (pinned by `test_render_gate_keeps_the_cohort_paragraph_until_reviewed`);
+  the bake stays ON so the next bake stores the data, and opening the gate
+  is a re-render, not a re-dive. **Michael's call** on the framing: print
+  the self-mirror baseline beside every count, score both seats and print
+  the symmetric mean, sweep the column under pvpoke_dp as well (doubles the
+  ~40 s), or drop the 1v1 sentence for the CMP cuts alone (which are
+  seat-free).
 
 **Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
 first -- measure the sped-up render layer on its own; this note is the only

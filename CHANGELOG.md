@@ -2,7 +2,7 @@
 
 Completed/shipped work, reverse chronological.
 
-## 2026-09-28 -- Mirror population as opponent columns (branch swing/mirror-population, unmerged)
+## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF)
 
 - **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
   built. After the main sweeps and before the blob is dumped, each dive
@@ -31,6 +31,11 @@ Completed/shipped work, reverse chronological.
   population's bake-time engine and gamemaster hashes (only when present).
 - **Cost:** Melmetal GL, 5 movesets: 31 members, 224 column-sweeps, 39-47 s
   per dive on a loaded machine. Default ON.
+- **Render gate:** `deep_dive_which_build.RENDER_MIRROR_POPULATION = False`.
+  A self-mirror probe on the 09-27 Melmetal GL blob scored a spread against
+  itself at 363-404 (1v1) on three of five arms, so the "beats N%" counts
+  carry the row-vs-column AI convention; the cohort paragraph renders until
+  Michael settles the framing (TODO "NEXT BAKE: mirror population" (g)).
 - **Cache:** engine hash unchanged (45cf73a2d23d); `iv_sweep` gained an
   opt-in `opp_ivs=`, and the new columns key on their IVs like any other
   column (CACHE_VERSION unchanged). The blob schema changed, so pages show

@@ -355,7 +355,8 @@ def test_one_page_pick_is_one_spread():
     assert '(1 spread: ' in out and '1 spreads' not in out
 
 
-def test_population_replaces_the_cohort_and_old_blobs_keep_it():
+def test_population_replaces_the_cohort_and_old_blobs_keep_it(monkeypatch):
+    monkeypatch.setattr(W, 'RENDER_MIRROR_POPULATION', True)
     mf = {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
           'split': None,
           'cmp': _pf()['groups'][0]['cmp'],
@@ -376,6 +377,28 @@ def test_population_replaces_the_cohort_and_old_blobs_keep_it():
         "PvPoke's IV rank list" in html_new
     assert 'mirror-slayer protocol' not in html_new
     assert html_new.count('<p class="wb-mirror">') == 1
+
+
+def test_render_gate_keeps_the_cohort_paragraph_until_reviewed():
+    """The gate as shipped (2026-09-28): the population is baked and stored,
+    but a blob that carries one still renders the COHORT paragraph, byte-
+    identical to a blob without one, until RENDER_MIRROR_POPULATION is
+    flipped (the self-mirror probe in deep_dive_which_build's gate comment).
+    Fails the day the gate is opened, which is the point: opening it is a
+    ship decision, and this test is where it gets recorded."""
+    assert W.RENDER_MIRROR_POPULATION is False
+    mf = {'n_iv': 4096, 'atk_lo': 154.62, 'n_final': 31, 'tilt': 'bulk',
+          'split': None,
+          'cmp': _pf()['groups'][0]['cmp'],
+          'builds': [{'role': 'primary', 'size': 400, 'n_clear': [0, 0],
+                      'atk_max': 119.0},
+                     {'role': 'fork', 'size': 300, 'n_clear': [0, 0],
+                      'atk_max': 118.0}]}
+    old = {'presets': {'flat': BL}, 'mirror': {'flat': mf}}
+    new = dict(old, population={'flat': _pf()})
+    html_old = W.mirror_block_html(FACTS, old)
+    assert 'mirror-slayer protocol' in html_old
+    assert W.mirror_block_html(FACTS, new) == html_old
 
 
 # ---------------------------------------------------------------------------
