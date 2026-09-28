@@ -16,7 +16,7 @@ rationale.
 Each state also carries an `atk_stage` (attacker atk-stage). Chance-1
 self-atk-buffs and chance-1 opp-def-debuffs increment it on throw; the
 kernel indexes a precomputed per-stage damage table (9 rows, one per stage
-in [-4..+4]) for `cm_dmgs` and `fast_damage`. This mirrors PvPoke's
+in [-4..+4]) for `cm_dmgs` and `fast_dmg_stage`. This mirrors PvPoke's
 `attackMult` accumulation in ActionLogic.js.
 
 Numba is treated as an optional dependency. If the import fails or numba
@@ -76,7 +76,6 @@ def _make_jit():
         _i8,               # start_energy
         _f8,               # start_hp
         _i8,               # start_shields
-        _i8,               # fast_damage
         _i8,               # fast_energy
         _i8,               # fast_turns
     )
@@ -95,7 +94,6 @@ def _make_jit():
         start_energy,       # int
         start_hp,           # float
         start_shields,      # int
-        fast_damage,        # int (unused — kept for signature stability)
         fast_energy,        # int
         fast_turns,         # int
     ):

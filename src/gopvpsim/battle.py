@@ -24,7 +24,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .moves import (damage as calc_damage, type_effectiveness, stab,
+from .moves import (damage as calc_damage,
                     parse_types, mega_multiplier)
 from .pokemon import SHADOW_ATK_BONUS, mega_level as _mega_level
 
@@ -134,22 +134,6 @@ def always_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: di
 def never_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
                  mechanics: str = 'new') -> bool:
     return False
-
-def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
-    """
-    Shield policy mirroring PvPoke's ActionLogic.wouldShield.
-
-    Returns True only when the defender has a shield available AND the move is
-    dangerous enough that a smart player would use it.  Mirrors the heuristic in
-    ActionLogic.js: shield if
-      - post-move HP is within one attacker charge-cycle of 0, OR
-      - any of the attacker's charged moves deals ≥ 71 % of remaining HP (and
-        the attacker's fast DPT is high), OR
-      - any of the attacker's charged moves would KO after the cycle damage.
-    """
-    if defender.shields <= 0:
-        return False
-    return would_shield(attacker, defender, move)
 
 def _estimate_best_cm(owner: "BattlePokemon", opponent: "BattlePokemon") -> "tuple[int, dict] | tuple[None, None]":
     """PvPoke's bestChargedMove for `owner` vs `opponent`.
@@ -1987,7 +1971,6 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # 2026-07-03_nb1_bounding_sweep.md and DEVELOPER_NOTES.md divergence #3.
     # The one dpe site kept fresh -- the don't-bait dpeRatio carve-out below --
     # is the remaining intentional divergence.)
-    best_idx       = dp_cache['best_idx']
     best_cycle_dmg = dp_cache['best_cycle_dmg']
 
     # ------------------------------------------------------------------ #
@@ -2103,7 +2086,6 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             int(attacker.energy),
             float(defender.hp),
             int(defender.shields),
-            int(fast_damage),
             int(fast_energy),
             int(fast_turns),
         )
@@ -2722,9 +2704,6 @@ class BattlePokemon:
     _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
     # Queued fast move: (queued_on_turn, move_dict) or None
     _queued_fast:    "tuple[int, dict] | None" = field(init=False, repr=False)
-    # Deferred charged move for mechanics='new' (2026-06-23 turn system):
-    # a charged move chosen this turn resolves at the START of the next
-    # turn. Holds the move dict (or None). NEVER set in legacy mode.
     # Stat stages: each in [-4, +4]
     atk_stage: int = field(init=False, repr=False)
     def_stage: int = field(init=False, repr=False)
@@ -3292,7 +3271,6 @@ class BattlePokemon:
         best_idx       = init['best_idx']
         min_cycle_thr  = init['min_cycle_thr']
         farm_swap_idx  = init['farm_swap_idx']
-        n = len(cms)
 
         # Per-atk-stage damage tables for the near-KO DP -- FRESH per stage.
         # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
@@ -3726,21 +3704,11 @@ def simulate(
             timeline.append(f"T{turn:>3}: {attacker.species} {name} "
                             f"CANCELLED ({reason})")
 
-    def _resolve_charged(charged_actions, allow_dead_attacker=False):
+    def _resolve_charged(charged_actions):
         # Resolve a list of (actor_index, move_dict) charged moves in CMP
         # order. Extracted verbatim from the former inline step 4 so that
-        # BOTH the legacy step-4 call site AND the mechanics=='new' deferred
-        # block (which runs this at the TOP of the next turn) share one
-        # implementation. With allow_dead_attacker=False (the default, used by
-        # the legacy step-4 call) behavior is byte-for-byte identical to the
-        # old inline loop, so the legacy path is unchanged (oracle/test
-        # verified).
-        #
-        # allow_dead_attacker=True is passed ONLY from the new-mode deferred
-        # block: spec change 1 says a charged move already committed still
-        # resolves even if its user fainted to a fast (here, on the previous
-        # turn). So we skip the "attacker killed by fast" cancel for that path.
-        # The simultaneous-charged CMP cancel (charged_ko) still applies.
+        # BOTH the legacy step-4 call site AND the mechanics=='new' step-2.5
+        # call share one implementation.
         if use_priority and len(charged_actions) == 2:
             charged_actions.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
 
@@ -3774,7 +3742,7 @@ def simulate(
             # the opponent is also throwing a charged move this turn (the
             # opponentChargedMoveThisTurn exception -- simultaneous charged moves
             # are allowed even if one side was killed by a fast move).
-            if attacker.hp <= 0 and not allow_dead_attacker:
+            if attacker.hp <= 0:
                 opponent_also_charged = any(ai == 1 - actor_idx
                                             for ai, _ in charged_actions)
                 if not opponent_also_charged:
@@ -3998,7 +3966,7 @@ def simulate(
         #     fast attack still lands, because it resolves while the attacker
         #     is alive. If it KOs, the fast never lands (dead defender); if it
         #     does not, the attacker faints to the fast immediately after --
-        #     exactly what the footage shows. No allow_dead_attacker, and no
+        #     exactly what the footage shows. No dead-attacker exception, and no
         #     "withhold the faint break" guard.
         #   * A charged move's buffs/debuffs are applied BEFORE the incoming
         #     fast attack is computed, so a self-defense-debuffing move makes
@@ -4019,18 +3987,18 @@ def simulate(
             # together. No CMP sort (the legacy sort exists only to let the
             # higher-attack side land first, which the tie semantics remove).
             # A fast against a defender already fainted THIS turn (from the
-            # step-1.5 deferred charged) is still skipped -- a faint is a faint.
+            # step-2.5 charged) is still skipped -- a faint is a faint.
             _fast_results = []   # (defender_idx, dmg, attacker_idx, energy)
             for actor_idx, move in fast_landings:
                 attacker = pokemon[actor_idx]
                 defender = pokemon[1 - actor_idx]
                 if defender.hp <= 0:
-                    continue   # fainted by deferred charged in step 1.5
+                    continue   # fainted by charged in step 2.5
                 dmg = attacker.fast_move_damage(defender)
                 # Energy from the CURRENT form's fast move, not the queued dict
                 # -- see the legacy floating-fast site below (FC-1). Differs
                 # only after a mid-flight Aegislash Blade->Shield revert
-                # (in step 1.5, before these step-3 landings).
+                # (in step 2.5, before these step-3 landings).
                 _fast_results.append((1 - actor_idx, dmg, actor_idx,
                                       attacker.fast_move['energyGain']))
             for defender_idx, dmg, attacker_idx, energy_gain in _fast_results:
