@@ -1996,8 +1996,20 @@ def compute_builds(state, arm, mode='pvpoke', level='l50', facts=None,
         mf = mirror_facts(ctx, frame, block, level=level, surface=surf)
         if mf is not None:
             mirror[key] = mf
+    # The mirror POPULATION, where the blob carries one: the paragraph reads
+    # it instead of the cohort (deep_dive_which_build.mirror_block_html).
+    # Empty on every blob baked before it existed, which keeps their pages
+    # byte-identical.
+    population = {}
+    if population_arm(ctx, level) is not None:
+        raw_focal = focal_raw_atk(ctx)
+        for key, block in presets.items():
+            pf = population_facts(ctx, block, key, level=level,
+                                  raw_focal=raw_focal)
+            if pf is not None:
+                population[key] = pf
     return dict(ctx=ctx, sets=sets, frame=frame, presets=presets,
-                mirror=mirror,
+                mirror=mirror, population=population,
                 clusters_result=clusters_result,
                 presets_identical=(len(presets) > 1 and len(sigs) == 1),
                 n_decision_cells=len(frame['cells']),
@@ -2352,6 +2364,166 @@ def mirror_facts(ctx, frame, block, level='l50', surface=None):
         # draws come off one array.
         'clear50': (atk > cmp_rows[0]['T']),
     }
+
+
+# ---------------------------------------------------------------------------
+# the mirror POPULATION -- read-only
+# ---------------------------------------------------------------------------
+# ``state['mirror_population']`` (deep_dive_lib/mirror_population.py, TODO.md
+# "NEXT BAKE: mirror population") holds the focal grid swept against the
+# mirrors a reader will actually meet: PvPoke's top-20 IV rank list for the
+# focal (and for the other shadow form when the pool carries it), plus the
+# page's own builds' most-winning members and SP1. Unlike the cohort above it
+# keeps a PER-(spread, scenario, member) score, so "beats 17 of the 20 in the
+# 1v1" is a count off the stored array, not an aggregate.
+#
+# League cap only: the population is swept against the 'l50' grid, so a
+# best-buddy (L51) section reads None here and keeps the cohort paragraph.
+
+# The one scenario the paragraph prints. Every preset's builds are compared
+# in it: it is the open-GBL lead and the scenario the decision record
+# phrases the sentence in. Falls back to the first baked scenario on a dive
+# that did not bake it. All nine are in the facts.
+POP_SCENARIO = '1v1'
+
+
+def lower_median(vals):
+    """The median as an ACTUAL member's value: the lower middle of the sorted
+    list. A build's "median member beats k of N" must be a k some member
+    reaches, so the two middles of an even-sized build are never averaged."""
+    srt = sorted(int(v) for v in vals)
+    return srt[(len(srt) - 1) // 2]
+
+
+def population_arm(ctx, level='l50'):
+    """``(pop, arm entry, scores (n_iv, n_sc, M))`` for this view, or None.
+
+    None on a blob without the key (every blob before the population
+    existed), at a level the population was not swept at, for an arm it
+    skipped, or for a bait mode it did not sweep.
+    """
+    pop = ctx['state'].get('mirror_population')
+    if not pop or pop.get('level') != level:
+        return None
+    arms = pop.get('arms') or []
+    if ctx['arm'] >= len(arms) or arms[ctx['arm']] is None:
+        return None
+    a = arms[ctx['arm']]
+    tag = 'nobait' if ':nobait' in str(ctx['mode']) else 'bait'
+    sc = (a.get('scores') or {}).get(tag)
+    if sc is None:
+        return None
+    sc = np.asarray(sc)
+    if sc.shape != (ctx['n_iv'], ctx['n_sc'], len(a['members'])):
+        raise ValueError(f"mirror population arm {ctx['arm']}: scores shape "
+                         f"{sc.shape} does not match the grid "
+                         f"({ctx['n_iv']}, {ctx['n_sc']}, "
+                         f"{len(a['members'])})")
+    return pop, a, sc
+
+
+def focal_raw_atk(ctx):
+    """The focal grid's PRE-shadow attack, what ``cmp_atk`` compares.
+
+    Computed from the same ingredients ``sweep._build_side`` uses (base
+    attack + IV, times the level's CPM) rather than by dividing the shadow
+    multiplier out of ``ctx['atk']``, which is one ULP low for some spreads
+    (``battle.BattlePokemon.cmp_atk``).
+    """
+    from gopvpsim.pokemon import CPM, get_species
+    base = get_species(ctx['state']['species'])['atk']
+    return np.array([(base + int(m[0])) * CPM[float(m[3])]
+                     for m in ctx['meta']], dtype=np.float64)
+
+
+def _pop_group_rows(block, win, cols, members, mids, raw_focal):
+    """Per build: members beaten per scenario and CMP wins, (median, min).
+
+    ``cols`` index the arm's score columns, ``mids`` the member table, in
+    the same order.
+    """
+    n = len(cols)
+    pop_raw = np.array([members[m]['raw_atk'] for m in mids])
+    out = []
+    for b in block['builds']:
+        idx = np.flatnonzero(b['_mask'])
+        per_scen = win[idx][:, :, cols].sum(axis=2)     # (members, n_sc)
+        # Strict, the engine's rule: equal pre-shadow attack is no priority.
+        cmp_n = (raw_focal[idx][:, None] > pop_raw[None, :]).sum(axis=1)
+        out.append({
+            'role': b['role'], 'size': int(len(idx)), 'n': n,
+            'beat': [[lower_median(per_scen[:, si]),
+                      int(per_scen[:, si].min())]
+                     for si in range(per_scen.shape[1])],
+            'cmp': [lower_median(cmp_n), int(cmp_n.min())],
+        })
+    return out
+
+
+def population_facts(ctx, block, preset, level='l50', raw_focal=None):
+    """Everything the population paragraph reads for one preset, or None.
+
+    Up to three groups, labelled separately on the page as the decision
+    record asks: ``rank`` (the focal form's rank-list members),
+    ``rank_other`` (the other shadow form's, when it was swept) and ``page``
+    (THIS preset's builds' most-winning members plus SP1). ``page`` is left
+    out -- and its sentence with it -- when the members the bake tagged for
+    this preset are not the builds this render selects: a population chosen
+    against other builds would be labelled "this page's builds" and be
+    something else.
+    """
+    got = population_arm(ctx, level)
+    if got is None or not block.get('builds'):
+        return None
+    pop, a, sc = got
+    members = pop['members']
+    win = brief.win_cube(sc)
+    if raw_focal is None:
+        raw_focal = focal_raw_atk(ctx)
+    focal_shadow = bool(ctx['state']['shadow'])
+    groups = []
+    for key, shadow in (('rank', focal_shadow),
+                        ('rank_other', not focal_shadow)):
+        cols = [j for j, m in enumerate(a['members'])
+                if 'pvpoke_rank' in a['tags'][j]
+                and members[m]['shadow'] == shadow]
+        if not cols:
+            continue
+        mids = [a['members'][j] for j in cols]
+        atks = [members[m]['atk'] for m in mids]
+        groups.append({
+            'key': key, 'shadow': shadow, 'n': len(cols),
+            'atk_lo': min(atks), 'atk_hi': max(atks),
+            # The a_50 / a_75 cuts, off the focal form's own list only: the
+            # printed cut is in the page's attack convention, the shadow-
+            # EFFECTIVE attack, so it is a CMP selector only against members
+            # of the focal's own form.
+            'cmp': mirror_cmp(ctx, atks) if key == 'rank' else None,
+            'builds': _pop_group_rows(block, win, cols, members, mids,
+                                      raw_focal),
+        })
+    tagged = (a.get('builds') or {}).get(preset)
+    meta = ctx['meta']
+    page_ok = tagged is not None and all(
+        tagged.get(b['role']) is not None
+        and tuple(members[tagged[b['role']]]['ivs'])
+        == tuple(int(v) for v in meta[b['most_winning_member']['idx'], :3])
+        for b in block['builds'])
+    if page_ok:
+        mids = sorted({tagged[b['role']] for b in block['builds']}
+                      | {a['sp1']})
+        pos = {m: j for j, m in enumerate(a['members'])}
+        cols = [pos[m] for m in mids]
+        groups.append({'key': 'page', 'shadow': focal_shadow,
+                       'n': len(cols), 'cmp': None,
+                       'builds': _pop_group_rows(block, win, cols, members,
+                                                 mids, raw_focal)})
+    si = (ctx['scen_labels'].index(POP_SCENARIO)
+          if POP_SCENARIO in ctx['scen_labels'] else 0)
+    return {'species': ctx['state']['species'], 'shadow': focal_shadow,
+            'scenario': ctx['scen_labels'][si], 'si': si,
+            'n_members': len(a['members']), 'page_ok': page_ok,
+            'groups': groups}
 
 
 # ---------------------------------------------------------------------------
