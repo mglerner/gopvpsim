@@ -351,7 +351,8 @@ Two iteration-speed layers shipped 2026-06-10; full design rationale
 in CHANGELOG ("Sweep disk cache + replay-from-saved-state").
 
 **Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 7 as of the
-2026-06-29 cache-rework, branch `cache-rework`): `iv_sweep` persists
+2026-06-29 cache-rework, branch `cache-rework`; 8 since 2026-08-06, a
+worker-code bump with the v7 schema unchanged): `iv_sweep` persists
 each opponent's column to `~/.cache/gopvpsim/sweep/` and skips
 cache-hit opponents entirely. Keys include the moveset, scenarios,
 bait mode, and `focal_max_level`; opponent-side keys carry resolved
@@ -454,13 +455,15 @@ Operational notes:
   (nothing printed on an all-miss sweep).
 - Stale columns accumulate as engine/gamemaster evolve.
   `scripts/gc_cache.py` (`--dry-run` default) prunes them. v7 split:
-  **legacy dirs** (cache version < 7, gamemaster in the focal key) get the
+  **legacy dirs** (meta `v` < `CACHE_VERSION`, now 8) get the
   original DIR-level pruning — keep current + N-1 gamemaster vintages;
-  **v7 dirs** are always kept (gamemaster is per-column, so a dir holds mixed
+  **current-schema dirs** (`v` >= `CACHE_VERSION`) are always kept (gamemaster is per-column, so a dir holds mixed
   vintages and dropping it would be a full cold re-sim) and instead get a
   COLUMN-level reclaim — drop columns whose gamemaster stamp is outside the
-  current + N-1 window. Run `gc_cache.py --keep-vintages 1 --apply` after the
-  v6->v7 transition to fully reclaim the legacy v1-v6 fodder.
+  current + N-1 window. Since the v8 bump the v7 dirs are in the legacy
+  bucket as one gamemaster-keyless vintage: the default `--keep-vintages 2`
+  keeps them, `--keep-vintages 1 --apply` deletes all of them at once
+  (`gc_cache.plan_sweep`; caveat in the `sweep_cache.py` v8 comment).
   `rm -r ~/.cache/gopvpsim/sweep` is still always safe.
 - The ML IV-guide path (`iv_envelope_analysis.py`) now rides this same
   cache via `iv_sweep` (Phase 6); the old per-guide `iv_envelope/` boolean
