@@ -106,7 +106,7 @@ guard) is closed and condensed in CHANGELOG. What stays here is the standing
 runbook and the genuinely open items.
 
 **Standing runbook after every bake that touches Cramorant** (post-bake
-verification last DONE 2026-09-27, sheet v7; the site published 2026-09-27):
+verification last DONE 2026-09-28, sheet v8; the site published 2026-09-28):
 
     python scripts/cramorant_certify.py --league both --selftest 5 --out \
         userdata/certify/cramorant_record.json
