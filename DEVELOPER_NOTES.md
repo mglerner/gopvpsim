@@ -30,7 +30,7 @@ below; Michael verified in-game that Morpeko enters every battle in Full Belly
 and toggles after each charged move). Pinned by a chargedLog assertion on the
 Morpeko test + known-divergence marks in the audit script.
 
-## Current status (updated 2026-06-12)
+## Current status (updated 2026-09-27)
 
 <!-- sync:test_count -->3051<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
@@ -119,42 +119,44 @@ Mienfoo vs Medicham (9/9) resolved by the `would_shield` buff-reset
 ordering and CMP cancellation fixes. Full root-cause writeup in
 `CHANGELOG.md` under `2026-04-04 to 2026-04-06`.
 
-## Experimental turn model: `mechanics='new'` (2026-06-23 PvP turn system)
+## Turn model: `mechanics='new'` (2026-06-23 PvP turn system; default since 2026-09-09)
 
 `simulate(...)` takes a keyword `mechanics='legacy'|'new'` (default
-`'legacy'`). The `'new'` model implements the in-game PvP turn changes
-that went live 2026-06-23 (spec: pokemongo.com/news/pvp-updates2026).
+`'new'` since 2026-09-09, `7e6a82b`). The `'new'` model implements the
+in-game PvP turn changes that went live 2026-06-23 (spec:
+pokemongo.com/news/pvp-updates2026). `--mechanics` on `scripts/battle.py`
+and `scripts/deep_dive.py` also defaults to `new`, and so does
+`deep_dive_slayer.SLAYER_DEFAULT_MECHANICS` (below).
 
-**UNVALIDATED, but a reference now EXISTS (updated 2026-08-31).** Our
-`'new'` branch was coded from the published spec alone and is still
-pinned only by our own spec-derived unit tests
-(`tests/test_new_turn_mechanics.py`) -- so treat all `'new'`-mode
-breakpoint/bulkpoint/CMP output as experimental.
+**Validated against PvPoke master.** PvPoke merged its own implementation
+of the new turn system to master on 2026-09-09 (recorded in our
+`5ca1b89`). The oracle audit (`scripts/audit_oracle_harness.py`,
+`--mechanics` default `new`) and the pytest suite run at the default (a
+handful of tests opt into legacy explicitly, via `conftest.py`'s env
+opt-in), so they exercise `'new'`, and the audit's cells are
+cross-checked against PvPoke master (current counts: "Current status"
+above). Both disk caches key on `mechanics` (`32400af`, 2026-09-02:
+`sweep_cache` and `slayer_cache` add a field only for non-legacy values),
+so they serve `'new'` columns like any other.
 
-What changed: PvPoke has now implemented the new turn system, on
-branch `origin/new-mechanics` (five commits, 2026-08-23..26:
-`041d8c722` "Updated action priority order", `71ab81008`, `442a4afe8`
-"Timing updates", `a2685efe6`, `a1b3ebd95` "0 turn switches after
-Charged Attack"; +29/-91 in `src/js/battle/Battle.js`). It is merged
-into `origin/twilight-trails` but **not** into `origin/master`. So the
-old claim here -- "no reference implementation to cross-check against"
--- has been false since 2026-08-23.
+`'legacy'` is retired: `simulate()` raises `ValueError` unless
+`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`2615c6e`), and it is kept
+only so the port-fidelity history stays runnable. It is byte-for-byte
+behavior-identical to the pre-change engine: every `'new'` behavior sits
+behind an explicit `if mechanics == 'new':` branch in `simulate`'s loop.
 
-Cross-checking our `'new'` branch against it is real, unscheduled work
-(not yet done, no oracle cells captured). Route it through
-`docs/rebalance_checklist.md` section B when picked up: PvPoke's
-in-game turn model becomes the live one at the 09-08 merge, at which
-point `'legacy'` stops matching the game even though it still matches
-`origin/master`.
-
-`'legacy'` stays the default everywhere and is byte-for-byte
-behavior-identical to the pre-change engine: the oracle harness and the
-full pytest suite never pass `mechanics`, so they exercise only the
-unguarded legacy path. The `--mechanics new` CLI flag exists on
-`scripts/battle.py` and `scripts/deep_dive.py` (default `legacy`); both
-emit an EXPERIMENTAL warning when `new` is selected, and the deep-dive
-sweep disk cache is force-disabled under `new` (its key does not include
-the turn model, so a cached column would otherwise collide with legacy).
+History, 2026-06-23..09-10 (pure history; the dated detail is in
+CHANGELOG "2026-09-02..03" and "2026-09-09..10"): `'new'` was first coded
+from the published spec alone and pinned only by spec-derived unit tests
+(`tests/test_new_turn_mechanics.py`); `'legacy'` stayed the default, the
+CLIs printed an EXPERIMENTAL caveat, and the sweep cache was
+force-disabled under `new` (the turn model was not yet in its key).
+PvPoke's implementation appeared on branch `origin/new-mechanics`
+(2026-08-23..26; five commits `041d8c722`, `71ab81008`, `442a4afe8`,
+`a2685efe6`, `a1b3ebd95`, +29/-91 in `src/js/battle/Battle.js`; merged
+into `origin/twilight-trails` before master), was A/B'd against ours on
+2026-09-02, and our charged-move resolution was re-ported on 2026-09-03 from live-game
+ground truth before PvPoke merged to master.
 
 The 5 spec changes and how they map onto our 1v1 core:
 
@@ -287,8 +289,12 @@ python scripts/profile_slayer.py --n-focal 60 --n-opp 20
 | 2026-06-10 | `a57c39f` (re-run, current data)      | 2,255     | Controlled baseline for the regression measurement |
 | 2026-06-10 | `d419306` (pre-fix HEAD)              | 1,121     | The 2.0x regression, root-caused to `141eee1`      |
 | 2026-06-10 | `154536a` (DP setup cache + log gate) | 2,278     | Post-regression-fix baseline                       |
-| 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | **3,160** | **Current baseline** (warm JIT cache; first run    |
+| 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | 3,160     | Previous baseline (warm JIT cache; first run       |
 |            | reachability, DP-cache precompute)    |           | after an engine edit pays ~1-2s compile)           |
+| 2026-09-25 | `6f99b08` (engine `5a813036625c`)     | **5,800** | **Current baseline** (CHANGELOG 2026-09-25;        |
+|            |                                       |           | 5,846 at the parent engine `d78c67fd06a7`). New    |
+|            |                                       |           | turn system, post-2026-09-09 gamemaster: NOT       |
+|            |                                       |           | comparable with the rows above                     |
 
 Gamemaster data changes shift battle lengths and therefore sims/s
 (that's the 3,055 → 2,255 gap on identical code), so when the
@@ -349,7 +355,8 @@ Two iteration-speed layers shipped 2026-06-10; full design rationale
 in CHANGELOG ("Sweep disk cache + replay-from-saved-state").
 
 **Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 7 as of the
-2026-06-29 cache-rework, branch `cache-rework`): `iv_sweep` persists
+2026-06-29 cache-rework, branch `cache-rework`; 8 since 2026-08-06, a
+worker-code bump with the v7 schema unchanged): `iv_sweep` persists
 each opponent's column to `~/.cache/gopvpsim/sweep/` and skips
 cache-hit opponents entirely. Keys include the moveset, scenarios,
 bait mode, and `focal_max_level`; opponent-side keys carry resolved
@@ -452,13 +459,15 @@ Operational notes:
   (nothing printed on an all-miss sweep).
 - Stale columns accumulate as engine/gamemaster evolve.
   `scripts/gc_cache.py` (`--dry-run` default) prunes them. v7 split:
-  **legacy dirs** (cache version < 7, gamemaster in the focal key) get the
+  **legacy dirs** (meta `v` < `CACHE_VERSION`, now 8) get the
   original DIR-level pruning — keep current + N-1 gamemaster vintages;
-  **v7 dirs** are always kept (gamemaster is per-column, so a dir holds mixed
+  **current-schema dirs** (`v` >= `CACHE_VERSION`) are always kept (gamemaster is per-column, so a dir holds mixed
   vintages and dropping it would be a full cold re-sim) and instead get a
   COLUMN-level reclaim — drop columns whose gamemaster stamp is outside the
-  current + N-1 window. Run `gc_cache.py --keep-vintages 1 --apply` after the
-  v6->v7 transition to fully reclaim the legacy v1-v6 fodder.
+  current + N-1 window. Since the v8 bump the v7 dirs are in the legacy
+  bucket as one gamemaster-keyless vintage: the default `--keep-vintages 2`
+  keeps them, `--keep-vintages 1 --apply` deletes all of them at once
+  (`gc_cache.plan_sweep`; caveat in the `sweep_cache.py` v8 comment).
   `rm -r ~/.cache/gopvpsim/sweep` is still always safe.
 - The ML IV-guide path (`iv_envelope_analysis.py`) now rides this same
   cache via `iv_sweep` (Phase 6); the old per-guide `iv_envelope/` boolean
@@ -799,9 +808,13 @@ messages.
     migrated via the both-sided self-debuff-CM predicate (`migrate_cache.py`
     `self_debuff_either_side`, 39,600/48,464 columns blessed); production re-dive
     launched 2026-06-29. **NB:** this resolves only the opponent-best-move PICK
-    inside the [910] gate -- the separate [910]/[918] self-debuff *timing*
-    deviation (throw a self-debuffing move only when fast-KO won't suffice)
-    remains an INTENTIONAL divergence (see "Known divergences" below; unchanged).
+    inside the [910] gate. (This entry used to add that a separate [910]/[918]
+    self-debuff *timing* deviation remained intentional; re-checked
+    2026-09-28 against pvpoke master `78b1e66db` ActionLogic.js, both gates
+    match PvPoke's, and the `_optimize_move_timing` self-debuff exclusion
+    that CLAUDE.md cited for it was removed 2026-06-11 (entry below). The
+    one live divergence in this family is bandaid[929], "Known divergences"
+    below.)
     Evidence: `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md`,
     CHANGELOG.
 
@@ -852,10 +865,10 @@ self-debuffing move and we swap.
 **Why we keep ours.** When `would_shield` is True the move is shielded either
 way (1 damage), so there is no damage tempo at stake -- the swap only avoids
 eating the -atk/-def self-debuff on a throw that is shielded regardless. It is
-avoid-waste, not bait tempo, and sits in the same family as the ungated
-`[910]`/`[918]` self-debuff timing (CLAUDE.md's "throw self-debuffing moves
-only when fast-KO won't suffice" deviation). PvPoke's gated line throws the
-self-debuffing nuke into a guaranteed shield -- strictly dominated.
+avoid-waste, not bait tempo, and sits in the same family as the
+`[910]`/`[918]` self-debuff timing, which PvPoke itself leaves ungated on
+`baitShields` (re-checked 2026-09-28 at pvpoke master `78b1e66db`).
+PvPoke's gated line throws the self-debuffing nuke into a guaranteed shield -- strictly dominated.
 
 **Evidence.** Trace: Malamar (Super Power + Foul Play) vs Furret, no-bait, 1-1
 -- ours throws Foul Play into the shield (score 769); gated throws Superpower
