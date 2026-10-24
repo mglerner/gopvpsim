@@ -37,15 +37,23 @@ from test_battle import _make_battle_pokemon, _extract_battle_log  # noqa: E402
 from gopvpsim.battle import simulate, pvpoke_dp  # noqa: E402
 
 
-def P(species, fast, charged, ivs, hid, shadow=False, level=None):
+def P(species, fast, charged, ivs, hid, shadow=False, level=None,
+      no_form_change=False):
     """One side of a matchup. `species` is our display name; `hid` is the
     PvPoke speciesId for the harness. `level` pins an explicit level on
     BOTH engines — needed when our at_best_level (max 51, best buddy)
     and PvPoke's UI default disagree (e.g. UL Aegislash: PvPoke default
     is level 50; level 51 Shield yields a level-39 Blade instead of 38
-    and every downstream damage/DP decision shifts)."""
+    and every downstream damage/DP decision shifts).
+
+    `no_form_change` strips the side's formChange in the harness
+    (`--pN-no-form-change`): the oracle for our synthetic 'Minior (Core
+    only)' species, a battle_start changer fighting its stored form all
+    battle. Our side uses whatever `species` names; PvPoke's side keeps
+    the base speciesName, so norm_log folds the ' (Core only)' label."""
     return dict(species=species, fast=fast, charged=list(charged),
-                ivs=ivs, hid=hid, shadow=shadow, level=level)
+                ivs=ivs, hid=hid, shadow=shadow, level=level,
+                no_form_change=no_form_change)
 
 
 # Every oracle matchup with a hand-typed PvPoke score/log in test_battle.py.
@@ -315,6 +323,56 @@ MATCHUPS = [
     dict(label='cramorant_vs_mimikyu',
          p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
          p2=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu')),
+    # --- Minior (ported as-is from pvpoke 38f70320d, 2026-10-24; fixtures
+    # also pinned in tests/test_minior.py). The stored Core enters as Meteor
+    # (battle_start; level from PvPoke's formula + its whole-level walk),
+    # flips one-way to Core under 50% HP off ANY damage, both sides hoard
+    # energy while the shell is up, and wouldShield spares shields vs weak
+    # hits on the shell. IVs = PvPoke defaultIVs cp1500 (5/14/15, L24) and
+    # the already-audited opponent spreads. ---
+    # Default moveset; shielded Power Gem on the shell, Core Acrobatics:
+    dict(label='minior_vs_azumarill',
+         p1=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core'),
+         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    # 1-turn fast pressure: the hp flip fires off a fast hit:
+    dict(label='minior_vs_medicham',
+         p1=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core'),
+         p2=P('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'], (7, 15, 14), 'medicham')),
+    # Ancient Power (10% self buff) moveset + a steel wall:
+    dict(label='minior_ap_vs_registeel',
+         p1=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'ANCIENT_POWER'], (5, 14, 15), 'minior_core'),
+         p2=P('Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'], (15, 15, 15), 'registeel')),
+    # Take Down fast (energyGain 9) vs the rock-weak bird:
+    dict(label='minior_takedown_vs_corviknight',
+         p1=P('Minior (Core)', 'TAKE_DOWN', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core'),
+         p2=P('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], (4, 12, 14), 'corviknight')),
+    # Opponent-side Minior: the hold-energy rule on the OTHER side + an
+    # opponent battle_start change:
+    dict(label='azumarill_vs_minior',
+         p1=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
+         p2=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core')),
+    # Two form-changers: Gulp Missile insertion vs the hp trigger ordering:
+    dict(label='cramorant_vs_minior',
+         p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
+         p2=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core')),
+    # Disguise interplay (break-disguise ASAP vs the Meteor hold):
+    dict(label='minior_vs_mimikyu',
+         p1=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core'),
+         p2=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu')),
+    # Mirror at different spreads (different Meteor levels, CMP on Meteor atk):
+    dict(label='minior_mirror',
+         p1=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core'),
+         p2=P('Minior (Core)', 'ROLLOUT', ['ACROBATICS', 'ANCIENT_POWER'], (10, 6, 10), 'minior_core')),
+    # 'Minior (Core only)': the synthetic stored-form-all-battle variant
+    # (PvPoke side: formChange stripped via --p1-no-form-change):
+    dict(label='minior_core_only_vs_azumarill',
+         p1=P('Minior (Core only)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core',
+              no_form_change=True),
+         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    dict(label='minior_core_only_vs_medicham',
+         p1=P('Minior (Core only)', 'ROLLOUT', ['ACROBATICS', 'POWER_GEM'], (5, 14, 15), 'minior_core',
+              no_form_change=True),
+         p2=P('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'], (7, 15, 14), 'medicham')),
 ]
 
 from gopvpsim.pokemon import LEAGUE_CP as _CANON_LEAGUE_CP  # noqa: E402
@@ -327,8 +385,11 @@ LEAGUE_CP = {k: str(v) for k, v in _CANON_LEAGUE_CP.items()}
 def norm_log(entries):
     """Harness chargedLog tags shadow forms ' (Shadow)'; our _extract_battle_log
     drops it. Strip it so the two are comparable. Form suffixes (Blade,
-    Busted, Hangry, Full Belly) are kept by both sides."""
-    return [e.replace(' (Shadow)', '') for e in entries]
+    Busted, Hangry, Full Belly, Meteor, Core) are kept by both sides.
+    Our synthetic 'Minior (Core only)' is PvPoke's 'Minior (Core)' with the
+    form change stripped, so fold that label too (applied to OUR log)."""
+    return [e.replace(' (Shadow)', '').replace(' (Core only)', ' (Core)')
+            for e in entries]
 
 
 MECHANICS = 'new'   # set from --mechanics; see main()
@@ -345,7 +406,7 @@ def run_sim(m, s1, s2):
     r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
                  log=True, mechanics=MECHANICS)
     return (round(r.pvpoke_score(0)), round(r.pvpoke_score(1)),
-            r.winner, _extract_battle_log(r))
+            r.winner, norm_log(_extract_battle_log(r)))
 
 
 def run_harness(m, s1, s2, root):
@@ -360,6 +421,8 @@ def run_harness(m, s1, s2, root):
     for side in ('p1', 'p2'):
         if m[side].get('level'):
             cmd += [f'--{side}-level', str(m[side]['level'])]
+        if m[side].get('no_form_change'):
+            cmd += [f'--{side}-no-form-change']
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise RuntimeError(f'harness rc={proc.returncode}: {proc.stderr.strip()}')

@@ -498,6 +498,19 @@ _DEFAULT_MOVESET_FALLBACK = {
 }
 
 
+# Synthetic species variants this library adds on top of the gamemaster:
+#   display name -> (base gamemaster speciesName, synthetic speciesId).
+# pokemon._all_entries() materializes each as a copy of the base entry with
+# formChange = None. Everything keyed by species NAME (sweep/slayer cache
+# keys, dive slugs, thresholds, signatures) therefore keys distinctly for
+# free, while rankings lookups (default moveset, default IVs, ranks) resolve
+# here to the BASE species. 'Minior (Core only)': a Minior that enters
+# battle already in Core form (after flipping in an earlier fight; PvPoke
+# resetOnSwitch=false) and so never gets its Meteor phase.
+SPECIES_VARIANTS = {
+    'Minior (Core only)': ('Minior (Core)', 'minior_core_only'),
+}
+
 _species_id_index = None  # speciesName -> speciesId, built from the gamemaster
 
 
@@ -520,6 +533,9 @@ def species_id(species_name, *, shadow=False):
         gm = load_gamemaster()
         _species_id_index = {p['speciesName']: p['speciesId']
                              for p in gm['pokemon']}
+    # A synthetic variant ranks as its base species (PvPoke knows no such id).
+    if species_name in SPECIES_VARIANTS:
+        species_name = SPECIES_VARIANTS[species_name][0]
     sid = _species_id_index.get(species_name)
     if sid is None:
         sid = (species_name.lower().replace(' ', '_')

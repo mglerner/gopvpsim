@@ -1,16 +1,23 @@
 """
 Form change mechanics for Pokemon Go PvP.
 
-Supports three form-change Pokemon:
+Supports five form-change Pokemon:
   - Morpeko: toggles AURA_WHEEL_ELECTRIC <-> AURA_WHEEL_DARK after each charged move
   - Aegislash: swaps Shield <-> Blade forms (stats, fast moves, level) on
     charged move use and shielding
   - Mimikyu: disguise absorbs first unshielded charged hit (dmg=1), then
     permanent -1 def stage
+  - Cramorant: Dive/Surf -> prey form, Gulp Missile counter, revert
+  - Minior: stored Core enters battle as Meteor (battle_start trigger, its
+    own level formula), flips one-way back to Core when HP drops below 50%
+    (hp trigger); HP stays Core's throughout
 
 The system is data-driven: form change triggers and effects are read from the
 gamemaster's formChange field on each Pokemon entry.  Adding a new form-change
-Pokemon with an existing trigger type requires no code changes here.
+Pokemon with an existing trigger type requires no code changes here. A NEW
+trigger type is refused loudly (build_form_change_state raises) rather than
+simmed in the stored form -- Minior's two triggers shipped in PvPoke's
+gamemaster 2026-10-20 and were silently ignored here until 2026-10-24.
 """
 import math
 from dataclasses import dataclass
@@ -46,6 +53,10 @@ class FormData:
     # alternativeFormId 'variable' -- Cramorant's HP-conditional prey pick,
     # resolved at the battle.py charged_move trigger site).
     target_idx: "int | None" = None
+    # 'hp' trigger threshold (gamemaster `amount`): the form changes when
+    # hp / max_hp drops STRICTLY below this after taking damage (PvPoke
+    # Battle.js:1644-1645). Minior (Meteor) carries 0.5; None elsewhere.
+    hp_amount: "float | None" = None
 
     def matches_move(self, move_id: str) -> bool:
         """True when ``move_id`` satisfies this form's trigger constraint
@@ -211,6 +222,116 @@ def _aegislash_shield_level(blade_level, league_cp):
     return min(float(start), max(CPM))
 
 
+# Minior (ported as-is from pvpoke 38f70320d, 2026-10-24). PvPoke's
+# getFormStats (Pokemon.js:2562-2613) walks the new form's level DOWN until
+# its CP fits under the cap, in steps of
+#
+#     decrementer = 1;
+#     if (this.activeFormId == "minior_core" || this.decrementer == "minior_meteor")
+#         decrementer = 0.5;
+#
+# `this.decrementer` is never assigned anywhere in PvPoke, so the second
+# clause is dead code (a typo for `formId == "minior_meteor"`). In the BATTLE
+# path changeForm() sets activeFormId to the NEW form before calling
+# getFormStats, so the Core -> Meteor change at battle start sees
+# activeFormId == "minior_meteor", neither clause holds, and the loop steps
+# WHOLE levels. (PvPoke's site UI calls getFormStats while Core is still
+# active and steps half levels, so pvpoke.com's displayed Meteor CP and its
+# simulator's Meteor stats disagree for ~1/3 of GL spreads.) We port the
+# battle path. Flip this to True to take the half-level step the author
+# evidently intended (the UI path); it is NOT what the simulator runs today.
+MINIOR_HALF_LEVEL_STEP = False
+
+# PvPoke caps the formula's start level at 55 (its cpms table ends there);
+# ours ends at max(CPM) = 52. The parity-preserving clamp below walks the
+# start down in whole decrementer steps until it is on our table, so every
+# level the loop would visit at or below 52 is visited in the same order
+# and the result is identical whenever the answer is <= 52 -- which it is
+# for every Great League Core (Meteor 0/0/0 at 52 is over 1500). It is NOT
+# identical in Ultra League: Meteor cannot reach 2500 CP at any level, so
+# PvPoke leaves it at 55 and we leave it at 52 (deliberate, documented;
+# UL Minior is unverified in-game anyway -- see DEVELOPER_NOTES).
+_MINIOR_PVPOKE_LEVEL_CAP = 55.0
+
+
+def _minior_step(forward: bool) -> float:
+    """Loop step for the level walk. ``forward`` = stored Core -> Meteor
+    (the battle_start change, whole levels via the dead clause); the
+    reverse Meteor -> Core walk of a UI-selected Meteor sees
+    activeFormId == "minior_core" and steps half levels."""
+    if not forward:
+        return 0.5
+    return 0.5 if MINIOR_HALF_LEVEL_STEP else 1.0
+
+
+def _minior_walk_down(start, step, base, atk_iv, def_iv, sta_iv, league_cp):
+    """PvPoke's `while (newCP > battleCP)` level walk, clamped to our table."""
+    level = min(float(start), _MINIOR_PVPOKE_LEVEL_CAP)
+    while level > max(CPM):
+        level -= step
+    while level > 1.0 and cp(base['atk'], base['def'], base['hp'],
+                             atk_iv, def_iv, sta_iv, level) > league_cp:
+        level -= step
+    return max(1.0, level)
+
+
+def _minior_meteor_level(core_level, league_cp, meteor_base,
+                         atk_iv, def_iv, sta_iv):
+    """Meteor's battle level from the stored Core's level (Pokemon.js:2562).
+
+    GL: floor((47 * L / 25 + 1) * 2) / 2;  UL: floor((73 * L / 50 + 26/25) * 2) / 2;
+    ML: Core's level (no branch). Then the whole-level walk down under the cap.
+    Formulas credited upstream to u/Ok_Lobster8494 (commit 38f70320d).
+    """
+    if league_cp == 1500:
+        start = math.floor((47 * core_level / 25 + 1) * 2) / 2
+    elif league_cp == 2500:
+        start = math.floor((73 * core_level / 50 + 26 / 25) * 2) / 2
+    else:
+        start = core_level
+    return _minior_walk_down(start, _minior_step(forward=True), meteor_base,
+                             atk_iv, def_iv, sta_iv, league_cp)
+
+
+def _minior_core_level(meteor_level, league_cp, core_base,
+                       atk_iv, def_iv, sta_iv):
+    """Core's level from a UI-selected Meteor's level (Pokemon.js:2574):
+    the inverse formulas, rounded to a half level, then the half-level walk.
+    Only reached when the STORED species is minior_meteor, which our dives
+    never do (a Meteor spread must come from a legal Core); kept for parity."""
+    if league_cp == 1500:
+        start = round((meteor_level - 1) * 25 / 47 * 2) / 2
+    elif league_cp == 2500:
+        start = round((meteor_level - 26 / 25) * 50 / 73 * 2) / 2
+    else:
+        start = meteor_level
+    return _minior_walk_down(start, _minior_step(forward=False), core_base,
+                             atk_iv, def_iv, sta_iv, league_cp)
+
+
+# Every formChange.trigger battle.py dispatches. A gamemaster entry with any
+# other trigger is a NEW mechanic; refuse it instead of simming the stored
+# form all battle (the silent-wrong-answer mode Minior sat in for four days).
+_KNOWN_TRIGGERS = frozenset({
+    'activate_charged',      # Aegislash Shield -> Blade (pre-damage)
+    'activate_shield',       # Aegislash Blade -> Shield
+    'charged_move',          # Morpeko toggle; Cramorant prey pick / revert
+    'charged_move_damage',   # Mimikyu disguise bust
+    'battle_start',          # Minior Core -> Meteor (Battle.start)
+    'hp',                    # Minior Meteor -> Core below 50% HP
+    'none',                  # terminal form (Busted Mimikyu)
+})
+
+
+def _check_trigger(trigger, species_id):
+    if trigger not in _KNOWN_TRIGGERS:
+        raise ValueError(
+            f"{species_id}: formChange trigger {trigger!r} is not implemented "
+            f"(known: {sorted(_KNOWN_TRIGGERS)}). Port the mechanic in "
+            f"battle.py before simming this species; refusing to sim it in "
+            f"its stored form.")
+
+
 def _build_variable_form_change(mon_entry, fc, atk_iv, def_iv, level, shadow,
                                 fast_move, charged_moves):
     """Build the 3-form FormChangeConfig for a 'variable' form change (Cramorant).
@@ -297,6 +418,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         return None
 
     trigger = fc.get('trigger')
+    _check_trigger(trigger, mon_entry.get('speciesId'))
     if trigger == 'none':
         # Busted Mimikyu has trigger='none' — no form change FROM this form
         return None
@@ -354,6 +476,16 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
                 break
             alt_level -= 1.0
         alt_level = max(1.0, alt_level)
+    # Minior: the stored Core's Meteor level comes from PvPoke's formula +
+    # whole-level walk (see MINIOR_HALF_LEVEL_STEP above). The level is
+    # purely a stat scale: HP is never recomputed on a form change, so
+    # Meteor fights with Core's HP at Meteor's atk/def.
+    elif species_id == 'minior_core':
+        alt_level = _minior_meteor_level(level, league_cp, alt_base,
+                                         atk_iv, def_iv, sta_iv)
+    elif species_id == 'minior_meteor':
+        alt_level = _minior_core_level(level, league_cp, alt_base,
+                                       atk_iv, def_iv, sta_iv)
 
     alt_cpm = CPM[alt_level]
     alt_raw_atk = (alt_base['atk'] + atk_iv) * alt_cpm
@@ -392,9 +524,12 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         move_id=fc.get('moveId'),
         native_stat_buffs=default_native_buffs,
         target_idx=1,
+        hp_amount=fc.get('amount') if trigger == 'hp' else None,
     )
 
     alt_trigger = alt_fc.get('trigger')
+    if alt_trigger is not None:
+        _check_trigger(alt_trigger, alt_species_id)
     # For toggle types, the alt form should use the same trigger as the default
     # so it can toggle back (e.g. Morpeko Hangry has no formChange in gamemaster
     # but needs to toggle back to Full Belly on the next charged move).
@@ -414,6 +549,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         move_id=fc.get('moveId') if form_type == 'toggle' and alt_fc.get('moveId') is None else alt_fc.get('moveId'),
         native_stat_buffs=alt_native_buffs,
         target_idx=0,
+        hp_amount=alt_fc.get('amount') if alt_trigger == 'hp' else None,
     )
 
     reset_on_switch = fc.get('resetOnSwitch', True)

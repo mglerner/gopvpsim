@@ -585,6 +585,41 @@ def _is_instant(move: dict) -> bool:
     return 'instant' in move.get('tags', ())
 
 
+def _is_meteor(bp: "BattlePokemon") -> bool:
+    """PvPoke's `activeFormId == "minior_meteor"` (ActionLogic.js:255, 261,
+    1256): Minior currently in its Meteor shell."""
+    return bp.active_form_sid == 'minior_meteor'
+
+
+def _apply_hp_form_trigger(defender: "BattlePokemon",
+                           attacker: "BattlePokemon") -> bool:
+    """PvPoke Battle.js:1644-1670 -- the HP-threshold form change, checked
+    at the end of EVERY useMove (fast or charged, shielded or not) on the
+    defender: when the current form's trigger is 'hp' and
+    hp / max_hp < amount with hp > 0, change into the target form. Minior
+    (Meteor) -> Core at under 50%. One-way: Core's own trigger is
+    battle_start, which only fires in simulate()'s setup. ``max_hp`` is
+    PvPoke's ``stats.hp``, which changeForm never rewrites.
+
+    NOT modeled: PvPoke adds the gamemaster ``animationTime`` (5000 ms for
+    Minior) to its wall-clock ``time`` here. That clock only feeds the
+    timeline display and the 240 s time-out check (Battle.js:636); turns
+    and cooldowns are untouched, so a fight that never approaches the
+    limit is unaffected. Our cap is MAX_TURNS, which is not time-based.
+
+    Returns True when a change happened (callers log it)."""
+    fc = defender._form_change
+    if fc is None:
+        return False
+    fd = fc.forms[defender._form_idx]
+    if fd.trigger != 'hp' or not fd.hp_amount:
+        return False
+    if defender.hp / defender.max_hp < fd.hp_amount and defender.hp > 0:
+        defender.change_form(attacker, fd.target_idx)
+        return True
+    return False
+
+
 def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
                            mechanics: str = 'new') -> bool:
     """
@@ -938,8 +973,12 @@ def _calc_turns_to_live(
     # Hoist defender's charged-move energy + damage into parallel arrays so
     # the inner loop avoids method/dict lookups. The damage cache was
     # populated by defender.fast_move_damage(attacker) above.
-    d_cm_dmgs   = defender._cached_charged_dmgs
-    d_cm_energy = [cm['energy'] for cm in defender.charged_moves]
+    # PvPoke iterates opponent.activeChargedMoves -- the frozen post-shuffle
+    # order (Pokemon.js:752-833) -- and the order is load-bearing (see
+    # _ensure_dmg_cache).
+    _order      = defender._ensure_dp_init_cache(attacker)['order']
+    d_cm_dmgs   = [defender._cached_charged_dmgs[i] for i in _order]
+    d_cm_energy = [defender.charged_moves[i]['energy'] for i in _order]
     n_d_cms     = len(d_cm_energy)
     fastest_cm_energy = min(d_cm_energy) if d_cm_energy else 0
 
@@ -1111,6 +1150,16 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         use_shield = False
         if _shield_trace:
             cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
+    # Save shields in Minior Meteor form to protect the Core form (pvpoke
+    # 4d2908fac ActionLogic.js:1254-1256). wouldShield ONLY: unlike the
+    # Aegislash/Cramorant rules, Battle.js's own shield decision has no
+    # Minior gate, so a plain always-shield move is still shielded by a
+    # Meteor; this rule only reaches the heuristic branches and the
+    # attacker's model of the defender.
+    if _d_form_sid == 'minior_meteor' and damage * 2 < defender.hp:
+        use_shield = False
+        if _shield_trace:
+            cm_reasons.append(f"miniorMeteor dmg({damage})*2<hp({defender.hp})")
     # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
     _tank_mult = _cram_tank_mult(attacker, defender, damage,
                                  attacker.energy - move.get('energy', 0))
@@ -1604,7 +1653,9 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict,
 def _dp_insert_farm_down(queue: list, ns: "_DPState") -> None:
     """Farm-down insertion (PvPoke lines 469-491).
 
-    Insert AFTER same-turn states (``<=``).
+    Insert AFTER same-turn states (``<=``). Also used by the ready-branch
+    stack-two expansion (ActionLogic.js:668-717), whose insertion follows
+    the same ``<=`` rule with a dead dominance check.
 
     PvPoke line 479 checks ``DPQueue[i].hp < 0`` to block insertion, but
     ``.hp`` is undefined on BattleState (stored as ``.oppHealth``), so
@@ -1772,6 +1823,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     cm_self_buff   = dp_cache['cm_self_buff']
     cm_debuf_delta = dp_cache['cm_debuf_delta']
     cm_buff_delta  = dp_cache['cm_buff_delta']
+    cm_stack_ok    = dp_cache['cm_stack_ok']
 
     # ------------------------------------------------------------------ #
     # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-251)
@@ -1894,6 +1946,25 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                             f"{cms[_n].get('moveId')} (energy={attacker.energy})"
                         )
                     return cm_orig_idx[_n]
+
+    # ------------------------------------------------------------------ #
+    # Minior (pvpoke 4d2908fac, ActionLogic.js:254-263): while a Meteor
+    # shell is on the field, BOTH sides sit on their energy -- the
+    # opponent waits for the squishy Core, Minior waits for its own
+    # high-attack form -- unless another fast move would overflow the
+    # energy cap or turnsToLive says it cannot afford to wait. Placed
+    # exactly where PvPoke has it: after the lethal throw, before OMT,
+    # so a KO throw still goes and TTL's own fire_now above still wins.
+    # `turns_to_live` here is PvPoke's adjusted value (same variable).
+    # ------------------------------------------------------------------ #
+    if ((_is_meteor(defender) or _is_meteor(attacker))
+            and ENERGY_CAP - attacker.energy >= fast_energy
+            and turns_to_live > fast_turns):
+        if _policy_debug:
+            _policy_log.append(
+                f"  DP[minior_hold]: {attacker.species} saves energy "
+                f"(energy={attacker.energy}, ttl={turns_to_live})")
+        return None
 
     # ------------------------------------------------------------------ #
     # optimizeMoveTiming (ActionLogic.js lines 237-344)
@@ -2095,7 +2166,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             cm_dmgs_stage_np[root_atk_stage + 4],
             dp_cache['cm_energy_np'], dp_cache['cm_self_db_np'],
             dp_cache['cm_db_dlt_np'],
-            dp_cache['cm_buff_dlt_np'], cm_dmgs_stage_np,
+            dp_cache['cm_buff_dlt_np'], dp_cache['cm_stack_ok_np'],
+            cm_dmgs_stage_np,
             dp_cache['fast_dmg_stage_np'],
             int(root_atk_stage),
             n_cms,
@@ -2205,6 +2277,33 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                         _DPState(new_e, new_hp, new_t, new_sh,
                                  new_first, new_max_idx, new_has_deb, new_deb_cnt,
                                  new_atk_stage))
+
+                    # Stack-two expansion, READY twin (PvPoke ActionLogic.js
+                    # 668-717, ported 2026-10-24): for a ready self-ATTACK-debuffing
+                    # move with 2*energy <= 100, also queue the state that
+                    # farms up to 2*energy FIRST (fast hits at the current
+                    # stage) and then throws one copy. Insert AFTER
+                    # same-turn states (<=, dominance check dead in the JS)
+                    # -- the same rule as the farm-down state. PvPoke skips
+                    # only fm_stack == 0; with energy already above
+                    # 2*energy the turn goes NEGATIVE and the state pops
+                    # ahead of everything (DEVELOPER_NOTES "DP stack-two
+                    # branch"). Kept verbatim.
+                    if cm_stack_ok[n]:
+                        fm_stack = math.ceil((2 * move_e - curr_e) / fast_energy)
+                        if fm_stack != 0:
+                            st_e  = fm_stack * fast_energy + curr_e - move_e
+                            st_hp = curr_hp - curr_fast_dmg * fm_stack
+                            if curr_sh > 0:
+                                st_hp -= 1
+                            else:
+                                st_hp -= move_dmg
+                            st_t = curr_t + fm_stack * fast_turns + 1
+                            _dp_insert_farm_down(
+                                queue,
+                                _DPState(st_e, st_hp, st_t, new_sh,
+                                         new_first, new_max_idx, new_has_deb,
+                                         new_deb_cnt, new_atk_stage))
                 else:
                     fm_needed    = math.ceil((move_e - curr_e) / fast_energy)
                     turns_needed = fm_needed * fast_turns
@@ -2222,6 +2321,29 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                         _DPState(new_e, new_hp, new_t, new_sh,
                                  new_first, new_max_idx, new_has_deb, new_deb_cnt,
                                  new_atk_stage))
+
+                    # Stack-two expansion, NOT-READY twin (PvPoke
+                    # ActionLogic.js:764-808): the same farm-to-2*energy
+                    # state as above, but inserted BEFORE same-turn states
+                    # (<) like the not-ready state itself, and with no
+                    # fm_stack == 0 guard (energy < move_e < 2*move_e here,
+                    # so fm_stack > 0 always). This twin is what lets a
+                    # plan read "cheap move now, farm to 2x, then the
+                    # debuffing nuke" (Malamar vs Dunsparce 2v1).
+                    if cm_stack_ok[n]:
+                        fm_stack = math.ceil((2 * move_e - curr_e) / fast_energy)
+                        st_e  = fm_stack * fast_energy + curr_e - move_e
+                        st_hp = curr_hp - curr_fast_dmg * fm_stack
+                        if curr_sh > 0:
+                            st_hp -= 1
+                        else:
+                            st_hp -= move_dmg
+                        st_t = curr_t + fm_stack * fast_turns + 1
+                        _dp_insert_not_ready(
+                            queue,
+                            _DPState(st_e, st_hp, st_t, new_sh,
+                                     new_first, new_max_idx, new_has_deb,
+                                     new_deb_cnt, new_atk_stage))
 
     # ------------------------------------------------------------------ #
     # Select move from plan
@@ -3078,10 +3200,35 @@ class BattlePokemon:
             # Prebuilt buffers for the turnsToLive JIT. Energies are
             # re-derived here (not __post_init__) so form changes -- which
             # swap the move dicts and invalidate this cache -- are covered.
+            # TTL-kernel views, in PvPoke's activeChargedMoves order: the
+            # energy sort PLUS the priority shuffle, FROZEN at this mon's
+            # last resetMoves (Pokemon.js:752-833) -- i.e. our frozen
+            # _dp_init_cache order vs this opponent. The turnsToLive DP
+            # pushes one state per affordable charged move and BREAKS on the
+            # first fast-move KO it pops, so the iteration order decides
+            # which states it ever sees: Drapion listed Crunch(45)/Aqua
+            # Tail(35) read TTL 3 here and 6 in PvPoke until 2026-10-24
+            # (plain ascending energy fixed that; Ariados [Lunge 45, Foul
+            # Play 40] -- rotated by the selfBuffing clause -- showed the
+            # shuffle matters too). Read the frozen order only if it already
+            # exists for this opponent: building it HERE would run the
+            # priority shuffle (which stamps move dicts) from reset_for_battle's
+            # own damage-cache call, ahead of its stamp restore. Until it
+            # exists (simulate() builds it at battle start, before any TTL
+            # call) fall back to the energy sort; _ensure_dp_init_cache
+            # invalidates this cache when it builds, so the arrays are
+            # rebuilt in the frozen order on the next call.
+            _init = self._dp_init_cache
+            if _init is not None and _init['opp'] is defender:
+                _order = _init['order']
+            else:
+                _order = sorted(range(len(self.charged_moves)),
+                                key=lambda i: self.charged_moves[i]['energy'])
             self._cached_charged_dmgs_np = _np.asarray(
-                self._cached_charged_dmgs, dtype=_np.int64)
+                [self._cached_charged_dmgs[i] for i in _order], dtype=_np.int64)
             self._cm_energy_np = _np.asarray(
-                [cm['energy'] for cm in self.charged_moves], dtype=_np.int64)
+                [self.charged_moves[i]['energy'] for i in _order],
+                dtype=_np.int64)
         self._dmg_cache_opp       = defender
         self._dmg_cache_atk_stage = self.atk_stage
         self._dmg_cache_def_stage = defender.def_stage
@@ -3169,6 +3316,14 @@ class BattlePokemon:
                          for m in cms]
         cm_debuf_delta = [_cm_debuf_delta(m) for m in cms]
         cm_buff_delta  = [_cm_buff_delta(m) for m in cms]
+        # Eligible for the DP's stack-two expansions (ActionLogic.js:668/764):
+        # selfDebuffing AND buffs[0] < 0 AND 2*energy <= 100. Read buffs
+        # directly (not selfAttackDebuffing) so the Aegislash shield stamp
+        # ([0,0] buffs) disqualifies exactly as it does in PvPoke.
+        cm_stack_ok = [1 if (m.get('selfDebuffing', False)
+                             and (m.get('buffs') or [0, 0])[0] < 0
+                             and 2 * m['energy'] <= 100) else 0
+                       for m in cms]
         # FROZEN raw dpe (Pokemon.js:796 move.damage/energy at init stage).
         root_init = [dmg_init[order[i]] for i in range(n)]
         cm_dpe = [root_init[i] / cm_energy_l[i] for i in range(n)]
@@ -3238,12 +3393,16 @@ class BattlePokemon:
             'cm_self_buff':   cm_self_buff,
             'cm_debuf_delta': cm_debuf_delta,
             'cm_buff_delta':  cm_buff_delta,
+            'cm_stack_ok':    cm_stack_ok,
             'cm_dpe':         cm_dpe,
             'best_idx':       best_idx,
             'min_cycle_thr':  min_cycle_thr,
             'farm_swap_idx':  farm_swap_idx,
         }
         self._dp_init_cache = init
+        # The TTL kernel's defender-side arrays are laid out in this frozen
+        # order (_ensure_dmg_cache); force their rebuild now that it exists.
+        self._dmg_cache_opp = None
         return init
 
     def _ensure_dp_cache(self, defender: "BattlePokemon") -> dict:
@@ -3291,6 +3450,7 @@ class BattlePokemon:
         cm_self_buff   = init['cm_self_buff']
         cm_debuf_delta = init['cm_debuf_delta']
         cm_buff_delta  = init['cm_buff_delta']
+        cm_stack_ok    = init['cm_stack_ok']
         cm_dpe         = init['cm_dpe']
         best_idx       = init['best_idx']
         min_cycle_thr  = init['min_cycle_thr']
@@ -3384,6 +3544,7 @@ class BattlePokemon:
             'cm_self_buff':   cm_self_buff,
             'cm_debuf_delta': cm_debuf_delta,
             'cm_buff_delta':  cm_buff_delta,
+            'cm_stack_ok':    cm_stack_ok,
             'cm_dmgs_by_stage':  cm_dmgs_by_stage,
             'fast_dmg_by_stage': fast_dmg_by_stage,
             'fast_root':      fast_root,
@@ -3400,6 +3561,7 @@ class BattlePokemon:
             dp['cm_self_db_np']     = _np.asarray(dp['cm_self_debuf'], dtype=_np.int8)
             dp['cm_db_dlt_np']      = _np.asarray(dp['cm_debuf_delta'], dtype=_np.int8)
             dp['cm_buff_dlt_np']    = _np.asarray(dp['cm_buff_delta'], dtype=_np.int8)
+            dp['cm_stack_ok_np']    = _np.asarray(dp['cm_stack_ok'], dtype=_np.int8)
             dp['cm_dmgs_stage_np']  = _np.asarray(cm_dmgs_by_stage, dtype=_np.float64)
             dp['fast_dmg_stage_np'] = _np.asarray(fast_dmg_by_stage, dtype=_np.int64)
         self._dp_cache = dp
@@ -3673,6 +3835,28 @@ def simulate(
     for p in pokemon:
         p.fast_move['_turns'] = p.fast_move.get('cooldown', 500) // 500
 
+    # Battle.js:245-247 (Battle.start): a `battle_start` form change fires
+    # right after reset(), BEFORE anything else reads the mon -- usePriority
+    # (Battle.js:262) compares the NEW form's attack and the resetMoves
+    # damage memos below are stamped against it. Minior: the stored Core
+    # enters as Meteor. Only from the starting form: reset_for_battle has
+    # already restored form 0, and a fresh BattlePokemon starts there.
+    # (PvPoke fires this in simulate mode only; emulate/sandbox mode would
+    # start in Core -- irrelevant here, simulate() IS simulate mode.)
+    #
+    # The loop below is PvPoke's Battle.start loop in its ORDER: for each
+    # seat, reset() -- which runs resetMoves() -> initializeMove() against
+    # the opponent AS IT STANDS at that moment -- and THEN that seat's
+    # battle_start form change. So the two seats freeze against different
+    # opponent forms: with Minior in seat 1, seat 0 freezes its move
+    # ordering / raw dpe / bestChargedMove / move.damage memos against
+    # CORE (Minior has not changed yet), while with Minior in seat 0 the
+    # opponent freezes against METEOR. Ariados vs Minior (Core 2026-10-24):
+    # Lunge/Foul Play dpe 1.0/1.4 vs Core keeps PvPoke's order [Foul Play,
+    # Lunge] (the 0.3 selfBuffing-promotion gap is exceeded) where the same
+    # pair vs Meteor reads 0.58/0.80 and rotates. Freezing lazily at the
+    # first DP call (after both form changes) got seat 0 wrong.
+    #
     # Battle.js:93-113 -> Pokemon.reset -> resetMoves -> initializeMove
     # (Pokemon.js:880-889): every charged move carries a damage number vs
     # the opponent from battle start, at the starting stat stages. The
@@ -3683,8 +3867,16 @@ def simulate(
     # and apply_form_change (the form-changer's new moves).
     for _i in (0, 1):
         _me, _opp = pokemon[_i], pokemon[1 - _i]
+        _me._ensure_dp_init_cache(_opp)
         for _cm in _me.charged_moves:
             _cm['_cached_damage'] = _me.charged_move_damage(_cm, _opp)
+        if _me._form_idx == 0 and _me.current_form_trigger == 'battle_start':
+            # apply_form_change resets _me's own frozen selection and
+            # re-stamps _me's memos (changeForm -> resetMoves), not _opp's.
+            _me.change_form(_opp, _me._form_change.forms[0].target_idx)
+            if log:
+                timeline.append(f"T{turn:>3}: {_me.species} changed form "
+                                f"(battle start)")
 
     # Priority: higher effective attack breaks ties on charged moves.
     # Cramorant mirror: PvPoke 78c64048a Battle.js:253-259 forces priority
@@ -3895,6 +4087,13 @@ def simulate(
                 _missile = defender._extra_charged[_prey_fd.move_id]
                 charged_actions.insert(_ai, (1 - actor_idx, _missile))
 
+            # Form change: hp threshold (Minior Meteor -> Core), the LAST
+            # step of PvPoke's useMove (Battle.js:1644), after buffs, the
+            # attacker's post-attack change, and the missile insertion --
+            # so an inserted missile is resolved against the new form.
+            if _apply_hp_form_trigger(defender, attacker) and log:
+                log_event(f"{defender.species} changed form (hp)")
+
     while turn < MAX_TURNS:
         turn += 1
 
@@ -3915,6 +4114,7 @@ def simulate(
         charged_actions = []   # list of (actor_index, move_dict)
         fast_landings   = []   # fast moves that land this turn
         _fired_fast     = []   # indices of pokemon whose queued FM fires now
+        _fast_queued_turn = {} # actor_index -> turn its landing FM was queued
 
         # Phase A: mark FMs that land this turn (added to fast_landings).
         # _queued_fast is intentionally NOT cleared here; it stays set so
@@ -3926,6 +4126,7 @@ def simulate(
                 if (turn - queued_turn) >= duration - 1:
                     fast_landings.append((i, qmove))
                     _fired_fast.append(i)
+                    _fast_queued_turn[i] = queued_turn
 
         # Phase B: collect decisions; no state changes yet.
         # Each pokemon with cooldown==0 AND no pending multi-turn FM decides.
@@ -3971,6 +4172,7 @@ def simulate(
                 charged_actions.append((i, p.charged_moves[data]))
             elif action_type == 'fast_1':
                 fast_landings.append((i, data))
+                _fast_queued_turn[i] = turn
                 p.cooldown = 1   # blocks re-acting until next turn
             else:   # 'fast_multi'
                 p._queued_fast = (turn, data)
@@ -4012,6 +4214,21 @@ def simulate(
             # higher-attack side land first, which the tie semantics remove).
             # A fast against a defender already fainted THIS turn (from the
             # step-2.5 charged) is still skipped -- a faint is a faint.
+            #
+            # Order = PvPoke's queue order (Battle.js:397-437): simulate-mode
+            # fast actions carry no priority, so the stable sort leaves them
+            # in push order -- earlier-queued first, same-turn pushes by
+            # index. Under the tie semantics the order is invisible EXCEPT
+            # when a landing flips the other side's form (Minior Meteor->Core
+            # off a fast hit): PvPoke's useMove computes the later landing's
+            # damage AFTER that flip, with the new form's attack. Fast damage
+            # reads atk/def/stages, never hp or energy, so the flip is the
+            # only thing a snapshot can go stale on; we re-read the damage of
+            # the not-yet-applied landings when one fires. (2026-10-24: the
+            # azumarill_vs_minior 1v1/2v1/2v2 and minior_mirror 2v2 oracle
+            # cells were 5-23 points off until this; the Minior-as-p1 cells
+            # matched because its own landing was already applied.)
+            fast_landings.sort(key=lambda ia: (_fast_queued_turn[ia[0]], ia[0]))
             _fast_results = []   # (defender_idx, dmg, attacker_idx, energy)
             for actor_idx, move in fast_landings:
                 attacker = pokemon[actor_idx]
@@ -4025,7 +4242,8 @@ def simulate(
                 # (in step 2.5, before these step-3 landings).
                 _fast_results.append((1 - actor_idx, dmg, actor_idx,
                                       attacker.fast_move['energyGain']))
-            for defender_idx, dmg, attacker_idx, energy_gain in _fast_results:
+            for k in range(len(_fast_results)):
+                defender_idx, dmg, attacker_idx, energy_gain = _fast_results[k]
                 attacker = pokemon[attacker_idx]
                 defender = pokemon[defender_idx]
                 attacker.energy = min(ENERGY_CAP, attacker.energy + energy_gain)
@@ -4037,6 +4255,16 @@ def simulate(
                         f"{attacker.species} fast → {dmg} dmg, "
                         f"energy {attacker.energy}"
                     )
+                # Form change: hp threshold -- PvPoke's useMove runs it for
+                # fast damage too (Minior flips to Core off a fast hit).
+                if _apply_hp_form_trigger(defender, attacker):
+                    if log:
+                        log_event(f"{defender.species} changed form (hp)")
+                    for j in range(k + 1, len(_fast_results)):
+                        d_idx, _, a_idx, eg = _fast_results[j]
+                        _fast_results[j] = (
+                            d_idx, pokemon[a_idx].fast_move_damage(pokemon[d_idx]),
+                            a_idx, eg)
         else:
             # Legacy: naturally-due fast moves resolve before charged moves.
             # When two fast moves land simultaneously, the game resolves them
@@ -4066,6 +4294,8 @@ def simulate(
                         f"{attacker.species} fast → {dmg} dmg, "
                         f"energy {attacker.energy}"
                     )
+                if _apply_hp_form_trigger(defender, attacker) and log:
+                    log_event(f"{defender.species} changed form (hp)")
 
         # --- 4. Resolve charged moves (higher priority first) ---
         # Skip if defender was already killed by the fast move this turn.
@@ -4111,6 +4341,8 @@ def simulate(
                                     f"{p.species} floating fast → {dmg} dmg, "
                                     f"energy {p.energy}"
                                 )
+                            if _apply_hp_form_trigger(defender, p) and log:
+                                log_event(f"{defender.species} changed form (hp)")
             for p in pokemon:
                 p.cooldown = 0
                 p._queued_fast = None
