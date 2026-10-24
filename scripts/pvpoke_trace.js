@@ -39,6 +39,11 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') { out.help = true; continue; }
+    // Boolean: strip the given side's gamemaster formChange so a
+    // battle_start changer (Minior) fights its STORED form all battle --
+    // the oracle for our "Core only" (post-flip re-entry) dives.
+    if (a === '--p1-no-form-change') { out['p1-no-form-change'] = true; continue; }
+    if (a === '--p2-no-form-change') { out['p2-no-form-change'] = true; continue; }
     if (!flags.has(a)) { throw new Error(`unknown arg: ${a}`); }
     const v = argv[++i];
     if (v === undefined) { throw new Error(`missing value for ${a}`); }
@@ -276,6 +281,14 @@ function buildPokemon(battle, spec) {
   if (!poke.speciesId) {
     throw new Error(`unknown species: ${spec.species}`);
   }
+  if (spec.noFormChange) {
+    // Pokemon's constructor copied the gamemaster entry's formChange onto
+    // the instance (Pokemon.js:88-ish); Battle.start() reads
+    // pokemon[i].formChange for the battle_start trigger and useMove reads
+    // defender.formChange for the hp trigger. Nulling the instance copy
+    // leaves the shared gamemaster entry untouched.
+    poke.formChange = null;
+  }
   poke.initialize(battle.getCP());
   // autoLevel=true makes each setIV walk the level down until CP<=cap,
   // which is what we want when overriding the default rank-1 IVs that
@@ -340,6 +353,7 @@ function main() {
     level:   args['p1-level'] ? parseFloat(args['p1-level']) : undefined,
     shields: parseInt(requireArg(args, 'p1-shields'), 10),
     bait:    parseBait(args['p1-bait']),
+    noFormChange: !!args['p1-no-form-change'],
   };
   const spec2 = {
     species: requireArg(args, 'p2'),
@@ -349,6 +363,7 @@ function main() {
     level:   args['p2-level'] ? parseFloat(args['p2-level']) : undefined,
     shields: parseInt(requireArg(args, 'p2-shields'), 10),
     bait:    parseBait(args['p2-bait']),
+    noFormChange: !!args['p2-no-form-change'],
   };
 
   // Route PvPoke's console.log to stderr so stdout stays pure JSON.
@@ -438,9 +453,35 @@ function main() {
     });
   };
 
+  // Form-change log: every changeForm() call with the stats PvPoke lands
+  // on. Wrapped on the instance property, which is what the internal
+  // `self.changeForm(...)` call sites (reset, Battle.start, useMove)
+  // resolve through. Lets the Python side pin form-level math (Minior's
+  // Meteor level formula + the whole-level `decrementer` loop) exactly.
+  const formLog = [];
+  for (const p of [p1, p2]) {
+    const orig = p.changeForm;
+    p.changeForm = function (id) {
+      const from = p.activeFormId;
+      const r = orig.call(p, id);
+      formLog.push({
+        turn: battle.getTurns(), index: p.index, from, to: p.activeFormId,
+        level: p.level, cpm: p.cpm,
+        baseStats: { ...p.baseStats },
+        stats: { atk: p.stats.atk, def: p.stats.def, hp: p.stats.hp },
+        hp: p.hp,
+      });
+      return r;
+    };
+  }
+
   battle.simulate();
 
   const poke = battle.getPokemon();
+  const finalForms = poke.map(p => ({
+    speciesId: p.speciesId, activeFormId: p.activeFormId, level: p.level,
+    cp: p.cp, stats: { atk: p.stats.atk, def: p.stats.def, hp: p.stats.hp },
+  }));
   const score = [pvpokeScore(poke[0], poke[1]), pvpokeScore(poke[1], poke[0])];
   // PvPoke's native tie semantics: equal battleRating → no winner.
   // We surface that as null so harness consumers can distinguish genuine
@@ -496,6 +537,7 @@ function main() {
 
   process.stdout.write(JSON.stringify({
     score, winner, turns, chargedLog, decisionLog, dpPlans, termLog, decideLog,
+    formLog, finalForms,
   }, null, 2) + '\n');
 }
 
