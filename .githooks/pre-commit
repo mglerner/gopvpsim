@@ -6,7 +6,8 @@
 #   1. Reject authored_by = "ai" in ship-tracked TOMLs
 #      (CLAUDE.md "Ship-mode narrative policy").
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
-#      (scripts/verify_dev_counts.py; only when an input is staged). The
+#      (scripts/verify_dev_counts.py; only when an input is staged, incl.
+#      a deleted test file). The
 #      sentinel VALUES are read from the index; the live counts (pytest
 #      collection, type chart) necessarily come from the working tree.
 #   3. Verify DEVELOPER_NOTES.md stays under its read-whole size cap and
@@ -75,8 +76,12 @@ elif [[ $rc -ne 0 ]]; then
     exit 1
 fi
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACM)
-if [[ -z "$STAGED" ]]; then
+# Paths unquoted (core.quotePath=false) so a non-ASCII TOML name still hits
+# the `thresholds/*.toml` pattern. STAGED_ANY includes deletions, which can
+# change the derived test count but cannot carry an authored_by line.
+STAGED=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
+STAGED_ANY=$(git -c core.quotePath=false diff --cached --name-only)
+if [[ -z "$STAGED_ANY" ]]; then
     exit 0
 fi
 
@@ -97,7 +102,7 @@ done <<< "$STAGED"
 
 if [[ -n "$AI_FILES" ]]; then
     echo "ERROR: AI-drafted prose in ship-tracked TOMLs:" >&2
-    printf '  %s\n' $AI_FILES >&2
+    printf '%s' "$AI_FILES" | sed 's/^/  /' >&2
     echo >&2
     echo 'Policy: articles/ and thresholds/ must not carry' >&2
     echo '  authored_by = "ai"' >&2
@@ -111,7 +116,8 @@ fi
 
 # --- 2. Dev-count sentinel drift -------------------------------------
 
-# Only run when DEVELOPER_NOTES.md or any derivation input is staged:
+# Only run when DEVELOPER_NOTES.md or any derivation input is staged (added,
+# modified, renamed OR deleted -- a deleted test file changes the count):
 # keeps the hook fast for unrelated commits. Derivation inputs are the
 # type chart (src/gopvpsim/moves.py) and the test suite (tests/**).
 needs_dev_count_check=0
@@ -121,7 +127,7 @@ while IFS= read -r f; do
             needs_dev_count_check=1
             ;;
     esac
-done <<< "$STAGED"
+done <<< "$STAGED_ANY"
 
 if [[ "$needs_dev_count_check" -eq 1 ]]; then
     set +e
@@ -135,8 +141,8 @@ if [[ "$needs_dev_count_check" -eq 1 ]]; then
         exit 1
     elif [[ $rc -ne 0 ]]; then
         echo >&2
-        echo "ERROR: scripts/verify_dev_counts.py crashed (exit $rc); this is a script or" >&2
-        echo '       environment problem (e.g. no pytest in the venv), not drift.' >&2
+        echo "ERROR: scripts/verify_dev_counts.py could not run (exit $rc): a script or" >&2
+        echo '       environment problem (e.g. no pytest/certifi in the venv), not drift.' >&2
         exit 1
     fi
 fi
