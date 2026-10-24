@@ -5,6 +5,9 @@
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
 #      (scripts/verify_dev_counts.py; see Task 1 in the
 #      pre-ship cleanup session).
+#   3. Verify DEVELOPER_NOTES.md stays under its read-whole size cap and
+#      that every pointer into or out of it resolves
+#      (scripts/verify_dev_notes.py; every commit, <1 s).
 #
 # Install by running: git config core.hooksPath .githooks
 set -euo pipefail
@@ -63,6 +66,18 @@ if [[ "$needs_dev_count_check" -eq 1 ]]; then
         echo 'Commit blocked by dev-count drift.' >&2
         exit 1
     fi
+fi
+
+# --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
+
+# Every commit: the notes must stay readable in one shot, and a renamed
+# or removed heading must not leave a quoted citation dangling anywhere
+# in the repo (engine-hash files only warn; see the script's docstring).
+if ! python "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet; then
+    echo >&2
+    echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer).' >&2
+    echo 'Run scripts/verify_dev_notes.py for the full report.' >&2
+    exit 1
 fi
 
 exit 0

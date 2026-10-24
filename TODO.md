@@ -41,11 +41,12 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   engine is trusted for a bake. No publish without Michael's go.
 - **Comment-pointer fixes riding the next engine bump** (engine-hash files;
   a comment-only edit would bump the sweep-cache hash, found by the
-  2026-10-24 DEVELOPER_NOTES link audit, all pre-existing): battle.py:653
-  'DEVELOPER_NOTES "Open divergences"' -> "Resolved engine divergences";
-  battle.py:2662 'DEVELOPER_NOTES "ActionLogic n=2 semantic changes"' -> the
-  block at battle.py:182 + tests/test_actionlogic_n2_knobs.py (never a notes
-  section); battle.py:2295 "DP stack-two branch" -> the exact heading;
+  2026-10-24 DEVELOPER_NOTES link audit, all pre-existing;
+  `scripts/verify_dev_notes.py` warns on them until fixed): battle.py:653
+  points at a notes section "Open divergences" -> "Resolved engine
+  divergences"; battle.py:2662 points at "ActionLogic n=2 semantic changes"
+  -> the block at battle.py:182 + tests/test_actionlogic_n2_knobs.py (never
+  a notes section); battle.py:2295 "DP stack-two branch" -> the exact heading;
   formchange.py:212 '"Known divergences" item 3' -> '"Form change gotchas"
   item 3'; formchange.py:203 docstring "max CPM table key, 51.0" -> 52.0
   (Mega Level 4 added 51.5/52.0).
