@@ -41,6 +41,23 @@ the REVERT-FAILS cell recorded inline, model: test_port_fidelity_68ad233):
      then that seat's battle_start change fires. So seat 0 freezes against
      CORE when Minior sits in seat 1, and against METEOR when Minior leads.
        Ariados vs Minior 2-1: fixed 625/375, pre-fix 265/734 (winner flip).
+  5. (class A, ported later on 2026-10-24) The form-animation cooldown
+     reset, Battle.js:548 `if(roundChargedMoveUsed || roundFormAnimation)
+     poke.cooldown = 500`. The charged-move arm is old and already matched;
+     the form-animation arm is new in pvpoke 4d2908fac and fires only on
+     Minior's hp flip (Battle.js:1668 is the only setter). After a flip off
+     a fast hit, BOTH Pokemon may act again next turn while a fast already
+     in flight still lands on its own schedule -- so a Pokemon can decide
+     with its own fast in the air, and two fasts can be in flight at once.
+     Our in-flight slot became a list, the decision gate became PvPoke's
+     plain `cooldown == 0`, and the TTL / DP reads of "opponent mid-fast"
+     became the `opponent.cooldown` tests PvPoke actually makes.
+       Minior vs Charjabug 1-1: fixed 626/373 w0, pre-port 210/789 w1.
+       Minior vs Cresselia 0-1: fixed 293/706, pre-port 103/896.
+       Minior vs Lanturn 1-1:   fixed 327/672, pre-port 306/693.
+       Minior vs Steelix 2-2:   fixed 95/904,  pre-port 87/912.
+     The 702-cell sweep went from 41 open cells to 4 (Medicham 1-2 / 2-2,
+     Morpeko 2-2 both seats); the audit's 387 cells were unchanged.
 """
 import sys
 from pathlib import Path
@@ -321,6 +338,79 @@ def test_fix4_freeze_order_is_seat_dependent():
     """Minior leading: the opponent freezes against Meteor instead. The
     seat-swapped cell is a different fight, not a mirror image."""
     assert _score(MINIOR, ARIADOS, 1, 2) == (734, 265, 0)
+
+
+CHARJABUG = ('Charjabug', 'VOLT_SWITCH', ['X_SCISSOR', 'DISCHARGE'], 'great',
+             4, 14, 15)
+CRESSELIA = ('Cresselia', 'PSYCHO_CUT', ['GRASS_KNOT', 'MOONBLAST'], 'great',
+             4, 11, 9)
+LANTURN = ('Lanturn', 'SPARK', ['SURF', 'THUNDERBOLT'], 'great', 5, 15, 12)
+STEELIX = ('Steelix', 'THUNDER_FANG', ['PSYCHIC_FANGS', 'CRUNCH'], 'great',
+           4, 11, 14)
+LICKITUNG = ('Lickitung', 'LICK', ['BODY_SLAM', 'POWER_WHIP'], 'great',
+             7, 15, 15)
+
+
+@pytest.mark.parametrize("opp,s1,s2,want,pre_port", [
+    pytest.param(CHARJABUG, 1, 1, (626, 373, 0), (210, 789, 1), id='charjabug-11'),
+    pytest.param(CRESSELIA, 0, 1, (293, 706, 1), (103, 896, 1), id='cresselia-01'),
+    pytest.param(LANTURN, 1, 1, (327, 672, 1), (306, 693, 1), id='lanturn-11'),
+    pytest.param(STEELIX, 2, 2, (95, 904, 1), (87, 912, 1), id='steelix-22'),
+])
+def test_fix5_form_animation_cooldown_reset(opp, s1, s2, want, pre_port):
+    """PvPoke-exact after the class-A port (pvpoke_trace.js, 2026-10-24).
+    `pre_port` is what the engine gave without the reset; the assertion
+    on it only documents that the cell is revert-sensitive."""
+    got = _score(MINIOR, opp, s1, s2)
+    assert got == want
+    assert got != pre_port
+
+
+def test_fix5_a_pokemon_may_act_while_its_fast_is_still_in_flight():
+    """The mechanism, read off the timeline: Charjabug's Volt Switch lands
+    on turn 20 and flips the shell; on turn 21 Minior (Core) decides a
+    charged move although its own Rollout, queued on turn 19, only lands
+    that same turn. Without the reset Minior sits at cooldown 2 on turn 21
+    and cannot act until turn 22."""
+    a = _make_battle_pokemon(*MINIOR[:4], 1, *MINIOR[4:])
+    d = _make_battle_pokemon(*CHARJABUG[:4], 1, *CHARJABUG[4:])
+    r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                 log=True)
+    tl = r.timeline
+    flip = next(i for i, line in enumerate(tl)
+                if 'Minior (Core) changed form (hp)' in line)
+    flip_turn = int(tl[flip].split(':')[0].replace('T', ''))
+    nxt = [line for line in tl
+           if line.startswith(f'T{flip_turn + 1:>3}:')]
+    assert any('Minior (Core) uses Power Gem' in line for line in nxt), nxt
+    assert any('Minior (Core) fast →' in line for line in nxt), nxt
+    # And the Rollout that lands there was queued BEFORE the flip.
+    queued = [int(line.split(':')[0].replace('T', '')) for line in tl[:flip]
+              if 'Minior (Meteor) uses Rollout' in line]
+    assert queued and queued[-1] == flip_turn - 1
+
+
+def test_fix5_lickitung_cells_need_pvpoke_level_cap_not_an_engine_change():
+    """Harness lesson, not a divergence: Lickitung 7/15/15's Great League
+    best level is above 50 (a best buddy), while PvPoke's autoLevel caps
+    at 50. Capped alike, the cell is PvPoke-exact; at our default cap the
+    one-level gap costs Acrobatics a point of damage at a floor boundary
+    (99 -> 98) and reads as a 5-point 'divergence'. Pin both so the next
+    sweep spec pins levels instead of chasing the engine."""
+    a = _make_battle_pokemon(*MINIOR[:4], 1, *MINIOR[4:])
+    d50 = _make_battle_pokemon(*LICKITUNG[:4], 1, *LICKITUNG[4:],
+                               max_level=50.0)
+    r = simulate(a, d50, charged_policy_0=pvpoke_dp,
+                 charged_policy_1=pvpoke_dp)
+    assert (round(r.pvpoke_score(0)), round(r.pvpoke_score(1))) == (408, 591)
+    assert Pokemon.at_best_level('Lickitung', 7, 15, 15, league='great',
+                                 max_level=50.0).level == 50.0
+    assert Pokemon.at_best_level('Lickitung', 7, 15, 15, league='great',
+                                 max_level=51.0).level > 50.0
+    d51 = _make_battle_pokemon(*LICKITUNG[:4], 1, *LICKITUNG[4:])
+    r = simulate(_make_battle_pokemon(*MINIOR[:4], 1, *MINIOR[4:]), d51,
+                 charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp)
+    assert (round(r.pvpoke_score(0)), round(r.pvpoke_score(1))) == (403, 596)
 
 
 # ===========================================================================
