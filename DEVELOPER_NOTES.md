@@ -11,6 +11,29 @@ divergences -> here. -->
 
 ## PvPoke re-vetting log
 
+**2026-10-24 — re-vetted against pvpoke `38f70320d`** (range
+`a93147bf1..38f70320d`, three commits). `e87448291` "Sandbox mode fix" adds
+`previousTurnActions = []` to `Battle.start` -- UI/sandbox only; it fixes
+the page-side double-simulate symptom our bug-report draft 9 described, and
+`tests/test_pvpoke_sandbox.py`'s replay test was re-pinned to the fixed
+page (662/[51,0]). `4d2908fac` + `38f70320d` add Minior: two new form-change
+triggers (`battle_start`, `hp`), the Meteor hold-energy rule
+(`ActionLogic.js:254-263`), the Meteor wouldShield rule (`:1256`) and the
+Meteor/Core level formulas (`Pokemon.js:2562-2580`). Every sim-relevant line
+is gated on `activeFormId == "minior_meteor"` except the trigger dispatch,
+so `pvpoke_dp` stays a valid PoGoDives baseline for every other species.
+**Ported as-is** (`tests/test_minior.py`; see "Form change gotchas" item 7
+and "PvPoke bugs found" #11 for the level-formula typo we port with a
+switch). Porting exposed four port-fidelity gaps in paths no earlier species
+exercised -- fast-landing queue order under the new mechanics, turnsToLive's
+move order, the DP "stack two self-debuffing moves" twins, and the
+battle-start freeze order -- all fixed to PvPoke-exact ("Key implementation
+details"). Oracle audit at re-pin: 387 cells (ten Minior matchups added,
+90/90 exact); the 20 non-Minior divergences are the identical set to the
+pre-port run (`userdata/logs/oracle_audit_full_2026-10-24e.log` vs `_24b`).
+A broader 702-cell Minior sweep against `pvpoke_trace.js` leaves 41 open
+cells, catalogued under "Known divergences" (Minior).
+
 **2026-06-06 — re-vetted against pvpoke `bc532fbda`** (range
 `8ed523811..bc532fbda`). Battle engine (`Battle.js` / `ActionLogic.js` /
 `DamageCalculator.js`) byte-identical to the 2026-04-16 vetting — every
@@ -30,16 +53,16 @@ below; Michael verified in-game that Morpeko enters every battle in Full Belly
 and toggles after each charged move). Pinned by a chargedLog assertion on the
 Morpeko test + known-divergence marks in the audit script.
 
-## Current status (updated 2026-09-28)
+## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3088<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3209<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
-against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->33<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->297<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->277<!-- /sync --> exact on score+winner+chargedLog, 20 cells =
+against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->43<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->387<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->367<!-- /sync --> exact on score+winner+chargedLog, 20 cells =
 documented divergences, each traced to a mechanism: 8 are bug #8 Hangry
 stickiness, 3 are our deliberate Shield-form Aegislash estimate-stage
 choice ("Form change gotchas" item 6), 9 are the #10 first-throw slot
@@ -48,6 +71,13 @@ control row is 9/9 exact); per-cell reasons live on the
 MATCHUPS entries in the audit script). Historical
 note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 (`bestChargedMove` selection, resolved then).
+
+**2026-10-24: 297 cells -> 387, 20 divergences + 0.** Ten Minior matchups
+(both seats, the mirror, the Ancient Power and Take Down movesets, Cramorant
+and Mimikyu interplay, and two for the synthetic 'Minior (Core only)'
+variant via the harness's new `--pN-no-form-change`) -- all 90 cells exact.
+The 297 prior cells were unchanged after the four fidelity fixes (full
+audit, 0 new, 0 vanished).
 
 **2026-09-28: 279 cells -> 297, 11 divergences + 9.** Two Aegislash-S vs
 Moltres-G rows were added to pin "PvPoke bugs found" #10: the default
@@ -581,7 +611,7 @@ pinned exactly in `tests/test_js_shadow_constants.py`.
 
 ## PvPoke bugs found
 
-<!-- sync:pvpoke_bugs_documented -->7<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9, 10 —
+<!-- sync:pvpoke_bugs_documented -->8<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9, 10, 11 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
 and is excluded from the count). **FILED UPSTREAM 2026-07-16** as pvpoke/pvpoke issues: #378 (our §3
 Gyro Ball), #379 (§8 Morpeko), #380 (§1 dead pruning), #381 (the
@@ -831,6 +861,30 @@ It passes none of the three "When our sim diverges" tests. Pinned in
 xfail cells on `aegislash_shield_vs_moltres_galarian_form_change` in
 `scripts/audit_oracle_harness.py`.
 
+### 11. Minior's Meteor level: the simulator steps whole levels, the site shows half levels (ported with a switch)
+
+**File**: `Pokemon.js:2590-2612` (`getFormStats`, Minior branch; pvpoke
+`38f70320d`). Found 2026-10-22, confirmed at runtime 2026-10-24.
+
+The Meteor level walk `while (newCP > battleCP)` steps `0.5` only when
+`this.activeFormId == "minior_core"` or `this.decrementer == "minior_meteor"`
+(sic -- `decrementer` is a never-assigned field, so the second clause is
+dead; evidently a typo for a form-id check), else `1`. `changeForm` sets
+`activeFormId` to the NEW form before calling `getFormStats`, so the
+battle-start Core -> Meteor change sees `minior_meteor` and steps WHOLE
+levels; the site UI (PokeSelect) calls `getFormStats` while Core is still
+active and steps half levels. Result: pvpoke.com's displayed Meteor CP/level
+and the simulator's Meteor stats disagree for about a third of GL spreads
+(10/6/10: UI 43.5, sim 43.0; 12/14/12: 40.5 vs 40.0). We port the BATTLE
+path (what the scores come from) behind `formchange.MINIOR_HALF_LEVEL_STEP`
+(False = sim path, True = UI path); pinned by
+`tests/test_minior.py::test_meteor_level_from_stored_core_gl` on both
+settings. Neither path matches every in-game reading (memory
+`project_minior_pvpoke_model`: go-iv's empirical rule fits 11/11; PvPoke's
+formula 3/9 GL); Michael's call was to trust PvPoke's model over go-iv and
+revisit when the community settles. Impact: <= ~2 Meteor levels, a 1-4%
+atk/def scale on the shell phase. Draft: `docs/pvpoke_bug_reports.md` Report 11.
+
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 
 Phantom bug: the divergence was a missing timeline log line in our
@@ -926,6 +980,57 @@ Places where our code intentionally does NOT match PvPoke's
 implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
+
+### Minior (2026-10-24): UL level clamp, animation clock, 41 open sweep cells
+
+Three deliberate or open gaps after the as-is port (`tests/test_minior.py`
+is PvPoke-exact on its 90 cells; none of these is in the oracle audit):
+
+- **UL Meteor level 52 vs PvPoke's 55 (deliberate).** Meteor cannot reach
+  2500 CP, so PvPoke's walk never steps down from its table end (55) and
+  ours stops at `max(CPM)` = 52 (`formchange._MINIOR_PVPOKE_LEVEL_CAP`
+  clamps the start; GL is unaffected because every GL answer is <= 52).
+  UL Minior is unverified in-game and outside every pool. Pinned by
+  `test_meteor_level_ul_clamps_to_our_cpm_table`.
+- **`animationTime` (5000 ms) on the hp flip is not added to a clock.**
+  PvPoke adds it to its wall-clock `time`, which only feeds the timeline
+  display and the 240 s time-out (see "Battle timeout" below); turns and
+  cooldowns are untouched, so no score effect unless a fight nears the limit.
+- **41 of 702 sweep cells differ** (`scripts`-free scratch sweep vs
+  `pvpoke_trace.js`, `userdata/logs/minior_midflight_sweep_5.log`; the
+  10-matchup oracle set is a subset and is 90/90). Attributed: ~35 cells in
+  six matchups (Lickitung 10, Charjabug 8, Steelix 6, Lanturn 6, Cresselia
+  4, Sableye 2) to the cooldown-reset quirk below, where a Core flip or a
+  charged round shortens an in-flight multi-turn fast move; Morpeko 2-2
+  both seats = the documented one-way-toggle divergence (bug #8); Medicham
+  vs Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 / 391): both engines
+  reach the same DP plan [Ice Punch x3] at Medicham e=95 vs an 80-HP
+  1-shield Meteor, then PvPoke's post-DP bandaid region (ActionLogic.js
+  ~838-990) swaps slot 0 to Dynamic Punch and ours does not (frozen Core dpe
+  1.775 vs 1.778 is the suspected gate -- NOT traced to a line); Ariados vs
+  Minior 2-0 (739 / 735), untraced. Michael's call 2026-10-24: ship the
+  port, improve later (TODO "Minior -- open items").
+
+### Cooldown reset after a charged-move / form-animation round shortens an in-flight fast move (class A, PENDING)
+
+`Battle.js:548`: at the end of a round in which a charged move was used OR a
+form animation played (`roundChargedMoveUsed || roundFormAnimation`), every
+Pokemon's `cooldown` is set to 500 -- so a 2- or 3-turn fast move that was
+mid-flight finishes on the next turn with full damage and energy: a free
+turn for that side. The Minior hp flip carries `animationTime: 5000`, so
+the form-animation arm fires on every Core flip that lands mid-Rollout,
+which is why it surfaced now (it also fires on every charged round, for
+every species, whenever a multi-turn fast move is in flight -- the related
+`chargedMoveLastTurn` rule at `Battle.js:333-345` drops all non-switch
+decisions on the turn after a charged move and is sequence-equivalent to our
+no-dead-turn model except in exactly these cases). Ours lets the fast move
+run its full duration. Which is right in-game is undetermined (the real
+charged-move pause does interrupt fast-move animations, but whether the
+remaining cooldown is forgiven is the question); port-vs-document is
+Michael's pending decision, with a bug-report/intent question drafted as
+`docs/pvpoke_bug_reports.md` Report 10. ~35 of the 702 Minior sweep cells
+above; margins are typically 1-8 points (Lickitung 1-1: 403 vs 408), with
+Charjabug 1-1 (210 vs 626) and Cresselia 0-1 (103 vs 293) the outliers.
 
 ### bandaid[929] stack-switch is ungated on bait_shields (no-bait only)
 (documented 2026-06-27, engine bug-hunt #5)
@@ -1194,6 +1299,51 @@ the two orders differ only on a same-turn tie with a ready move
 where the farm-down state now pops first, as in PvPoke. Pinned by
 `tests/test_farmdown_order_port.py`.
 
+### DP "stack two self-debuffing moves" expansion -- both twins (2026-10-24)
+
+PvPoke's DP has TWO blocks that expand a state by stacking two copies of a
+self-debuffing charged move (selfDebuffing, `buffs[0] < 0`, `2 * energy <=
+100`) and throwing both: a READY twin (ActionLogic.js:668-717, inserted
+AFTER same-turn states with `<=`, skipped when `fm_stack == 0`, and it can
+produce negative turn counts when energy > 2E -- kept verbatim) and a
+NOT-READY twin (:764-808, inserted BEFORE same-turn states with `<`).
+Eligibility reads `buffs` directly, so the Aegislash `[0,0]` selfDebuffing
+stamp (bug #10) does not qualify. Both twins were missing until Minior's
+hold-to-100 AI made Malamar reach 2x Super Power energy routinely. Porting
+only the ready twin regressed 36 cells (Malamar vs Dunsparce 2-1 640/359 vs
+PvPoke 784/215); with both, a 14,022-cell GL A/B scan moved 496 cells, every
+one onto PvPoke's value (`userdata/logs/stack_two_verify_2026-10-24b.log`).
+GL default movesets that qualify: Super Power and Psycho Boost (28 species).
+Plumbing: `cm_stack_ok` in `_ensure_dp_init_cache` -> int8 array into
+`_near_ko_dp_jit`; Python fallback `_dp_insert_farm_down` (ready) and
+`_dp_insert_not_ready`. Pinned: `tests/test_minior.py` fix 3.
+
+### turnsToLive walks the defender's FROZEN move order (2026-10-24)
+
+PvPoke's TTL loop iterates `opponent.activeChargedMoves` -- the post-shuffle
+order from `resetMoves` (same-energy pairs with the buffing / harder-hitting
+move first), not ascending energy. Ours walked ascending energy, which
+differs exactly when the shuffle promoted a move: Drapion [Crunch, Aqua
+Tail] (Minior vs Drapion 1-1: 461/538 -> 680/319 PvPoke-exact), Carbink vs
+Malamar 2-2 (399/600 -> 406/593, the only non-Minior mover in a
+13,338-cell GL scan, `userdata/logs/mid_vs_new_scan_2026-10-24.log`).
+`_ensure_dmg_cache` reads the defender's `_dp_init_cache['order']` when that
+cache already exists for this opponent (ascending fallback otherwise), and
+`_ensure_dp_init_cache` invalidates `_dmg_cache_opp` after building so the
+arrays rebuild in the frozen order. Do NOT build the init cache from inside
+`_ensure_dmg_cache`: `reset_for_battle`'s damage-cache call runs before the
+shuffle-stamp restore, and that ordering broke the Aegislash reuse test.
+Pinned: `tests/test_minior.py` fix 2.
+
+### Battle-start freeze order is per seat, change-after-freeze (2026-10-24)
+
+See "Form change gotchas" item 7(b): `simulate()`'s setup loop mirrors
+`Battle.start` -- for each seat, `_ensure_dp_init_cache(opp)` and the
+`_cached_damage` stamps against the opponent AS IT STANDS, then that seat's
+`battle_start` form change. Freezing lazily at the first DP call (after both
+changes) got seat 0 wrong whenever Minior sat in seat 1. Pinned:
+`tests/test_minior.py` fix 4 (both seats).
+
 ### CMP tie resolution: exact ties fall to player index (PROP-1)
 
 Charge-move priority (CMP) orders two same-turn charged moves by
@@ -1345,6 +1495,31 @@ tests/test_form_change_oracle.py, and by the stage -1 leg of the estimate
 pin). Kept because PvPoke's choice is internally inconsistent (estimate !=
 its own dealt damage) and not demonstrably better on outcomes; revisit if
 that changes. Listed as docs/pvpoke_divergences.md item 7.
+
+**7. Minior: the first `battle_start` + `hp` changer, and the freeze is
+seat-dependent (2026-10-24).** The stored, CP-capped form is Core
+(218/131); `simulate()` changes it to Meteor (116/194) in its setup, at the
+level `formchange._minior_meteor_level` gives (PvPoke's formula + its
+whole-level walk, bug #11), with HP locked to Core's (item 1). Meteor drops
+ONE WAY to Core when `hp / max_hp < 0.5` with hp > 0, checked after EVERY
+landing on it -- fast or charged, shielded or not (`_apply_hp_form_trigger`,
+Battle.js:1644-1670; Core's own trigger is `battle_start`, which only the
+setup fires). Two gotchas beyond the triggers: (a) the hp check runs at the
+END of the attacker's useMove, so a landing that flips the form re-prices
+every fast move still in flight -- `_fast_results` is recomputed after a
+landing's hp-trigger, and fast landings resolve in queue order (queued
+turn, then seat), not seat order; (b) PvPoke's `Battle.start` loop runs
+each seat's `reset()` -> `resetMoves()` (the move-selection freeze, DEVELOPER
+"Move-selection freeze") and THEN that seat's battle_start change, so
+with Minior in seat 1 the opponent freezes against CORE and with Minior in
+seat 0 against METEOR; `simulate()` reproduces that order per seat (Ariados
+vs Minior 2-1: 625/375 PvPoke-exact, vs 265/734 freezing after both
+changes). Unknown gamemaster triggers now raise (`formchange._check_trigger`)
+instead of simming the stored form all battle, which is what Minior silently
+did for four days. 'Minior (Core only)' (`data.SPECIES_VARIANTS`) is the
+same Core spread with the form change stripped -- a Minior re-entering
+battle already flipped (`resetOnSwitch: false`), simmed in both GL dives.
+Pinned in `tests/test_minior.py` (90 oracle cells + mechanics unit pins).
 
 ## Active alt-moveset opponent variants
 

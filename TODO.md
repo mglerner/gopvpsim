@@ -6,6 +6,52 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## Minior -- open items (port shipped 2026-10-24; record: CHANGELOG 2026-10-24)
+
+Michael 2026-10-24: "take your recommendation. we can improve later" -- the
+port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
+
+- **Class A decision (Michael): port or document the cooldown-reset quirk.**
+  `Battle.js:548` sets both cooldowns to 500 after a charged-move or
+  form-animation round, finishing an in-flight multi-turn fast move a turn
+  early. ~35 of the 702 Minior sweep cells; affects every species with a
+  multi-turn fast move during a charged round, not just Minior. Options:
+  port (then it is a global engine change -> cold re-dive or a predicate
+  over "either side has a multi-turn fast move", which is most columns),
+  or keep ours and file the intent question (`docs/pvpoke_bug_reports.md`
+  Report 10 draft; DEVELOPER_NOTES "Known divergences" class A).
+- **Untraced sweep cells** (`userdata/logs/minior_midflight_sweep_5.log`):
+  Medicham vs Minior 1-2 (351 vs 373) and 2-2 (734 vs 391) -- same DP plan
+  [IP,IP,IP] at e=95 vs 80-HP 1-shield Meteor, PvPoke's post-DP bandaid
+  (ActionLogic.js ~838-990) swaps slot 0 to Dynamic Punch, ours does not;
+  suspect the frozen Core dpe gate (1.775 vs 1.778). Ariados vs Minior 2-0
+  (739 vs 735). Morpeko 2-2 both seats = documented bug #8, no action.
+  Tooling for the trace already exists: `scripts/pvpoke_trace.js`
+  decideLog/decisionLog/dpPlans vs `scripts/battle.py --log --trace-dp
+  --debug`.
+- **Cache migrations before the next bake** (CLAUDE.md "Before a cold
+  re-dive"). Gamemaster: `migrate_cache.py --from-gamemaster 9856aa366b5d
+  --old-gamemaster-file <c15fb6f7e blob>` (new hash 03e7b77024e9; computed
+  delta, no predicate). Engine: fixes 2-3 move non-Minior columns, so a
+  predicate must cover the WHOLE delta: sketch "Minior on either side OR a
+  SUPER_POWER / PSYCHO_BOOST user on either side OR the defender's
+  post-shuffle order != its ascending-energy order" -- needs a proof
+  (fix 1's queue-order change is new-mechanics-global: prove it is a no-op
+  without a same-turn form flip, or the predicate is unsound and the
+  re-dive is cold). Not implemented.
+- **Dives:** `run_website_dives.py minior --dry-run` fails because the
+  opponent pools have drifted; regenerate via `scripts/build_opponent_pool.py
+  <recipe>` (Michael's call), then `direnv exec . python
+  scripts/run_website_dives.py minior` -- with `--no-sweep-cache` until the
+  engine is trusted for a bake. No publish without Michael's go.
+- **UL Minior** is unverified in-game; our Meteor level clamps at 52 where
+  PvPoke sits at 55 (deliberate, docs/pvpoke_divergences.md item 9). Revisit
+  if a UL dive is ever wanted.
+- **Level rule:** `MINIOR_HALF_LEVEL_STEP` (False = PvPoke's simulator path).
+  Re-check go-iv PR #48 and pvpoke master for a settled rule before a bake.
+- **File Reports 10 and 11** (`docs/pvpoke_bug_reports.md`) after
+  Michael's review; Report 9 is superseded upstream (e87448291), do not file.
+
 ## OPEN: Bake speed (2026-09-25 scout)
 
 Plan of record, with file:line evidence and the verified attribution of the

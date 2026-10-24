@@ -2,6 +2,56 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-10-24 -- Minior ported as-is from PvPoke 38f70320d; four port-fidelity fixes; engine digest re-pinned
+
+- **What:** Minior (released 2026-10-19) is the first `battle_start` +
+  `hp` form changer. The stored Core (218/131) enters `simulate()` as
+  Meteor (116/194) at PvPoke's formula level (whole-level walk, its
+  simulator path; `formchange.MINIOR_HALF_LEVEL_STEP` flips to the site's
+  half-level path), drops one way to Core under 50% HP off any landing, HP
+  locked to Core's; both sides hold charged energy while a shell is up
+  (`DP[minior_hold]`), and `would_shield` spares the shell against a hit it
+  can take twice. Unknown gamemaster triggers now raise
+  (`formchange._check_trigger`) instead of simming the stored form.
+  Synthetic variant 'Minior (Core only)' (`data.SPECIES_VARIANTS`,
+  `pokemon._all_entries`): the same Core spreads with no Meteor phase (a
+  Minior re-entering battle already flipped); `species_id` and the
+  rankings lookups map it to `minior_core`. Michael's decisions: trust
+  PvPoke over go-iv's empirical rule, port as-is with the switch, GL dives
+  in both forms (registry slugs `minior-core-great-league`,
+  `minior-core-only-great-league`, Rollout pinned), Core spreads only.
+- **Four fidelity fixes the port exposed** (each PvPoke-exact after;
+  revert-fails cells in `tests/test_minior.py`'s docstring): (1) new-mechanics
+  fast landings resolve in queue order (queued turn, seat) and a landing
+  that flips the defender's form re-prices in-flight fasts
+  (azumarill_vs_minior 1-1 646 -> 641); (2) turnsToLive walks the
+  defender's frozen post-shuffle move order (Minior vs Drapion 1-1 461 ->
+  680, Carbink vs Malamar 2-2 399 -> 406); (3) the DP "stack two
+  self-debuffing moves" expansion, BOTH twins (ActionLogic.js:668-717,
+  :764-808) -- 496 of 14,022 scanned GL cells moved, all 496 onto PvPoke
+  (Minior vs Malamar 0-0 612 -> 599; Malamar vs Dunsparce 2-1 640 -> 784
+  with the not-ready twin); (4) battle-start freeze order per seat,
+  freeze-then-change as in `Battle.start` (Ariados vs Minior 2-1 265 ->
+  625). Fixes 2-3 move non-Minior cells: every published GL column with a
+  Super Power / Psycho Boost user or a shuffle-promoted defender move is
+  stale under the new engine hash (TODO "Minior -- open items", cache).
+- **Verification:** oracle audit 387 cells (ten Minior matchups added,
+  90/90 exact), the 20 non-Minior divergences the identical set to the
+  pre-port run; 702-cell Minior sweep 41 open cells, catalogued in
+  DEVELOPER_NOTES "Known divergences" (Minior; the class-A cooldown-reset
+  quirk is Michael's pending port-vs-document decision, Report 10 drafted).
+  `tests/fixtures/pvpoke_engine_digests.json` re-pinned at `38f70320d`
+  (upstream delta: Minior + the e87448291 sandbox fix, which supersedes our
+  bug-report draft 9; `test_pvpoke_sandbox.py` re-pinned to the fixed page).
+- **Tooling:** `scripts/pvpoke_trace.js` `--p1/--p2-no-form-change` +
+  formLog/finalForms; audit harness `no_form_change` plumbing and
+  ' (Core only)' label fold; `deep_dive_slayer.py` looks the focal up via
+  `get_pokemon_entry` (variants are not in `gm['pokemon']`); deep-dive
+  form-change callouts for both Minior names.
+- **Not done:** no dives run (opponent pools have drifted, `run_website_dives.py
+  minior --dry-run` fails; regeneration is Michael's call), no publish, no
+  cache migration, UL unverified.
+
 ## 2026-09-28 -- Mirror population block: wording decided, render gate opened
 
 - **What:** TODO "NEXT BAKE: mirror population" item (g). Michael picked
