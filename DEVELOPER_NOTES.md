@@ -1,15 +1,17 @@
 <!-- DEVELOPER_NOTES is a session-startup read (see CLAUDE.md) and MUST stay
-small enough to read WHOLE in one shot: under 52,000 chars (~900 lines).
-`scripts/verify_dev_notes.py` (pre-commit, every commit) gates the cap and
-checks quoted section citations of this file, plus its backticked repo
-paths and test refs -- not prose refs or file:line numbers.
+small enough to read WHOLE in one shot: under 52,000 chars.
+`scripts/verify_dev_notes.py` (pre-commit, every commit) gates the cap, the
+sync sentinels, quoted section citations of this file, and its own quoted
+CLAUDE.md/TODO/CHANGELOG citations, repo paths and test refs -- not prose
+refs or file:line numbers.
 Shipped/dated history -> CHANGELOG; live invariants + open divergences ->
 here. An entry is: the RULE the code obeys, the PIN that fails if it stops
 (test or oracle cell), any PvPoke line ref WITH its pvpoke commit (a bare
-ref is as of the latest re-vetting-log pin), and a CHANGELOG pointer for
-the story -- never the story. The 2026-10-24 trim's
-archive is CHANGELOG "DEVELOPER_NOTES trimmed to its read-whole cap"; the
-complete pre-trim text is `git show 0829b5a:DEVELOPER_NOTES.md`. -->
+ref into the four tripwire engine files is as of the latest re-vetting-log
+pin; UI-file refs always carry one), and a CHANGELOG pointer for the story
+-- never the story. Pre-trim (2026-10-24) text:
+`git show 0829b5a:DEVELOPER_NOTES.md`; archive: CHANGELOG "DEVELOPER_NOTES
+trimmed to its read-whole cap". -->
 
 # Developer Notes
 
@@ -32,13 +34,12 @@ TTL order, stack-two twins and battle-start freeze order ("Key implementation
 details"); class A followed the same day. Engine digests:
 `tests/fixtures/pvpoke_engine_digests.json`.
 
-Earlier vettings (2026-06-06 at `bc532fbda`; the first full oracle-harness
-audit the same day) are archived in CHANGELOG. Record a new entry here only
-for the CURRENT pin; move the previous one to CHANGELOG when you do.
+Earlier vettings are archived in CHANGELOG. Record a new entry here only for
+the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3237<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3251<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
@@ -367,8 +368,8 @@ effectiveness difference, where PvPoke's published numbers are wrong.
 
 ### 9. Stale IV-rank chip on battle permalink loads (UI-only)
 
-**File**: `Interface.js:1858-1875` vs `PokeSelect.js:418` (updateIVRank;
-found 2026-08-10). Loading a permalink with custom IVs renders the "Rank #N /
+**File**: `Interface.js:1858-1875` vs `PokeSelect.js:418` (updateIVRank, at
+pvpoke `397d23dc1`; found 2026-08-10). Loading a permalink with custom IVs renders the "Rank #N /
 4096" chip for the DEFAULT spread and never refreshes it (typing an IV by
 hand does). GL Mimikyu 0/8/14 shows "#42" where PvPoke's own
 `getIVRank("overall")` gives #80, which is what our card prints.
@@ -842,8 +843,8 @@ Picks: `data_obj['recIvs']` (overlay) = the card's spreads;
 reuses the league-cap spreads. **Fallback when a page has no builds**:
 composite-score `rec_candidates`, filtered by the `efficient_frontier`
 strict-dominance guard, capped at `REC_MAX_SPREADS`, labelled "Top pick #N".
-Never a pole: `tests/test_card_pole_tiebreak.py` pins the retirement (a pole
-that came back would re-open the 2026-06-24 UL Mimikyu dominated-spread bug).
+Never a pole: `tests/test_card_pole_tiebreak.py` pins the retirement (the
+2026-06-24 UL Mimikyu dominated-spread bug).
 
 **Names and SP1.** One canonical short name per standout ("Most matchups
 won", "Highest avg battle score"; `CARD_SHORT` / `STANDOUT_KIND`), every

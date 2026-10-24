@@ -143,7 +143,7 @@ _ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 def _derive_test_count() -> int:
     """Run pytest --collect-only and parse the tests-collected total."""
     result = subprocess.run(
-        ['python', '-m', 'pytest', '--collect-only', '-q',
+        [sys.executable, '-m', 'pytest', '--collect-only', '-q',
          str(REPO_ROOT / 'tests')],
         cwd=REPO_ROOT,
         capture_output=True, text=True, check=False,
@@ -181,13 +181,18 @@ def main() -> int:
                         help='Rewrite drifted DERIVABLE sentinels in '
                              'DEVELOPER_NOTES.md instead of failing on them. '
                              'Non-derivable keys are never touched.')
+    parser.add_argument('--notes', type=Path, default=DEV_NOTES_PATH,
+                        help='DEVELOPER_NOTES.md to check (the pre-commit hook '
+                             'passes its index export). Live counts always come '
+                             'from the working tree.')
     args = parser.parse_args()
+    notes_path = args.notes
 
-    if not DEV_NOTES_PATH.is_file():
-        print(f'error: {DEV_NOTES_PATH} missing', file=sys.stderr)
+    if not notes_path.is_file():
+        print(f'error: {notes_path} missing', file=sys.stderr)
         return 1
 
-    text = DEV_NOTES_PATH.read_text()
+    text = notes_path.read_text()
     sentinels = _parse_sentinels(text)
 
     problems: list[str] = []
@@ -243,7 +248,7 @@ def main() -> int:
                 f'(update DEVELOPER_NOTES.md)')
 
     if dirty:
-        DEV_NOTES_PATH.write_text(text)
+        notes_path.write_text(text)
 
     # 4. Unknown sentinel keys are informational - print but don't fail.
     unknown = sentinels.keys() - ALL_KEYS
