@@ -95,6 +95,21 @@ EXTRA_DIVES = [
          slug='forretress-shadow-bug-bite-great-league',
          extra_args=['--fast', 'BUG_BITE', '--charged', 'SAND_TOMB,ROCK_TOMB'],
          reference='BUG_BITE,SAND_TOMB,ROCK_TOMB'),
+    # Minior (2026-10-24): outside the GL pool (PvPoke rank ~130), dived on
+    # request in both battle forms. Rollout pinned (the Take Down line is
+    # off-meta) so the three charged pairs -- Acrobatics+Power Gem (PvPoke's
+    # default), Acrobatics+Ancient Power, Power Gem+Ancient Power -- all
+    # render under DEFAULT_TOP_MOVESETS. 'Minior (Core only)' is the
+    # synthetic stored-form variant (data.SPECIES_VARIANTS): same Core IV
+    # spreads, no Meteor phase.
+    dict(species='Minior (Core)', league='great', shadow=False,
+         slug='minior-core-great-league',
+         extra_args=['--fast', 'ROLLOUT'],
+         reference='ROLLOUT,ACROBATICS,POWER_GEM'),
+    dict(species='Minior (Core only)', league='great', shadow=False,
+         slug='minior-core-only-great-league',
+         extra_args=['--fast', 'ROLLOUT'],
+         reference='ROLLOUT,ACROBATICS,POWER_GEM'),
 ]
 
 # Editorial per-dive settings, keyed by slug. Anything absent is derived.
