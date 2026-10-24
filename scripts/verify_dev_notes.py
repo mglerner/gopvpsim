@@ -25,14 +25,15 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
   inbound     every quoted citation ``DEVELOPER_NOTES "Section name"`` (also
               ``'...'``, curly double quotes, a backticked file name,
               ``DEVELOPER_NOTES.md section "..."``, ``DEVELOPER_NOTES's
-              "..."``, a comment-prefixed line wrap before the quote) in a
-              scanned file names a heading or a ``**N. ...**`` item of the
-              notes, matched case-insensitive on word boundaries. A miss in
-              an ENGINE-HASH file (sweep_cache._ENGINE_FILES +
-              deep_dive_signature.py) is a warning, because fixing a comment
-              there bumps the sweep cache hash and must ride the next engine
-              change; a miss in a point-in-time doc (docs/validations,
-              docs/reviews, docs/TODO_archive.md) is a warning too.
+              "..."``, a section sign, a comment-prefixed line wrap before
+              the quote) in a scanned file names a heading or a ``**N.
+              ...**`` item of the notes, matched case-insensitive on word
+              boundaries. A miss in an ENGINE-HASH file
+              (sweep_cache._ENGINE_FILES + deep_dive_signature.py) is a
+              warning, because fixing a comment there bumps the sweep cache
+              hash and must ride the next engine change; a miss in a
+              point-in-time doc (docs/validations, docs/reviews,
+              docs/TODO_archive.md) is a warning too.
   outbound    every quoted citation FROM the notes to CLAUDE.md, TODO.md or
               CHANGELOG.md names a phrase that exists there (CHANGELOG: a
               heading), and every quoted citation of the notes' OWN sections
@@ -40,28 +41,34 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
               (``path.py:LINE`` and trailing CLI args tolerated; ``userdata/``
               misses only warn, it is gitignored); every ``tests/x.py::name``
               (``::Class::method``, ``[case]`` too) names a def / async def /
-              class / module-or-class-level assignment at that position,
-              resolved with ``ast``.
+              class / assignment at that position, resolved with ``ast`` and
+              seeing through if/try/with blocks. A backticked path may wrap
+              a line after ``::`` or inside an identifier at ``_``; a token
+              that starts with a scanned prefix but fits no path grammar
+              warns instead of being skipped silently.
 
 NOT checked (so do not read a green run as "every pointer resolves"):
 unquoted prose references ("the re-dive entry"), ``file:line`` numbers in
 either direction, bare basenames (``battle.py``), directories (``docs/x/``),
 identifiers, commit SHAs, item numbers written outside the quotes, a second
 quoted item in the same sentence, curly SINGLE quotes, a single-quoted name
-containing an apostrophe (skipped, not mis-resolved), and files outside
-SCAN_DIRS/SCAN_FILES.
+containing an apostrophe (skipped, not mis-resolved), files outside
+SCAN_DIRS/SCAN_FILES or with a suffix outside SCAN_SUFFIXES, and (in the
+hook, whose index export never holds the gitignored ``userdata/``) any
+``userdata/`` path.
 
 Usage::
 
-    python scripts/verify_dev_notes.py            # report; exit 2 on failure
+    python scripts/verify_dev_notes.py            # report; exit 3 on failure
     python scripts/verify_dev_notes.py --quiet    # failures only
     python scripts/verify_dev_notes.py --print-scan-paths   # for the hook
 
-Exit codes: 0 clean, 2 failures; anything else is a crash (the hook tells
-them apart). Run by hand it scans the working tree, untracked files
-included. Pass ``--repo-root`` to point at another checkout (the hook passes
-an index export built from ``--print-scan-paths``; the tests a synthetic
-repo).
+Exit codes: 0 clean, 3 = DRIFT_EXIT (failures); anything else is a crash --
+1 is a Python traceback, 2 an argparse usage error or a missing script --
+and the hook tells them apart. Run by hand it scans the working tree,
+untracked files included. Pass ``--repo-root`` to point at another checkout
+(the hook passes an index export built from ``--print-scan-paths``; the
+tests a synthetic repo).
 """
 from __future__ import annotations
 
@@ -77,6 +84,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # ~25k-token single-Read limit at ~2.36 chars/token, with margin. The
 # notes' preamble states the same number; change both together.
 CHAR_CAP = 52_000
+
+# Exit code for failures; 1 and 2 are taken by tracebacks and argparse.
+DRIFT_EXIT = 3
 
 NOTES = 'DEVELOPER_NOTES.md'
 CHANGELOG = 'CHANGELOG.md'
@@ -100,32 +110,40 @@ HISTORICAL_PREFIXES = ('docs/validations/', 'docs/reviews/', 'docs/TODO_archive.
 # (plus the notes and CHANGELOG) from the index via --print-scan-paths.
 SCAN_DIRS = ('src', 'scripts', 'tests', 'docs', 'guides', 'articles',
              'thresholds', 'opponent_pools')
-SCAN_FILES = ('CLAUDE.md', 'TODO.md', 'README.md')
+SCAN_FILES = ('CLAUDE.md', 'TODO.md', 'README.md', '.gitignore')
 SCAN_SUFFIXES = {'.py', '.md', '.js', '.toml', '.txt', '.sh', '.json', '.html'}
 
 _SENTINEL_RE = re.compile(r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->')
 # A quoted citation of a doc section: ``DOC "name"``, ``DOC 'name'``,
 # ```DOC.md` "name"``, ``DOC.md section "name"``, ``DOC's "name"``, curly
-# double quotes, and a comment-prefixed line wrap between name and quote.
-# The quoted span may cross a line break inside a comment or docstring, so
-# it is normalised before matching (comment prefixes and whitespace
-# collapsed). Guards: the name must not be preceded by a word char, a quote
-# or a slash (so the string literal "DEVELOPER_NOTES.md" and a path are not
-# citations); a single-quoted name must follow whitespace and its closing
-# quote must not be followed by a word char (so 'DEVELOPER_NOTES.md' and
-# an apostrophe inside the name do not open or truncate one).
+# double quotes, an optional section sign, and a comment-prefixed line wrap
+# between name and quote. The quoted span may cross a line break inside a
+# comment or docstring, so it is normalised before matching (comment
+# prefixes and whitespace collapsed). Guards: the name must not be preceded
+# by a word char, a quote or a slash (so the string literal
+# "DEVELOPER_NOTES.md" and a path are not citations); at most ONE line
+# break between name and quote (so a mention at the end of a paragraph
+# cannot pair with a quote paragraphs later); a single-quoted name must
+# follow whitespace and its closing quote must not be followed by a word
+# char (so 'DEVELOPER_NOTES.md' and an apostrophe inside the name do not
+# open or truncate one).
 _CITE_RE = re.compile(
     r'(?<![\w"\'/])`?(DEVELOPER_NOTES|CLAUDE\.md|TODO(?:\.md)?|CHANGELOG(?:\.md)?)'
-    r"(?:\.md)?`?(?:'s)?,?\s*(?:(?:#+|//)\s*)?(?:section\s+)?"
+    r"(?:\.md)?`?(?:'s)?,?[ \t]*(?:\n[ \t]*)?(?:(?:#(?!#)|//)[ \t]*)?(?:section\s+)?"
+    r'(?:§\s*)?'
     r'(?:"([^"]{3,140})"|(?<=\s)\'([^\']{3,140})\'(?!\w)|“([^”]{3,140})”)')
-# A backticked repo path, optionally ``:LINE[-LINE]``, ``::member`` chain,
-# ``[case]``, and CLI args after whitespace.
+# A backticked repo path (matched against a normalised backtick span),
+# optionally ``:LINE[-LINE]``, ``::member`` chain, ``[case]``, CLI args.
+_PATH_PREFIXES = ('src', 'scripts', 'tests', 'docs', 'guides', 'articles',
+                  'thresholds', 'opponent_pools', 'userdata')
 _PATH_RE = re.compile(
-    r'`((?:src|scripts|tests|docs|guides|articles|thresholds|opponent_pools|'
-    r'userdata)/[\w./-]+?\.(?:py|md|js|toml|json|txt|sh|html|log|csv|cfg|'
-    r'ya?ml|gz|pkl))'
-    r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]`]*\])?(?:\s[^`]*)?`')
-_FENCE_RE = re.compile(r'^ {0,3}(```|~~~)')
+    r'^((?:' + '|'.join(_PATH_PREFIXES) + r')/[\w./-]+?\.(?:py|md|js|toml|json|'
+    r'txt|sh|html|log|csv|cfg|ya?ml|gz|pkl))'
+    r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]]*\])?(?:\s.*)?$', re.S)
+_BACKTICK_SPAN_RE = re.compile(r'`([^`\n][^`]*)`')
+# A fence opens with 3+ backticks or tildes (<= 3 spaces indent, optional
+# info string) and closes with the same char, at least as many, nothing else.
+_FENCE_RE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 _HEADING_RE = re.compile(r'#{1,6}\s')
 # A bold numbered item; may wrap lines but not cross a blank line or a
 # nested ``**``, so an unclosed item cannot swallow the next paragraph.
@@ -142,8 +160,12 @@ def _strip_fences(text: str) -> str:
     out, fence = [], None
     for line in text.splitlines():
         m = _FENCE_RE.match(line)
-        if m and (fence is None or m.group(1) == fence):
-            fence = None if fence else m.group(1)
+        if m and fence is None:
+            fence = m.group(1)
+            continue
+        if m and fence is not None and m.group(1)[0] == fence[0] \
+                and len(m.group(1)) >= len(fence) and not m.group(2).strip():
+            fence = None
             continue
         if fence is None:
             out.append(line)
@@ -171,6 +193,17 @@ def _resolves(quote: str, anchors: list[str]) -> bool:
 
 def _cite_quote(m: re.Match) -> str:
     return next(g for g in m.groups()[1:] if g is not None)
+
+
+def _path_tokens(notes: str):
+    """Yield (line_no, normalised token) for every backticked span that
+    starts with a repo path prefix. A span may wrap after ``::`` or at an
+    identifier ``_``; both are re-joined before matching."""
+    for m in _BACKTICK_SPAN_RE.finditer(notes):
+        tok = re.sub(r'::\s+', '::', m.group(1))
+        tok = re.sub(r'_\n\s*', '_', tok)
+        if re.match(r'(?:' + '|'.join(_PATH_PREFIXES) + r')/', tok):
+            yield notes.count('\n', 0, m.start()) + 1, tok
 
 
 def _iter_repo_files(root: Path):
@@ -202,13 +235,30 @@ def _load_known_keys(root: Path) -> set[str] | str:
     return keys or 'verify_dev_counts.ALL_KEYS is empty'
 
 
-def _find_def(body: list[ast.stmt], name: str) -> ast.stmt | None:
+def _flatten(body: list[ast.stmt]):
+    """Statements of a body, seeing through if/try/with blocks."""
     for n in body:
+        yield n
+        if isinstance(n, (ast.If, ast.Try, ast.With)):
+            for sub in ('body', 'orelse', 'finalbody'):
+                yield from _flatten(getattr(n, sub, None) or [])
+            for h in getattr(n, 'handlers', []):
+                yield from _flatten(h.body)
+
+
+def _targets(node: ast.stmt) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return [e.id for t in node.targets for e in ast.walk(t) if isinstance(e, ast.Name)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return [node.target.id]
+    return []
+
+
+def _find_def(body: list[ast.stmt], name: str) -> ast.stmt | None:
+    for n in _flatten(body):
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == name:
             return n
-        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets):
-            return n
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) and n.target.id == name:
+        if name in _targets(n):
             return n
     return None
 
@@ -328,10 +378,15 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
                 f'-- not found in {path.name}'
                 + (' headings' if headings_only else ''))
 
-    for m in _PATH_RE.finditer(notes):
+    for line_no, tok in _path_tokens(notes):
+        m = _PATH_RE.match(tok)
+        if not m:
+            if not re.search(r'[*<]|/$', tok):  # globs, placeholders, dirs: by design
+                warnings.append(f'outbound: {NOTES}:{line_no} backticked `{tok}` looks '
+                                f'like a repo path but fits no checked form (unchecked)')
+            continue
         path_part, members = m.group(1), m.group(2)
         target = root / path_part
-        line_no = notes.count('\n', 0, m.start()) + 1
         if not target.exists():
             msg = f'outbound: {NOTES}:{line_no} names `{path_part}` which does not exist'
             # userdata/ is gitignored, machine-local evidence: warn only.
@@ -374,7 +429,7 @@ def main() -> int:
         print(f'\nERROR: {NOTES} checks failed:', file=sys.stderr)
         for f in failures:
             print(f'  - {f}', file=sys.stderr)
-        return 2
+        return DRIFT_EXIT
     if not args.quiet:
         notes_len = len(_read(args.repo_root / NOTES))
         print(f'{NOTES}: {notes_len:,}/{CHAR_CAP:,} chars; quoted citations, '

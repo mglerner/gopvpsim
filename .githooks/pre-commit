@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Project pre-commit checks, all against the INDEX (what is being committed),
-# never the working tree:
+# Project pre-commit checks. Each reads the content being committed from the
+# INDEX, not the working tree (step 2's live counts -- pytest collection, the
+# type chart -- and the checker scripts themselves necessarily come from the
+# working tree):
 #   1. Reject authored_by = "ai" in ship-tracked TOMLs
 #      (CLAUDE.md "Ship-mode narrative policy").
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
@@ -41,7 +43,11 @@ fi
 # dir, which is always writable and per-worktree -- an odd TMPDIR from a
 # GUI client must not block commits. `git commit <path>` hands the hook a
 # temporary GIT_INDEX_FILE, which ls-files/checkout-index honour.
-INDEX_EXPORT=$(mktemp -d "$(git rev-parse --absolute-git-dir)/index-export.XXXXXX")
+GIT_DIR_ABS=$(git rev-parse --absolute-git-dir)
+# A hook killed by SIGKILL skips its EXIT trap; nothing else ever looks in
+# .git, so sweep exports older than an hour here.
+find "$GIT_DIR_ABS" -maxdepth 1 -name 'index-export.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+INDEX_EXPORT=$(mktemp -d "$GIT_DIR_ABS/index-export.XXXXXX")
 trap 'rm -rf "$INDEX_EXPORT"' EXIT
 # shellcheck disable=SC2046  # the paths are the checker's constants, no spaces
 git ls-files -z -- $("$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --print-scan-paths) \
@@ -50,12 +56,13 @@ git ls-files -z -- $("$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --print-scan
 # --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
 # First and unconditional: it must also run for deletion/rename-only
 # commits and for --amend with nothing staged, which the early exit below
-# would skip. Exit 2 = drift; anything else = the checker itself crashed.
+# would skip. Exit 3 (DRIFT_EXIT) = drift; anything else = the checker
+# itself crashed (1: traceback; 2: argparse usage error or missing script).
 set +e
 "$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet --repo-root "$INDEX_EXPORT"
 rc=$?
 set -e
-if [[ $rc -eq 2 ]]; then
+if [[ $rc -eq 3 ]]; then
     echo >&2
     echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer)' >&2
     echo 'in the content being committed. Run scripts/verify_dev_notes.py for the' >&2
@@ -79,7 +86,9 @@ AI_FILES=""
 while IFS= read -r f; do
     case "$f" in
         articles/*.toml|thresholds/*.toml)
-            if git show ":$f" | grep -q '^authored_by = "ai"'; then
+            # No `grep -q`: under pipefail an early exit sends `git show`
+            # SIGPIPE on a large blob and the file silently passes.
+            if git show ":$f" | grep '^authored_by = "ai"' >/dev/null; then
                 AI_FILES="$AI_FILES$f"$'\n'
             fi
             ;;
@@ -115,10 +124,19 @@ while IFS= read -r f; do
 done <<< "$STAGED"
 
 if [[ "$needs_dev_count_check" -eq 1 ]]; then
-    if ! "$PY" "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet \
-            --notes "$INDEX_EXPORT/DEVELOPER_NOTES.md"; then
+    set +e
+    "$PY" "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet \
+        --notes "$INDEX_EXPORT/DEVELOPER_NOTES.md"
+    rc=$?
+    set -e
+    if [[ $rc -eq 3 ]]; then
         echo >&2
         echo 'Commit blocked by dev-count drift (sentinel values read from the index).' >&2
+        exit 1
+    elif [[ $rc -ne 0 ]]; then
+        echo >&2
+        echo "ERROR: scripts/verify_dev_counts.py crashed (exit $rc); this is a script or" >&2
+        echo '       environment problem (e.g. no pytest in the venv), not drift.' >&2
         exit 1
     fi
 fi

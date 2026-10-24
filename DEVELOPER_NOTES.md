@@ -39,7 +39,7 @@ the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3251<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3261<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
@@ -368,8 +368,8 @@ effectiveness difference, where PvPoke's published numbers are wrong.
 
 ### 9. Stale IV-rank chip on battle permalink loads (UI-only)
 
-**File**: `Interface.js:1858-1875` vs `PokeSelect.js:418` (updateIVRank, at
-pvpoke `397d23dc1`; found 2026-08-10). Loading a permalink with custom IVs renders the "Rank #N /
+**File**: `Interface.js:1858-1875` vs `PokeSelect.js:418` (updateIVRank,
+at pvpoke `397d23dc1`; found 2026-08-10). Loading a permalink with custom IVs renders the "Rank #N /
 4096" chip for the DEFAULT spread and never refreshes it (typing an IV by
 hand does). GL Mimikyu 0/8/14 shows "#42" where PvPoke's own
 `getIVRank("overall")` gives #80, which is what our card prints.

@@ -30,9 +30,16 @@ STRIPPED_ENV = {'HOME': os.environ.get('HOME', '/tmp'),
 IDENT = ['-c', 'user.name=hook test', '-c', 'user.email=hook@test.invalid']
 
 
+def _clean_env(env: dict | None) -> dict:
+    # A hook exports GIT_INDEX_FILE/GIT_DIR; never let those leak into the
+    # clone's git calls if this module is ever run from inside a hook.
+    base = dict(env) if env is not None else dict(os.environ)
+    return {k: v for k, v in base.items() if not k.startswith('GIT_')}
+
+
 def _git(cwd: Path, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(['git', *IDENT, '-C', str(cwd), *args], text=True,
-                          capture_output=True, env=env)
+                          capture_output=True, env=_clean_env(env))
 
 
 def _run(cwd: Path, *args: str) -> list[str]:
@@ -54,9 +61,9 @@ def clone(tmp_path: Path) -> Path:
             shutil.copy(src, dst)
         elif dst.exists():
             dst.unlink()
-    _git(c, 'add', '-A')  # throwaway clone: the broad add is the point here
-    _git(c, 'commit', '-q', '--no-verify', '--allow-empty', '-m', 'baseline')
-    _git(c, 'config', 'core.hooksPath', '.githooks')
+    assert _git(c, 'add', '-A').returncode == 0  # throwaway clone: the broad add is the point
+    assert _git(c, 'commit', '-q', '--no-verify', '--allow-empty', '-m', 'baseline').returncode == 0
+    assert _git(c, 'config', 'core.hooksPath', '.githooks').returncode == 0
     (c / '.venv').symlink_to(REPO_ROOT / '.venv')
     return c
 
@@ -111,10 +118,24 @@ def test_bad_tmpdir_does_not_block(clone):
 
 def test_checker_crash_is_reported_as_a_crash(clone):
     checker = clone / 'scripts' / 'verify_dev_notes.py'
-    checker.write_text('import nonexistent_module_zz\n' + checker.read_text())
+    original = checker.read_text()
+    checker.write_text('import nonexistent_module_zz\n' + original)
     r = _commit(clone, 'x')
     assert r.returncode == 1 and 'crashed' in r.stderr
     assert 'Commit blocked by DEVELOPER_NOTES drift' not in r.stderr
+    # A usage error exits 2 (argparse), a missing script 2 (python): neither is drift.
+    checker.write_text(original.replace("'--print-scan-paths'", "'--print-scan-pathz'"))
+    r = _commit(clone, 'y')
+    assert r.returncode == 1 and 'crashed' in r.stderr and 'drift' not in r.stderr.split('crashed')[0]
+    # Same split for step 2's sibling.
+    checker.write_text(original)
+    sib = clone / 'scripts' / 'verify_dev_counts.py'
+    sib.write_text(sib.read_text().replace('def main() -> int:', 'def main() -> int:\n    raise RuntimeError("boom")'))
+    _append(clone / 'tests' / 'conftest.py', '# s2 crash\n')
+    _git(clone, 'add', 'tests/conftest.py', 'scripts/verify_dev_counts.py')
+    r = _commit(clone, 'z')
+    assert r.returncode == 1 and 'verify_dev_counts.py crashed' in r.stderr
+    assert 'dev-count drift' not in r.stderr
 
 
 def test_step1_reads_the_index_not_the_working_tree(clone):
@@ -122,21 +143,31 @@ def test_step1_reads_the_index_not_the_working_tree(clone):
     p = clone / toml
     _append(p, '\nauthored_by = "ai"\n')
     _git(clone, 'add', toml)
-    _git(clone, 'checkout', '--', toml) if False else None
     # Restore the WORKING COPY only; the index still holds the bad line.
-    subprocess.run(['git', '-C', str(clone), 'show', f'HEAD:{toml}'], check=True,
-                   stdout=p.open('w'))
+    p.write_text(_git(clone, 'show', f'HEAD:{toml}').stdout)
     r = _commit(clone, 's1')
     assert r.returncode == 1 and 'AI-drafted prose' in r.stderr
 
 
-@pytest.mark.slow  # pytest collection of the whole suite (~3 s)
+def test_step1_large_toml_with_ai_line_at_top_is_still_caught(clone):
+    # `grep -q` on a pipe under pipefail took SIGPIPE above ~450 KB and the
+    # file passed silently (round-3 review); grep must read the whole blob.
+    big = clone / 'thresholds' / 'zz_big_great.toml'
+    big.write_text('authored_by = "ai"\n' + ('# padding line of no consequence\n' * 40000))
+    assert big.stat().st_size > 1_000_000
+    _git(clone, 'add', 'thresholds/zz_big_great.toml')
+    r = _commit(clone, 'big')
+    assert r.returncode == 1 and 'AI-drafted prose' in r.stderr
+
+
+@pytest.mark.slow  # pytest collection of the whole suite (~5 s)
 def test_step2_runs_under_stripped_path_and_reads_index_sentinels(clone):
     # Staging a tests/ file triggers step 2; the sibling script must find
     # its own interpreter (pre-fix: "derivation failed ... 'python'").
-    # NOTE: test_count itself is machine-dependent (tests parametrize over
-    # local userdata/ artifacts), so a clean clone may legitimately report
-    # drift; the pin here is "no interpreter error", not rc == 0.
+    # NOTE: test_count is checkout-dependent: modules skip themselves at
+    # import without a sibling ../pvpoke clone (10 tests) or a rendered
+    # userdata/ article (5), so a clean clone legitimately reports drift;
+    # the pin here is "no interpreter error", not rc == 0.
     _append(clone / 'tests' / 'conftest.py', '# hook test\n')
     _git(clone, 'add', 'tests/conftest.py')
     r = _commit(clone, 's2', STRIPPED_ENV)
