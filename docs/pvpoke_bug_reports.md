@@ -503,9 +503,23 @@ moveId` twice, plus (if the intent read is right) `false -> true` at
 for upstream fixes; search the issue tracker for "moveID"/"Cramorant"
 duplicates; re-verify both line numbers against master tip.
 
-## Drafted 2026-09-12, NOT YET FILED - Report 9 - `hasActed` survives `Pokemon.reset()`, so a sandbox link's displayed battle is not the battle it encodes
+## Drafted 2026-09-12, FIXED UPSTREAM 2026-09-27 (e87448291) - do not file - Report 9 - `hasActed` survives `Pokemon.reset()`, so a sandbox link's displayed battle is not the battle it encodes
 
-**Status:** drafted from a browser-verified reproduction (pvpoke.com
+**Status (2026-10-24):** superseded by PvPoke's own fix. Commit
+`e87448291` "Sandbox mode fix" (2026-09-27) adds `previousTurnActions =
+[]` to `Battle.start()`, with the message "previous turn actions weren't
+properly cleared, causing some sandbox mode battles to have a one turn
+delay and making subsequent action assignments invalid." The symptom is
+the one described below (the one-turn delay on the page's second run) and
+our replay test now pins the FIXED page: the UL Cramorant vs Lapras link
+displays 662 with the scripted actions at [51, 0]
+(`tests/test_pvpoke_sandbox.py::test_cancelled_charged_sandbox_replays_the_same_fight`,
+`verify_url(page=True)`). Our diagnosis named `hasActed` as the field
+that survives `reset()`; upstream cleared `previousTurnActions` instead,
+and we have not re-derived whether `hasActed` still carries over in a way
+that matters once that list is cleared. The draft is kept for the record.
+
+**Status (original):** drafted from a browser-verified reproduction (pvpoke.com
 1.40.1.6, engine JS byte-identical to master `a93147bf1`; gamemaster
 2026-09-10). Not yet filed. Possibly the same root cause as the
 unresolved site-vs-harness discrepancy noted under Report 3 on
@@ -560,3 +574,71 @@ already handles the in-battle case.
 shows this: the sandbox share links above, and any UI flow that re-runs
 after a settings change without rebuilding the Pokemon. Single-run
 consumers (rankings, matrix) are unaffected.
+
+## Drafted 2026-10-24, NOT YET FILED (intent question) - Report 10 - a charged-move or form-animation round sets both cooldowns to 500 ms, finishing an in-flight multi-turn fast move early
+
+**Status:** drafted from the 2026-10-24 Minior sweep (gopvpsim vs
+`pvpoke_trace.js` at master `38f70320d`, 702 cells, ~35 attributed to
+this). Not yet filed. Frame as an intent question, not a bug: the game
+does interrupt fast-move animations with a charged move, and whether the
+remaining cooldown is forgiven is exactly what we do not know.
+
+**Summary.** `Battle.js:548` (inside the per-Pokemon end-of-turn loop):
+
+    // Reset after a charged move
+    if(roundChargedMoveUsed || roundFormAnimation){
+        poke.cooldown = 500;
+    }
+
+When a charged move was used this round, or a form change with an
+`animationTime` played, every Pokemon's cooldown becomes 500 ms regardless
+of what it was. A Pokemon one turn into a 3-turn fast move (cooldown 1000
+left) therefore resolves that fast move on the next turn, for full damage
+and energy, one turn early. The side that was mid-fast-move gains a turn;
+the side that threw the charged move does not (its cooldown was already
+0 or 500).
+
+**Where it shows.** Any multi-turn fast move in flight during a charged
+round; Minior makes it frequent because its Meteor -> Core change carries
+`animationTime: 5000` and often lands mid-Rollout (the `hp` trigger fires
+off fast damage). Minior (Core) L24 5/14/15 Rollout / Acrobatics + Power
+Gem vs Lickitung 7/15/15 Lick / Body Slam + Power Whip, 1-1: PvPoke 408
+for Minior, a model without the reset 403; vs Charjabug 4/14/15 Volt Switch
+/ X-Scissor + Discharge, 1-1, the winner changes (PvPoke 626 vs 210). Both
+opponents at their GL best level (`userdata/logs/minior_midflight_sweep_5.log`;
+reproduce either cell with `scripts/pvpoke_trace.js` before filing).
+
+**Question for upstream.** Is the early completion intended -- i.e. does
+the game forgive the remaining cooldown after a charged-move pause -- or
+should the reset only apply when `poke.cooldown` was already <= 500 (so
+an in-flight fast move keeps its remaining duration)? If the former, a
+one-line comment at :548 saying so would spare the next porter the trace.
+
+## Drafted 2026-10-24, NOT YET FILED - Report 11 - Minior `getFormStats` steps whole levels in battle but half levels in the UI (`this.decrementer` typo)
+
+**Status:** drafted; see DEVELOPER_NOTES "PvPoke bugs found" #11 for the
+runtime confirmation (2026-10-24, master `38f70320d`).
+
+**Summary.** `Pokemon.js:2590-2612` (Minior branch of `getFormStats`):
+the level walk steps 0.5 when `this.activeFormId == "minior_core" ||
+this.decrementer == "minior_meteor"`, else 1. `decrementer` is never
+assigned anywhere in `src/js`, so the second clause is always false and
+reads as a typo for a form-id check. `changeForm` sets `activeFormId` to
+the new form BEFORE calling `getFormStats`, so the battle-start Core ->
+Meteor change evaluates the clause with `activeFormId == "minior_meteor"`
+and steps whole levels, while `PokeSelect` calls `getFormStats` while Core
+is still active and steps half levels. The displayed Meteor CP/level on
+the site and the Meteor stats the simulator fights with therefore disagree
+for roughly a third of Great League spreads: 10/6/10 displays L43.5 and
+sims L43.0; 12/14/12 displays L40.5 and sims L40.0 (5/14/15 agrees at
+L44.0).
+
+**Suggested fix.** Replace the dead clause with the intended one (or step
+0.5 unconditionally, since the walk is "highest level whose CP fits" and a
+half-level grid is the game's). Either makes the UI and the simulator
+agree; which level rule matches the game is a separate question the
+community is still measuring.
+
+**Our handling.** Ported the battle path as-is behind
+`formchange.MINIOR_HALF_LEVEL_STEP`, pinned on both settings
+(`tests/test_minior.py::test_meteor_level_from_stored_core_gl`).

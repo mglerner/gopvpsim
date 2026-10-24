@@ -101,6 +101,32 @@ the default since 2026-09-09.
    Gyro-Ball-first positive control) and DEVELOPER_NOTES "PvPoke bugs found"
    #10.
 
+9. **Minior's Meteor level in Ultra League stops at 52, PvPoke's at 55.**
+   Minior enters battle as its Meteor shell at a level PvPoke derives from
+   the stored Core's level and then walks down until the shell's CP fits the
+   cap. In Ultra League the shell can never reach 2500 CP, so PvPoke's walk
+   never moves from the top of its level table (55); ours ends at 52, the top
+   of our table. Great League is unaffected: every Great League answer is at
+   or below 52 and the two engines agree exactly (`tests/test_minior.py`,
+   90 of 90 cells). Ultra League Minior is unverified in-game and outside
+   every pool we dive, so this is noted rather than fixed. (We port PvPoke's
+   level formula as it runs in its simulator, whole-level steps and all;
+   `formchange.MINIOR_HALF_LEVEL_STEP` switches to the half-level steps its
+   site display uses. Neither matches every in-game reading yet, and we
+   expect to revisit when the community settles the rule.)
+10. **A charged move or form animation does not shorten a fast move already
+    in flight.** After any round with a charged move or a form animation,
+    PvPoke sets both Pokemon's cooldown to half a second, so a two- or
+    three-turn fast move that was mid-animation completes a turn early with
+    full damage and energy. Ours lets the fast move run its full length. The
+    two models agree whenever no multi-turn fast move is in flight at that
+    moment; where they differ the margin is usually a few rating points
+    (Minior vs Lickitung 1-1: ours 403, PvPoke 408), occasionally a winner
+    (Minior vs Charjabug 1-1). Minior made this visible because its Core
+    flip plays a five-second animation that often lands mid-Rollout. Which
+    reading matches the game is still open, so this one is under review
+    rather than decided (DEVELOPER_NOTES "Known divergences", class A).
+
 We also deliberately do NOT replicate one block of PvPoke's decision code (its
 non-guaranteed-buff "needsBoost" plan selection): that code is disabled
 upstream and never runs, so copying it would make us diverge from PvPoke's
@@ -126,7 +152,7 @@ PvPoke master under the new system (CHANGELOG 2026-09-09..10).
   logic lives in `Battle.js`, `actions/ActionLogic.js`, `DamageCalculator.js`
   and `pokemon/Pokemon.js`. `tests/test_rebalance_tripwire.py` pins their
   sha256 in `tests/fixtures/pvpoke_engine_digests.json` (last re-vetted
-  2026-09-10) and fails when the `../pvpoke` checkout drifts; the procedure
+  2026-10-24) and fails when the `../pvpoke` checkout drifts; the procedure
   is `docs/rebalance_checklist.md` section B -- read the upstream commits,
   re-run the oracle audit (`scripts/audit_oracle_harness.py`), then update
   this list, the re-vetting log in `DEVELOPER_NOTES.md`, and the digest

@@ -1,13 +1,13 @@
 {
  "digests": {
-  "../pokemon/Pokemon.js": "3270783ce337ba748a2596a5ae9ae71d9fe07c2a6b6facfe32ffbd6c14139927",
-  "Battle.js": "52e423ab0d876ac265c61b68b33cce4cc6781ff97e6c58743486472e59437a63",
+  "../pokemon/Pokemon.js": "10893308f8e8b408d396d19e541d7482c9657dd9c07fd6c8c9bf8f783669c47d",
+  "Battle.js": "65765dc0214710f6587b4e5d5a07a7bf8d2639090be6a5a59270650d6d5225b4",
   "DamageCalculator.js": "557b9345367a272e7822b47d346b67ae05d4124050e9d3876fb2446246915f31",
-  "actions/ActionLogic.js": "3847c2329c86b6bfe843f06d4b1c3b680155eb2ef8bdce65706727712cdf94e4"
+  "actions/ActionLogic.js": "9a5a7bb28a01c115e18e5b904646f5fb18bf1b17c2bf8757d2d90144ef7d0e30"
  },
- "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: docs/validations/2026-09-02_pvpoke_mega_revet.md",
- "pinned_at": "2026-09-02",
- "pvpoke_commit": "a93147bf1",
- "vetted": "2026-09-10",
- "vetted_note": "Re-vetted per docs/rebalance_checklist.md section B after the Twilight Trails rebalance + the new-mechanics merge. Only Battle.js drifted from 79d04af74; Pokemon.js, DamageCalculator.js and ActionLogic.js are byte-identical, so PvPoke AI/strategy did NOT change and pvpoke_dp remains a valid baseline for the PoGoDives tier. Oracle audit at re-pin: 229/243 cells match exactly; the 14 that differ are 6 open Aegislash form-change cells + 8 documented xfails."
+ "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: DEVELOPER_NOTES.md 'PvPoke re-vetting log' 2026-10-24 (Minior port).",
+ "pinned_at": "2026-10-24",
+ "pvpoke_commit": "38f70320d",
+ "vetted": "2026-10-24",
+ "vetted_note": "Re-vetted per docs/rebalance_checklist.md section B. Upstream delta a93147bf1..38f70320d is three commits: e87448291 (sandbox-mode fix: previousTurnActions cleared in Battle.start, UI-only for us; our Report 9 sandbox test re-pinned to the fixed page), 4d2908fac + 38f70320d (Minior: battle_start/hp form-change triggers, the Meteor hold-energy rule in ActionLogic.js:254-263, the Meteor wouldShield rule at :1256, Pokemon.js level formulas). All sim-relevant lines are Minior-gated (activeFormId == 'minior_meteor') except the new form-change trigger dispatch, so pvpoke_dp remains a valid PoGoDives baseline for every other species. Ported as-is (tests/test_minior.py). Oracle audit at re-pin: 387 cells, Minior 90/90 exact, and the 20 non-Minior divergences are the identical set to the pre-port audit (userdata/logs/oracle_audit_full_2026-10-24e.log)."
 }
