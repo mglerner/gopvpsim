@@ -11,15 +11,17 @@ lines of mostly-completed chronological batches. -->
 Michael 2026-10-24: "take your recommendation. we can improve later" -- the
 port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 
-- **Class A decision (Michael): port or document the cooldown-reset quirk.**
-  `Battle.js:548` sets both cooldowns to 500 after a charged-move or
-  form-animation round, finishing an in-flight multi-turn fast move a turn
-  early. ~35 of the 702 Minior sweep cells; affects every species with a
-  multi-turn fast move during a charged round, not just Minior. Options:
-  port (then it is a global engine change -> cold re-dive or a predicate
-  over "either side has a multi-turn fast move", which is most columns),
-  or keep ours and file the intent question (`docs/pvpoke_bug_reports.md`
-  Report 10 draft; DEVELOPER_NOTES "Known divergences" class A).
+- **Class A decision (Michael): port or document the form-animation
+  cooldown reset.** `Battle.js:548` sets both cooldowns to 500 after a
+  round with a charged move (old rule, already matched by our turn model)
+  OR a form animation (new in 4d2908fac; `roundFormAnimation` is set only
+  by the `hp`-trigger change, i.e. Minior's flip). Minior-only. ~35 of the
+  702 Minior sweep cells. Port = a localized change (hp-flip turn: any
+  in-flight multi-turn fast on either side lands next turn; cache
+  predicate "Minior on either side"), verified against the sweep; document
+  = keep ours (DEVELOPER_NOTES "Known divergences" class A, Report 10
+  draft). Best done BEFORE the Minior dives so they are PvPoke-comparable
+  and never need a Minior-only re-dive.
 - **Untraced sweep cells** (`userdata/logs/minior_midflight_sweep_5.log`):
   Medicham vs Minior 1-2 (351 vs 373) and 2-2 (734 vs 391) -- same DP plan
   [IP,IP,IP] at e=95 vs 80-HP 1-shield Meteor, PvPoke's post-DP bandaid
@@ -49,8 +51,9 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   if a UL dive is ever wanted.
 - **Level rule:** `MINIOR_HALF_LEVEL_STEP` (False = PvPoke's simulator path).
   Re-check go-iv PR #48 and pvpoke master for a settled rule before a bake.
-- **File Reports 10 and 11** (`docs/pvpoke_bug_reports.md`) after
-  Michael's review; Report 9 is superseded upstream (e87448291), do not file.
+- **Reports 10 and 11** (`docs/pvpoke_bug_reports.md`) stay drafts:
+  Michael 2026-10-24, not filing anything upstream while PvPoke has not
+  responded to the 2026-07-16 batch. Report 9 is superseded (e87448291).
 
 ## OPEN: Bake speed (2026-09-25 scout)
 

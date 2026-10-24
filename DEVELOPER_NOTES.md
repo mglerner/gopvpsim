@@ -1000,8 +1000,8 @@ is PvPoke-exact on its 90 cells; none of these is in the oracle audit):
   `pvpoke_trace.js`, `userdata/logs/minior_midflight_sweep_5.log`; the
   10-matchup oracle set is a subset and is 90/90). Attributed: ~35 cells in
   six matchups (Lickitung 10, Charjabug 8, Steelix 6, Lanturn 6, Cresselia
-  4, Sableye 2) to the cooldown-reset quirk below, where a Core flip or a
-  charged round shortens an in-flight multi-turn fast move; Morpeko 2-2
+  4, Sableye 2) to the form-animation cooldown reset below, where a Core
+  flip shortens an in-flight multi-turn fast move; Morpeko 2-2
   both seats = the documented one-way-toggle divergence (bug #8); Medicham
   vs Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 / 391): both engines
   reach the same DP plan [Ice Punch x3] at Medicham e=95 vs an 80-HP
@@ -1011,26 +1011,33 @@ is PvPoke-exact on its 90 cells; none of these is in the oracle audit):
   Minior 2-0 (739 / 735), untraced. Michael's call 2026-10-24: ship the
   port, improve later (TODO "Minior -- open items").
 
-### Cooldown reset after a charged-move / form-animation round shortens an in-flight fast move (class A, PENDING)
+### Minior's form animation resets both cooldowns like a charged move (class A, Minior-only, PENDING)
 
-`Battle.js:548`: at the end of a round in which a charged move was used OR a
-form animation played (`roundChargedMoveUsed || roundFormAnimation`), every
-Pokemon's `cooldown` is set to 500 -- so a 2- or 3-turn fast move that was
-mid-flight finishes on the next turn with full damage and energy: a free
-turn for that side. The Minior hp flip carries `animationTime: 5000`, so
-the form-animation arm fires on every Core flip that lands mid-Rollout,
-which is why it surfaced now (it also fires on every charged round, for
-every species, whenever a multi-turn fast move is in flight -- the related
-`chargedMoveLastTurn` rule at `Battle.js:333-345` drops all non-switch
-decisions on the turn after a charged move and is sequence-equivalent to our
-no-dead-turn model except in exactly these cases). Ours lets the fast move
-run its full duration. Which is right in-game is undetermined (the real
-charged-move pause does interrupt fast-move animations, but whether the
-remaining cooldown is forgiven is the question); port-vs-document is
-Michael's pending decision, with a bug-report/intent question drafted as
-`docs/pvpoke_bug_reports.md` Report 10. ~35 of the 702 Minior sweep cells
-above; margins are typically 1-8 points (Lickitung 1-1: 403 vs 408), with
-Charjabug 1-1 (210 vs 626) and Cresselia 0-1 (103 vs 293) the outliers.
+`Battle.js:548`: at the end of a round, `if(roundChargedMoveUsed ||
+roundFormAnimation) poke.cooldown = 500` for BOTH Pokemon. The
+charged-move arm is old (blame: 2019; body re-touched in the 2026-08-26
+new-mechanics branch) and was at the previously vetted `a93147bf1` -- our
+turn model already reproduces it (every multi-turn-fast oracle cell is
+exact: Bubble, Counter, Psycho Cut, Sand Attack users all throw and take
+charged moves mid-fast). The `|| roundFormAnimation` arm is NEW in
+`4d2908fac`, and `roundFormAnimation` is set in exactly one place
+(`Battle.js:1668`, inside the `hp`-trigger form change), so it fires only
+on Minior's Meteor -> Core flip. Effect: a 2- or 3-turn fast move in flight
+on the flip turn (either side; Minior's own Rollout is 3 turns, and the
+fast it queues on the flip turn counts too) finishes the next turn with
+full damage and energy -- PvPoke treats the 5000 ms form animation as a
+battle pause, like a charged move. Ours lets the fast run its full length.
+Whether the game really pauses for the Meteor animation is unconfirmed (no
+source either way); if it does, PvPoke is consistent and we should port.
+Scope is Minior-only, so a port is a localized change (cache predicate:
+Minior on either side). Attributed to ~35 of the 41 open Minior sweep cells
+above (MIDFLIGHT-tagged cells traced; the 'landed' cells fit the
+fast-queued-on-the-flip-turn shape but were not individually traced).
+Margins are typically 1-8 points (Lickitung 1-1: 403 vs 408); Charjabug
+1-1 (210 vs 626) and Cresselia 0-1 (103 vs 293) are the outliers.
+Michael's port-vs-document decision pending; the intent question is drafted
+as `docs/pvpoke_bug_reports.md` Report 10 (not being filed: PvPoke has not
+responded to the 2026-07-16 batch).
 
 ### bandaid[929] stack-switch is ungated on bait_shields (no-bait only)
 (documented 2026-06-27, engine bug-hunt #5)
