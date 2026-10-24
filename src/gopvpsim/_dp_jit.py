@@ -69,6 +69,7 @@ def _make_jit():
         _nbt.int8[:],      # cm_self_debuf
         _nbt.int8[:],      # cm_debuf_delta
         _nbt.int8[:],      # cm_buff_delta
+        _nbt.int8[:],      # cm_stack_ok
         _f8[:, :],         # cm_dmgs_stage
         _i8[:],            # fast_dmg_stage
         _i8,               # root_atk_stage
@@ -87,6 +88,7 @@ def _make_jit():
         cm_self_debuf,      # int8[:]   (0/1 per move)
         cm_debuf_delta,     # int8[:]   (-1/0/+1 per move)
         cm_buff_delta,      # int8[:]   (atk-stage delta per throw)
+        cm_stack_ok,        # int8[:]   (0/1: eligible for the stack-two expansion)
         cm_dmgs_stage,      # float64[:,:] shape (9, n_cms); indexed by stage+4
         fast_dmg_stage,     # int64[:]    shape (9,); indexed by stage+4
         root_atk_stage,     # int
@@ -327,6 +329,52 @@ def _make_jit():
                             q_deb_cnt[i] = new_deb_cnt
                             q_atk_stg[i] = new_atk_stg
                             q_size += 1
+
+                    # ---- Stack-two expansion, READY twin (ActionLogic.js:668-717) ----
+                    # Mirrors the Python loop in battle.py: farm to
+                    # 2*energy first, then throw one copy; insert AFTER
+                    # same-turn (<=). fm_stack may be negative (energy
+                    # already above 2*energy) -- kept verbatim.
+                    if cm_stack_ok[n] != 0:
+                        diff2 = 2 * move_e - curr_e
+                        # ceil(diff2 / fast_energy) for any sign of diff2
+                        fm_stack = -((-diff2) // fast_energy)
+                        if fm_stack != 0:
+                            st_e  = fm_stack * fast_energy + curr_e - move_e
+                            st_hp = curr_hp - curr_fast_dmg * fm_stack
+                            if curr_sh > 0:
+                                st_hp -= 1.0
+                            else:
+                                st_hp -= move_dmg
+                            st_t = curr_t + fm_stack * fast_turns + 1
+
+                            i = 0
+                            while i < q_size and q_turn[i] <= st_t:
+                                i += 1
+
+                            if q_size >= QUEUE_CAP:
+                                overflowed = True
+                            else:
+                                for k in range(q_size, i, -1):
+                                    q_energy[k]  = q_energy[k - 1]
+                                    q_hp[k]      = q_hp[k - 1]
+                                    q_turn[k]    = q_turn[k - 1]
+                                    q_shields[k] = q_shields[k - 1]
+                                    q_first[k]   = q_first[k - 1]
+                                    q_max_idx[k] = q_max_idx[k - 1]
+                                    q_has_deb[k] = q_has_deb[k - 1]
+                                    q_deb_cnt[k] = q_deb_cnt[k - 1]
+                                    q_atk_stg[k] = q_atk_stg[k - 1]
+                                q_energy[i]  = st_e
+                                q_hp[i]      = st_hp
+                                q_turn[i]    = st_t
+                                q_shields[i] = new_sh
+                                q_first[i]   = new_first
+                                q_max_idx[i] = new_max_idx
+                                q_has_deb[i] = new_has_deb
+                                q_deb_cnt[i] = new_deb_cnt
+                                q_atk_stg[i] = new_atk_stg
+                                q_size += 1
                 else:
                     # ---- Move not ready: insert BEFORE same-turn (<) ----
                     # ceil((move_e - curr_e) / fast_energy)
@@ -370,6 +418,48 @@ def _make_jit():
                         q_deb_cnt[i] = new_deb_cnt
                         q_atk_stg[i] = new_atk_stg
                         q_size += 1
+
+                    # ---- Stack-two expansion, NOT-READY twin (ActionLogic.js:764-808) ----
+                    # Same state as the ready twin, inserted BEFORE
+                    # same-turn (<); fm_stack > 0 always here.
+                    if cm_stack_ok[n] != 0:
+                        diff2 = 2 * move_e - curr_e
+                        fm_stack = -((-diff2) // fast_energy)
+                        st_e  = fm_stack * fast_energy + curr_e - move_e
+                        st_hp = curr_hp - curr_fast_dmg * fm_stack
+                        if curr_sh > 0:
+                            st_hp -= 1.0
+                        else:
+                            st_hp -= move_dmg
+                        st_t = curr_t + fm_stack * fast_turns + 1
+
+                        i = 0
+                        while i < q_size and q_turn[i] < st_t:
+                            i += 1
+
+                        if q_size >= QUEUE_CAP:
+                            overflowed = True
+                        else:
+                            for k in range(q_size, i, -1):
+                                q_energy[k]  = q_energy[k - 1]
+                                q_hp[k]      = q_hp[k - 1]
+                                q_turn[k]    = q_turn[k - 1]
+                                q_shields[k] = q_shields[k - 1]
+                                q_first[k]   = q_first[k - 1]
+                                q_max_idx[k] = q_max_idx[k - 1]
+                                q_has_deb[k] = q_has_deb[k - 1]
+                                q_deb_cnt[k] = q_deb_cnt[k - 1]
+                                q_atk_stg[k] = q_atk_stg[k - 1]
+                            q_energy[i]  = st_e
+                            q_hp[i]      = st_hp
+                            q_turn[i]    = st_t
+                            q_shields[i] = new_sh
+                            q_first[i]   = new_first
+                            q_max_idx[i] = new_max_idx
+                            q_has_deb[i] = new_has_deb
+                            q_deb_cnt[i] = new_deb_cnt
+                            q_atk_stg[i] = new_atk_stg
+                            q_size += 1
 
         if overflowed:
             iters = -1
@@ -430,8 +520,9 @@ def _make_ttl_jit():
         wins_cmp,           # bool — attacker.cmp_atk >= defender.cmp_atk
         cmp_bonus,          # bool — attacker.cmp_atk > defender.cmp_atk and
                             #        opp_fast_cd % atk_fast_cd == 0
-        d_cm_dmgs,          # int64[:] — defender charged damage (natural order)
-        d_cm_energy,        # int64[:]
+        d_cm_dmgs,          # int64[:] — defender charged damage, ascending-
+                            #            energy order (PvPoke activeChargedMoves)
+        d_cm_energy,        # int64[:] — same order
         energy_cap,         # int
     ):
         n_d_cms = d_cm_energy.shape[0]

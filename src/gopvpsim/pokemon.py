@@ -205,12 +205,37 @@ _gm_entry_index = None
 _gm_id_index = None
 
 
+def _all_entries():
+    """gm['pokemon'] plus this library's synthetic species variants
+    (data.SPECIES_VARIANTS): a copy of a real entry with its formChange
+    stripped, so a battle_start changer can be simmed as its STORED form
+    for the whole fight. Today only 'Minior (Core only)' -- a Minior that
+    re-enters battle already flipped (PvPoke resetOnSwitch=false; the form
+    is not reset on a switch, so this is a reachable state in a 3-mon
+    battle, not a hypothetical). The variant is NOT in gm['pokemon'], so
+    whole-gamemaster sweeps never see it; rankings/default-IV lookups map
+    it back to the base name (data.species_id)."""
+    from .data import SPECIES_VARIANTS
+    gm = load_gamemaster()
+    mons = list(gm['pokemon'])
+    by_name = {m['speciesName']: m for m in mons}
+    for name, (base_name, sid) in SPECIES_VARIANTS.items():
+        base = by_name.get(base_name)
+        if base is None:
+            continue   # gamemaster vintage predates the base species
+        e = dict(base)
+        e['speciesName'] = name
+        e['speciesId'] = sid
+        e['formChange'] = None
+        mons.append(e)
+    return mons
+
+
 def get_pokemon_index():
     """Return a dict of speciesName -> baseStats from the gamemaster. Cached."""
     global _pokemon_index
     if _pokemon_index is None:
-        gm = load_gamemaster()
-        _pokemon_index = {mon['speciesName']: mon['baseStats'] for mon in gm['pokemon']}
+        _pokemon_index = {mon['speciesName']: mon['baseStats'] for mon in _all_entries()}
     return _pokemon_index
 
 
@@ -218,8 +243,7 @@ def get_entry_index() -> dict:
     """Return the cached speciesName -> full gamemaster entry index."""
     global _gm_entry_index
     if _gm_entry_index is None:
-        gm = load_gamemaster()
-        _gm_entry_index = {mon['speciesName']: mon for mon in gm['pokemon']}
+        _gm_entry_index = {mon['speciesName']: mon for mon in _all_entries()}
     return _gm_entry_index
 
 
@@ -253,8 +277,7 @@ def get_pokemon_entry_by_id(species_id: str) -> dict:
     """
     global _gm_id_index
     if _gm_id_index is None:
-        gm = load_gamemaster()
-        _gm_id_index = {mon['speciesId']: mon for mon in gm['pokemon']}
+        _gm_id_index = {mon['speciesId']: mon for mon in _all_entries()}
     return _gm_id_index[species_id]
 
 

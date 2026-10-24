@@ -19,9 +19,16 @@ PvPoke's live engine via scripts/pvpoke_trace.js at 15/15/15 IVs both sides
 (9/9 exact on winner + score).
 
 The values below were RE-DERIVED 2026-09-09 under the new turn system
-(fa7d801; 0-0 is now 555). They come from our engine, on the warrant that
+(fa7d801; 0-0 is now 555). They came from our engine, on the warrant that
 the oracle harness matches PvPoke master on 229 of 243 cells; Pinsir vs
-Cresselia is not itself a harness matchup and was not re-traced.
+Cresselia is not itself a harness matchup and was not re-traced then.
+
+2026-10-24: all nine cells TRACED against PvPoke master 38f70320d
+(scripts/pvpoke_trace.js, 15/15/15 both sides): 9/9 exact on score +
+winner. One cell moved with the DP "stack two self-debuffing moves"
+expansion (both twins, DEVELOPER_NOTES "Key implementation details"):
+1-2 was 354/645 from our engine and is 348/651 in PvPoke and now ours
+(Super Power is stack-two eligible). The other eight were already exact.
 """
 import sys
 from pathlib import Path
@@ -38,14 +45,14 @@ CRESSELIA = ('Cresselia', 'PSYCHO_CUT', ['GRASS_KNOT', 'MOONBLAST'], 'great')
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
     # RE-DERIVED 2026-09-09 against PvPoke master under the NEW turn
-    # system; verified against the oracle harness (229/243 cells match
-    # PvPoke exactly). See the step-B commit for the warrant.
+    # system; TRACED 2026-10-24 against PvPoke 38f70320d, 9/9 exact
+    # (see module docstring).
     (0, 0, 555, 444, 0),
     (0, 1, 435, 564, 1),
     (0, 2, 316, 683, 1),
     (1, 0, 808, 191, 0),
     (1, 1, 474, 525, 1),
-    (1, 2, 354, 645, 1),
+    (1, 2, 348, 651, 1),   # 2026-10-24: 354 -> 348 (stack-two expansion; PvPoke 348)
     (2, 0, 808, 191, 0),
     (2, 1, 747, 252, 0),
     (2, 2, 696, 303, 0),
