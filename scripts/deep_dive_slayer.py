@@ -13,10 +13,10 @@ import sys
 
 from gopvpsim.pokemon import (
     Pokemon, best_level, CPM,
-    LEAGUE_CAPS, LEAGUE_MAX_LEVEL,
+    LEAGUE_CAPS, LEAGUE_MAX_LEVEL, get_pokemon_entry,
 )
 from gopvpsim.moves import get_moves, type_effectiveness
-from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset
+from gopvpsim.data import load_rankings, get_default_moveset
 from gopvpsim.moves import parse_types
 from gopvpsim.battle import simulate, pvpoke_dp, pvpoke_simulate_shield
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
@@ -303,8 +303,10 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     fm_template = dict(fast_moves_db[fast_id])
     cms_template = [dict(charged_moves_db[cid]) for cid in charged_ids]
 
-    gm = load_gamemaster()
-    focal_mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    # Index lookup, not a raw gm['pokemon'] scan: the synthetic variants
+    # (data.SPECIES_VARIANTS, e.g. 'Minior (Core only)') live only in the
+    # index (pokemon._all_entries), never in the gamemaster list.
+    focal_mon = get_pokemon_entry(species)
     focal_types = parse_types(focal_mon)
 
     max_cp = LEAGUE_CAPS[league]

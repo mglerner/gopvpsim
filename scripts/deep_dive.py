@@ -155,6 +155,29 @@ _FORM_CHANGE_NOTES = {
         'the post-bust state -- a starting state you cannot reach in an '
         'actual battle. For the realistic Disguise-intact start, see the '
         'Mimikyu dive.'),
+    'Minior (Core)': _form_change_callout(
+        'This dive is the real Minior. You power up and CP-cap the '
+        '<b>Core</b> form (the stored form, 218 attack / 131 defense), but it '
+        '<b>enters every battle as Meteor</b> (116 attack / 194 defense: a '
+        'bulky shell) at a higher battle level that keeps its CP under the '
+        'cap, and <b>drops to Core one way</b> as soon as its HP falls below '
+        '50% (a fast move can trigger it). HP is Core&#39;s throughout. The '
+        'sim models this as PvPoke does, including PvPoke&#39;s Meteor-level '
+        'rule (whole-level steps) and its AI: both sides hold charged energy '
+        'while the shell is up. The exact in-game Meteor level is still being '
+        'pinned down by the community; the shell phase is a small stat '
+        'adjustment, not the fight&#39;s hinge. For a Minior that re-enters a '
+        'battle already in Core form, see the Minior (Core only) dive.'),
+    'Minior (Core only)': _form_change_callout(
+        'The real Minior <em>enters</em> a battle as its bulky <b>Meteor</b> '
+        'shell and drops to <b>Core</b> below 50% HP; once it has dropped, '
+        'the shell does not come back for the rest of that battle, even '
+        'after a switch. This dive is that <b>already-dropped Core</b>: the '
+        'Minior that returns from the bench after flipping earlier, fighting '
+        'as Core (218 attack / 131 defense) from turn one. The IV spreads are '
+        'the same stored Core spreads as the realistic dive, so every build '
+        'here is one you could actually bring. For the realistic enters-as-'
+        'Meteor fight, see the Minior (Core) dive.'),
     'Cramorant': _form_change_callout(
         'After using <b>Dive</b> or <b>Surf</b>, Cramorant surfaces holding '
         'prey: <b>Gulping</b> form (Arrokuda) above 50% HP, <b>Gorging</b> '
