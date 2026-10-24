@@ -9,8 +9,9 @@ buff chances" credit fired there but not in our port. The fix compares as
 branch cannot silently come back.
 
 The delta feeds only the DP dedup tie-break debuff count; it is value-neutral
-inside a DP node (impact empirically + structurally zero -- see DEVELOPER_NOTES
-"RESOLVED 2026-06-27 (bug #7)"), but it must stay faithful to PvPoke's count.
+inside a DP node (impact empirically + structurally zero -- see the 2026-06-27
+engine bug-hunt #7 entry in CHANGELOG "Archived: Resolved engine divergences"),
+but it must stay faithful to PvPoke's count.
 """
 from gopvpsim.battle import _cm_debuf_delta
 from gopvpsim.moves import get_moves

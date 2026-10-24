@@ -440,7 +440,7 @@ correct for us. The draft's fallback claim (NaN comparisons in the
 walk-down) was also wrong: an out-of-range level would give
 `cpms.indexOf(undefined) = -1`, the `cpmIndex >= 0` guard skips the
 loop, and `changeForm` would throw a TypeError - no NaN path exists.
-DEVELOPER_NOTES "Known divergences" item 3 has been corrected to
+DEVELOPER_NOTES "Form change gotchas" item 3 has been corrected to
 match.
 
 ---
@@ -577,7 +577,7 @@ consumers (rankings, matrix) are unaffected.
 
 ## Drafted 2026-10-24, MOOT (we ported the rule the same day; not filing) - Report 10 - a form-animation round sets both cooldowns to 500 ms, letting both Pokemon act while a fast is still in flight
 
-**Status (later 2026-10-24):** ported as PvPoke has it (class A, DEVELOPER_NOTES "Known divergences"); the in-game question (does the shell-break animation pause the battle like a charged move?) is unanswered but no longer a divergence. Kept for the record; not filing. Note the draft below mis-describes the effect: the reset does not shorten the in-flight fast move (queued fasts resolve on their own turn clock), it lets the Pokemon act again while the fast is still in the air.
+**Status (later 2026-10-24):** ported as PvPoke has it (class A, DEVELOPER_NOTES "Key implementation details", "Cooldown gates DECISIONS, not landings"); the in-game question (does the shell-break animation pause the battle like a charged move?) is unanswered but no longer a divergence. Kept for the record; not filing. Note the draft below mis-describes the effect: the reset does not shorten the in-flight fast move (queued fasts resolve on their own turn clock), it lets the Pokemon act again while the fast is still in the air.
 
 **Status (original):** drafted from the 2026-10-24 Minior sweep (gopvpsim vs
 `pvpoke_trace.js` at master `38f70320d`, 702 cells, ~35 attributed to

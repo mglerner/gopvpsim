@@ -81,7 +81,7 @@ def test_ordinary_levels_keep_the_game_published_cpm():
     supermega matches PvPoke exactly, an ordinary mon differs by ~3e-8 at
     level 50 because we use Niantic's published 0.84029999 where PvPoke uses
     the full float expansion. That gap predates this work and is documented
-    in DEVELOPER_NOTES as changing no cell.
+    in docs/validations/2026-09-02_pvpoke_mega_revet.md as changing no cell.
     """
     assert CPM[50.0] == 0.84029999
     assert CPM[50.0] != 0.840300023555755

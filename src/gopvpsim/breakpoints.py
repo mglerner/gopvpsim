@@ -53,7 +53,8 @@ _K = damage_constant
 # PvPoke's favour on all three questions: its solver is internally
 # inconsistent with its own damage function, breakpoints ARE this project's
 # deliverable, and matching the inconsistency would ship a knowingly wrong
-# threshold. Recorded in DEVELOPER_NOTES "PvPoke bugs found".
+# threshold. Recorded in DEVELOPER_NOTES "Known divergences" ("Breakpoint /
+# bulkpoint solvers apply the Mega bonus").
 def atk_for_damage(dmg: int, def_: float, move: dict,
                    attacker_types: list[str], defender_types: list[str],
                    mega_level: "int | None" = None) -> float:

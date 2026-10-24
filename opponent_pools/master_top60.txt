@@ -2,7 +2,7 @@
 #
 # Snapshot generated 2026-06-19 for the Dialga (Origin) ETM / IV deep dive,
 # pinning the opponent set against rankings drift (PvPoke rankings are
-# refreshed upstream; see DEVELOPER_NOTES "non-reproducible opponent data").
+# refreshed upstream; see TODO.md "Reproducibility").
 # Includes the base/shadow near-duplicates and the Dialga (Origin) mirror at
 # #8, exactly as PvPoke ranks them. All opponents assumed hundo (15/15/15)
 # at the dive's build level.

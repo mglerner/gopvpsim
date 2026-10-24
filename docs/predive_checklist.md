@@ -67,7 +67,7 @@ L5-affordance, change-propagation), not just the engine math.
    hide in the un-updated consumer, never in the changed file. (This is the ML
    miss.)
    - trigger: `git log --oneline <last-dive-sha>..HEAD -- scripts/ src/gopvpsim/`
-     (seed `<last-dive-sha>` from the latest DEVELOPER_NOTES re-dive entry). For
+     (seed `<last-dive-sha>` from the latest CHANGELOG re-dive entry). For
      each touched module, `grep -rn '<symbol>' scripts/ src/gopvpsim/ *.sh` and
      ask of each caller: "does the new behavior -- including how many
      processes / cores / how much RAM it now uses -- still match what this caller
