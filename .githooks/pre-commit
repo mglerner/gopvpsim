@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Project pre-commit checks:
+# Project pre-commit checks, all against the INDEX (what is being committed),
+# never the working tree:
 #   1. Reject authored_by = "ai" in ship-tracked TOMLs
 #      (CLAUDE.md "Ship-mode narrative policy").
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
-#      (scripts/verify_dev_counts.py; see Task 1 in the
-#      pre-ship cleanup session).
+#      (scripts/verify_dev_counts.py; only when an input is staged). The
+#      sentinel VALUES are read from the index; the live counts (pytest
+#      collection, type chart) necessarily come from the working tree.
 #   3. Verify DEVELOPER_NOTES.md stays under its read-whole size cap and
 #      that its quoted section citations, repo paths and test refs resolve
-#      (scripts/verify_dev_notes.py; every commit, against the INDEX).
+#      (scripts/verify_dev_notes.py; every commit, incl. deletion-only).
 #
 # Install by running: git config core.hooksPath .githooks
 # Escape hatch: git commit --no-verify. Rebase/cherry-pick/merge replays do
@@ -17,36 +19,52 @@ set -euo pipefail
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
 # Project interpreter. direnv puts .venv/bin on PATH in interactive shells
-# and Emacs, but not in GUI git clients or non-interactive shells; resolve
-# it explicitly so a missing interpreter is never reported as a check failure.
+# and Emacs, but not in GUI git clients or non-interactive shells, and a
+# `git worktree` checkout has no .venv of its own (gitignored). Try the
+# checkout's venv, then the main worktree's, then PATH; a missing
+# interpreter is reported as such, never as a check failure.
 PY="$REPO_ROOT/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+    PY="$(git rev-parse --path-format=absolute --git-common-dir)/../.venv/bin/python"
+fi
 if [[ ! -x "$PY" ]]; then
     PY=$(command -v python || true)
 fi
 if [[ -z "$PY" ]]; then
-    echo 'ERROR: pre-commit: no project interpreter found (.venv/bin/python missing' >&2
-    echo '       and no python on PATH). Run `uv venv && uv pip install -e ".[dev,perf]"`.' >&2
+    echo 'ERROR: pre-commit: no project interpreter found: no .venv/bin/python in this' >&2
+    echo '       checkout or the main worktree, and no python on PATH. In the main' >&2
+    echo '       checkout run `uv venv && uv pip install -e ".[dev,perf]"`.' >&2
     exit 1
 fi
 
-# --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
-# (first, and unconditional: it must also run for deletion/rename-only
-# commits and for --amend with nothing staged, which the early exit below
-# would skip.) The checker reads a directory, so export what is being
-# committed -- the index -- rather than the working tree: an unstaged
-# work-in-progress edit to the notes must not block an unrelated commit,
-# and a staged dangling citation must not pass because the working copy
-# was fixed afterwards. Only the scanned dirs are exported (~0.1 s).
-INDEX_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/gopvpsim-index.XXXXXX")
+# Export the index (only the paths the checker reads, ~0.1 s) into the git
+# dir, which is always writable and per-worktree -- an odd TMPDIR from a
+# GUI client must not block commits. `git commit <path>` hands the hook a
+# temporary GIT_INDEX_FILE, which ls-files/checkout-index honour.
+INDEX_EXPORT=$(mktemp -d "$(git rev-parse --absolute-git-dir)/index-export.XXXXXX")
 trap 'rm -rf "$INDEX_EXPORT"' EXIT
-git ls-files -z -- src scripts tests docs guides articles thresholds opponent_pools \
-    CLAUDE.md TODO.md README.md DEVELOPER_NOTES.md CHANGELOG.md \
+# shellcheck disable=SC2046  # the paths are the checker's constants, no spaces
+git ls-files -z -- $("$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --print-scan-paths) \
     | git checkout-index -z --prefix="$INDEX_EXPORT/" --stdin
-if ! "$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet --repo-root "$INDEX_EXPORT"; then
+
+# --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
+# First and unconditional: it must also run for deletion/rename-only
+# commits and for --amend with nothing staged, which the early exit below
+# would skip. Exit 2 = drift; anything else = the checker itself crashed.
+set +e
+"$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet --repo-root "$INDEX_EXPORT"
+rc=$?
+set -e
+if [[ $rc -eq 2 ]]; then
     echo >&2
     echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer)' >&2
-    echo 'in the STAGED content. Run scripts/verify_dev_notes.py for the full' >&2
-    echo 'working-tree report; stage the fix, or use --no-verify.' >&2
+    echo 'in the content being committed. Run scripts/verify_dev_notes.py for the' >&2
+    echo 'full working-tree report; stage the fix, or use --no-verify.' >&2
+    exit 1
+elif [[ $rc -ne 0 ]]; then
+    echo >&2
+    echo "ERROR: scripts/verify_dev_notes.py crashed (exit $rc); this is a checker" >&2
+    echo '       bug, not notes drift. Fix it or commit with --no-verify.' >&2
     exit 1
 fi
 
@@ -61,7 +79,7 @@ AI_FILES=""
 while IFS= read -r f; do
     case "$f" in
         articles/*.toml|thresholds/*.toml)
-            if grep -q '^authored_by = "ai"' "$f" 2>/dev/null; then
+            if git show ":$f" | grep -q '^authored_by = "ai"'; then
                 AI_FILES="$AI_FILES$f"$'\n'
             fi
             ;;
@@ -97,9 +115,10 @@ while IFS= read -r f; do
 done <<< "$STAGED"
 
 if [[ "$needs_dev_count_check" -eq 1 ]]; then
-    if ! "$PY" "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet; then
+    if ! "$PY" "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet \
+            --notes "$INDEX_EXPORT/DEVELOPER_NOTES.md"; then
         echo >&2
-        echo 'Commit blocked by dev-count drift.' >&2
+        echo 'Commit blocked by dev-count drift (sentinel values read from the index).' >&2
         exit 1
     fi
 fi

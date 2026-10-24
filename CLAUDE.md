@@ -482,9 +482,12 @@ The `.githooks/pre-commit` hook enforces this by rejecting any
 commit that leaves `authored_by = "ai"` in a ship-tracked TOML. The same
 hook also gates the DEVELOPER_NOTES dev-count sentinels
 (`scripts/verify_dev_counts.py`) and, on every commit, the notes' size
-cap and pointer integrity (`scripts/verify_dev_notes.py`, run against
-the index); it uses `.venv/bin/python` directly, so it works from GUI
-git clients without direnv. To activate the hook, run once per clone:
+cap and pointer integrity (`scripts/verify_dev_notes.py`); all three
+read the index, not the working tree. The hook finds the interpreter
+itself (this checkout's `.venv`, else the main worktree's, else
+`python` on PATH), so it works from GUI git clients and worktrees
+without direnv as long as the main checkout has its venv. To activate
+the hook, run once per clone:
 
     git config core.hooksPath .githooks
 

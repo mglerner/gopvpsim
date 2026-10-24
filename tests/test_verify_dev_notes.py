@@ -1,13 +1,14 @@
 """Gate tests for scripts/verify_dev_notes.py (DEVELOPER_NOTES size + pointers).
 
 Synthetic repos under tmp_path exercise each check in isolation; the last
-test runs the checker against THIS repo and asserts it finds a non-trivial
+tests run the checker against THIS repo and assert it finds a non-trivial
 number of citations (an empty scan passing is the silent failure mode).
 """
 from __future__ import annotations
 
 import importlib.util
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,16 +50,42 @@ See CLAUDE.md "Ship-mode narrative policy" and TODO "Reproducibility" and
 CHANGELOG "2026-01-01 -- an archived entry". Pin: `tests/test_thing.py::test_ok`,
 `tests/test_thing.py:12-14`, `tests/test_thing.py::TestK::test_m`,
 `tests/test_thing.py::test_ok[case-1]`, `tests/test_thing.py::LIMIT`,
-`scripts/tool.py --flag x`.
+`tests/test_thing.py::ANN`, `tests/test_thing.py::test_async`,
+`scripts/tool.py --flag x`, `docs/notes.md::not_a_python_member`.
+Own section: DEVELOPER_NOTES "PvPoke bugs found". CLAUDE.md "a human override
+always wins" is a body phrase, not a heading.
 """
 
+TEST_THING = '''LIMIT = 3
+ANN: int = 4
+
+def test_ok():
+    pass
+
+async def test_async():
+    pass
+
+class TestK:
+    def test_m(self):
+        pass
+
+class Other:
+    def test_elsewhere(self):
+        pass
+
+"""
+    def test_in_docstring(): removed
+"""
+FLAG == 3
+'''
+
 GOOD_FILES = {
-    'CLAUDE.md': '## Ship-mode narrative policy\n',
+    'CLAUDE.md': '## Ship-mode narrative policy\n\nBody phrase: a human override always wins.\n',
     'TODO.md': '## Reproducibility\n',
     'CHANGELOG.md': '## 2026-01-01 -- an archived entry\n\nbody mentions "not a heading".\n',
     'scripts/tool.py': 'pass\n',
-    'tests/test_thing.py': ('LIMIT = 3\n\ndef test_ok():\n    pass\n\n'
-                            'class TestK:\n    def test_m(self):\n        pass\n'),
+    'docs/notes.md': 'x\n',
+    'tests/test_thing.py': TEST_THING,
     'tests/test_cite.py': ('# See DEVELOPER_NOTES "Engine constant\n'
                            '# sourcing" and DEVELOPER_NOTES "League facts: pokemon.LEAGUES"\n'
                            '# and DEVELOPER_NOTES "3. A numbered item".\n'
@@ -133,6 +160,9 @@ def test_citation_quote_styles_all_checked(tmp_path):
         'docs/b.md': 'DEVELOPER_NOTES “Section gone”\n',
         'docs/c.md': 'DEVELOPER_NOTES.md section "Section gone"\n',
         'docs/d.md': 'DEVELOPER_NOTES\'s "Section gone"\n',
+        'docs/e.md': 'see `DEVELOPER_NOTES.md` "Section gone"\n',
+        'scripts/f.py': '# see DEVELOPER_NOTES\n# "Section gone"\n',
+        'docs/g.md': 'DEVELOPER_NOTES, "Section gone"\n',
     }
     for rel, text in forms.items():
         fails, _ = vdn.run_checks(make_repo(tmp_path, **{rel: text}))
@@ -142,6 +172,25 @@ def test_citation_quote_styles_all_checked(tmp_path):
     good = {rel: t.replace('Section gone', 'PvPoke bugs found') for rel, t in forms.items()}
     fails, _ = vdn.run_checks(make_repo(tmp_path, **good))
     assert fails == []
+
+
+def test_string_literals_and_prefixed_names_are_not_citations(tmp_path):
+    repo = make_repo(tmp_path, **{
+        'scripts/lit.py': ('P = ROOT / "DEVELOPER_NOTES.md"\nQ = "other"\n'
+                           "R = ROOT / 'DEVELOPER_NOTES.md'\n"
+                           'MY_DEVELOPER_NOTES "Gone"\n'
+                           'docs/DEVELOPER_NOTES "Gone"\n')})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+
+
+def test_apostrophe_in_single_quoted_name_does_not_truncate(tmp_path):
+    # Would otherwise resolve "A numbered item" by accident; now skipped.
+    repo = make_repo(tmp_path, **{
+        'docs/x.md': "DEVELOPER_NOTES 'A numbered item's renamed bit'\n"})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+    assert not vdn._CITE_RE.search("DEVELOPER_NOTES 'A numbered item's renamed bit'")
 
 
 def test_wrapped_bold_item_is_an_anchor_but_fenced_hash_is_not(tmp_path):
@@ -155,10 +204,21 @@ def test_wrapped_bold_item_is_an_anchor_but_fenced_hash_is_not(tmp_path):
     assert len(fails) == 1 and 'docs/y.md' in fails[0]
 
 
+def test_unclosed_bold_item_does_not_swallow_next_paragraph():
+    anchors = vdn._anchors('## H\n\n**2. Item unclosed body\n\nPara two has **bold** words.\n')
+    assert not any('para two' in a for a in anchors)
+    assert vdn._anchors('**1. Real item.** x **bold** y **9. ** z **w**') == ['1. real item.']
+
+
+def test_tilde_fences_and_issue_numbers_are_not_headings():
+    assert vdn._anchors('~~~\n# fake heading\n~~~\n#378 wrapped issue ref\n## Real\n') == ['real']
+
+
 def test_match_is_on_word_boundaries(tmp_path):
-    repo = make_repo(tmp_path, **{'docs/x.md': 'DEVELOPER_NOTES "ugs fou"\n'})
-    fails, _ = vdn.run_checks(repo)
-    assert len(fails) == 1
+    for bad in ('ugs fou', 'gs found', '###'):
+        repo = make_repo(tmp_path, **{'docs/x.md': f'DEVELOPER_NOTES "{bad}"\n'})
+        fails, _ = vdn.run_checks(repo)
+        assert len(fails) == 1, bad
     repo = make_repo(tmp_path, **{'docs/x.md': 'DEVELOPER_NOTES "bugs found"\n'})
     fails, _ = vdn.run_checks(repo)
     assert fails == []
@@ -171,11 +231,22 @@ def test_outbound_missing_test_name_fails(tmp_path):
 
     notes = GOOD_NOTES.replace('::TestK::test_m`', '::TestK::test_gone`')
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
-    assert len(fails) == 1 and 'defines no `test_gone`' in fails[0]
+    assert len(fails) == 1 and 'defines no `TestK::test_gone`' in fails[0]
 
     notes = GOOD_NOTES.replace('::LIMIT`', '::NOPE`')
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     assert len(fails) == 1 and 'defines no `NOPE`' in fails[0]
+
+
+def test_member_check_uses_ast_scoping(tmp_path):
+    for bad in ('::TestK::test_elsewhere', '::test_in_docstring', '::FLAG', '::test_ok::nested'):
+        notes = GOOD_NOTES + f'`tests/test_thing.py{bad}`\n'
+        fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+        assert len(fails) == 1 and 'defines no' in fails[0], (bad, fails)
+    repo = make_repo(tmp_path)
+    (repo / 'tests' / 'test_thing.py').write_text('def broken(:\n')
+    fails, _ = vdn.run_checks(repo)
+    assert fails and all('does not parse' in f for f in fails)
 
 
 def test_outbound_missing_path_fails_but_userdata_warns(tmp_path):
@@ -194,10 +265,24 @@ def test_outbound_doc_citations(tmp_path):
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     assert len(fails) == 1 and 'CLAUDE.md "no such policy"' in fails[0]
 
-    # CHANGELOG citations must hit a HEADING, not body text.
+    # CLAUDE.md/TODO citations may hit body text...
+    notes = GOOD_NOTES.replace('"a human override\nalways wins"', '"a robot override\nalways wins"')
+    assert notes != GOOD_NOTES
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'CLAUDE.md "a robot override always wins"' in fails[0]
+
+    # ...but CHANGELOG citations must hit a HEADING.
     notes = GOOD_NOTES.replace('"2026-01-01 -- an archived entry"', '"not a heading"')
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     assert len(fails) == 1 and 'CHANGELOG' in fails[0] and 'headings' in fails[0]
+
+
+def test_own_section_citation_in_notes_is_checked(tmp_path):
+    notes = GOOD_NOTES.replace('Own section: DEVELOPER_NOTES "PvPoke bugs found"',
+                               'Own section: DEVELOPER_NOTES "Section gone"')
+    assert notes != GOOD_NOTES
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'its own section' in fails[0]
 
 
 def test_sentinel_duplicate_and_leak_fail(tmp_path):
@@ -220,16 +305,48 @@ def test_missing_sentinel_fails(tmp_path):
     assert [f for f in fails if f'sync:{k} appears 0x' in f]
 
 
-def test_unloadable_sibling_fails_rather_than_disabling_sentinel_check(tmp_path):
+def test_unloadable_or_empty_sibling_fails_rather_than_disabling_sentinel_check(tmp_path):
     notes = GOOD_NOTES.replace('<!-- sync:', '<!-- nosync:')  # every sentinel gone
     repo = make_repo(tmp_path, notes)
-    (repo / 'scripts' / 'verify_dev_counts.py').unlink()
+    sibling = repo / 'scripts' / 'verify_dev_counts.py'
+    sibling.unlink()
     fails, _ = vdn.run_checks(repo)
     assert len(fails) == 1 and 'sentinels:' in fails[0] and 'missing' in fails[0]
 
-    (repo / 'scripts' / 'verify_dev_counts.py').write_text('raise RuntimeError("boom")\n')
+    sibling.write_text('raise RuntimeError("boom")\n')
     fails, _ = vdn.run_checks(repo)
     assert len(fails) == 1 and 'could not load ALL_KEYS' in fails[0]
+
+    sibling.write_text('ALL_KEYS = set()\n')
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 1 and 'empty' in fails[0]
+
+
+def test_non_ascii_warns_and_bad_utf8_fails(tmp_path):
+    repo = make_repo(tmp_path, GOOD_NOTES + 'arrow → here\n')
+    fails, warns = vdn.run_checks(repo)
+    assert fails == [] and len(warns) == 1 and 'non-ASCII' in warns[0]
+    (repo / 'DEVELOPER_NOTES.md').write_bytes(GOOD_NOTES.encode() + b'\x92\n')
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 1 and 'UTF-8' in fails[0]
+
+
+def test_hook_exports_the_checkers_scan_paths():
+    hook = (REPO_ROOT / '.githooks' / 'pre-commit').read_text()
+    assert '--print-scan-paths' in hook
+    r = subprocess.run([sys.executable, str(SCRIPT), '--print-scan-paths'],
+                       capture_output=True, text=True, check=True)
+    assert r.stdout.split() == [*vdn.SCAN_FILES, *vdn.SCAN_DIRS, vdn.NOTES, vdn.CHANGELOG]
+
+
+def test_exit_codes_distinguish_drift_from_crash(tmp_path):
+    repo = make_repo(tmp_path, GOOD_NOTES + 'x' * vdn.CHAR_CAP)
+    r = subprocess.run([sys.executable, str(SCRIPT), '--quiet', '--repo-root', str(repo)],
+                       capture_output=True, text=True)
+    assert r.returncode == 2 and r.stdout == '' and 'size:' in r.stderr
+    r = subprocess.run([sys.executable, str(SCRIPT), '--repo-root', str(make_repo(tmp_path))],
+                       capture_output=True, text=True)
+    assert r.returncode == 0 and 'resolve' in r.stdout
 
 
 def test_real_repo_passes_and_scan_is_non_trivial():
@@ -241,14 +358,14 @@ def test_real_repo_passes_and_scan_is_non_trivial():
     resolved, files = 0, set()
     for p in vdn._iter_repo_files(REPO_ROOT):
         rel = p.relative_to(REPO_ROOT).as_posix()
-        if rel in ('DEVELOPER_NOTES.md', 'CHANGELOG.md') or rel in vdn.SELF_FILES:
+        if rel in vdn.SELF_FILES:
             continue
         text = vdn._read(p)
         for m in vdn._CITE_RE.finditer(text):
             if m.group(1) == 'DEVELOPER_NOTES' and vdn._resolves(vdn._cite_quote(m), anchors):
                 resolved += 1
                 files.add(rel)
-    # 2026-10-24: ~50 resolving citations across ~30 files; floors well below.
+    # 2026-10-24: 53 resolving citations across 32 files; floors well below.
     assert resolved >= 20, resolved
     assert len(files) >= 10, sorted(files)
     assert len(notes) <= vdn.CHAR_CAP
