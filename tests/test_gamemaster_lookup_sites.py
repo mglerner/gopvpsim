@@ -221,7 +221,12 @@ def test_duplicate_species_rows_agree_on_everything_the_battle_reads():
     for mon in gm['pokemon']:
         by_name.setdefault(mon['speciesName'], []).append(mon)
     dupes = {n: rows for n, rows in by_name.items() if len(rows) > 1}
-    assert dupes, 'expected the gamemaster to still carry duplicate rows'
+    if not dupes:
+        # PvPoke dropped the last duplicate rows in its 2026-10 gamemaster
+        # (first seen with the 2026-10-23 blob). With none left, FIRST and
+        # LAST are the same row and the conversion is trivially a no-op;
+        # the guard re-arms by itself if duplicates ever come back.
+        pytest.skip('gamemaster carries no duplicate speciesName rows')
     divergent = []
     for name, rows in sorted(dupes.items()):
         first, last = rows[0], rows[-1]
