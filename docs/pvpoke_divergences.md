@@ -114,19 +114,15 @@ the default since 2026-09-09.
    `formchange.MINIOR_HALF_LEVEL_STEP` switches to the half-level steps its
    site display uses. Neither matches every in-game reading yet, and we
    expect to revisit when the community settles the rule.)
-10. **Minior's shell-break animation does not shorten a fast move already in
-    flight.** PvPoke treats Minior's five-second Meteor -> Core animation
-    the way it treats a charged move: at the end of that turn both Pokemon's
-    cooldowns are set to half a second, so a two- or three-turn fast move
-    that was mid-animation completes a turn early with full damage and
-    energy. Ours lets the fast move run its full length. (The charged-move
-    half of that rule is years old and our turn model already matches it;
-    only the form-animation half is new, and only Minior has a form change
-    that plays one.) Where the two differ the margin is usually a few rating
-    points (Minior vs Lickitung 1-1: ours 403, PvPoke 408), occasionally a
-    winner (Minior vs Charjabug 1-1). Whether the game pauses for the
-    animation is not yet confirmed either way, so this one is under review
-    rather than decided (DEVELOPER_NOTES "Known divergences", class A).
+10. **Minior's shell-break animation and fast moves in flight -- RESOLVED
+    2026-10-24, we match PvPoke.** PvPoke treats Minior's five-second Meteor
+    -> Core animation the way it treats a charged move: at the end of that
+    turn both Pokemon's cooldowns are reset, so both may act again on the
+    next turn while a fast move already in flight still lands on its own
+    schedule. For a few hours we let the fast run and blocked the actor
+    until it landed; that was ported the same day (the charged-move half of
+    the rule is years old and was always matched). Pinned in
+    `tests/test_minior.py` (fix 5).
 
 We also deliberately do NOT replicate one block of PvPoke's decision code (its
 non-guaranteed-buff "needsBoost" plan selection): that code is disabled
