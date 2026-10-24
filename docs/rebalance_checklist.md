@@ -69,6 +69,13 @@ steps make either event a procedure instead of a scramble.
    (our strat is defined RELATIVE to pvpoke_dp).
 4. **Re-pin** `tests/fixtures/pvpoke_engine_digests.json` at the newly
    vetted commit, same commit as the re-vet record.
+5. **One adversarial "wrong claims" pass over DEVELOPER_NOTES** (an Opus
+   review reading the notes against the code at the new pvpoke commit,
+   hunting claims the code now contradicts). The 2026-10-24 trim found
+   three that had survived for months (charged-move resolution turn, a
+   deleted flag, a JS table row); `scripts/verify_dev_notes.py` catches
+   only pointer rot, never this. Record what it found, or "none", in the
+   DEVELOPER_NOTES "PvPoke re-vetting log" entry.
 
 Tone reminder for anything public that comes out of either event:
 warm toward PvPoke (memory: feedback-pvpoke-tone).

@@ -1,14 +1,14 @@
 <!-- DEVELOPER_NOTES is a session-startup read (see CLAUDE.md) and MUST stay
-small enough to read WHOLE in one shot: ~25k-token read cap at ~2.36
-chars/token, so keep `wc -c` under ~52k chars (~900 lines). When adding an
-entry, pair it with a trim or push dated root-cause prose to CHANGELOG -- a
-future session must not read half and think it read all. Shipped/dated
-history -> CHANGELOG; live invariants + open divergences -> here. The
-2026-10-24 trim archived the removed blocks and the long-form originals of
-the heavily condensed sections in CHANGELOG ("DEVELOPER_NOTES trimmed to its
-read-whole cap"); sections condensed in place have no archive block, so the
-complete pre-trim text is `git show 0829b5a:DEVELOPER_NOTES.md`. PvPoke JS
-line numbers are as of the pvpoke commit named in each entry. -->
+small enough to read WHOLE in one shot: under 52,000 chars (~900 lines).
+`scripts/verify_dev_notes.py` gates the cap and every pointer into or out
+of this file on every commit (.githooks/pre-commit).
+Shipped/dated history -> CHANGELOG; live invariants + open divergences ->
+here. An entry is: the RULE the code obeys, the PIN that fails if it stops
+(test or oracle cell), any PvPoke line ref WITH its pvpoke commit, and a
+CHANGELOG pointer for the story -- never the story. The 2026-10-24 trim's
+archive is CHANGELOG "DEVELOPER_NOTES trimmed to its read-whole cap";
+sections condensed in place have no archive block, so the complete pre-trim
+text is `git show 0829b5a:DEVELOPER_NOTES.md`. -->
 
 # Developer Notes
 
@@ -37,7 +37,7 @@ for the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3215<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3228<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
@@ -865,13 +865,10 @@ membership, and the panel (LAST in the payload's `builds` array, `col:
 null`). Every count it prints is a RETENTION on the preset's own scale.
 Round-by-round record: CHANGELOG.
 
-**Section-plot legend geometry** (two measured, undocumented Plotly 2.35.2
-facts behind `_wbFitLegend`): a horizontal legend's DRAWN height is capped at
-half the graph height, so size from `gd._fullLayout.legend._height`, not
-`rect.bg`; and `Plotly.react` does not re-read the graph div's height -- use
-`Plotly.relayout(gd, {autosize: true})` (setting `layout.height` kills
-responsive width). The invariant is the PLOT AREA (322-324px); the panel's
-height is what moves.
+**Section-plot legend geometry**: the measured Plotly 2.35.2 facts live as
+comments above `_wbLegendHeight` and `_wbFitLegend` in
+`scripts/deep_dive_engine.js`. The invariant is the PLOT AREA
+(`WB_PLOT_AREA`, 322-324px); the panel's height is what moves.
 
 ## Article lifecycle
 
