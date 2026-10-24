@@ -44,15 +44,19 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
               class / assignment at that position, resolved with ``ast`` and
               seeing through if/try/with blocks. A backticked path may wrap
               a line after ``::`` or inside an identifier at ``_``; a token
-              that starts with a scanned prefix but fits no path grammar
-              warns instead of being skipped silently.
+              that starts with a repo-path prefix but fits no path grammar
+              warns instead of being skipped silently (globs ``*``,
+              ``<placeholder>`` and ``{a,b}`` forms, and directories, are
+              skipped by design).
 
 NOT checked (so do not read a green run as "every pointer resolves"):
 unquoted prose references ("the re-dive entry"), ``file:line`` numbers in
 either direction, bare basenames (``battle.py``), directories (``docs/x/``),
 identifiers, commit SHAs, item numbers written outside the quotes, a second
 quoted item in the same sentence, curly SINGLE quotes, a single-quoted name
-containing an apostrophe (skipped, not mis-resolved), files outside
+containing an apostrophe (skipped, not mis-resolved), ``::member`` on a
+non-``.py`` path, globs / placeholders / brace forms / directories in
+backticks, files outside
 SCAN_DIRS/SCAN_FILES or with a suffix outside SCAN_SUFFIXES, and (in the
 hook, whose index export never holds the gitignored ``userdata/``) any
 ``userdata/`` path.
@@ -140,7 +144,9 @@ _PATH_RE = re.compile(
     r'^((?:' + '|'.join(_PATH_PREFIXES) + r')/[\w./-]+?\.(?:py|md|js|toml|json|'
     r'txt|sh|html|log|csv|cfg|ya?ml|gz|pkl))'
     r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]]*\])?(?:\s.*)?$', re.S)
-_BACKTICK_SPAN_RE = re.compile(r'`([^`\n][^`]*)`')
+# A span may wrap lines but not cross a blank line, so one stray backtick
+# cannot desynchronise every later span.
+_BACKTICK_SPAN_RE = re.compile(r'`([^`\n](?:[^`\n]|\n(?![ \t]*\n))*)`')
 # A fence opens with 3+ backticks or tildes (<= 3 spaces indent, optional
 # info string) and closes with the same char, at least as many, nothing else.
 _FENCE_RE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
@@ -246,11 +252,23 @@ def _flatten(body: list[ast.stmt]):
                 yield from _flatten(h.body)
 
 
+def _names(t: ast.expr) -> list[str]:
+    """Names BOUND by an assignment target: plain names and those inside
+    tuple/list/starred unpacking. `obj.attr = 1` and `a[0] = 1` bind nothing."""
+    if isinstance(t, ast.Name):
+        return [t.id]
+    if isinstance(t, (ast.Tuple, ast.List)):
+        return [n for e in t.elts for n in _names(e)]
+    if isinstance(t, ast.Starred):
+        return _names(t.value)
+    return []
+
+
 def _targets(node: ast.stmt) -> list[str]:
     if isinstance(node, ast.Assign):
-        return [e.id for t in node.targets for e in ast.walk(t) if isinstance(e, ast.Name)]
-    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-        return [node.target.id]
+        return [n for t in node.targets for n in _names(t)]
+    if isinstance(node, ast.AnnAssign):
+        return _names(node.target)
     return []
 
 
@@ -381,7 +399,7 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     for line_no, tok in _path_tokens(notes):
         m = _PATH_RE.match(tok)
         if not m:
-            if not re.search(r'[*<]|/$', tok):  # globs, placeholders, dirs: by design
+            if not re.search(r'[*<{]|/$', tok):  # globs, placeholders, braces, dirs: by design
                 warnings.append(f'outbound: {NOTES}:{line_no} backticked `{tok}` looks '
                                 f'like a repo path but fits no checked form (unchecked)')
             continue

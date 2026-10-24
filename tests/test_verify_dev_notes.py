@@ -51,7 +51,9 @@ CHANGELOG "2026-01-01 -- an archived entry". Pin: `tests/test_thing.py::test_ok`
 `tests/test_thing.py:12-14`, `tests/test_thing.py::TestK::test_m`,
 `tests/test_thing.py::test_ok[case-1]`, `tests/test_thing.py::LIMIT`,
 `tests/test_thing.py::ANN`, `tests/test_thing.py::test_async`,
-`scripts/tool.py --flag x`, `docs/notes.md::not_a_python_member`.
+`scripts/tool.py
+--flag x`, `docs/notes.md::not_a_python_member`, `tests/test_thing.py::test_
+ok`.
 Own section: DEVELOPER_NOTES "PvPoke bugs found". CLAUDE.md "a human override
 always wins" is a body phrase, not a heading.
 """
@@ -352,8 +354,11 @@ def test_exit_codes_distinguish_drift_from_crash(tmp_path):
 
 
 def test_real_repo_passes_and_scan_is_non_trivial():
-    fails, _warns = vdn.run_checks(REPO_ROOT)
+    fails, warns = vdn.run_checks(REPO_ROOT)
     assert fails == [], '\n'.join(fails)
+    # Every backticked repo path in the notes fits a checked form (pins the
+    # `::`/`_` line-wrap rejoin and the glob/placeholder suppressions).
+    assert not [w for w in warns if 'fits no checked form' in w], warns
 
     notes = (REPO_ROOT / 'DEVELOPER_NOTES.md').read_text()
     anchors = vdn._anchors(notes)
@@ -380,12 +385,13 @@ def test_wrapped_backticked_test_ref_is_checked(tmp_path):
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     assert len(fails) == 1 and 'test_gone' in fails[0], fails
     notes = GOOD_NOTES + '`tests/test_thing.py::test_ok[case]::extra`\n'
-    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
-    assert fails == []  # [case] consumed, no further member chain required
+    fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
+    assert fails == [] and len(warns) == 1 and 'fits no checked form' in warns[0]
 
 
 def test_unparseable_path_like_token_warns(tmp_path):
-    notes = GOOD_NOTES + '`tests/test_thing.py::1bad` `docs/validations/` `articles/*.toml`\n'
+    notes = (GOOD_NOTES + '`tests/test_thing.py::1bad` `docs/validations/` `articles/*.toml` '
+             '`userdata/<slug>.log` `userdata/x.{sh,log}`\n')
     fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
     assert fails == []
     assert len(warns) == 1 and 'fits no checked form' in warns[0] and '1bad' in warns[0]
@@ -416,15 +422,51 @@ def test_fences_long_indented_and_mixed_markers():
     text = ('````md\n```\n# leaked\n```\n````\n'
             '  ```python\n# leaked2\n```\n'
             '~~~\n# leaked3\n```\n~~~\n'
+            '```\n```python\n# leaked4: an info string cannot close a fence\n```\n'
             '## Real\n')
     assert vdn._anchors(text) == ['real']
 
 
+def test_markdown_heading_after_mention_is_not_a_citation(tmp_path):
+    repo = make_repo(tmp_path, **{'docs/x.md': '# see DEVELOPER_NOTES\n## "Section gone"\n'})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+
+
+def test_stray_backtick_does_not_hide_later_refs(tmp_path):
+    notes = GOOD_NOTES + 'a stray ` here\n\n`tests/test_thing.py::test_gone`\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'test_gone' in fails[0]
+
+
+def test_attribute_and_subscript_assignments_bind_nothing(tmp_path):
+    src = 'obj = object()\nobj.attr = 1\na = [0]\na[0] = 1\nd = {}\nd[k] = 1\n'
+    for bad in ('attr', 'k'):
+        repo = make_repo(tmp_path, GOOD_NOTES + f'`tests/test_bind.py::{bad}`\n',
+                         **{'tests/test_bind.py': src})
+        fails, _ = vdn.run_checks(repo)
+        assert len(fails) == 1 and f'defines no `{bad}`' in fails[0], (bad, fails)
+    repo = make_repo(tmp_path, GOOD_NOTES + '`tests/test_bind.py::obj` `tests/test_bind.py::a`\n',
+                     **{'tests/test_bind.py': src})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+
+
+def test_drift_exit_is_shared_with_the_sibling_and_the_hook():
+    hook = (REPO_ROOT / '.githooks' / 'pre-commit').read_text()
+    assert vdn.DRIFT_EXIT == _vdc.DRIFT_EXIT == 3
+    assert hook.count(f'$rc -eq {vdn.DRIFT_EXIT} ]]') == 2  # steps 3 and 2
+
+
 def test_member_check_scoping_and_blocks(tmp_path):
     src = ('import typing\nif typing.TYPE_CHECKING:\n    def under_if(): pass\n'
-           'try:\n    A, B = 1, 2\nexcept Exception:\n    pass\n'
+           'else:\n    IN_ELSE = 1\n'
+           'try:\n    A, B = 1, 2\nexcept ImportError:\n    FALLBACK = 1\nfinally:\n    FIN = 2\n'
+           'with open(__file__):\n    def under_with(): pass\n'
            'class K:\n    def meth(self): pass\n')
     repo = make_repo(tmp_path, GOOD_NOTES + '`tests/test_blocks.py::under_if` `tests/test_blocks.py::B` '
+                     '`tests/test_blocks.py::IN_ELSE` `tests/test_blocks.py::FALLBACK` '
+                     '`tests/test_blocks.py::FIN` `tests/test_blocks.py::under_with` '
                      '`tests/test_blocks.py::K::meth`\n', **{'tests/test_blocks.py': src})
     fails, _ = vdn.run_checks(repo)
     assert fails == []

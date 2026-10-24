@@ -85,8 +85,9 @@ PLAUSIBILITY_KEYS = {
 }
 ALL_KEYS = DERIVABLE_KEYS | PLAUSIBILITY_KEYS
 
-# Exit code for drift. Distinct from 1 (a Python traceback) and 2 (an
-# argparse usage error) so the pre-commit hook can tell drift from a crash.
+# Exit code for drift. Distinct from 1 (a Python traceback, or a derivation
+# that could not run: no pytest/certifi) and 2 (an argparse usage error) so
+# the pre-commit hook can tell drift from a crash.
 DRIFT_EXIT = 3
 
 
@@ -224,14 +225,15 @@ def main() -> int:
         ('type_chart_cells_verified', _derive_type_chart_cells),
     )
     dirty = False
+    derive_failures: list[str] = []
     for key, derive in derivers:
         if key not in sentinels:
             continue
         val = sentinels[key]
         try:
             live = derive()
-        except Exception as exc:  # pragma: no cover - environmental
-            problems.append(f'{key}: derivation failed ({exc})')
+        except Exception as exc:  # noqa: BLE001 - environmental (no pytest, no certifi)
+            derive_failures.append(f'{key}: derivation failed ({exc})')
             continue
         if val == live:
             if not args.quiet:
@@ -259,6 +261,16 @@ def main() -> int:
     if unknown and not args.quiet:
         for key in sorted(unknown):
             print(f'  {key}: {sentinels[key]} (unknown key, not verified)')
+
+    if derive_failures:
+        # Not drift: the live value could not be computed at all (missing
+        # pytest/certifi, a collection error). Exit 1 so the pre-commit hook
+        # reports an environment problem rather than a stale sentinel.
+        print('\nERROR: dev-count derivation failed (environment, not drift):',
+              file=sys.stderr)
+        for d in derive_failures:
+            print(f'  - {d}', file=sys.stderr)
+        return 1
 
     if problems:
         print('\nERROR: dev-count drift detected:', file=sys.stderr)
