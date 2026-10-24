@@ -256,23 +256,18 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     s1 = PokeSpec('lapras', level=pb.level, ivs=(15, 15, 15),
                   fast='PSYWAVE', charged=['SPARKLING_ARIA', 'ICE_BEAM'])
     url = sandbox_url(2500, s0, s1, (1, 1), acts)
-    # ENGINE-level round trip (one simulate()): the encoder's contract.
-    got = verify_url(url, page=False)
+    # PAGE-level (what pvpoke.com displays) == the sim. Until PvPoke's
+    # 2026-09-27 "Sandbox mode fix" (e87448291, which clears
+    # previousTurnActions in Battle.start) the page's second run of a
+    # sandbox link read 446 / HP [0, 24], a LOSS, and this test pinned that
+    # value with a page=False engine-only split to isolate the encoder
+    # (docs/pvpoke_bug_reports.md Report 9). The split went 2026-10-24 when
+    # the page started replaying the single-run result.
+    got = verify_url(url)
     assert (round(got['score'][0]), got['hp'], got['shields']) == (
         662, [51, 0], [0, 0]), (
         f'the link does not replay the sim (662 / [51, 0]): {url}')
     assert round(got['score'][0]) == r.pvpoke_score(0)
-    # PAGE-level (what pvpoke.com shows, verified in a browser 2026-09-12):
-    # 446, a LOSS. Upstream bug -- the page simulates a sandbox link twice
-    # and Pokemon.reset() never clears hasActed, so Cramorant (who acted on
-    # run 1's KO turn) loses its turn-1 action in run 2 and every scripted
-    # Cramorant action lands off-parity. Pinned so a PvPoke fix is noticed:
-    # when this assertion fails with 662, delete it and the page=False
-    # split above (docs/pvpoke_bug_reports.md Report 9).
-    page = verify_url(url)
-    assert (round(page['score'][0]), page['hp']) == (446, [0, 24]), (
-        'pvpoke.com now replays this link differently -- did they fix '
-        f'hasActed? got {page["score"][0]} {page["hp"]}')
 
     # POSITIVE CONTROL: the replay must actually be driven by our action
     # script, not merely coincide with PvPoke's own AI. Corrupt one REAL
@@ -287,7 +282,7 @@ def test_cancelled_charged_sandbox_replays_the_same_fight():
     # that it changes THIS fight would now be asserting something false.
     dropped = url.replace('25.101100-', '')
     assert dropped != url, f'the turn-25 Fly is missing from {url}'
-    without_fly = verify_url(dropped, page=False)
+    without_fly = verify_url(dropped)
     assert (round(without_fly['score'][0]), without_fly['hp']) != (
         round(got['score'][0]), got['hp']), (
         'dropping a real action changed nothing -- the replay is not being '
