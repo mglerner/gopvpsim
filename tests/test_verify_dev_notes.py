@@ -343,7 +343,9 @@ def test_exit_codes_distinguish_drift_from_crash(tmp_path):
     repo = make_repo(tmp_path, GOOD_NOTES + 'x' * vdn.CHAR_CAP)
     r = subprocess.run([sys.executable, str(SCRIPT), '--quiet', '--repo-root', str(repo)],
                        capture_output=True, text=True)
-    assert r.returncode == 2 and r.stdout == '' and 'size:' in r.stderr
+    assert r.returncode == vdn.DRIFT_EXIT == 3 and r.stdout == '' and 'size:' in r.stderr
+    r = subprocess.run([sys.executable, str(SCRIPT), '--bogus-flag'], capture_output=True, text=True)
+    assert r.returncode == 2  # argparse; must never collide with DRIFT_EXIT
     r = subprocess.run([sys.executable, str(SCRIPT), '--repo-root', str(make_repo(tmp_path))],
                        capture_output=True, text=True)
     assert r.returncode == 0 and 'resolve' in r.stdout
@@ -369,3 +371,81 @@ def test_real_repo_passes_and_scan_is_non_trivial():
     assert resolved >= 20, resolved
     assert len(files) >= 10, sorted(files)
     assert len(notes) <= vdn.CHAR_CAP
+
+
+# --- round-3 pins -----------------------------------------------------------
+
+def test_wrapped_backticked_test_ref_is_checked(tmp_path):
+    notes = GOOD_NOTES + '`tests/test_thing.py::\ntest_ok` and `tests/test_thing.py::\ntest_gone`\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'test_gone' in fails[0], fails
+    notes = GOOD_NOTES + '`tests/test_thing.py::test_ok[case]::extra`\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert fails == []  # [case] consumed, no further member chain required
+
+
+def test_unparseable_path_like_token_warns(tmp_path):
+    notes = GOOD_NOTES + '`tests/test_thing.py::1bad` `docs/validations/` `articles/*.toml`\n'
+    fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
+    assert fails == []
+    assert len(warns) == 1 and 'fits no checked form' in warns[0] and '1bad' in warns[0]
+
+
+def test_citation_pairs_across_at_most_one_newline(tmp_path):
+    repo = make_repo(tmp_path, **{
+        'docs/x.md': 'end of a paragraph about DEVELOPER_NOTES\n\n\n"Unrelated quote three paras later"\n',
+        'scripts/y.js': '// DEVELOPER_NOTES\n// "Section gone"\n',
+        'docs/z.md': 'see `DEVELOPER_NOTES.md` \u00a7"Section gone"\n'})
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 2 and all('Section gone'.lower() in f for f in fails), fails
+
+
+def test_single_quote_needs_whitespace_before_it(tmp_path):
+    repo = make_repo(tmp_path, **{'docs/x.md': "DEVELOPER_NOTES.md'Gone section'\n"})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+
+
+def test_right_word_boundary(tmp_path):
+    repo = make_repo(tmp_path, **{'docs/x.md': 'DEVELOPER_NOTES "bugs fou"\n'})
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 1
+
+
+def test_fences_long_indented_and_mixed_markers():
+    text = ('````md\n```\n# leaked\n```\n````\n'
+            '  ```python\n# leaked2\n```\n'
+            '~~~\n# leaked3\n```\n~~~\n'
+            '## Real\n')
+    assert vdn._anchors(text) == ['real']
+
+
+def test_member_check_scoping_and_blocks(tmp_path):
+    src = ('import typing\nif typing.TYPE_CHECKING:\n    def under_if(): pass\n'
+           'try:\n    A, B = 1, 2\nexcept Exception:\n    pass\n'
+           'class K:\n    def meth(self): pass\n')
+    repo = make_repo(tmp_path, GOOD_NOTES + '`tests/test_blocks.py::under_if` `tests/test_blocks.py::B` '
+                     '`tests/test_blocks.py::K::meth`\n', **{'tests/test_blocks.py': src})
+    fails, _ = vdn.run_checks(repo)
+    assert fails == []
+    # A method named without its class must NOT resolve at module level.
+    repo = make_repo(tmp_path, GOOD_NOTES + '`tests/test_blocks.py::meth`\n', **{'tests/test_blocks.py': src})
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 1 and 'defines no `meth`' in fails[0]
+
+
+def test_gitignore_is_scanned(tmp_path):
+    repo = make_repo(tmp_path, **{'.gitignore': '# see DEVELOPER_NOTES "Section gone"\n'})
+    fails, _ = vdn.run_checks(repo)
+    assert len(fails) == 1 and '.gitignore:1' in fails[0]
+
+
+def test_real_repo_outbound_floors():
+    notes = (REPO_ROOT / 'DEVELOPER_NOTES.md').read_text()
+    paths = [tok for _, tok in vdn._path_tokens(notes) if vdn._PATH_RE.match(tok)]
+    members = [tok for tok in paths if '::' in tok]
+    doc_cites = [m for m in vdn._CITE_RE.finditer(notes) if m.group(1) != 'DEVELOPER_NOTES']
+    # 2026-10-24: 69 paths, 7 member refs, 5 doc citations; floors well below.
+    assert len(paths) >= 30, len(paths)
+    assert len(members) >= 4, members
+    assert len(doc_cites) >= 3, len(doc_cites)

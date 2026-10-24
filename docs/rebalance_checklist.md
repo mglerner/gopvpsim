@@ -75,9 +75,10 @@ steps make either event a procedure instead of a scramble.
    at least three, two of them months old (charged-move resolution turn,
    a deleted flag, a JS table row); `scripts/verify_dev_notes.py` catches
    only pointer rot, never this. In the same pass re-anchor the notes'
-   bare PvPoke line refs into the four tripwire files to the new pin (a
-   ref into a UI file is outside the tripwire and must carry its own
-   hash, since nothing here ever re-checks it). Record what it found, or
+   bare PvPoke line refs into the four tripwire files (the `digests` keys
+   of `tests/fixtures/pvpoke_engine_digests.json`) to the new pin; a ref
+   into any other PvPoke file is outside the tripwire and must carry its
+   own hash, since nothing here ever re-checks it. Record what it found, or
    "none", in the DEVELOPER_NOTES "PvPoke re-vetting log" entry.
 
 Tone reminder for anything public that comes out of either event:

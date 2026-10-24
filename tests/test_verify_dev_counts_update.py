@@ -152,7 +152,7 @@ def test_without_update_drift_is_still_a_gate(mod, tmp_path, monkeypatch,
     rc = _run(mod, monkeypatch, notes, [], live_test_count=1740)
     err = capsys.readouterr().err
 
-    assert rc == 1
+    assert rc == 3  # DRIFT_EXIT, distinct from a crash (1) or usage error (2)
     assert 'test_count: sentinel 1733 != live 1740' in err
     assert notes.read_bytes() == before
 
@@ -179,7 +179,7 @@ def test_update_never_touches_non_derivable_keys(mod, tmp_path, monkeypatch,
     rc = _run(mod, monkeypatch, notes, ['--update'], live_test_count=1740)
     captured = capsys.readouterr()
 
-    assert rc == 1
+    assert rc == 3  # DRIFT_EXIT, distinct from a crash (1) or usage error (2)
     assert ('pvpoke_bugs_documented: implausible sentinel value 0'
             in captured.err)
     text = notes.read_text()
@@ -198,7 +198,7 @@ def test_update_missing_derivable_sentinel_still_fails(mod, tmp_path,
     err = capsys.readouterr().err
 
     # --update rewrites sentinels; it does not invent missing ones.
-    assert rc == 1
+    assert rc == 3  # DRIFT_EXIT, distinct from a crash (1) or usage error (2)
     assert 'missing sentinel: sync:test_count' in err
     assert '1740' not in notes.read_text()
 
@@ -235,7 +235,7 @@ def test_update_reports_a_malformed_sentinel_instead_of_eating_prose(
     rc = _run(mod, monkeypatch, notes, ['--update'], live_test_count=1766)
     err = capsys.readouterr().err
 
-    assert rc == 1
+    assert rc == 3  # DRIFT_EXIT, distinct from a crash (1) or usage error (2)
     assert 'could not rewrite sentinel' in err
     # Nothing between the orphaned opener and the next key was touched.
     assert notes.read_text() == before

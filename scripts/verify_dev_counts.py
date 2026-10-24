@@ -85,6 +85,10 @@ PLAUSIBILITY_KEYS = {
 }
 ALL_KEYS = DERIVABLE_KEYS | PLAUSIBILITY_KEYS
 
+# Exit code for drift. Distinct from 1 (a Python traceback) and 2 (an
+# argparse usage error) so the pre-commit hook can tell drift from a crash.
+DRIFT_EXIT = 3
+
 
 def _parse_sentinels(text: str) -> dict[str, int]:
     """Extract sentinel keys from DEVELOPER_NOTES.md as ints.
@@ -266,7 +270,7 @@ def main() -> int:
             'or adjust the derivation in scripts/verify_dev_counts.py '
             "if the metric's definition has changed.",
             file=sys.stderr)
-        return 1
+        return DRIFT_EXIT
 
     if not args.quiet:
         print('\nAll dev-count sentinels verified.')
