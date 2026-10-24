@@ -72,10 +72,11 @@ steps make either event a procedure instead of a scramble.
 5. **One adversarial "wrong claims" pass over DEVELOPER_NOTES** (an Opus
    review reading the notes against the code at the new pvpoke commit,
    hunting claims the code now contradicts). The 2026-10-24 trim found
-   three that had survived for months (charged-move resolution turn, a
-   deleted flag, a JS table row); `scripts/verify_dev_notes.py` catches
-   only pointer rot, never this. Record what it found, or "none", in the
-   DEVELOPER_NOTES "PvPoke re-vetting log" entry.
+   at least three, two of them months old (charged-move resolution turn,
+   a deleted flag, a JS table row); `scripts/verify_dev_notes.py` catches
+   only pointer rot, never this. In the same pass re-anchor the notes'
+   bare PvPoke line refs to the new pin. Record what it found, or "none",
+   in the DEVELOPER_NOTES "PvPoke re-vetting log" entry.
 
 Tone reminder for anything public that comes out of either event:
 warm toward PvPoke (memory: feedback-pvpoke-tone).
