@@ -929,14 +929,13 @@ def _calc_turns_to_live(
     atk_fast_turns    = attacker.fast_move.get('_turns', 1)
     wins_cmp          = attacker.cmp_atk >= defender.cmp_atk
 
-    # Build initial state.
-    # In our timing model, fast moves with D ≤ 2 always land before the action-
-    # decision phase, so _queued_fast is None.  For D ≥ 3 moves, compute the
-    # PvPoke-equivalent cooldown: defender.cooldown turns remaining (= D − k,
-    # where k turns have already elapsed).  The fast move lands after
-    # defender.cooldown − 1 more turns, but the DP turn offset uses the full
-    # defender.cooldown to match PvPoke's `opponent.cooldown / 500`.
-    if defender._queued_fast is not None:
+    # Build initial state (ActionLogic.js:45-56): PvPoke keys on
+    # `opponent.cooldown != 0`, NOT on whether a fast is in flight. The two
+    # agree in normal flow (a landing fast still shows cooldown 1 at decision
+    # time) and differ only after the Minior form-animation cooldown reset
+    # (Battle.js:548), when a fast is in flight at cooldown 0 and PvPoke's
+    # TTL ignores it. Our `defender.cooldown` is in turns, = PvPoke's / 500.
+    if defender.cooldown > 0:
         initial = (attacker.hp - opp_fast_damage,
                    min(ENERGY_CAP, defender.energy + opp_fast_energy),
                    defender.cooldown,
@@ -1304,8 +1303,14 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
     if attacker.hp <= opp_fast_dmg:
         return False
 
-    # Throwing a fast move would overflow energy past 100
-    if attacker.energy + attacker.fast_move.get('energyGain', 0) > ENERGY_CAP:
+    # Throwing a fast move would overflow energy past 100. PvPoke
+    # (ActionLogic.js:301-313) counts the attacker's OWN fast moves still in
+    # the action queue plus the one being considered; in normal flow that
+    # queue is empty at decision time, so this is 1 -- it is 2 only after the
+    # Minior form-animation cooldown reset let us act mid-fast.
+    _own_queued = len(attacker._queued_fasts) + 1
+    if (attacker.energy
+            + attacker.fast_move.get('energyGain', 0) * _own_queued > ENERGY_CAP):
         return False
 
     # Turns planned vs turns to live. PvPoke (ActionLogic.js:305) divides
@@ -1862,14 +1867,14 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         turns_to_live -= 1
 
     if (attacker.hp <= opp_fast_damage
-            and defender._queued_fast is not None
+            and defender.cooldown > 0          # PvPoke: opponent.cooldown > 0
             and opp_fast_cd > 500):
         turns_to_live = defender.cooldown      # PvPoke: opponent.cooldown / 500
         if defender.hp > fast_damage:
             turns_to_live -= 1
 
     if (attacker.hp <= opp_fast_damage
-            and defender._queued_fast is None
+            and defender.cooldown == 0         # PvPoke: opponent.cooldown == 0
             and opp_fast_cd <= atk_fast_cd + 500):
         if defender.hp > fast_damage:
             turns_to_live -= 1
@@ -2848,8 +2853,11 @@ class BattlePokemon:
     energy:             int   = field(init=False)
     cooldown:           int   = field(init=False)   # turns remaining
     _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
-    # Queued fast move: (queued_on_turn, move_dict) or None
-    _queued_fast:    "tuple[int, dict] | None" = field(init=False, repr=False)
+    # In-flight multi-turn fast moves: [(queued_on_turn, move_dict), ...].
+    # Normally at most one; two after Minior's form-animation cooldown reset
+    # (Battle.js:548 lets a Pokemon act again while its fast is still in
+    # flight, so a 4-turn Volt Switch can overlap the next action).
+    _queued_fasts:   list = field(init=False, repr=False)
     # Stat stages: each in [-4, +4]
     atk_stage: int = field(init=False, repr=False)
     def_stage: int = field(init=False, repr=False)
@@ -2930,7 +2938,7 @@ class BattlePokemon:
         self.energy            = min(ENERGY_CAP, max(0, self.initial_energy))
         self.cooldown          = 0
         self._fm_since_charge  = 0
-        self._queued_fast      = None
+        self._queued_fasts     = []
         self.atk_stage         = self.initial_atk_stage
         self.def_stage         = self.initial_def_stage
         if self.raw_atk is None:
@@ -3104,7 +3112,7 @@ class BattlePokemon:
         self.shields = shields
         self.cooldown = 0
         self._fm_since_charge = 0
-        self._queued_fast = None
+        self._queued_fasts = []
         self.atk_stage = self.initial_atk_stage
         self.def_stage = self.initial_def_stage
         self._buff_apply_meters = {}
@@ -4106,39 +4114,41 @@ def simulate(
         # other's pre-queuing state at decision time. Implemented in three
         # phases:
         #
-        # Phase A -- detect fast-move landings (but keep _queued_fast set so
+        # Phase A -- detect fast-move landings (but keep _queued_fasts set so
         #   the turnsToLive DP can see in-flight FMs during decisions).
         # Phase B -- collect decisions (no state mutation; each pokemon sees
         #   the other's cooldown/energy BEFORE any new queuing this turn).
         # Phase C -- apply decisions and clear landed-FM state.
         charged_actions = []   # list of (actor_index, move_dict)
         fast_landings   = []   # fast moves that land this turn
-        _fired_fast     = []   # indices of pokemon whose queued FM fires now
+        _fired_fast     = []   # (pokemon index, queued entry) of FMs firing now
         _fast_queued_turn = {} # actor_index -> turn its landing FM was queued
 
         # Phase A: mark FMs that land this turn (added to fast_landings).
-        # _queued_fast is intentionally NOT cleared here; it stays set so
+        # _queued_fasts is intentionally NOT cleared here; it stays set so
         # that Phase B decision-making can observe the in-flight state.
         for i, p in enumerate(pokemon):
-            if p._queued_fast is not None:
-                queued_turn, qmove = p._queued_fast
+            for entry in p._queued_fasts:
+                queued_turn, qmove = entry
                 duration = qmove['_turns']
                 if (turn - queued_turn) >= duration - 1:
                     fast_landings.append((i, qmove))
-                    _fired_fast.append(i)
+                    _fired_fast.append((i, entry))
                     _fast_queued_turn[i] = queued_turn
 
         # Phase B: collect decisions; no state changes yet.
-        # Each pokemon with cooldown==0 AND no pending multi-turn FM decides.
-        # Note: pokemon whose FM fired in Phase A still have _queued_fast set
-        # and cooldown > 0, so they cannot decide this turn (correct: the FM
-        # fires in step 3 and only then is their cooldown reset to 0).
+        # PvPoke's gate (Battle.js:732) is `poke.cooldown == 0`, nothing
+        # about in-flight fast moves: a pokemon whose multi-turn FM fires in
+        # Phase A still shows cooldown 1 here, so in normal flow it cannot
+        # decide until the turn after the landing. The one way to decide
+        # WITH a fast in flight is the Minior form-animation cooldown reset
+        # (end of turn, below), which is exactly what PvPoke does there.
         _pending: list = []   # (i, 'charged'|'fast_1'|'fast_multi', data)
         for i, p in enumerate(pokemon):
             opponent = pokemon[1 - i]
             charged_pol, _ = policies[i]
 
-            if p.cooldown == 0 and p._queued_fast is None:
+            if p.cooldown == 0:
                 move_idx = charged_pol(p, opponent, mechanics=mechanics)
                 if move_idx is not None:
                     _pending.append((i, 'charged', move_idx))
@@ -4159,9 +4169,9 @@ def simulate(
             _policy_log.clear()
 
         # Phase C: apply decisions and clear fired-FM state.
-        # Clear _queued_fast only for FMs that fired in Phase A.
-        for i in _fired_fast:
-            pokemon[i]._queued_fast = None
+        # Drop only the entries that fired in Phase A.
+        for i, entry in _fired_fast:
+            pokemon[i]._queued_fasts.remove(entry)
 
         for i, action_type, data in _pending:
             p = pokemon[i]
@@ -4175,7 +4185,7 @@ def simulate(
                 _fast_queued_turn[i] = turn
                 p.cooldown = 1   # blocks re-acting until next turn
             else:   # 'fast_multi'
-                p._queued_fast = (turn, data)
+                p._queued_fasts.append((turn, data))
                 p.cooldown = data['_turns']
 
         # --- 2.5 (mechanics=='new' ONLY) Resolve charged moves FIRST ---
@@ -4229,6 +4239,7 @@ def simulate(
             # cells were 5-23 points off until this; the Minior-as-p1 cells
             # matched because its own landing was already applied.)
             fast_landings.sort(key=lambda ia: (_fast_queued_turn[ia[0]], ia[0]))
+            _round_form_animation = False
             _fast_results = []   # (defender_idx, dmg, attacker_idx, energy)
             for actor_idx, move in fast_landings:
                 attacker = pokemon[actor_idx]
@@ -4248,7 +4259,11 @@ def simulate(
                 defender = pokemon[defender_idx]
                 attacker.energy = min(ENERGY_CAP, attacker.energy + energy_gain)
                 defender.hp = max(0, defender.hp - dmg)
-                attacker.cooldown = 0
+                # No `attacker.cooldown = 0` here (the legacy branch keeps
+                # it): a landing fast always sits at cooldown 1, which the
+                # next turn's decrement takes to 0 anyway -- and after the
+                # form-animation reset the attacker may have queued a NEW
+                # action this turn whose cooldown this would wipe.
                 attacker._fm_since_charge += 1
                 if log:
                     log_event(
@@ -4258,6 +4273,7 @@ def simulate(
                 # Form change: hp threshold -- PvPoke's useMove runs it for
                 # fast damage too (Minior flips to Core off a fast hit).
                 if _apply_hp_form_trigger(defender, attacker):
+                    _round_form_animation = True
                     if log:
                         log_event(f"{defender.species} changed form (hp)")
                     for j in range(k + 1, len(_fast_results)):
@@ -4311,7 +4327,7 @@ def simulate(
         # only -- queuedActions is never cleared by a charged move in simulate mode.
         if charged_actions:
             for i, p in enumerate(pokemon):
-                if p._queued_fast is not None:
+                for _entry in list(p._queued_fasts):
                     # Only fire if the pokemon survived (if killed by charged move,
                     # PvPoke marks faintSource="charged" and the fast is invalid).
                     if p.hp > 0:
@@ -4345,8 +4361,21 @@ def simulate(
                                 log_event(f"{defender.species} changed form (hp)")
             for p in pokemon:
                 p.cooldown = 0
-                p._queued_fast = None
+                p._queued_fasts = []
                 p._fm_since_charge = 0
+        elif mechanics == 'new' and _round_form_animation:
+            # Battle.js:548 `if(roundChargedMoveUsed || roundFormAnimation)
+            # poke.cooldown = 500` -- the form-animation arm (new in pvpoke
+            # 4d2908fac; `roundFormAnimation` is set only by the hp-trigger
+            # change, Battle.js:1668, so this is Minior's Meteor -> Core flip
+            # off a fast hit). PvPoke treats the 5000 ms animation as a
+            # battle pause like a charged move: BOTH Pokemon may act again
+            # next turn, while a fast already in flight still lands on its
+            # own schedule (queue processing keys on the action's turn, not
+            # on cooldown). A flip off a charged hit takes the charged arm
+            # above. 500 ms = 1 turn here. Ported 2026-10-24 (class A).
+            for p in pokemon:
+                p.cooldown = 1
 
         # --- 5. Check for faint ---
         # No 'new'-mode special case here any more. The old deferral model
