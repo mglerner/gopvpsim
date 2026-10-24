@@ -52,6 +52,11 @@ SHIP_GATES = (
     # sentinel is a public wrong number. Wired in 2026-08-06 after the
     # final gate found it uncalled anywhere and a month stale.
     ('verify_dev_counts.py', ('--quiet',)),
+    # DEVELOPER_NOTES read-whole cap + pointer integrity. Already covered
+    # by verify_tests.py (tests/test_verify_dev_notes.py runs the real
+    # repo), but as a named gate a failure says what it is instead of
+    # surfacing as one red pytest line. Wired 2026-10-24.
+    ('verify_dev_notes.py', ('--quiet',)),
     # Worlds 2026 surfaces: gate REMOVED from the roster 2026-08-31.
     # Worlds ran 2026-08-28..30. The shipped pages are frozen at engine
     # 5839391a7596 / gamemaster 8f1d6cca5c0f / worlds_code c1395dfa10b9,

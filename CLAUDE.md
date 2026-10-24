@@ -479,8 +479,12 @@ Claude-drafted prose. When drafting for these blocks:
    fighting the templates.
 
 The `.githooks/pre-commit` hook enforces this by rejecting any
-commit that leaves `authored_by = "ai"` in a ship-tracked TOML. To
-activate the hook, run once per clone:
+commit that leaves `authored_by = "ai"` in a ship-tracked TOML. The same
+hook also gates the DEVELOPER_NOTES dev-count sentinels
+(`scripts/verify_dev_counts.py`) and, on every commit, the notes' size
+cap and pointer integrity (`scripts/verify_dev_notes.py`, run against
+the index); it uses `.venv/bin/python` directly, so it works from GUI
+git clients without direnv. To activate the hook, run once per clone:
 
     git config core.hooksPath .githooks
 

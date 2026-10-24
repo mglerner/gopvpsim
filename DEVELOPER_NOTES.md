@@ -1,14 +1,15 @@
 <!-- DEVELOPER_NOTES is a session-startup read (see CLAUDE.md) and MUST stay
 small enough to read WHOLE in one shot: under 52,000 chars (~900 lines).
-`scripts/verify_dev_notes.py` gates the cap and every pointer into or out
-of this file on every commit (.githooks/pre-commit).
+`scripts/verify_dev_notes.py` (pre-commit, every commit) gates the cap and
+checks quoted section citations of this file, plus its backticked repo
+paths and test refs -- not prose refs or file:line numbers.
 Shipped/dated history -> CHANGELOG; live invariants + open divergences ->
 here. An entry is: the RULE the code obeys, the PIN that fails if it stops
-(test or oracle cell), any PvPoke line ref WITH its pvpoke commit, and a
-CHANGELOG pointer for the story -- never the story. The 2026-10-24 trim's
-archive is CHANGELOG "DEVELOPER_NOTES trimmed to its read-whole cap";
-sections condensed in place have no archive block, so the complete pre-trim
-text is `git show 0829b5a:DEVELOPER_NOTES.md`. -->
+(test or oracle cell), any PvPoke line ref WITH its pvpoke commit (a bare
+ref is as of the latest re-vetting-log pin), and a CHANGELOG pointer for
+the story -- never the story. The 2026-10-24 trim's
+archive is CHANGELOG "DEVELOPER_NOTES trimmed to its read-whole cap"; the
+complete pre-trim text is `git show 0829b5a:DEVELOPER_NOTES.md`. -->
 
 # Developer Notes
 
@@ -37,7 +38,7 @@ for the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3228<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3237<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
@@ -858,8 +859,7 @@ least `WIDE_MIN_FACTOR` (2x) its size, and (3) carries a rule at the fidelity
 the table prints; ranked among those on how many of the preset's OUTSIDE
 standouts it holds, then guaranteed cells, then size. Clauses 1 and 3 are
 FILTERS, not ranking terms. It lives at `bl['wide']`, NOT in `bl['builds']`,
-so the objectives line, card set, nearest-build search and UpSet columns
-keep seeing two or three builds; the opt-in surfaces are the table row and
+so build-count consumers keep seeing two or three builds; the opt-in surfaces are the table row and
 paragraph under Build 1's, the collapsed summary clause, the standouts'
 membership, and the panel (LAST in the payload's `builds` array, `col:
 null`). Every count it prints is a RETENTION on the preset's own scale.

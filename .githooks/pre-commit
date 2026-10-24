@@ -6,13 +6,49 @@
 #      (scripts/verify_dev_counts.py; see Task 1 in the
 #      pre-ship cleanup session).
 #   3. Verify DEVELOPER_NOTES.md stays under its read-whole size cap and
-#      that every pointer into or out of it resolves
-#      (scripts/verify_dev_notes.py; every commit, <1 s).
+#      that its quoted section citations, repo paths and test refs resolve
+#      (scripts/verify_dev_notes.py; every commit, against the INDEX).
 #
 # Install by running: git config core.hooksPath .githooks
+# Escape hatch: git commit --no-verify. Rebase/cherry-pick/merge replays do
+# not run pre-commit, so a replayed commit is unchecked until the next one.
 set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Project interpreter. direnv puts .venv/bin on PATH in interactive shells
+# and Emacs, but not in GUI git clients or non-interactive shells; resolve
+# it explicitly so a missing interpreter is never reported as a check failure.
+PY="$REPO_ROOT/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+    PY=$(command -v python || true)
+fi
+if [[ -z "$PY" ]]; then
+    echo 'ERROR: pre-commit: no project interpreter found (.venv/bin/python missing' >&2
+    echo '       and no python on PATH). Run `uv venv && uv pip install -e ".[dev,perf]"`.' >&2
+    exit 1
+fi
+
+# --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
+# (first, and unconditional: it must also run for deletion/rename-only
+# commits and for --amend with nothing staged, which the early exit below
+# would skip.) The checker reads a directory, so export what is being
+# committed -- the index -- rather than the working tree: an unstaged
+# work-in-progress edit to the notes must not block an unrelated commit,
+# and a staged dangling citation must not pass because the working copy
+# was fixed afterwards. Only the scanned dirs are exported (~0.1 s).
+INDEX_EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/gopvpsim-index.XXXXXX")
+trap 'rm -rf "$INDEX_EXPORT"' EXIT
+git ls-files -z -- src scripts tests docs guides articles thresholds opponent_pools \
+    CLAUDE.md TODO.md README.md DEVELOPER_NOTES.md CHANGELOG.md \
+    | git checkout-index -z --prefix="$INDEX_EXPORT/" --stdin
+if ! "$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet --repo-root "$INDEX_EXPORT"; then
+    echo >&2
+    echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer)' >&2
+    echo 'in the STAGED content. Run scripts/verify_dev_notes.py for the full' >&2
+    echo 'working-tree report; stage the fix, or use --no-verify.' >&2
+    exit 1
+fi
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 if [[ -z "$STAGED" ]]; then
@@ -61,23 +97,11 @@ while IFS= read -r f; do
 done <<< "$STAGED"
 
 if [[ "$needs_dev_count_check" -eq 1 ]]; then
-    if ! python "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet; then
+    if ! "$PY" "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet; then
         echo >&2
         echo 'Commit blocked by dev-count drift.' >&2
         exit 1
     fi
-fi
-
-# --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
-
-# Every commit: the notes must stay readable in one shot, and a renamed
-# or removed heading must not leave a quoted citation dangling anywhere
-# in the repo (engine-hash files only warn; see the script's docstring).
-if ! python "$REPO_ROOT/scripts/verify_dev_notes.py" --quiet; then
-    echo >&2
-    echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer).' >&2
-    echo 'Run scripts/verify_dev_notes.py for the full report.' >&2
-    exit 1
 fi
 
 exit 0

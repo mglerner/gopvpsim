@@ -42,7 +42,8 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 - **Comment-pointer fixes riding the next engine bump** (engine-hash files;
   a comment-only edit would bump the sweep-cache hash, found by the
   2026-10-24 DEVELOPER_NOTES link audit, all pre-existing;
-  `scripts/verify_dev_notes.py` warns on them until fixed): battle.py:653
+  `scripts/verify_dev_notes.py` warns on the three battle.py ones, the two
+  formchange.py ones are invisible to it): battle.py:653
   points at a notes section "Open divergences" -> "Resolved engine
   divergences"; battle.py:2662 points at "ActionLogic n=2 semantic changes"
   -> the block at battle.py:182 + tests/test_actionlogic_n2_knobs.py (never

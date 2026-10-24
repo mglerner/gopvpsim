@@ -5,9 +5,11 @@ DEVELOPER_NOTES.md is the session-startup read (CLAUDE.md). Two things rot
 it: it grows past the size a single Read returns (2026-10-24: 2,034 lines /
 118k chars against its own ~52k cap, found only when a session noticed it
 had read half), and the cross-references between it and the rest of the
-repo go stale (14 dangling ``DEVELOPER_NOTES "Section"`` citations the same
-day, most of them months old). Both are mechanical, so both are gated here;
-``.githooks/pre-commit`` runs this on every commit. Semantic rot -- prose
+repo go stale (about a dozen dangling DEVELOPER_NOTES pointers the same
+day -- quoted, unquoted and line-range -- several broken by the trim
+itself). The mechanical part is gated here; ``.githooks/pre-commit`` runs
+this on every commit against an export of the INDEX, so the result is
+about what is being committed, not the working tree. Semantic rot -- prose
 that no longer matches the code -- is NOT detectable here; the re-vetting
 procedure (docs/rebalance_checklist.md section B) carries that review.
 
@@ -17,39 +19,53 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
   sentinels   every ``<!-- sync:KEY -->`` key that verify_dev_counts.py
               knows appears exactly once, and none appears in CHANGELOG.md
               (build_guides.py parses the notes alone; a copy elsewhere is
-              a second source of truth).
-  inbound     every quoted citation ``DEVELOPER_NOTES "Section name"`` in
-              the repo names a heading or a numbered bold item of the
-              notes (case-insensitive substring). A miss in an ENGINE-HASH
-              file (sweep_cache._ENGINE_FILES + deep_dive_signature.py) is
-              a warning, because fixing a comment there bumps the sweep
-              cache hash and must ride the next engine change; a miss in a
+              a second source of truth). A missing/unimportable sibling is
+              itself a failure, never a silent pass.
+  inbound     every quoted citation ``DEVELOPER_NOTES "Section name"`` (also
+              ``'...'``, curly quotes, ``DEVELOPER_NOTES.md section "..."``,
+              ``DEVELOPER_NOTES's "..."``) in a tracked file names a heading
+              or a ``**N. ...**`` item of the notes, matched case-insensitive
+              on word boundaries. A miss in an ENGINE-HASH file
+              (sweep_cache._ENGINE_FILES + deep_dive_signature.py) is a
+              warning, because fixing a comment there bumps the sweep cache
+              hash and must ride the next engine change; a miss in a
               point-in-time doc (docs/validations, docs/reviews,
               docs/TODO_archive.md) is a warning too.
-  outbound    every quoted citation FROM the notes to CLAUDE.md, TODO.md
-              or CHANGELOG.md names a phrase that exists there (CHANGELOG:
-              a heading); every backticked repo path in the notes exists;
-              every ``tests/x.py::name`` names a def/class in that file.
+  outbound    every quoted citation FROM the notes to CLAUDE.md, TODO.md or
+              CHANGELOG.md names a phrase that exists there (CHANGELOG: a
+              heading); every backticked repo path in the notes exists
+              (``path.py:LINE`` and trailing CLI args tolerated); every
+              ``tests/x.py::name`` (``::Class::method``, ``[case]`` too)
+              names a def/class/module constant in that file.
+
+NOT checked (so do not read a green run as "every pointer resolves"):
+unquoted prose references ("the re-dive entry"), ``file:line`` ranges in
+either direction, bare basenames (``battle.py``), identifiers, commit SHAs,
+item numbers written outside the quotes, and files outside SCAN_DIRS.
 
 Usage::
 
     python scripts/verify_dev_notes.py            # report, exit 1 on failure
     python scripts/verify_dev_notes.py --quiet    # failures only
 
-Pass ``--repo-root`` to point at another checkout (the tests use a
-synthetic one).
+Run by hand it scans the working tree. Pass ``--repo-root`` to point at
+another checkout (the hook passes an index export; the tests a synthetic
+repo). Untracked/ignored files under SCAN_DIRS are scanned when present,
+so a scratch draft with a stale citation shows up by hand but cannot block
+a commit.
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# The notes' own stated cap (see the HTML comment at its top): ~25k-token
-# read limit at ~2.36 chars/token, with margin.
+# ~25k-token single-Read limit at ~2.36 chars/token, with margin. The
+# notes' preamble states the same number; change both together.
 CHAR_CAP = 52_000
 
 NOTES = 'DEVELOPER_NOTES.md'
@@ -64,28 +80,38 @@ ENGINE_HASH_FILES = frozenset({
 })
 
 # The checker and its tests quote the citation pattern itself.
-SELF_FILES = ('scripts/verify_dev_notes.py', 'tests/test_verify_dev_notes.py')
+SELF_FILES = ('scripts/verify_dev_notes.py', 'tests/test_verify_dev_notes.py',
+              'tests/test_precommit_hook.py')
 
 # Point-in-time records: they cite the notes as they were when written.
 HISTORICAL_PREFIXES = ('docs/validations/', 'docs/reviews/', 'docs/TODO_archive.md')
 
-# Where inbound citations are looked for.
+# Where inbound citations are looked for. The hook exports exactly these
+# (plus the notes and CHANGELOG) from the index.
 SCAN_DIRS = ('src', 'scripts', 'tests', 'docs', 'guides', 'articles',
              'thresholds', 'opponent_pools')
 SCAN_FILES = ('CLAUDE.md', 'TODO.md', 'README.md')
 SCAN_SUFFIXES = {'.py', '.md', '.js', '.toml', '.txt', '.sh', '.json', '.html'}
 
 _SENTINEL_RE = re.compile(r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->')
-# A quoted citation of a doc section. The quoted span may cross a line
-# break inside a Python comment or docstring, so it is normalised before
-# matching (``#`` runs and whitespace collapsed).
+# A quoted citation of a doc section: ``DOC "name"``, ``DOC 'name'``,
+# ``DOC.md section "name"``, ``DOC's "name"``, curly double quotes. The
+# quoted span may cross a line break inside a comment or docstring, so it
+# is normalised before matching (comment prefixes and whitespace collapsed).
+# A single-quoted name must follow whitespace, or every Python string
+# literal 'DEVELOPER_NOTES.md' would open a bogus citation.
 _CITE_RE = re.compile(
     r'(DEVELOPER_NOTES|CLAUDE\.md|TODO(?:\.md)?|CHANGELOG(?:\.md)?)'
-    r'(?:\.md)?\s*["\u201c]([^"\u201d]{3,140})["\u201d]')
+    r"(?:\.md)?(?:'s)?\s*(?:section\s+)?"
+    r'(?:"([^"]{3,140})"|(?<=\s)\'([^\']{3,140})\'|“([^”]{3,140})”)')
+# A backticked repo path, optionally ``:LINE[-LINE]``, ``::member`` chain,
+# ``[case]``, and CLI args after whitespace.
 _PATH_RE = re.compile(
     r'`((?:src|scripts|tests|docs|guides|articles|thresholds|opponent_pools|'
-    r'userdata)/[\w./-]+?\.(?:py|md|js|toml|json|txt|sh|html|log)'
-    r'(?:::[A-Za-z_]\w*)?)`')
+    r'userdata)/[\w./-]+?\.(?:py|md|js|toml|json|txt|sh|html|log))'
+    r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]`]*\])?(?:\s[^`]*)?`')
+_FENCE_RE = re.compile(r'^\s*```')
+_BOLD_ITEM_RE = re.compile(r'\*\*(\d+\.\s.+?)\*\*', re.S)
 
 
 def _norm(s: str) -> str:
@@ -94,26 +120,36 @@ def _norm(s: str) -> str:
     return re.sub(r'\s+', ' ', s).strip().lower()
 
 
-def _anchors(notes_text: str) -> list[str]:
-    """Headings and numbered bold items of the notes, normalised."""
-    out = []
-    for line in notes_text.splitlines():
-        if line.startswith('#'):
-            out.append(_norm(line.lstrip('#')))
-        else:
-            m = re.match(r'\*\*(\d+\.\s[^*]+)\*\*', line)
-            if m:
-                out.append(_norm(m.group(1)))
-    return out
+def _strip_fences(text: str) -> str:
+    out, fenced = [], False
+    for line in text.splitlines():
+        if _FENCE_RE.match(line):
+            fenced = not fenced
+            continue
+        if not fenced:
+            out.append(line)
+    return '\n'.join(out)
 
 
 def _headings(text: str) -> list[str]:
-    return [_norm(l.lstrip('#')) for l in text.splitlines() if l.startswith('#')]
+    return [_norm(l.lstrip('#')) for l in _strip_fences(text).splitlines()
+            if l.startswith('#')]
+
+
+def _anchors(notes_text: str) -> list[str]:
+    """Headings and ``**N. ...**`` items (wrapped ones too), normalised."""
+    body = _strip_fences(notes_text)
+    return _headings(body) + [_norm(m.group(1)) for m in _BOLD_ITEM_RE.finditer(body)]
 
 
 def _resolves(quote: str, anchors: list[str]) -> bool:
     q = _norm(quote)
-    return any(q in a for a in anchors)
+    pat = re.compile(r'(?<!\w)' + re.escape(q) + r'(?!\w)')
+    return any(pat.search(a) for a in anchors)
+
+
+def _cite_quote(m: re.Match) -> str:
+    return next(g for g in m.groups()[1:] if g is not None)
 
 
 def _iter_repo_files(root: Path):
@@ -130,19 +166,23 @@ def _iter_repo_files(root: Path):
                 yield p
 
 
-def _load_known_keys(root: Path) -> set[str]:
-    """The sentinel keys verify_dev_counts.py checks (import, with fallback)."""
+def _load_known_keys(root: Path) -> set[str] | str:
+    """ALL_KEYS of the sibling verify_dev_counts.py, or an error string."""
     script = root / 'scripts' / 'verify_dev_counts.py'
-    if script.is_file():
-        import importlib.util
-        spec = importlib.util.spec_from_file_location('_vdc', script)
-        mod = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(mod)
-            return set(mod.ALL_KEYS)
-        except Exception:  # pragma: no cover - a broken sibling script
-            pass
-    return set()
+    if not script.is_file():
+        return f'{script.relative_to(root)} missing'
+    spec = importlib.util.spec_from_file_location('_vdc', script)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+        keys = set(mod.ALL_KEYS)
+    except Exception as e:  # noqa: BLE001 - any breakage must FAIL, not pass
+        return f'could not load ALL_KEYS from verify_dev_counts.py: {e!r}'
+    return keys or 'verify_dev_counts.ALL_KEYS is empty'
+
+
+def _read(p: Path) -> str:
+    return p.read_text(encoding='utf-8', errors='replace')
 
 
 def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
@@ -152,7 +192,7 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     notes_path = root / NOTES
     if not notes_path.is_file():
         return [f'{NOTES} missing'], warnings
-    notes = notes_path.read_text()
+    notes = _read(notes_path)
 
     # --- size ------------------------------------------------------------
     n = len(notes)
@@ -166,12 +206,16 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     counts: dict[str, int] = {}
     for m in _SENTINEL_RE.finditer(notes):
         counts[m.group(1)] = counts.get(m.group(1), 0) + 1
-    for key in sorted(_load_known_keys(root)):
-        c = counts.get(key, 0)
-        if c != 1:
-            failures.append(f'sentinels: sync:{key} appears {c}x in {NOTES} (want 1)')
+    keys = _load_known_keys(root)
+    if isinstance(keys, str):
+        failures.append(f'sentinels: {keys}')
+    else:
+        for key in sorted(keys):
+            c = counts.get(key, 0)
+            if c != 1:
+                failures.append(f'sentinels: sync:{key} appears {c}x in {NOTES} (want 1)')
     cl_path = root / CHANGELOG
-    changelog = cl_path.read_text() if cl_path.is_file() else ''
+    changelog = _read(cl_path) if cl_path.is_file() else ''
     for m in _SENTINEL_RE.finditer(changelog):
         failures.append(f'sentinels: sync:{m.group(1)} leaked into {CHANGELOG}')
 
@@ -182,13 +226,13 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
         if rel in (NOTES, CHANGELOG) or rel in SELF_FILES:
             continue
         try:
-            text = p.read_text()
-        except (UnicodeDecodeError, OSError):
+            text = _read(p)
+        except OSError:
             continue
         for m in _CITE_RE.finditer(text):
             if m.group(1) != 'DEVELOPER_NOTES':
                 continue
-            quote = m.group(2)
+            quote = _cite_quote(m)
             if _resolves(quote, anchors):
                 continue
             line_no = text.count('\n', 0, m.start()) + 1
@@ -211,12 +255,12 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     }
     cache: dict[Path, str] = {}
     for m in _CITE_RE.finditer(notes):
-        kind, quote = m.group(1), m.group(2)
+        kind, quote = m.group(1), _cite_quote(m)
         if kind == 'DEVELOPER_NOTES':
             continue
         path, headings_only = targets[kind]
         if path not in cache:
-            cache[path] = path.read_text() if path.is_file() else ''
+            cache[path] = _read(path) if path.is_file() else ''
         hay = _headings(cache[path]) if headings_only else [_norm(cache[path])]
         if not _resolves(quote, hay):
             line_no = notes.count('\n', 0, m.start()) + 1
@@ -226,8 +270,7 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
                 + (' headings' if headings_only else ''))
 
     for m in _PATH_RE.finditer(notes):
-        token = m.group(1)
-        path_part, _, member = token.partition('::')
+        path_part, members = m.group(1), m.group(2)
         target = root / path_part
         line_no = notes.count('\n', 0, m.start()) + 1
         if not target.exists():
@@ -235,11 +278,13 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
             # userdata/ is gitignored, machine-local evidence: warn only.
             (warnings if path_part.startswith('userdata/') else failures).append(msg)
             continue
-        if member and target.suffix == '.py':
-            src = target.read_text()
-            if not re.search(rf'^\s*(?:def|class)\s+{re.escape(member)}\b', src, re.M):
+        if members and target.suffix == '.py':
+            member = members.rsplit('::', 1)[-1]
+            src = _read(target)
+            pat = rf'^\s*(?:def|class)\s+{re.escape(member)}\b|^{re.escape(member)}\s*='
+            if not re.search(pat, src, re.M):
                 failures.append(
-                    f'outbound: {NOTES}:{line_no} names `{token}` but '
+                    f'outbound: {NOTES}:{line_no} names `{path_part}{members}` but '
                     f'{path_part} defines no `{member}`')
 
     return failures, warnings
@@ -262,8 +307,9 @@ def main() -> int:
             print(f'  - {f}', file=sys.stderr)
         return 1
     if not args.quiet:
-        notes_len = len((args.repo_root / NOTES).read_text())
-        print(f'{NOTES}: {notes_len:,}/{CHAR_CAP:,} chars; all pointers resolve.')
+        notes_len = len(_read(args.repo_root / NOTES))
+        print(f'{NOTES}: {notes_len:,}/{CHAR_CAP:,} chars; quoted citations, '
+              f'paths and test refs resolve ({len(warnings)} warnings).')
     return 0
 
 
