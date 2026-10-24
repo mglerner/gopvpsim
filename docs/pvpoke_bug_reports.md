@@ -590,13 +590,15 @@ remaining cooldown is forgiven is exactly what we do not know.
         poke.cooldown = 500;
     }
 
-When a charged move was used this round, or a form change with an
-`animationTime` played, every Pokemon's cooldown becomes 500 ms regardless
-of what it was. A Pokemon one turn into a 3-turn fast move (cooldown 1000
-left) therefore resolves that fast move on the next turn, for full damage
-and energy, one turn early. The side that was mid-fast-move gains a turn;
-the side that threw the charged move does not (its cooldown was already
-0 or 500).
+The `roundChargedMoveUsed` arm is old (2019) and our engine already
+matches it; the question is the `|| roundFormAnimation` arm added in
+`4d2908fac`. `roundFormAnimation` is set only by the `hp`-trigger form
+change (Battle.js:1668), i.e. Minior's Meteor -> Core flip, so this is
+Minior-specific. On a flip turn every Pokemon's cooldown becomes 500 ms
+regardless of what it was: a Pokemon one turn into a 3-turn fast move
+(cooldown 1000 left) resolves it on the next turn, for full damage and
+energy, one turn early; the side that was mid-fast-move gains a turn.
+Not being filed for now (2026-10-24: no response yet to the July batch).
 
 **Where it shows.** Any multi-turn fast move in flight during a charged
 round; Minior makes it frequent because its Meteor -> Core change carries
