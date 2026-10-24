@@ -55,7 +55,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3209<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3215<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
@@ -983,8 +983,8 @@ PvPoke bug.
 
 ### Minior (2026-10-24): UL level clamp, animation clock, 41 open sweep cells
 
-Three deliberate or open gaps after the as-is port (`tests/test_minior.py`
-is PvPoke-exact on its 90 cells; none of these is in the oracle audit):
+Deliberate or open gaps after the as-is port (`tests/test_minior.py` is
+PvPoke-exact on its 90 cells; none of these is in the oracle audit):
 
 - **UL Meteor level 52 vs PvPoke's 55 (deliberate).** Meteor cannot reach
   2500 CP, so PvPoke's walk never steps down from its table end (55) and
@@ -996,48 +996,60 @@ is PvPoke-exact on its 90 cells; none of these is in the oracle audit):
   PvPoke adds it to its wall-clock `time`, which only feeds the timeline
   display and the 240 s time-out (see "Battle timeout" below); turns and
   cooldowns are untouched, so no score effect unless a fight nears the limit.
-- **41 of 702 sweep cells differ** (`scripts`-free scratch sweep vs
-  `pvpoke_trace.js`, `userdata/logs/minior_midflight_sweep_5.log`; the
-  10-matchup oracle set is a subset and is 90/90). Attributed: ~35 cells in
-  six matchups (Lickitung 10, Charjabug 8, Steelix 6, Lanturn 6, Cresselia
-  4, Sableye 2) to the form-animation cooldown reset below, where a Core
-  flip shortens an in-flight multi-turn fast move; Morpeko 2-2
-  both seats = the documented one-way-toggle divergence (bug #8); Medicham
+- **4 of 702 sweep cells differ** after the class-A port below
+  (`userdata/logs/minior_midflight_sweep_6.log`, scratch sweep vs
+  `pvpoke_trace.js`; 41 before the port, `_5.log`; the 10-matchup oracle
+  set is a subset and is 90/90). The log still lists 14: the ten Lickitung
+  cells are the level-cap artifact explained below, PvPoke-exact when both
+  sides cap at 50. Morpeko 2-2 both seats = the documented one-way-toggle
+  divergence (bug #8); Medicham
   vs Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 / 391): both engines
   reach the same DP plan [Ice Punch x3] at Medicham e=95 vs an 80-HP
   1-shield Meteor, then PvPoke's post-DP bandaid region (ActionLogic.js
   ~838-990) swaps slot 0 to Dynamic Punch and ours does not (frozen Core dpe
-  1.775 vs 1.778 is the suspected gate -- NOT traced to a line); Ariados vs
-  Minior 2-0 (739 / 735), untraced. Michael's call 2026-10-24: ship the
-  port, improve later (TODO "Minior -- open items").
+  1.775 vs 1.778 is the suspected gate -- NOT traced to a line). Michael's
+  call 2026-10-24: ship the port, improve later (TODO "Minior -- open
+  items"). (Ariados vs Minior 2-0 and the Sableye/Steelix/Lanturn/
+  Cresselia/Charjabug cells closed with the class-A port.)
 
-### Minior's form animation resets both cooldowns like a charged move (class A, Minior-only, PENDING)
+### Minior's form animation resets both cooldowns like a charged move (class A, PORTED 2026-10-24)
 
 `Battle.js:548`: at the end of a round, `if(roundChargedMoveUsed ||
-roundFormAnimation) poke.cooldown = 500` for BOTH Pokemon. The
-charged-move arm is old (blame: 2019; body re-touched in the 2026-08-26
-new-mechanics branch) and was at the previously vetted `a93147bf1` -- our
-turn model already reproduces it (every multi-turn-fast oracle cell is
-exact: Bubble, Counter, Psycho Cut, Sand Attack users all throw and take
-charged moves mid-fast). The `|| roundFormAnimation` arm is NEW in
-`4d2908fac`, and `roundFormAnimation` is set in exactly one place
-(`Battle.js:1668`, inside the `hp`-trigger form change), so it fires only
-on Minior's Meteor -> Core flip. Effect: a 2- or 3-turn fast move in flight
-on the flip turn (either side; Minior's own Rollout is 3 turns, and the
-fast it queues on the flip turn counts too) finishes the next turn with
-full damage and energy -- PvPoke treats the 5000 ms form animation as a
-battle pause, like a charged move. Ours lets the fast run its full length.
-Whether the game really pauses for the Meteor animation is unconfirmed (no
-source either way); if it does, PvPoke is consistent and we should port.
-Scope is Minior-only, so a port is a localized change (cache predicate:
-Minior on either side). Attributed to ~35 of the 41 open Minior sweep cells
-above (MIDFLIGHT-tagged cells traced; the 'landed' cells fit the
-fast-queued-on-the-flip-turn shape but were not individually traced).
-Margins are typically 1-8 points (Lickitung 1-1: 403 vs 408); Charjabug
-1-1 (210 vs 626) and Cresselia 0-1 (103 vs 293) are the outliers.
-Michael's port-vs-document decision pending; the intent question is drafted
-as `docs/pvpoke_bug_reports.md` Report 10 (not being filed: PvPoke has not
-responded to the 2026-07-16 batch).
+roundFormAnimation) poke.cooldown = 500` for BOTH Pokemon. The charged-move
+arm is old (blame: 2019) and our turn model already reproduced it; the
+`|| roundFormAnimation` arm is new in `4d2908fac` and `roundFormAnimation`
+is set in exactly one place (`Battle.js:1668`, the `hp`-trigger change), so
+it fires only on Minior's Meteor -> Core flip. PvPoke treats the 5000 ms
+animation as a battle pause like a charged move. What that means in
+PvPoke's state machine: cooldown only gates `getTurnAction` (`:732`), while
+a queued fast resolves when `(turns - action.turn) * 500 >= fastMove.cooldown
+- 500` (`:405-410`) -- so after the reset BOTH Pokemon may act again next
+turn and a fast already in flight still lands on its own schedule. A Pokemon
+can therefore decide with its own fast in the air, and a 4-turn mover (Volt
+Switch) can have two fasts in flight. Ported in `simulate()`: `_queued_fasts`
+is a list; the Phase B gate is PvPoke's plain `cooldown == 0` (a landing
+fast still shows cooldown 1 at decision time, so normal flow is unchanged);
+the new-mechanics landing no longer zeroes the attacker's cooldown (always
+1 there anyway, and it would wipe a newly queued action); the TTL initial
+state and the two DP adjustments test `defender.cooldown` as PvPoke does
+instead of "has a fast in flight" (identical in normal flow); optimizeMove
+Timing counts the attacker's own queued fasts (`ActionLogic.js:301-313`);
+and after a fast-triggered flip both cooldowns are set to 1 (a flip off a
+charged hit takes the existing charged arm). A flip off a charged hit was
+already covered. Result: the 702-cell Minior sweep went from 41 open cells
+to 4, the 387-cell audit was unchanged, and every mover landed on PvPoke's
+value. Pinned: `tests/test_minior.py` fix 5 (four revert-fails cells, the
+timeline mechanism, and the Lickitung level-cap lesson below).
+
+Two lessons from the sweep that attributed those cells: (1) the scratch
+tool read PvPoke's decisionLog "uses X" as the queue turn, but it is logged
+at RESOLUTION, so its MIDFLIGHT/landed tags were unreliable -- the port's
+evidence is the 27 cells that moved onto PvPoke, not the tags; (2) the ten
+Lickitung cells that survived the port were a harness artifact: Lickitung
+7/15/15's GL best level is 50.5 (best buddy) under our default cap and 50
+under PvPoke's autoLevel, and that one level moves Acrobatics across a
+floor boundary (99 vs 98). Pin `level=` in audit specs when a species'
+best level exceeds 50 (the harness's `P(level=...)` exists for this).
 
 ### bandaid[929] stack-switch is ungated on bait_shields (no-bait only)
 (documented 2026-06-27, engine bug-hunt #5)

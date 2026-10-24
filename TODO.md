@@ -11,23 +11,14 @@ lines of mostly-completed chronological batches. -->
 Michael 2026-10-24: "take your recommendation. we can improve later" -- the
 port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 
-- **Class A decision (Michael): port or document the form-animation
-  cooldown reset.** `Battle.js:548` sets both cooldowns to 500 after a
-  round with a charged move (old rule, already matched by our turn model)
-  OR a form animation (new in 4d2908fac; `roundFormAnimation` is set only
-  by the `hp`-trigger change, i.e. Minior's flip). Minior-only. ~35 of the
-  702 Minior sweep cells. Port = a localized change (hp-flip turn: any
-  in-flight multi-turn fast on either side lands next turn; cache
-  predicate "Minior on either side"), verified against the sweep; document
-  = keep ours (DEVELOPER_NOTES "Known divergences" class A, Report 10
-  draft). Best done BEFORE the Minior dives so they are PvPoke-comparable
-  and never need a Minior-only re-dive.
-- **Untraced sweep cells** (`userdata/logs/minior_midflight_sweep_5.log`):
-  Medicham vs Minior 1-2 (351 vs 373) and 2-2 (734 vs 391) -- same DP plan
-  [IP,IP,IP] at e=95 vs 80-HP 1-shield Meteor, PvPoke's post-DP bandaid
-  (ActionLogic.js ~838-990) swaps slot 0 to Dynamic Punch, ours does not;
-  suspect the frozen Core dpe gate (1.775 vs 1.778). Ariados vs Minior 2-0
-  (739 vs 735). Morpeko 2-2 both seats = documented bug #8, no action.
+- **Untraced sweep cells** (`userdata/logs/minior_midflight_sweep_6.log`,
+  after the class-A port; 4 open of 702): Medicham vs Minior 1-2 (351 vs
+  373) and 2-2 (734 vs 391) -- same DP plan [IP,IP,IP] at e=95 vs 80-HP
+  1-shield Meteor, PvPoke's post-DP bandaid (ActionLogic.js ~838-990) swaps
+  slot 0 to Dynamic Punch, ours does not; suspect the frozen Core dpe gate
+  (1.775 vs 1.778). Morpeko 2-2 both seats = documented bug #8, no action.
+  (The log's ten Lickitung rows are a harness level-cap artifact, see
+  DEVELOPER_NOTES class A; pin `level=50` for Lickitung in any re-sweep.)
   Tooling for the trace already exists: `scripts/pvpoke_trace.js`
   decideLog/decisionLog/dpPlans vs `scripts/battle.py --log --trace-dp
   --debug`.
@@ -40,7 +31,9 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   post-shuffle order != its ascending-energy order" -- needs a proof
   (fix 1's queue-order change is new-mechanics-global: prove it is a no-op
   without a same-turn form flip, or the predicate is unsound and the
-  re-dive is cold). Not implemented.
+  re-dive is cold; the class-A port is Minior-only by construction, the
+  Phase B gate / TTL / DP rewrites are identity in normal flow -- the clean
+  387-cell audit is the evidence, not a proof). Not implemented.
 - **Dives:** `run_website_dives.py minior --dry-run` fails because the
   opponent pools have drifted; regenerate via `scripts/build_opponent_pool.py
   <recipe>` (Michael's call), then `direnv exec . python
@@ -53,7 +46,8 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   Re-check go-iv PR #48 and pvpoke master for a settled rule before a bake.
 - **Reports 10 and 11** (`docs/pvpoke_bug_reports.md`) stay drafts:
   Michael 2026-10-24, not filing anything upstream while PvPoke has not
-  responded to the 2026-07-16 batch. Report 9 is superseded (e87448291).
+  responded to the 2026-07-16 batch. Report 9 is superseded (e87448291);
+  Report 10's mechanic is now ported, so it is moot for us.
 
 ## OPEN: Bake speed (2026-09-25 scout)
 

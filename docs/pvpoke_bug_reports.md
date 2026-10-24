@@ -575,9 +575,11 @@ shows this: the sandbox share links above, and any UI flow that re-runs
 after a settings change without rebuilding the Pokemon. Single-run
 consumers (rankings, matrix) are unaffected.
 
-## Drafted 2026-10-24, NOT YET FILED (intent question) - Report 10 - a charged-move or form-animation round sets both cooldowns to 500 ms, finishing an in-flight multi-turn fast move early
+## Drafted 2026-10-24, MOOT (we ported the rule the same day; not filing) - Report 10 - a form-animation round sets both cooldowns to 500 ms, letting both Pokemon act while a fast is still in flight
 
-**Status:** drafted from the 2026-10-24 Minior sweep (gopvpsim vs
+**Status (later 2026-10-24):** ported as PvPoke has it (class A, DEVELOPER_NOTES "Known divergences"); the in-game question (does the shell-break animation pause the battle like a charged move?) is unanswered but no longer a divergence. Kept for the record; not filing. Note the draft below mis-describes the effect: the reset does not shorten the in-flight fast move (queued fasts resolve on their own turn clock), it lets the Pokemon act again while the fast is still in the air.
+
+**Status (original):** drafted from the 2026-10-24 Minior sweep (gopvpsim vs
 `pvpoke_trace.js` at master `38f70320d`, 702 cells, ~35 attributed to
 this). Not yet filed. Frame as an intent question, not a bug: the game
 does interrupt fast-move animations with a charged move, and whether the

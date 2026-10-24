@@ -2,6 +2,25 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-10-24 (later) -- class A ported: Minior's form animation resets both cooldowns
+
+- **What:** `Battle.js:548`'s `|| roundFormAnimation` arm (new in pvpoke
+  4d2908fac; set only by the hp-trigger change, so Minior-only). After a
+  Core flip off a fast hit both Pokemon may act again next turn while a fast
+  already in flight still lands on schedule. `simulate()`: `_queued_fasts`
+  list, Phase B gate = `cooldown == 0`, no cooldown wipe on a new-mechanics
+  landing, TTL/DP read `defender.cooldown` (as PvPoke), optimizeMoveTiming
+  counts own queued fasts, both cooldowns -> 1 after a fast-triggered flip.
+- **Evidence:** 702-cell Minior sweep 41 -> 4 open (Medicham 1-2/2-2,
+  Morpeko 2-2 x2); 387-cell audit unchanged; Charjabug 1-1 210 -> 626 (w
+  flip), Cresselia 0-1 103 -> 293, Lanturn 1-1 306 -> 327, Steelix 2-2 87
+  -> 95, all onto PvPoke. The ten Lickitung "divergences" were a harness
+  artifact (our best-buddy L50.5 vs PvPoke's autoLevel 50; one Acrobatics
+  floor boundary). Pins: `tests/test_minior.py` fix 5.
+- **Correction to the morning's docs:** class A had been written up as a
+  global engine change; the charged-move arm is from 2019 and was always
+  matched. Michael: not filing anything upstream (PvPoke unresponsive).
+
 ## 2026-10-24 -- Minior ported as-is from PvPoke 38f70320d; four port-fidelity fixes; engine digest re-pinned
 
 - **What:** Minior (released 2026-10-19) is the first `battle_start` +
