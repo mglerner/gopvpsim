@@ -39,6 +39,16 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   <recipe>` (Michael's call), then `direnv exec . python
   scripts/run_website_dives.py minior` -- with `--no-sweep-cache` until the
   engine is trusted for a bake. No publish without Michael's go.
+- **Comment-pointer fixes riding the next engine bump** (engine-hash files;
+  a comment-only edit would bump the sweep-cache hash, found by the
+  2026-10-24 DEVELOPER_NOTES link audit, all pre-existing): battle.py:653
+  'DEVELOPER_NOTES "Open divergences"' -> "Resolved engine divergences";
+  battle.py:2662 'DEVELOPER_NOTES "ActionLogic n=2 semantic changes"' -> the
+  block at battle.py:182 + tests/test_actionlogic_n2_knobs.py (never a notes
+  section); battle.py:2295 "DP stack-two branch" -> the exact heading;
+  formchange.py:212 '"Known divergences" item 3' -> '"Form change gotchas"
+  item 3'; formchange.py:203 docstring "max CPM table key, 51.0" -> 52.0
+  (Mega Level 4 added 51.5/52.0).
 - **UL Minior** is unverified in-game; our Meteor level clamps at 52 where
   PvPoke sits at 55 (deliberate, docs/pvpoke_divergences.md item 9). Revisit
   if a UL dive is ever wanted.
@@ -1025,8 +1035,8 @@ The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
     site-reproducible in razor-thin cells until resolved.
 
 * **Known PvPoke divergences** — DEVELOPER_NOTES "Known divergences"
-  is the single source of truth (bestChargedMove per-turn recompute,
-  the near-KO plan cluster, the battle-timeout guard). Re-audit
+  is the single source of truth (the move-selection freeze carve-out,
+  bandaid[929], the battle-timeout guard, the Minior gaps). Re-audit
   anytime: `python scripts/audit_oracle_harness.py` (covers GL + UL;
   current baseline 207 cells = 172 exact + 35 documented; re-audited
   2026-08-06 A/B at origin/main vs the entry-13 batch, identical both

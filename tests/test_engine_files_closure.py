@@ -14,9 +14,9 @@ runtime probe would miss: ``battle.py`` reaches ``formchange`` only through
 function-level ``from .formchange import ...`` statements (battle.py:2041,
 2093, 2126), which never execute for a battle without a form-change species.
 
-DEVELOPER_NOTES.md:384-388 already states the design rule this enforces
-("the same constants in an unhashed module would let the sweep cache serve
-columns computed under the old values").  The point of the test is that new
+DEVELOPER_NOTES "League facts: pokemon.LEAGUES" already states the design
+rule this enforces ("the same constants in an unhashed module would let the
+sweep cache serve columns computed under the old values").  The point of the test is that new
 edges get caught: the two current exceptions are named and reasoned about
 below, and anything else fails.
 """

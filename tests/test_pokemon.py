@@ -843,8 +843,8 @@ class TestAegislashBladeWholeLevels:
 # configs eagerly at sweep setup, so the first Aegislash (Blade) GL
 # dive after S1 crashed on it. Fix: clamp the start to max(CPM) in
 # _aegislash_shield_level — a deliberate divergence (PvPoke walks down
-# using above-cap CPMs 52-55; see DEVELOPER_NOTES divergence item 3 and
-# round-2 FC-2).
+# using above-cap CPMs 52-55; see DEVELOPER_NOTES "Form change gotchas"
+# item 3 and round-2 FC-2).
 # ===========================================================================
 
 class TestAegislashShieldLevelOverflow:

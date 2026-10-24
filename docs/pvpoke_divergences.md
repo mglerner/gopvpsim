@@ -37,7 +37,8 @@ the default since 2026-09-09.
    check from `selfBuffing` to `selfDebuffing`, and PvPoke now throws Shadow
    Ball there too: the affected oracle cells match on score and on the
    charged-move log, and reverting that one check in a copy of PvPoke's JS
-   brings the old difference back (DEVELOPER_NOTES "Current status"). The
+   brings the old difference back (CHANGELOG "Archived: Current status: the
+   oracle-audit cell-count progression", the 2026-09-02 entry). The
    six Aegislash x Azumarill form-change cells that still differed under the
    new turn system were resolved on 2026-09-27, on our side: we priced
    Shield-form charged moves at the Shield form's Attack, while PvPoke

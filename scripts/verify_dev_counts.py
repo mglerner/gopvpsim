@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Cross-check DEVELOPER_NOTES.md dev-count sentinels against live code.
 
-DEVELOPER_NOTES.md carries five machine-readable scalars wrapped in
+DEVELOPER_NOTES.md carries six machine-readable scalars wrapped in
 HTML-comment sentinels of the form ``<!-- sync:KEY -->VALUE<!-- /sync -->``
 (see ``build_guides.py._load_verification_counts``). This script:
 
