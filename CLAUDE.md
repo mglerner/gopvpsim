@@ -479,10 +479,12 @@ Claude-drafted prose. When drafting for these blocks:
    fighting the templates.
 
 The `.githooks/pre-commit` hook enforces this by rejecting a commit
-(or a clean merge, via the `pre-merge-commit` symlink) that stages
-a ship-tracked TOML whose `authored_by`, in any table and any quoting
-or case, the renderer would read as `ai`, or that stages one as a
-symlink; it does not rescan files the commit leaves untouched. The same
+(or a non-fast-forward clean merge, via the `pre-merge-commit`
+symlink) that stages a ship-tracked TOML with an `authored_by` whose
+value reads as `ai` after `.strip().lower()` in ANY table (broader
+than the renderer, which reads only intro/meta_role/verdict), or that
+stages one as a symlink; it does not rescan files the commit leaves
+untouched, and a fast-forward pull brings commits in unchecked. The same
 hook also gates the DEVELOPER_NOTES dev-count sentinels
 (`scripts/verify_dev_counts.py`) and, on every commit, the notes' size
 cap and pointer integrity (`scripts/verify_dev_notes.py`); all three

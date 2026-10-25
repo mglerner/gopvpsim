@@ -75,9 +75,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEV_NOTES_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 
+# `[^<]*?`, not `.+?`: an opener that lost its closer must NOT be paired
+# with the NEXT sentinel's closer, which swallowed that key from the parse
+# (round-7 review; verify_dev_notes gates the pairing with the same shape).
 _SENTINEL_RE = re.compile(
-    r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->(.+?)<!--\s*/sync\s*-->',
-    flags=re.DOTALL,
+    r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->([^<]*?)<!--\s*/sync\s*-->',
 )
 
 DERIVABLE_KEYS = {'test_count', 'type_chart_cells_verified'}

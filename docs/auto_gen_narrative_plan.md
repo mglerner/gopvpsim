@@ -248,8 +248,11 @@ hooks if you prefer tool-level over git-level).
 
 (Superseded: the sketch below is the original 2026 design. The shipped
 hook reads the staged content from the index rather than the working
-tree, lists renames as delete + add, rejects symlinked ship TOMLs, and
-also carries the DEVELOPER_NOTES gates; read `.githooks/pre-commit`.)
+tree, parses each TOML with tomllib and rejects an `authored_by` reading
+as `ai` in any table rather than grepping one literal line, lists
+renames as delete + add, rejects symlinked ship TOMLs, runs on
+non-fast-forward merges via a `pre-merge-commit` symlink, and also
+carries the DEVELOPER_NOTES gates; read `.githooks/pre-commit`.)
 
 ```bash
 #!/usr/bin/env bash

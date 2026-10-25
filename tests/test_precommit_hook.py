@@ -59,11 +59,17 @@ def clone(tmp_path: Path) -> Path:
     untracked = [f for f in _run(REPO_ROOT, 'ls-files', '-o', '--exclude-standard') if f]
     for rel in changed + untracked:
         src, dst = REPO_ROOT / rel, c / rel
-        if src.is_file():
+        # Never write THROUGH a symlink in the clone (.githooks/pre-merge-commit
+        # points at pre-commit: a plain copy onto it overwrote the hook under
+        # test, round 7), and carry a symlink over as a symlink.
+        if dst.is_symlink() or dst.exists():
+            dst.unlink()
+        if src.is_symlink():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(os.readlink(src), dst)
+        elif src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(src, dst)
-        elif dst.exists():
-            dst.unlink()
     assert _git(c, 'add', '-A').returncode == 0  # throwaway clone: the broad add is the point
     assert _git(c, 'commit', '-q', '--no-verify', '--allow-empty', '-m', 'baseline').returncode == 0
     assert _git(c, 'config', 'core.hooksPath', '.githooks').returncode == 0
@@ -319,9 +325,10 @@ def test_quoted_and_non_ascii_toml_names_are_checked(clone):
     assert all(n in r.stderr for n in names), r.stderr
 
 
-def test_authored_by_forms_the_renderer_reads_as_ai_are_rejected(clone):
-    # deep_dive_rendering._authored_by_class does .strip().lower() on the value
-    # of ANY block; the literal grep caught only `authored_by = "ai"`.
+def test_authored_by_ai_in_any_table_or_quoting_is_rejected(clone):
+    # Value test as deep_dive_rendering._authored_by_class (.strip().lower()),
+    # applied to EVERY table (broader than the renderer, which reads only
+    # intro/meta_role/verdict); the literal grep caught only `authored_by = "ai"`.
     bad = {
         'nospace': 'authored_by="ai"\n',
         'single': "authored_by = 'ai'\n",
@@ -333,7 +340,12 @@ def test_authored_by_forms_the_renderer_reads_as_ai_are_rejected(clone):
         'broken': 'authored_by = "ai"\nthis is not toml ==\n',
     }
     good = {'human': 'authored_by = "human"\n', 'mixed': '[intro]\nauthored_by = "mixed"\n',
-            'other_key': 'author = "ai drafted"\nai = "authored_by"\n'}
+            'other_key': 'author = "ai drafted"\nai = "authored_by"\n',
+            # The tomllib gain over any grep: the line inside a multi-line
+            # string is prose, not a key.
+            'in_body': '[intro]\nbody = """\nauthored_by = "ai"\n"""\nauthored_by = "human"\n',
+            # Regex fallback negative control: broken TOML without the key.
+            'broken_clean': 'author = "ai"\nthis is not toml ==\n'}
     for k, body in {**bad, **good}.items():
         (clone / 'thresholds' / f'zz{k}_great.toml').write_text(body)
     _git(clone, 'add', 'thresholds')
@@ -369,3 +381,31 @@ def test_clean_merge_bringing_an_ai_toml_is_blocked(clone):
     assert _commit(clone, 'm').returncode == 0
     r = _git(clone, 'merge', '--no-ff', '-q', '-m', 'merge side', 'side')
     assert r.returncode != 0 and 'AI-drafted prose' in r.stderr, r.stderr
+
+
+# --- round-7 pins -----------------------------------------------------------
+
+def test_authored_by_check_crash_blocks_and_cwd_cannot_shadow_the_stdlib(clone):
+    # A Python crash exited 1 like "not ai" and the commit PASSED (round 7).
+    # (a) an untracked tomllib.py at the repo root shadowed the stdlib under
+    #     `-c` (cwd on sys.path): -I ignores it, so the file is caught as ai;
+    (clone / 'tomllib.py').write_text('raise ImportError("scratch shadow")\n')
+    (clone / 'thresholds' / 'zz_sh_great.toml').write_text('authored_by = "ai"\n')
+    _git(clone, 'add', 'thresholds/zz_sh_great.toml')
+    r = _commit(clone, 'shadow')
+    assert r.returncode == 1 and 'AI-drafted prose' in r.stderr, r.stderr
+    (clone / 'tomllib.py').unlink()
+    _git(clone, 'reset', '-q', '--hard')
+    # (b) a genuine crash (RecursionError in the parser) is reported as such
+    #     and blocks, instead of reading as clean.
+    (clone / 'thresholds' / 'zz_deep_great.toml').write_text('x = ' + '[' * 3000 + ']' * 3000 + '\n')
+    _git(clone, 'add', 'thresholds/zz_deep_great.toml')
+    r = _commit(clone, 'deep')
+    assert r.returncode == 1 and 'could not check authored_by' in r.stderr, r.stderr
+    assert 'AI-drafted prose' not in r.stderr
+
+
+def test_clone_fixture_carries_the_hook_symlink_as_a_symlink(clone):
+    pm = clone / '.githooks' / 'pre-merge-commit'
+    assert pm.is_symlink() and os.readlink(pm) == 'pre-commit'
+    assert (clone / '.githooks' / 'pre-commit').read_text() == (REPO_ROOT / '.githooks' / 'pre-commit').read_text()

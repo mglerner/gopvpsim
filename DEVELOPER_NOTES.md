@@ -2,9 +2,9 @@
 small enough to read WHOLE in one shot: under 52,000 chars.
 `scripts/verify_dev_notes.py` (pre-commit, every commit) gates the cap, the
 sync sentinels, file-name-prefixed quoted citations of this file's sections
-(a bare quoted name is not checked), and its own quoted CLAUDE.md/TODO/
-CHANGELOG citations, repo paths and test refs -- not prose refs or
-file:line numbers.
+(a bare quoted name is not checked; a miss in an engine-hash file or a
+point-in-time doc only warns), and its own quoted CLAUDE.md/TODO/CHANGELOG
+citations, repo paths and test refs -- not prose refs or file:line numbers.
 Shipped/dated history -> CHANGELOG; live invariants + open divergences ->
 here. An entry is: the RULE the code obeys, the PIN that fails if it stops
 (test or oracle cell), any PvPoke line ref WITH its pvpoke commit (a bare
@@ -40,7 +40,7 @@ the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3289<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3297<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for

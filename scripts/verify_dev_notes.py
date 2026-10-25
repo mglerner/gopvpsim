@@ -40,11 +40,13 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
               CHANGELOG.md names a phrase that exists there (CHANGELOG: a
               heading), and every quoted citation of the notes' OWN sections
               resolves; every backticked path under a repo-path prefix
-              (``_PATH_PREFIXES``) in the notes exists, whether the span
-              opens with it or with a command (``python scripts/x.py``,
-              ``./``); ``path.ext:LINE``, ``#anchor`` and trailing CLI args
-              are tolerated, any extension is accepted, and ``userdata/``
-              misses only warn (it is gitignored); for a glob /
+              (``_PATH_PREFIXES``) in the notes exists, wherever it starts
+              in the span (after a command, ``./``, ``=``, a quote or a
+              bracket -- anything but a path character); ``path.ext:LINE``,
+              ``#anchor``, trailing punctuation and CLI args are tolerated,
+              any ``[\\w-]+`` extension is accepted, the target must stay
+              inside the repo, and ``userdata/`` misses only warn (it is
+              gitignored); for a glob /
               ``<placeholder>`` / ``{a,b}`` / directory token the concrete
               path before the first such character must exist; every
               ``tests/x.py::name`` (``::Class::method``, ``[case]`` too)
@@ -53,11 +55,15 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
               backticked path may wrap a line around ``::``, after ``/`` or
               inside an identifier at ``_``; a token under a repo-path prefix
               that fits no path grammar FAILS (the hook runs --quiet, so a
-              warning would never be seen); a paragraph with an odd number of
-              backticks fails (a stray one inverts span pairing and hides
-              every later ref in the paragraph), and so does a code fence
+              warning would never be seen). The notes are a constrained
+              markdown dialect so that the span scan can stay a one-line
+              regex instead of a CommonMark parser: a double-backtick run
+              (````` `` `````) anywhere, or a backtick in a paragraph that no
+              single-backtick span accounts for (a stray one, or a span
+              opening on a line break, inverts pairing and hides every later
+              ref in the paragraph), is a failure, and so is a code fence
               left open to the end of the file (it hides every later heading
-              and ref).
+              from the citation scan).
 
 NOT checked (so do not read a green run as "every pointer resolves"):
 unquoted prose references ("the re-dive entry"), ``file:line`` numbers in
@@ -68,7 +74,11 @@ sentence, a bare quoted section name in the notes without the
 quotes, a single-quoted name containing an apostrophe (skipped, not
 mis-resolved), ``::member`` on a non-``.py`` path, a second path in the
 same backtick span (read as CLI args), the part of a token after a glob /
-placeholder / brace, paths outside ``_PATH_PREFIXES`` (root files such as
+placeholder / brace (a ``::member_*`` prefix included), a path led by a
+path character or ``:`` (``$REPO/tests/x.py``, ``../tests/x.py``,
+``pvpoke/src/``, a git ``<rev>:src/x.json``),
+a path inside a fenced block that is not a complete code span, paths
+outside ``_PATH_PREFIXES`` (root files such as
 ``pyproject.toml``, ``.githooks/``), ``#anchor`` targets, files outside
 SCAN_DIRS/SCAN_FILES or with a suffix outside SCAN_SUFFIXES, the checker and
 its tests themselves (``SELF_FILES``), and (in the hook, whose index export
@@ -132,7 +142,7 @@ SCAN_SUFFIXES = {'.py', '.md', '.js', '.toml', '.txt', '.sh', '.json', '.html'}
 
 _SENTINEL_RE = re.compile(r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->')
 # A complete pair; `[^<]*?` so a lost closer cannot be satisfied by the
-# NEXT sentinel's closer (same shape as verify_dev_counts._rewrite_sentinel).
+# NEXT sentinel's closer (verify_dev_counts parses with the same shape).
 _SENTINEL_PAIR_RE = re.compile(
     r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->[^<]*?<!--\s*/sync\s*-->')
 # A quoted citation of a doc section: ``DOC "name"``, ``DOC 'name'``,
@@ -157,16 +167,21 @@ _CITE_RE = re.compile(
 # optionally ``:LINE[-LINE]``, ``::member`` chain, ``[case]``, CLI args.
 _PATH_PREFIXES = ('src', 'scripts', 'tests', 'docs', 'guides', 'articles',
                   'thresholds', 'opponent_pools', 'userdata')
-# Where a ref starts inside a span: at the span start or after whitespace,
-# an optional `./` (`python scripts/x.py --flag`, `./tests/x.py`).
+# Where a ref starts inside a span: anywhere not led by a path character
+# (`python scripts/x.py`, `--out=tests/x.py`, `"tests/x.py"`, `(tests/x.py)`),
+# with an optional `./`. `$REPO/tests/x.py` and `../tests/x.py` are led by
+# `/`, a git `<rev>:src/x.json` by `:`; those stay unchecked by design.
 _FIRST_PATH_RE = re.compile(
-    r'(?:^|(?<=\s))(?:\./)?((?:' + '|'.join(_PATH_PREFIXES) + r')/)')
+    r'(?<![\w./:-])(?:\./)?((?:' + '|'.join(_PATH_PREFIXES) + r')/)')
 _PATH_RE = re.compile(
-    r'^((?:' + '|'.join(_PATH_PREFIXES) + r')/[\w./-]+?\.\w+)'  # any extension
-    r'(?:#[\w-]+)?'  # a markdown anchor is tolerated, not resolved
-    r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]]*\])?(?:\s.*)?$', re.S)
-# A span may wrap lines but not cross a blank line, so one stray backtick
-# cannot desynchronise every later span.
+    r'^((?:' + '|'.join(_PATH_PREFIXES) + r')/[\w./+-]+?\.[\w-]+)'  # any extension
+    r'(?:#[\w.-]+)?'  # a markdown anchor is tolerated, not resolved
+    r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]]*\])?'
+    r'["\'),;:.\]]*(?:\s.*)?$', re.S)  # closing quote/bracket/punctuation
+# A single-backtick span; may wrap lines but not cross a blank line, so one
+# stray backtick cannot desynchronise every later span. Exact for the
+# notes' dialect (no `` runs, enforced below) once every backtick in a
+# paragraph is accounted for (_stray_backtick_paragraphs).
 _BACKTICK_SPAN_RE = re.compile(r'`([^`\n](?:[^`\n]|\n(?![ \t]*\n))*)`')
 # A fence opens with 3+ backticks or tildes (<= 3 spaces indent, optional
 # info string) and closes with the same char, at least as many, nothing else.
@@ -215,25 +230,36 @@ def _unclosed_fence(text: str) -> int | None:
     return _fence_scan(text, False)[1]
 
 
-def _odd_backtick_paragraphs(text: str) -> list[int]:
-    """First line of every blank-line-delimited paragraph (fences dropped)
-    with an odd number of backticks. A stray backtick inverts span pairing
+def _stray_backtick_paragraphs(text: str) -> list[tuple[int, str]]:
+    """(first line, reason) for every blank-line-delimited paragraph (fences
+    dropped) that breaks the dialect: a double-backtick run, or a backtick
+    that no single-backtick span accounts for -- judged by the SAME regex
+    the ref scan uses, so "clean here" means "the scan paired every span".
+    A stray backtick, or a span opening on a line break, inverts pairing
     for the rest of its paragraph and silently hides every ref there
-    (round-5 review: four refs vanished behind one typo)."""
-    out, start, count = [], None, 0
+    (round-5 review: four refs vanished behind one typo). Escaped backticks
+    (``\\```) are not strays."""
+    out, start, para = [], None, []
+
+    def flush():
+        if start is None:
+            return
+        body = '\n'.join(para).replace('\\`', '')
+        if '``' in body:
+            out.append((start, 'has a double-backtick run; the notes use single-backtick '
+                               'spans only (see the checker docstring)'))
+        elif '`' in _BACKTICK_SPAN_RE.sub('', body):
+            out.append((start, 'has an unpaired backtick; every ref after it is paired wrong'))
+
     for i, line in enumerate(_strip_fences(text, keep_lines=True).split('\n'), 1):
         if not line.strip():
-            if count % 2:
-                out.append(start)
-            start, count = None, 0
+            flush()
+            start, para = None, []
             continue
         if start is None:
             start = i
-        # CommonMark forms that legitimately hold a lone backtick: an
-        # escaped one and a double-backtick span (`` a ` b ``).
-        count += re.sub(r'``.+?``|\\`', '', line).count('`')
-    if count % 2:
-        out.append(start)
+        para.append(line)
+    flush()
     return out
 
 
@@ -278,12 +304,21 @@ def _path_tokens(notes: str):
 def _concrete_head(tok: str) -> tuple[str, bool]:
     """For a glob / placeholder / brace / directory token: the concrete path
     before the first special character, and whether it is a whole name
-    (cut at ``::``, ``:LINE``, ``[``, whitespace or the end) rather than a
+    (cut at ``:``, ``#``, ``[``, whitespace or the end) rather than a
     name prefix (cut inside a component at ``*``, ``<`` or ``{``)."""
-    m = re.search(r'[*<{\[]|::|:\d|\s', tok)
+    m = re.search(r'[*<{\[:#\s]', tok)
     if m is None:
         return tok, True
-    return tok[:m.start()], m.group(0)[0] not in '*<{'
+    return tok[:m.start()], m.group(0) not in '*<{'
+
+
+def _inside(root: Path, rel: str) -> bool:
+    """False when ``rel`` resolves outside ``root`` (`docs/../../etc`): the
+    checker must never read, let alone ast-parse, a file outside the repo."""
+    try:
+        return (root / rel).resolve().is_relative_to(root.resolve())
+    except OSError:
+        return False
 
 
 def _iter_repo_files(root: Path):
@@ -404,7 +439,14 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     counts: dict[str, int] = {}
     for m in _SENTINEL_RE.finditer(notes):
         counts[m.group(1)] = counts.get(m.group(1), 0) + 1
-    closed = {m.group(1) for m in _SENTINEL_PAIR_RE.finditer(notes)}
+        # EVERY opener, known key or not, must close before the next
+        # comment: an orphan opener drops its own key from every parser,
+        # and a `.+?` parser pairs an orphan UNKNOWN opener with the next
+        # key's closer and swallows that key too (round-7 review).
+        if not _SENTINEL_PAIR_RE.match(notes, m.start()):
+            failures.append(f'sentinels: sync:{m.group(1)} opener at {NOTES}:'
+                            f'{notes.count(chr(10), 0, m.start()) + 1} has no '
+                            f'<!-- /sync --> closer before the next comment')
     keys = _load_known_keys(root)
     if isinstance(keys, str):
         failures.append(f'sentinels: {keys}')
@@ -413,11 +455,6 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
             c = counts.get(key, 0)
             if c != 1:
                 failures.append(f'sentinels: sync:{key} appears {c}x in {NOTES} (want 1)')
-            elif key not in closed:
-                # Every parser (verify_dev_counts, build_guides) needs the
-                # pair, so an orphan opener silently drops the key from all.
-                failures.append(f'sentinels: sync:{key} opener in {NOTES} has no '
-                                f'<!-- /sync --> closer before the next comment')
     cl_path = root / CHANGELOG
     changelog = _read(cl_path) if cl_path.is_file() else ''
     for m in _SENTINEL_RE.finditer(changelog):
@@ -479,10 +516,9 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
     open_fence = _unclosed_fence(notes)
     if open_fence is not None:
         failures.append(f'outbound: {NOTES}:{open_fence} opens a code fence that is never '
-                        f'closed; every heading and ref after it is unchecked')
-    for line_no in _odd_backtick_paragraphs(notes):
-        failures.append(f'outbound: {NOTES}:{line_no} paragraph has an odd number of '
-                        f'backticks; every ref after the stray one is paired wrong')
+                        f'closed; every heading after it is invisible to the citation scan')
+    for line_no, why in _stray_backtick_paragraphs(notes):
+        failures.append(f'outbound: {NOTES}:{line_no} paragraph {why}')
 
     for line_no, tok in _path_tokens(notes):
         m = _PATH_RE.match(tok)
@@ -493,8 +529,11 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
                 head, whole = _concrete_head(tok)
                 if head.startswith('userdata/'):
                     continue  # gitignored, machine-local; never in the export
+                if not _inside(root, head):
+                    failures.append(f'outbound: {NOTES}:{line_no} `{tok}` escapes the repo')
+                    continue
                 if whole:
-                    ok = (root / head).exists()
+                    ok = (root / head).is_dir() if head.endswith('/') else (root / head).exists()
                 else:
                     d, _, stem = head.rpartition('/')
                     ok = (root / d).is_dir() and any(
@@ -511,6 +550,9 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
             continue
         path_part, members = m.group(1), m.group(2)
         target = root / path_part
+        if not _inside(root, path_part):
+            failures.append(f'outbound: {NOTES}:{line_no} `{path_part}` escapes the repo')
+            continue
         if not target.exists():
             msg = f'outbound: {NOTES}:{line_no} names `{path_part}` which does not exist'
             # userdata/ is gitignored, machine-local evidence: warn only.

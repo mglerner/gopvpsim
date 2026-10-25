@@ -433,7 +433,7 @@ def test_odd_backtick_paragraph_fails_with_the_files_line_number(tmp_path):
     notes = base + 'first line of the paragraph\nhas a stray ` here\n'
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     first_line = base.count('\n') + 1
-    assert len(fails) == 1 and f':{first_line} paragraph has an odd number' in fails[0], fails
+    assert len(fails) == 1 and f':{first_line} paragraph has an unpaired' in fails[0], fails
 
 
 def test_citation_pairs_across_at_most_one_newline(tmp_path):
@@ -475,7 +475,7 @@ def test_markdown_heading_after_mention_is_not_a_citation(tmp_path):
 def test_stray_backtick_does_not_hide_later_refs(tmp_path):
     notes = GOOD_NOTES + 'a stray ` here\n\n`tests/test_thing.py::test_gone`\n'
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
-    assert len(fails) == 2 and 'test_gone' in fails[1] and 'odd number' in fails[0], fails
+    assert len(fails) == 2 and 'test_gone' in fails[1] and 'unpaired' in fails[0], fails
 
 
 def test_attribute_and_subscript_assignments_bind_nothing(tmp_path):
@@ -537,7 +537,9 @@ def test_unclosed_fence_fails_and_names_its_line(tmp_path):
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     fence_line = GOOD_NOTES.count('\n') + 2
     assert any(f':{fence_line} opens a code fence' in f for f in fails), fails
-    assert len(fails) == 1  # the open fence is the one actionable report
+    # The fence's own ``` consumes a span in the raw scan, so the refs behind
+    # it are not reliably checked: the open-fence report is the actionable one.
+    assert fails[0].count('opens a code fence') == 1
 
 
 def test_glob_and_placeholder_tokens_check_their_concrete_head(tmp_path):
@@ -572,10 +574,78 @@ def test_any_extension_is_a_checked_path(tmp_path):
     assert len(fails) == 1 and 'does not exist' in fails[0]
 
 
-def test_double_backtick_spans_and_escapes_are_not_stray_backticks(tmp_path):
-    notes = GOOD_NOTES + 'a `` span ` with ` one `` inside and an escaped \\` here\n'
-    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+def test_double_backtick_runs_fail_and_escapes_are_not_stray_backticks(tmp_path):
+    # Round 7: the dialect forbids `` runs outright instead of modelling
+    # CommonMark pairing (the span scan is one regex). Round 6 had discounted
+    # them in the parity count while the scan still paired them wrong.
+    for text in ('a `` span ` with ` one `` inside', '`` a `` b `tests/gone.py` c',
+                 'use `` a`b `` then `tests/gone.py`', 'lone `` here `tests/test_thing.py`'):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '\n' + text + '\n'))
+        assert len(fails) == 1 and 'double-backtick run' in fails[0], (text, fails)
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '\nan escaped \\` is fine `tests/test_thing.py`\n'))
     assert fails == []
+    # A span opening on a line break is read as a stray (reported), never as
+    # a silent inversion that hides the refs after it.
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '\nsee `\ntests/gone.py` and `tests/gone2.py` here\n'))
+    assert len(fails) == 1 and 'unpaired' in fails[0], fails
+
+
+# --- round-7 pins -----------------------------------------------------------
+
+def test_path_after_equals_quote_or_bracket_is_checked(tmp_path):
+    for span in ('--out=tests/gone.py', '"tests/gone.py"', "'tests/gone.py'", '(tests/gone.py)',
+                 'a,tests/gone.py', '[tests/gone.py]', 'python x --out=scripts/gone.py'):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{span}`\n'))
+        assert len(fails) == 1 and 'does not exist' in fails[0], (span, fails)
+    ok = ('--notes "tests/test_thing.py"', "('tests/test_thing.py')", 'see tests/test_thing.py.',
+          'git show abc123:src/data/gm.json', '$REPO/tests/gone.py', '../tests/gone.py', 'pvpoke/src/gone.py')
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + ' '.join(f'`{t}`' for t in ok) + '\n'))
+    assert fails == [], fails
+
+
+def test_unknown_key_orphan_opener_cannot_swallow_a_known_key(tmp_path):
+    # `<!-- sync:draft --> <!-- sync:test_count -->1<!-- /sync -->`: a `.+?`
+    # parser paired `draft` with test_count's closer and lost test_count; the
+    # checker saw test_count opened AND closed and passed (round 7).
+    notes = GOOD_NOTES.replace(f'<!-- sync:{KEYS[0]} -->', f'<!-- sync:draft_key --> <!-- sync:{KEYS[0]} -->')
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'sync:draft_key opener' in fails[0], fails
+    # A middle key losing its closer names THAT key, not the next one.
+    mid = KEYS[len(KEYS) // 2]
+    notes = GOOD_NOTES.replace(f'<!-- sync:{mid} -->{KEYS.index(mid) + 1}<!-- /sync -->',
+                               f'<!-- sync:{mid} -->{KEYS.index(mid) + 1}')
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and f'sync:{mid} opener' in fails[0], fails
+
+
+def test_glob_head_edge_cases(tmp_path):
+    # A placeholder after `:` or `#` on an existing file is NOT a miss (round-7
+    # false block); the member prefix before a glob is not checked; a file
+    # with a trailing `/` is not a directory; a `..` escape is refused; the
+    # `userdata/` skip holds without a userdata/ directory.
+    ok = ('tests/test_thing.py:<line>', 'docs/notes.md#<anchor>', 'tests/test_thing.py::nosuch_*',
+          'userdata/<x>/gone.log', 'scripts/tool*')
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + ' '.join(f'`{t}`' for t in ok) + '\n'))
+    assert fails == [], fails
+    for tok, why in (('tests/test_thi::test_*', 'does not exist'), ('docs/notes.md/', 'does not exist'),
+                     ('tests/test_thing.py/<x>', 'does not exist'),
+                     ('docs/../../' + '../' * 12 + 'etc/*', 'escapes the repo'),
+                     ('docs/../../' + '../' * 12 + 'etc/x.cfg', 'escapes the repo')):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{tok}`\n'))
+        assert len(fails) == 1 and why in fails[0], (tok, fails)
+
+
+def test_fence_closer_must_match_char_and_final_paragraph_is_checked(tmp_path):
+    assert vdn._unclosed_fence('~~~\nx\n```\n') == 1
+    assert vdn._unclosed_fence('~~~\nx\n~~~\n') is None
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '\nfinal paragraph, stray ` no newline'))
+    assert len(fails) == 1 and 'unpaired' in fails[0], fails
+
+
+def test_extension_and_name_characters(tmp_path):
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`docs/a+b.md` `docs/a.weird-ext` `docs/notes.md#a.b`\n',
+                                        **{'docs/a+b.md': 'x', 'docs/a.weird-ext': 'x'}))
+    assert fails == [], fails
 
 
 def test_odd_backtick_line_numbers_count_newlines_only(tmp_path):
