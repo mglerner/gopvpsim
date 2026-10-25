@@ -55,7 +55,7 @@ def clone(tmp_path: Path) -> Path:
     subprocess.run(['git', 'clone', '-q', '--shared', str(REPO_ROOT), str(c)],
                    check=True, env=_clean_env(None))
     # Bring the clone to the working tree's state (tracked changes + untracked).
-    changed = [f for f in _run(REPO_ROOT, 'diff', '--name-only', 'HEAD') if f]
+    changed = [f for f in _run(REPO_ROOT, 'diff', '--no-renames', '--name-only', 'HEAD') if f]
     untracked = [f for f in _run(REPO_ROOT, 'ls-files', '-o', '--exclude-standard') if f]
     for rel in changed + untracked:
         src, dst = REPO_ROOT / rel, c / rel
@@ -136,8 +136,10 @@ def test_checker_crash_is_reported_as_a_crash(clone):
     checker.write_text(original)
     sib = clone / 'scripts' / 'verify_dev_counts.py'
     sib.write_text(sib.read_text().replace('def main() -> int:', 'def main() -> int:\n    raise RuntimeError("boom")'))
+    # Stage ONLY the tests/ file: the sibling runs from the working tree, and
+    # staging it too let a hook without the `tests/*` trigger pass this test.
     _append(clone / 'tests' / 'conftest.py', '# s2 crash\n')
-    _git(clone, 'add', 'tests/conftest.py', 'scripts/verify_dev_counts.py')
+    _git(clone, 'add', 'tests/conftest.py')
     r = _commit(clone, 'z')
     assert r.returncode == 1 and 'verify_dev_counts.py could not run' in r.stderr
     assert 'dev-count drift' not in r.stderr
@@ -160,9 +162,9 @@ def test_venv_without_pytest_is_an_environment_error_not_drift(clone, tmp_path):
     assert 'dev-count drift' not in r.stderr
 
 
-@pytest.mark.slow  # the deletion half triggers pytest collection (~5 s)
-def test_renamed_toml_and_deleted_test_file_are_not_skipped(clone):
-    # Pure rename (status R) of a TOML carrying the ai line: step 1 must see it.
+def test_renamed_toml_with_ai_line_is_seen(clone):
+    # Pure rename (status R) of a TOML carrying the ai line: step 1 must see
+    # it (fast-tier pin of --no-renames on the step-1 list).
     bad = clone / 'thresholds' / 'zz_ai_great.toml'
     bad.write_text('authored_by = "ai"\n')
     _git(clone, 'add', 'thresholds/zz_ai_great.toml')
@@ -170,7 +172,10 @@ def test_renamed_toml_and_deleted_test_file_are_not_skipped(clone):
     _git(clone, 'mv', 'thresholds/zz_ai_great.toml', 'thresholds/zz_ai2_great.toml')
     r = _commit(clone, 'mv')
     assert r.returncode == 1 and 'AI-drafted prose' in r.stderr
-    _git(clone, 'reset', '-q', '--hard')
+
+
+@pytest.mark.slow  # each half triggers pytest collection (~3-5 s)
+def test_deleted_renamed_out_and_quoted_name_test_files_trigger_step2(clone):
     # Deletion (status D) of a test file the notes do not name: step 2 must run.
     notes = (clone / 'DEVELOPER_NOTES.md').read_text()
     victim = next(f for f in _run(clone, 'ls-files', 'tests')
@@ -184,6 +189,13 @@ def test_renamed_toml_and_deleted_test_file_are_not_skipped(clone):
     _git(clone, 'mv', victim, 'docs/zz_moved_out.py')
     r = _commit(clone, 'mv-out')
     assert 'dev-count' in r.stderr, (victim, r.stderr)
+    _git(clone, 'reset', '-q', '--hard')
+    # A `"` in the name (round 6): the text listing C-quoted it and the
+    # quoted form matched no trigger, so the commit passed in <0.5 s.
+    (clone / 'tests' / 'test_zz"q.py').write_text('def test_a(): pass\n')
+    _git(clone, 'add', 'tests/test_zz"q.py')
+    r = _commit(clone, 'q')
+    assert 'dev-count' in r.stderr, r.stderr
 
 
 @pytest.mark.slow  # pytest collection of the whole suite (~5 s)
@@ -206,6 +218,14 @@ def test_symlinked_ship_toml_is_rejected(clone):
     _git(clone, 'add', 'thresholds/zz_link_great.toml')
     r = _commit(clone, 'ln')
     assert r.returncode == 1 and 'symlinked ship-tracked' in r.stderr, r.stderr
+    # Round 6: `[` in the link's name made the ls-files pathspec a glob that
+    # also listed the plain file's mode, so the two-line result != 120000.
+    _git(clone, 'reset', '-q', '--hard')
+    (clone / 'thresholds' / 'zz1_great.toml').write_text('authored_by = "human"\n')
+    (clone / 'thresholds' / 'zz[1]_great.toml').symlink_to('../zz_target.toml')
+    _git(clone, 'add', 'thresholds/zz1_great.toml', 'thresholds/zz[1]_great.toml')
+    r = _commit(clone, 'glob')
+    assert r.returncode == 1 and 'zz[1]_great.toml' in r.stderr and 'symlinked' in r.stderr, r.stderr
     # Typechange (T): a tracked TOML replaced by a symlink is also caught.
     _git(clone, 'reset', '-q', '--hard')
     toml = next(f for f in _run(clone, 'ls-files', 'thresholds') if f.endswith('.toml'))
@@ -264,14 +284,88 @@ def test_step2_runs_under_stripped_path_and_reads_index_sentinels(clone):
     assert r.returncode == 1 and 'sentinel 1 !=' in r.stderr, r.stderr
 
 
-@pytest.mark.slow
-def test_staged_heading_rename_without_citers_is_blocked_but_unstaged_is_not(clone):
+@pytest.mark.slow  # staging the notes triggers step 2's collection
+def test_staged_heading_rename_with_citers_is_blocked_but_unstaged_is_not(clone):
+    # Round 6: the heading renamed here used to be "Article lifecycle", which
+    # nothing cites, so the block came from checkout-dependent count drift and
+    # a disabled step 3 would have passed. "Performance baseline" is cited
+    # from TODO.md and docs/TODO_backlog.md.
     notes = clone / 'DEVELOPER_NOTES.md'
-    renamed = notes.read_text().replace('## Article lifecycle\n', '## Article lifecycle (renamed)\n')
+    renamed = notes.read_text().replace('## Performance baseline (regression gate)\n',
+                                        '## Perf baseline (renamed)\n')
     assert renamed != notes.read_text()
     notes.write_text(renamed)
     _append(clone / 'README.md', 'y\n')
     _git(clone, 'add', 'README.md')
     assert _commit(clone, 'f').returncode == 0  # index clean, tree broken
     _git(clone, 'add', 'DEVELOPER_NOTES.md')
-    assert _commit(clone, 'h').returncode == 1
+    r = _commit(clone, 'h')
+    assert r.returncode == 1 and 'Commit blocked by DEVELOPER_NOTES drift' in r.stderr, r.stderr
+
+
+# --- round-6 pins -----------------------------------------------------------
+
+def test_quoted_and_non_ascii_toml_names_are_checked(clone):
+    # A `"`, a tab or a backslash in the name made git C-quote it on the text
+    # listing, and `"thresholds/zz\"q.toml"` matched no pattern (round 6);
+    # the non-ASCII case pins round 4's quotePath fix, which had no test.
+    names = ['thresholds/zz"q_great.toml', 'thresholds/zz\tt_great.toml',
+             'thresholds/zz\\b_great.toml', 'thresholds/zz\u00e9_great.toml']
+    for n in names:
+        (clone / n).write_text('authored_by = "ai"\n')
+    _git(clone, 'add', *names)
+    r = _commit(clone, 'names')
+    assert r.returncode == 1 and 'AI-drafted prose' in r.stderr, r.stderr
+    assert all(n in r.stderr for n in names), r.stderr
+
+
+def test_authored_by_forms_the_renderer_reads_as_ai_are_rejected(clone):
+    # deep_dive_rendering._authored_by_class does .strip().lower() on the value
+    # of ANY block; the literal grep caught only `authored_by = "ai"`.
+    bad = {
+        'nospace': 'authored_by="ai"\n',
+        'single': "authored_by = 'ai'\n",
+        'upper': '[intro]\nauthored_by = "AI"\n',
+        'indent': '[intro]\n  authored_by = "ai"\n',
+        'dotted': 'intro.authored_by = "ai"\n',
+        'inline': 'intro = { authored_by = " ai " }\n',
+        'nested': '[Species.Azumarill]\nauthored_by = "ai"\n',
+        'broken': 'authored_by = "ai"\nthis is not toml ==\n',
+    }
+    good = {'human': 'authored_by = "human"\n', 'mixed': '[intro]\nauthored_by = "mixed"\n',
+            'other_key': 'author = "ai drafted"\nai = "authored_by"\n'}
+    for k, body in {**bad, **good}.items():
+        (clone / 'thresholds' / f'zz{k}_great.toml').write_text(body)
+    _git(clone, 'add', 'thresholds')
+    r = _commit(clone, 'forms')
+    assert r.returncode == 1 and 'AI-drafted prose' in r.stderr, r.stderr
+    listed = {line.strip() for line in r.stderr.splitlines()}
+    assert {f'thresholds/zz{k}_great.toml' for k in bad} <= listed, (listed, r.stderr)
+    assert not {f'thresholds/zz{k}_great.toml' for k in good} & listed, listed
+
+
+def test_skip_worktree_entries_do_not_block(clone):
+    # checkout-index refused skip-worktree entries (sparse checkouts) and the
+    # hook aborted every commit with a raw git error (round 6).
+    assert _git(clone, 'update-index', '--skip-worktree', 'docs/concepts.md').returncode == 0
+    _append(clone / 'README.md', 'sw\n')
+    _git(clone, 'add', 'README.md')
+    r = _commit(clone, 'sw')
+    assert r.returncode == 0, r.stderr
+
+
+def test_clean_merge_bringing_an_ai_toml_is_blocked(clone):
+    # A clean merge runs pre-merge-commit, not pre-commit; it is a symlink to
+    # the same file since round 6 (the header comment had just documented
+    # the gap).
+    assert (REPO_ROOT / '.githooks' / 'pre-merge-commit').resolve().name == 'pre-commit'
+    assert _git(clone, 'checkout', '-q', '-b', 'side').returncode == 0
+    (clone / 'thresholds' / 'zz_merge_great.toml').write_text('authored_by = "ai"\n')
+    _git(clone, 'add', 'thresholds/zz_merge_great.toml')
+    assert _git(clone, 'commit', '-q', '--no-verify', '-m', 'side').returncode == 0
+    assert _git(clone, 'checkout', '-q', '-').returncode == 0
+    _append(clone / 'README.md', 'main side\n')
+    _git(clone, 'add', 'README.md')
+    assert _commit(clone, 'm').returncode == 0
+    r = _git(clone, 'merge', '--no-ff', '-q', '-m', 'merge side', 'side')
+    assert r.returncode != 0 and 'AI-drafted prose' in r.stderr, r.stderr

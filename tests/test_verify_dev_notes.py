@@ -240,6 +240,15 @@ def test_outbound_missing_test_name_fails(tmp_path):
     assert len(fails) == 1 and 'defines no `NOPE`' in fails[0]
 
 
+def test_nested_def_is_not_a_class_member(tmp_path):
+    # Round-6 surviving mutant: dropping the ClassDef check in the chain walk
+    # let `::outer::inner` resolve through a FUNCTION body.
+    src = 'def outer():\n    def inner(): pass\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`tests/test_nest.py::outer::inner`\n',
+                                        **{'tests/test_nest.py': src}))
+    assert len(fails) == 1 and 'defines no `outer::inner`' in fails[0], fails
+
+
 def test_member_check_uses_ast_scoping(tmp_path):
     for bad in ('::TestK::test_elsewhere', '::test_in_docstring', '::FLAG', '::test_ok::nested'):
         notes = GOOD_NOTES + f'`tests/test_thing.py{bad}`\n'
@@ -397,7 +406,8 @@ def test_unparseable_path_like_token_fails(tmp_path):
     notes = (GOOD_NOTES + '`tests/test_thing.py::1bad` `docs/validations/` `articles/*.toml` '
              '`userdata/<slug>.log` `userdata/x.{sh,log}` `docs/notes.md#some-anchor` '
              '`scripts/\ntool.py`\n')
-    fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
+    fails, warns = vdn.run_checks(make_repo(tmp_path, notes, **{'docs/validations/x.md': 'x\n',
+                                                                 'articles/a.toml': 'x\n'}))
     assert len(fails) == 1 and 'fits no checked form' in fails[0] and '1bad' in fails[0], fails
     assert not [w for w in warns if 'fits no checked form' in w]
     for tok in ('scripts/nope', 'docs/notes.md#'):  # no extension; empty anchor
@@ -507,6 +517,75 @@ def test_member_check_scoping_and_blocks(tmp_path):
     assert len(fails) == 1 and 'defines no `meth`' in fails[0]
 
 
+# --- round-6 pins -----------------------------------------------------------
+
+def test_orphan_sentinel_opener_fails(tmp_path):
+    # The last sentinel losing its closer dropped the key from every parser
+    # (opener count still 1) and, under the hook's --notes presence skip,
+    # passed both steps.
+    notes = GOOD_NOTES.replace(f'<!-- sync:{KEYS[-1]} -->{len(KEYS)}<!-- /sync -->',
+                               f'<!-- sync:{KEYS[-1]} -->0')
+    assert notes != GOOD_NOTES
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and f'sync:{KEYS[-1]} opener' in fails[0] and 'no <!-- /sync -->' in fails[0], fails
+
+
+def test_unclosed_fence_fails_and_names_its_line(tmp_path):
+    # An open fence hid every later ref: headings vanish from the anchor scan
+    # and the fence's own backticks invert span pairing in the raw scan.
+    notes = GOOD_NOTES + '\n```python\nsee `tests/gone.py` and `tests/test_thing.py::test_gone`\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    fence_line = GOOD_NOTES.count('\n') + 2
+    assert any(f':{fence_line} opens a code fence' in f for f in fails), fails
+    assert len(fails) == 1  # the open fence is the one actionable report
+
+
+def test_glob_and_placeholder_tokens_check_their_concrete_head(tmp_path):
+    for tok in ('tests/gone.py::{test_a,test_b}', 'tests/gone.py::test_*',
+                'src/gopvpsim/gone.py:<line>', 'tests/gone.py::test_x[<id>]::y',
+                'scripts/gone.py*', 'docs/nosuch.md/'):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{tok}`\n'))
+        assert len(fails) == 1 and 'does not exist' in fails[0], (tok, fails)
+    ok = ('tests/test_thing.py::test_*', 'scripts/tool*', 'docs/validations/', 'articles/*.toml',
+          'userdata/<slug>.log', 'userdata/logs/YYYY-MM/<x>.log', 'tests/test_thing.py::test_ok[<id>]')
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + ' '.join(f'`{t}`' for t in ok) + '\n',
+                                        **{'docs/validations/x.md': 'x\n', 'articles/a.toml': 'x\n'}))
+    assert fails == [], fails
+
+
+def test_command_prefixed_and_dot_slash_spans_are_checked(tmp_path):
+    for span in ('python scripts/gone.py --x', 'direnv exec . scripts/gone.sh', './tests/gone.py',
+                 ' tests/gone.py', 'tail -f docs/gone.log'):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{span}`\n'))
+        assert len(fails) == 1 and 'does not exist' in fails[0], (span, fails)
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`python scripts/tool.py --x` `./tests/test_thing.py`\n'))
+    assert fails == []
+
+
+def test_any_extension_is_a_checked_path(tmp_path):
+    # `.png` (11 tracked) hard-failed as "fits no checked form" and the
+    # message's advice could not be followed.
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`docs/img/a.png` `docs/notes.ipynb`\n',
+                                        **{'docs/img/a.png': 'x', 'docs/notes.ipynb': 'x'}))
+    assert fails == []
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`docs/img/gone.png`\n'))
+    assert len(fails) == 1 and 'does not exist' in fails[0]
+
+
+def test_double_backtick_spans_and_escapes_are_not_stray_backticks(tmp_path):
+    notes = GOOD_NOTES + 'a `` span ` with ` one `` inside and an escaped \\` here\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert fails == []
+
+
+def test_odd_backtick_line_numbers_count_newlines_only(tmp_path):
+    # splitlines() also splits on \x0c; every other line number counts '\n'.
+    # The \x0c line is whitespace (a paragraph break), so the paragraph is 'l1'.
+    notes = GOOD_NOTES + '\n\x0c\nl1\nstray ` here\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and f':{GOOD_NOTES.count(chr(10)) + 3} paragraph' in fails[0], fails
+
+
 def test_gitignore_is_scanned(tmp_path):
     repo = make_repo(tmp_path, **{'.gitignore': '# see DEVELOPER_NOTES "Section gone"\n'})
     fails, _ = vdn.run_checks(repo)
@@ -519,6 +598,7 @@ def test_real_repo_outbound_floors():
     members = [tok for tok in paths if '::' in tok]
     doc_cites = [m for m in vdn._CITE_RE.finditer(notes) if m.group(1) != 'DEVELOPER_NOTES']
     # 2026-10-24: 69 paths, 7 member refs, 5 doc citations; floors well below.
+    # (Round 6 widened the token scan to command-prefixed spans: 2026-10-25 >= 74.)
     assert len(paths) >= 30, len(paths)
     assert len(members) >= 4, members
     assert len(doc_cites) >= 3, len(doc_cites)

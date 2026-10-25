@@ -14,7 +14,7 @@ What these tests pin:
     identical regex keeps working).
   - the no-change case writes nothing at all.
   - WITHOUT ``--update`` the exact-match gate is untouched: drift still
-    exits 1 and the file is never written.
+    exits 3 (``DRIFT_EXIT``) and the file is never written.
 
 Every test drives a temp copy via ``monkeypatch.setattr(mod,
 'DEV_NOTES_PATH', ...)`` -- the real DEVELOPER_NOTES.md is never read
@@ -267,6 +267,36 @@ def test_collection_error_is_a_derivation_failure_not_a_count(mod, monkeypatch):
         return subprocess.CompletedProcess(a, 0, stdout='2 tests collected in 0.05s\n', stderr='')
     monkeypatch.setattr(mod.subprocess, 'run', fake_ok)
     assert mod._derive_test_count() == 2
+
+
+def test_collection_guard_halves_and_ansi_strip_each_hold(mod, monkeypatch):
+    # Round-6 surviving mutants: the rc-only and the "error"-tail-only halves
+    # of the guard, and the ANSI strip (the 2026-08-16/17 regression had no test).
+    import subprocess
+
+    def runner(rc, out):
+        return lambda *a, **k: subprocess.CompletedProcess(a, rc, stdout=out, stderr='')
+    monkeypatch.setattr(mod.subprocess, 'run', runner(2, '2 tests collected in 0.05s\n'))
+    with pytest.raises(RuntimeError, match='exited 2'):
+        mod._derive_test_count()
+    monkeypatch.setattr(mod.subprocess, 'run', runner(0, '2 tests collected, 1 error in 0.05s\n'))
+    with pytest.raises(RuntimeError, match='1 error'):
+        mod._derive_test_count()
+    monkeypatch.setattr(mod.subprocess, 'run', runner(0, '\x1b[32m\x1b[1m7 tests collected\x1b[0m in 0.1s\n'))
+    assert mod._derive_test_count() == 7
+
+
+def test_update_with_notes_is_a_usage_error(mod, tmp_path, monkeypatch):
+    # --update --notes <copy> rewrote the copy and reported success while the
+    # real notes stayed stale.
+    notes = _write_notes(tmp_path, test_count=1)
+    before = notes.read_text()
+    monkeypatch.setattr(mod, '_derive_test_count', lambda: 2)
+    monkeypatch.setattr(mod, '_derive_type_chart_cells', lambda: 324)
+    monkeypatch.setattr(sys, 'argv', ['verify_dev_counts.py', '--update', '--notes', str(notes)])
+    with pytest.raises(SystemExit) as e:
+        mod.main()
+    assert e.value.code == 2 and notes.read_text() == before
 
 
 def test_derivation_failure_still_prints_the_drift_it_found(mod, tmp_path, monkeypatch, capsys):

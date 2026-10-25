@@ -3,7 +3,9 @@
 # INDEX, not the working tree (step 2's live counts -- pytest collection, the
 # type chart -- and the checker scripts themselves necessarily come from the
 # working tree):
-#   1. Reject authored_by = "ai" in ship-tracked TOMLs
+#   1. Reject a ship-tracked TOML whose authored_by the renderer would read
+#      as "ai" -- any table, any quoting or case, mirroring
+#      deep_dive_rendering._authored_by_class -- and any symlinked one
 #      (CLAUDE.md "Ship-mode narrative policy").
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
 #      (scripts/verify_dev_counts.py; only when an input is staged, incl.
@@ -15,8 +17,11 @@
 #      (scripts/verify_dev_notes.py; every commit, incl. deletion-only).
 #
 # Install by running: git config core.hooksPath .githooks
-# Escape hatch: git commit --no-verify. Rebase/cherry-pick/merge replays do
-# not run pre-commit, so a replayed commit is unchecked until the next one.
+# Escape hatch: git commit --no-verify. Rebase and clean cherry-pick/revert
+# replays never run pre-commit, so a replayed commit is unchecked until the
+# next one; a clean merge runs pre-merge-commit instead, which is a symlink
+# to this file; a conflict resolution finished with `git commit` or
+# `cherry-pick --continue` runs it normally.
 set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -51,8 +56,10 @@ find "$GIT_DIR_ABS" -maxdepth 1 -name 'index-export.*' -mmin +60 -exec rm -rf {}
 INDEX_EXPORT=$(mktemp -d "$GIT_DIR_ABS/index-export.XXXXXX")
 trap 'rm -rf "$INDEX_EXPORT"' EXIT
 # shellcheck disable=SC2046  # the paths are the checker's constants, no spaces
+# --ignore-skip-worktree-bits: a sparse checkout (or any skip-worktree
+# entry) otherwise makes checkout-index refuse and abort every commit.
 git ls-files -z -- $("$PY" "$REPO_ROOT/scripts/verify_dev_notes.py" --print-scan-paths) \
-    | git checkout-index -z --prefix="$INDEX_EXPORT/" --stdin
+    | git checkout-index -z --ignore-skip-worktree-bits --prefix="$INDEX_EXPORT/" --stdin
 
 # --- 3. DEVELOPER_NOTES size cap + pointer integrity -----------------
 # First and unconditional: it must also run for deletion/rename-only
@@ -76,37 +83,61 @@ elif [[ $rc -ne 0 ]]; then
     exit 1
 fi
 
-# Paths unquoted (core.quotePath=false) so a non-ASCII TOML name still hits
-# the `thresholds/*.toml` pattern. --no-renames lists a rename as D + A: with
-# detection on, `git mv tests/x.py docs/` showed only the destination and
-# step 2 never saw the test count change. STAGED_ANY includes deletions,
-# which can change the derived test count but cannot carry an authored_by
-# line. T (typechange, e.g. a file replaced by a symlink) is checked too.
-STAGED=$(git -c core.quotePath=false diff --cached --no-renames --name-only --diff-filter=ACMT)
-STAGED_ANY=$(git -c core.quotePath=false diff --cached --no-renames --name-only)
-if [[ -z "$STAGED_ANY" ]]; then
+# Staged names are read NUL-terminated (-z) straight from git: a text
+# listing C-quotes a name holding `"`, `\`, a tab or a newline (quotePath
+# covers only high bytes), and `"thresholds/zz\"q.toml"` matched no pattern,
+# so such a file skipped steps 1 and 2. --no-renames lists a rename as D + A:
+# with detection on, `git mv tests/x.py docs/` showed only the destination
+# and step 2 never saw the test count change. Deletions are included for
+# step 2 (they change the derived test count); T (typechange, e.g. a file
+# replaced by a symlink) is checked by step 1 too.
+staged_names() {  # $1: --diff-filter value, or "" for everything
+    git diff --cached -z --no-renames --name-only ${1:+--diff-filter=$1}
+}
+if [[ -z "$(git diff --cached --no-renames --name-only)" ]]; then
     exit 0
 fi
 
 # --- 1. Ship-mode narrative policy -----------------------------------
 
+# Mirrors scripts/deep_dive_rendering.py _authored_by_class: an authored_by
+# in ANY table whose value .strip().lower() is "ai" renders as AI prose, so
+# `authored_by="ai"`, 'ai', "AI", an indented or dotted key and an inline
+# table all count (a literal `^authored_by = "ai"` grep missed every one).
+# A TOML that does not parse falls back to a tolerant line match, so a
+# syntax error cannot hide the field. Exit 0 = found.
+read -r -d '' AI_CHECK <<'PY' || true
+import re, sys, tomllib
+text = sys.stdin.buffer.read().decode('utf-8', 'replace')
+def walk(o):
+    if isinstance(o, dict):
+        v = o.get('authored_by')
+        return (isinstance(v, str) and v.strip().lower() == 'ai') or any(walk(x) for x in o.values())
+    return isinstance(o, list) and any(walk(x) for x in o)
+try:
+    hit = walk(tomllib.loads(text))
+except tomllib.TOMLDecodeError:
+    hit = re.search(r'(?im)^\s*(?:[\w.-]+\.)?authored_by\s*=\s*["\']\s*ai\s*["\']', text) is not None
+sys.exit(0 if hit else 1)
+PY
+
 AI_FILES=""
 LINK_FILES=""
-while IFS= read -r f; do
+while IFS= read -r -d '' f; do
     case "$f" in
         articles/*.toml|thresholds/*.toml)
             # A staged symlink (index mode 120000) shows its target PATH to
             # `git show`, not the content, so it cannot be checked: reject.
-            if [[ "$(git ls-files -s -- "$f" | cut -c1-6)" == 120000 ]]; then
+            # :(literal) -- a name holding `[`, `*` or `?` is otherwise a glob
+            # and ls-files can list ANOTHER file's mode.
+            if [[ "$(git ls-files -s -- ":(literal)$f" | cut -c1-6)" == 120000 ]]; then
                 LINK_FILES="$LINK_FILES$f"$'\n'
-            # No `grep -q`: under pipefail an early exit sends `git show`
-            # SIGPIPE on a large blob and the file silently passes.
-            elif git show ":$f" | grep '^authored_by = "ai"' >/dev/null; then
+            elif git show ":$f" | "$PY" -c "$AI_CHECK"; then
                 AI_FILES="$AI_FILES$f"$'\n'
             fi
             ;;
     esac
-done <<< "$STAGED"
+done < <(staged_names ACMT)
 
 if [[ -n "$LINK_FILES" ]]; then
     echo "ERROR: symlinked ship-tracked TOMLs (content cannot be checked):" >&2
@@ -118,8 +149,8 @@ if [[ -n "$AI_FILES" ]]; then
     echo "ERROR: AI-drafted prose in ship-tracked TOMLs:" >&2
     printf '%s' "$AI_FILES" | sed 's/^/  /' >&2
     echo >&2
-    echo 'Policy: articles/ and thresholds/ must not carry' >&2
-    echo '  authored_by = "ai"' >&2
+    echo 'Policy: articles/ and thresholds/ must not carry an authored_by' >&2
+    echo '  the renderer reads as "ai" (any table, quoting or case).' >&2
     echo 'Either blank the field and let scripts/auto_gen_narrative.py' >&2
     echo 'populate it at render time, or human-author and set' >&2
     echo '  authored_by = "human" or "mixed".' >&2
@@ -138,13 +169,13 @@ fi
 # pyproject.toml's pytest config; those are not triggers, so a commit that
 # changes only them is checked by the next commit that touches tests/.
 needs_dev_count_check=0
-while IFS= read -r f; do
+while IFS= read -r -d '' f; do
     case "$f" in
         DEVELOPER_NOTES.md|src/gopvpsim/moves.py|tests/*|scripts/verify_dev_counts.py)
             needs_dev_count_check=1
             ;;
     esac
-done <<< "$STAGED_ANY"
+done < <(staged_names "")
 
 if [[ "$needs_dev_count_check" -eq 1 ]]; then
     set +e
