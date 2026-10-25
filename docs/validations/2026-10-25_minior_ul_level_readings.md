@@ -22,6 +22,9 @@ and any Core at 1500 CP or below can enter a Great League (GL) one.
 | 14/10/14, L28            | 1789    | Ultra  | 1624     | 46.0        | +18.0 | 41.5 (1536)    | n/a                |
 | 15/9/8, L30              | 1884    | Ultra  | 1632     | 47.5        | +17.5 | 44.5 (1574)    | n/a                |
 | 15/13/13, L35            | 2101    | Ultra  | 1829     | 55.0        | +20.0 | 52.0 (1766)    | n/a                |
+| 4/0/8, L22               | 1273    | Ultra  | 856      | 22.5        | +0.5  | 33.0 (1199)    | n/a                |
+| 13/10/7, L22             | 1370    | Ultra  | 1360     | 35.0        | +13.0 | 33.0 (1318)    | n/a                |
+| 1/1/0, L8                | 441     | Ultra  | 305      | 8.5         | +0.5  | 12.5 (453)     | n/a                |
 
 Every shell CP matches one half-level exactly (the neighbouring half-levels
 are 9-21 CP away), so the level column is pinned, not fitted. The second
@@ -45,8 +48,17 @@ depend on the opponent.
   reading at the ceiling). The boost (+9.5, +12.5, +16.5, +18.0, +17.5,
   +20.0 for L15, L25, L26, L28, L30, L35) is not a function of Core level
   alone: the two L25/L26 Cores differ by four levels of boost.
-- **The 1/4/3 L26 Ultra reading (978 = L26.5, boost +0.5)** is the outlier,
-  and it reproduced against a second opponent. The same Minior reaches L52
+- **Three Miniors get NO boost in Ultra (shell = Core + 0.5):** 1/4/3 L26
+  (978, reproduced against a second opponent), 4/0/8 L22 (856) and 1/1/0
+  L8 (305), the last two predicted before they were read. The no-boost
+  case is a regime, not an outlier. All three have defense IV <= 4 and IV
+  total <= 12; every boosted Minior has defense >= 9 and total >= 24.
+  Attack IV alone is not the condition (0/9/15 got +12.5). No stat-ratio
+  rule fits the boosted set either (best 6 of 10 with Core+0.5 as a
+  floor), so the working model is a THRESHOLD on IVs (defense, total, or
+  appraisal stars; readings between the two groups are listed below)
+  plus a level-driven boost above it.
+- The 1/4/3 L26 Ultra reading The same Minior reaches L52
   in Great, and the other L26 Core (15/10/11) reaches L42.5 in Ultra. +0.5
   is exactly the go-iv Master League rule (Core + 0.5), which reads like a
   boost condition that FAILED for this Minior rather than a formula giving
@@ -91,7 +103,15 @@ depend on the opponent.
 
 ## Further readings still wanted (all free)
 
-- Ultra, same-level pairs, now the decisive readings: 4/0/8 vs 13/10/7
+- Ultra, straddling the IV threshold (Core CP / no-boost CP / PvPoke
+  formula CP): high defense, low total: 1/14/5 L25 (1488 / 971 / 1285),
+  4/12/1 L10 (591 / 403 / 595); low defense, high total: 15/3/13 L13
+  (811 / 574 / 850), 11/4/12 L17 (1043 / 721 / 1050); defense 5-9:
+  14/5/0 L24 (1442 / 998 / 1344), 15/5/1 L27 (1635 / 1132 / 1441),
+  14/6/2 L26 (1578 / 1089 / 1418), 7/8/6 L22 (1321 / 890 / 1246),
+  8/9/1 L8 (470 / 331 / 492); totals 12-25: 8/4/0 L28 (1633 / 1104 /
+  1382), 1/3/11 L21 (1223 / 811 / 1161), 4/9/12 L23 (1393 / 926 / 1271).
+- Ultra, same-level pairs (partly read): 4/0/8 vs 13/10/7
   (L22, Core CP 1273 / 1370; Core+0.5 would read 856 / 941); 1/1/0 vs
   13/5/3 (L8, 441 / 476; Core+0.5 = 305 / 343); 10/2/1 vs 6/3/8 (L29,
   1699 / 1713; Core+0.5 = 1159 / 1150); 8/2/6 L1 CP 29 (the floor;
