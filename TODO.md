@@ -92,8 +92,15 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   / 55.0, plus one flagged outlier; docs/validations/2026-10-25_minior_ul_
   level_readings.md) sit 2-4.5 levels ABOVE PvPoke's formula everywhere
   but L25, and the boost is not a function of Core level alone, so the
-  formula is wrong in UL below the ceiling too; no closed form found yet.
-  More free readings are listed in that doc. Until the
+  formula is wrong in UL below the ceiling too. **Found later 2026-10-25
+  (15 readings): Miniors with a LOW IV TOTAL get NO boost in UL (shell =
+  Core + 0.5; totals 2, 8, 12, 20 floored; 24+ boosted; defense, attack,
+  CP and level each ruled out), threshold somewhere in 21-24 (appraisal
+  1-star boundary = 23 is the natural guess).** PvPoke models none of
+  this, and the GL cap rule is not general either (946 -> L26.5). The
+  boost formula above the threshold is still open. The doc lists the
+  exact Miniors (by Core CP) that pin the threshold; next session: read
+  those, then decide the model. Until the
   rule is pinned the UL Core page carries a caveat callout (deep_dive.py,
   league-conditional) and should not be published; the Core-only page is
   unaffected.
