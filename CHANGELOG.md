@@ -2,6 +2,31 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-10-24 -- PoGoDives strat re-checked against pvpoke_dp at 38f70320d (checklist B.3)
+
+- **What:** the strat leg of the 2026-10-24 re-vet, deferred when Minior
+  was ported. Record: `docs/validations/2026-10-24_cramorant_strat_recheck.md`.
+- **Strat:** unchanged. Lab grid today vs the pre-port engine (`87e73e3`):
+  0 of 2,430 PoGoDives-tier cells moved, 2 plain-tier cells moved onto
+  PvPoke (UL Cramorant vs Dusknoir 1v2, 470 -> 487); net vs plain +76 on
+  both engines; the 720-cell strict bar passes from the shipped tensors;
+  800 random tensor cells re-simmed exact. No Minior overlay exists;
+  2,304 Minior-on-either-side cells have PoGoDives tier == plain tier.
+- **Found:** the shipped UL Cramorant page is not today's engine -- the
+  port's TTL-order fix moved plain-tier cells against Dusknoir, Shadow
+  Dusknoir and Seaking: at full resolution 11,793 of 552,960 plain-tier
+  cells (those three opponents, 5 UL pages x 9 scenarios, PvPoke-IV / bait)
+  differ, in 14 of 45 slices, never at 1v1 / 2v0 / 2v1 / 2v2; the Surf-only
+  page is clean, as were the GL probes. PvPoke-confirmed in three cells,
+  one a shown win that is a loss. The bar cannot flip (subset shifts <=
+  0.16 mean against +11 margins), but the page is wrong where it moved. Cramorant UL re-dive owed before
+  any Cramorant publish; `cramorant_certify.py --check-record` would pass
+  the stale page (sha-only) -- TODO Cramorant block.
+- **Predicate correction:** Dusknoir's frozen order equals its ascending
+  order yet moved, so the fix-2 migration clause must read "frozen
+  post-shuffle order != LISTED slot order", not "!= ascending" (TODO
+  "Minior -- open items").
+
 ## 2026-10-24 -- DEVELOPER_NOTES trimmed to its read-whole cap; the long-form history is archived here
 
 DEVELOPER_NOTES.md had grown to 2,034 lines / 118k chars against its own

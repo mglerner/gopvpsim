@@ -27,8 +27,13 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   --old-gamemaster-file <c15fb6f7e blob>` (new hash 03e7b77024e9; computed
   delta, no predicate). Engine: fixes 2-3 move non-Minior columns, so a
   predicate must cover the WHOLE delta: sketch "Minior on either side OR a
-  SUPER_POWER / PSYCHO_BOOST user on either side OR the defender's
-  post-shuffle order != its ascending-energy order" -- needs a proof
+  SUPER_POWER / PSYCHO_BOOST user on either side OR either side's frozen
+  post-shuffle charged order != its LISTED slot order" -- the third clause
+  was "!= ascending-energy order" until 2026-10-24; that is unsound: the
+  pre-port TTL walked the defender's LISTED order, and Cramorant UL vs
+  Dusknoir (listed Dynamic Punch, Shadow Punch; frozen = ascending = Shadow
+  Punch first) moved 470 -> 487 onto PvPoke
+  (docs/validations/2026-10-24_cramorant_strat_recheck.md) -- needs a proof
   (fix 1's queue-order change is new-mechanics-global: prove it is a no-op
   without a same-turn form flip, or the predicate is unsound and the
   re-dive is cold; the class-A port is Minior-only by construction, the
@@ -159,6 +164,19 @@ The 2026-09-10..27 narrative (rebalance re-verify, deep re-verification
 campaign, stale-article audit, sheet v6 -> v7, certification + publish
 guard) is closed and condensed in CHANGELOG. What stays here is the standing
 runbook and the genuinely open items.
+
+**Shipped UL page is NOT today's engine (found 2026-10-24,
+docs/validations/2026-10-24_cramorant_strat_recheck.md):** the Minior port's
+TTL-order fix moved plain-tier Cramorant UL cells against Dusknoir, Shadow
+Dusknoir and Seaking (headless PvPoke agrees with the new engine; e.g.
+Shadow Dusknoir 0v0 at iv 0/1/10 reads 509, a win, on the page and is 394).
+GL probes were clean. The strat is unaffected (0 of 2,430 lab strat cells
+moved; 720-cell bar still passes), but a Cramorant UL re-dive is owed before
+any Cramorant publish, and `cramorant_certify.py --check-record` would pass
+the stale page as-is (it checks sha256 only; the 5-per-page random selftest
+missed cells concentrated on three opponents). Lens-grid input-freshness
+item: make the record check re-sim an opponent-stratified sample, or raise
+the selftest N, before the next publish.
 
 **Standing runbook after every bake that touches Cramorant** (post-bake
 verification last DONE 2026-09-28, sheet v8; the site published 2026-09-28):
