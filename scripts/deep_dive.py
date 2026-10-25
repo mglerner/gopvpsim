@@ -165,9 +165,11 @@ _FORM_CHANGE_NOTES = {
         'sim models this as PvPoke does, including PvPoke&#39;s Meteor-level '
         'rule (whole-level steps) and its AI: both sides hold charged energy '
         'while the shell is up. The exact in-game Meteor level is still being '
-        'pinned down by the community; the shell phase is a small stat '
-        'adjustment, not the fight&#39;s hinge. For a Minior that re-enters a '
-        'battle already in Core form, see the Minior (Core only) dive.'),
+        'pinned down by the community; the rule used here differs from the '
+        'measured readings by at most about two Meteor levels, a few percent '
+        'of the shell&#39;s attack and defense (the Core phase is untouched). '
+        'For a Minior that re-enters a battle already in Core form, see the '
+        'Minior (Core only) dive.'),
     'Minior (Core only)': _form_change_callout(
         'The real Minior <em>enters</em> a battle as its bulky <b>Meteor</b> '
         'shell and drops to <b>Core</b> below 50% HP; once it has dropped, '

@@ -42,13 +42,33 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   re-dive is cold; the class-A port is Minior-only by construction, the
   Phase B gate / TTL / DP rewrites are identity in normal flow -- the clean
   387-cell audit is the evidence, not a proof). Not implemented.
-- **Dives:** GL pools regenerated 2026-10-24 (383518b; Michael: "that
-  definitely means redoing the pool"); both Minior dives launched
-  2026-10-24 21:58 via `run_website_dives.py minior --allow-stale-pools`
-  (the hand-built UL/ML pools still read DRIFT and are not inputs; the
-  preflight checks every pool, not the selected dives' -- scoping it is a
-  small runner change). Sweep cache ON on purpose: the engine is committed
-  and PvPoke-verified, and no Minior column existed to overwrite. No publish
+- **Dives: RENDERED LOCALLY 2026-10-24, NOT PUBLISHED** (record: CHANGELOG
+  "2026-10-24 (night) -- Minior GL dives rendered locally"). GL pools
+  regenerated (383518b; Michael: "that definitely means redoing the pool");
+  `run_website_dives.py minior --allow-stale-pools` ran 21:58-22:25 (Core
+  17.4 min, Core-only 9.2 min; sweep cache ON on purpose: the engine is
+  committed and PvPoke-verified, and no Minior column existed to overwrite).
+  Artifacts: `userdata/website/minior-core-great-league/` and
+  `minior-core-only-great-league/` (79 opponents each; engine 3d125a0e165f /
+  gamemaster 03e7b77024e9), blobs `userdata/replay/20261024_221424_Minior_
+  Core_great.replay.pkl.gz` and `20261024_222408_Minior_Core_only_great.
+  replay.pkl.gz`. Verified: 48/48 random tensor cells == live sim and 10/10
+  random cells == PvPoke on EACH page (Core-only via `--p1-no-form-change`);
+  verify_overnight checks 2-3 green. Pre-publish items from the render
+  review (none blocks a local read): (a) the closed-form breakpoint /
+  bulkpoint labels (`src/gopvpsim/anchors.py`) use stored CORE stats on both
+  sides and know nothing of the Meteor phase -- about 15% of spread pairs
+  swap attack order between the forms, so a label describes the post-drop
+  phase exactly and the shell phase only approximately (grid cells are
+  unaffected; labels only) -- needs a one-line caveat or a decision; (b) the
+  callout's "see the Minior (Core only) dive" pointer is plain text, not a
+  link; (c) the Core-only page's mirror opponent has no PvPoke sandbox link
+  (PvPoke's UI cannot start a Minior in Core) -- say so or hide the slot;
+  (d) tier-card anchor lines read "Minior Core (Move)" where everything else
+  reads "Minior (Core)"; (e) the Mimikyu-ordering bullet below touches 2 of
+  this dive's 693 cells vs Mimikyu. The hand-built UL/ML pools still read
+  DRIFT and are not inputs; the preflight checks every pool, not the
+  selected dives' -- scoping it is a small runner change. No publish
   without Michael's go.
 - **Engine fix riding the next bump: Mimikyu break-disguise runs BEFORE
   turnsToLive** (found 2026-10-24 by the pre-dive L1 sweep, 2,106 Minior

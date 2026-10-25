@@ -2,6 +2,79 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-10-24 (night) -- Minior GL dives rendered locally (both forms); GL pools regenerated; NOT published
+
+Michael, going to bed: "I want to have gotten to the point of having a
+minior dive. that definitely means redoing the pool." Commits 383518b,
+472235a, eea3705, 580a808 and this one. Nothing was published.
+
+**Pools (383518b).** `opponent_pools/gl_top50_plus_cs.txt` regenerated
+against today's rankings (pvpoke 38f70320d, fetched 2026-10-24 12:03):
+adds Dragonair (Shadow) and Kingdra (Shadow), drops Diggersby and
+Feraligatr (Shadow). `gl_top30_plus_cs_top100.txt`: adds Annihilape,
+Azumarill, Electrode (Hisuian), Hydreigon (Shadow); drops Araquanid
+(Shadow), Empoleon, Empoleon (Shadow), Feraligatr. The hand-built
+`ul_top60.txt` / `master_top60.txt` still read DRIFT (Michael's curation
+call; not inputs to a GL dive). `verify_overnight.py` DEFAULT_MARKERS
+follow the regeneration (472235a): Dragonair (Shadow) and Kingdra (Shadow)
+in, Diggersby out.
+
+**Pre-dive gate** (docs/predive_checklist.md grid, four Opus reviewers, all
+GO): orchestration (launcher fixed: no keeper, PYTHONUNBUFFERED, caffeinate,
+pinned data cache; sweep cache ON is safe because no Minior column existed);
+input freshness (gamemaster, rankings and the default moveset ROLLOUT /
+ACROBATICS, POWER_GEM all match the registry); engine (2,106 Minior cells vs
+PvPoke: 31 mismatches, 30 already catalogued, one new = the Mimikyu
+break-disguise ordering, now TODO "Minior -- open items", 580a808); trace
+(Medicham = PvPoke's seat-order route, docs/pvpoke_divergences.md item 1;
+Ariados closed by the class-A port, eea3705). Fast tier: 3,119 passed, 2
+failed, both known (`test_ml_guide_progress` cannot spawn `ps` under the
+sandbox; `test_real_dives_contain_their_declared_pools` fails on the old
+shipped pages until the next full bake brings the two re-entrants in). Smoke
+renders on a 4-opponent pool passed.
+
+**Dives.** `run_website_dives.py minior --allow-stale-pools` via
+`userdata/logs/launch_minior_dives_2026-10-24.sh`: launched 21:58:35,
+minior-core-great-league done in 17.4 min, minior-core-only-great-league in
+9.2 min, exit 0 at 22:25:10. 79 opponents each (75 pool + 3 active variants
++ mirror). Artifacts `userdata/website/minior-core-great-league/` and
+`.../minior-core-only-great-league/` (index + 4 split pages + vintage.toml;
+engine 3d125a0e165f / gamemaster 03e7b77024e9); blobs
+`userdata/replay/20261024_221424_Minior_Core_great.replay.pkl.gz` and
+`20261024_222408_Minior_Core_only_great.replay.pkl.gz`.
+
+**Verification.** Per page, 48 random tensor cells (any moveset, pvpoke /
+rank1 IVs, bait / nobait, any scenario) re-simmed live: 48/48 integer-exact
+on both pages (the Core-only draw included two mirror cells). Per page, 10
+random pvpoke-IV bait cells vs headless PvPoke: 10/10 exact on both
+(Core-only via `--p1-no-form-change`). `verify_overnight.py --since
+"2026-10-24 21:58"`: check 2 (2 dirs fully fresh, one vintage) and check 3
+(every declared pool entry present, 79 opponents) green; check 1 reads the
+Sep 27 chain status and check 5 (60 stale ML guides) are not this run's;
+check 4's pytest shows the same two known failures. Render review (Opus,
+L5): structure matches Azumarill one for one, every handler and anchor
+resolves, visible numbers match the embedded grids, mirror 1v1 at the
+default IVs = 500. Findings carried to TODO as pre-publish items: the
+closed-form breakpoint / bulkpoint labels are Core-form stats on both sides
+(`anchors.py` has no form-change handling; about 15% of spread pairs swap
+attack order between forms; grid cells unaffected); the "(Core only)"
+pointer is plain text; the Core-only mirror has no PvPoke link; tier-card
+anchor lines read "Minior Core (Move)".
+
+**Two render-only follow-ups, re-rendered from the blobs
+(`rerender_dive_cards.py`), no sim change.** (1) The Core page's dive card
+had the typing-coloured fallback: pokemondb has no `go/normal/minior-core`
+sprite (404), so the home sprite was placed at
+`~/Documents/gopvpsim_cache/sprites/minior-core.png`; after the re-render
+the Core pages differ from the first render ONLY in the card sprite (and
+vintage.toml's rendered_at), the Core-only pages only in rendered_at. (2)
+The callout's "the shell phase is a small stat adjustment, not the fight's
+hinge" read as a claim about the shell phase (which swings scores by
+hundreds) rather than about the level-rule uncertainty; reworded to the
+recorded claim (<= ~2 Meteor levels, a few percent of the shell's attack
+and defense; the Core phase is untouched). The selftests above were re-run
+after the sprite re-render; the callout re-render changes prose only.
+
 ## 2026-10-24 -- PoGoDives strat re-checked against pvpoke_dp at 38f70320d (checklist B.3)
 
 - **What:** the strat leg of the 2026-10-24 re-vet, deferred when Minior
