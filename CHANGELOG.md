@@ -2,6 +2,65 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-10-25 -- Minior UL dives rendered locally (both forms, no one-move pages); UL shell level found unpinned in-game; NOT published
+
+Michael: "Now dive UL, same way, except we don't need the single-moved
+miniors" (the one-charged-move entries in the GL dropdown). Commits 410bd5e
+and this one. Nothing published.
+
+**Setup (410bd5e).** `deep_dive.py --no-single-charged` drops the
+one-charged-move candidates from the no-`--charged` enumeration (Minior
+with Rollout pinned: 6 candidates -> 3; `tests/test_no_single_charged.py`).
+Registry entries `minior-core-ultra-league` / `minior-core-only-ultra-league`
+with that flag. `opponent_pools/ul_top60.txt` unioned with today's top-60
+per the file's own convention (Golisopod (Shadow), Kingdra, Malamar,
+Toucannon (Shadow) added; verifies OK, 64 committed / 60 live);
+`master_top60` still drifts (Zekrom (Shadow)), so the run used
+`--allow-stale-pools`. Rankings `ultra.json` fetched 2026-10-24 12:03 from
+pvpoke 38f70320d.
+
+**Dives.** Launcher `userdata/logs/launch_minior_ul_dives_2026-10-25.sh`
+(same shape as the GL one; the two slugs run back to back because the
+runner's filter is a slug substring): LAUNCH 09:50:56, Core done in 17.3
+min, Core-only in 12.1 min, EXIT 0 10:20:24. Pages
+`userdata/website/minior-core-ultra-league/` and
+`.../minior-core-only-ultra-league/` (index + 2 split pages each, three
+Rollout pairs, no one-move pages); 68 opponents (64 pool + 3 active
+variants + mirror); engine 3d125a0e165f / gamemaster 03e7b77024e9; blobs
+`userdata/replay/20261025_100643_Minior_Core_ultra.replay.pkl.gz` and
+`20261025_101912_Minior_Core_only_ultra.replay.pkl.gz`. Card sprites
+present on both (cached from last night).
+
+**Verification.** Core page: 48/48 random tensor cells == live sim, 6/12
+== PvPoke (misses 90 vs 105, 167 vs 170, 470 vs 497, 277 vs 280, 145 vs
+151, 33 vs 67: the shell-level gap below). Core-only page: 48/48 live,
+12/12 PvPoke (with `--p1-no-form-change`). `verify_overnight.py --since
+"2026-10-25 09:50"`: see the log `userdata/logs/verify_overnight_minior_ul_2026-10-25.log`.
+
+**The UL shell level is not pinned, two ways.** (1) Ceiling: our Meteor
+level clamps at 52 (top of `pokemon.CPM`), PvPoke's at 55. An Opus probe in
+a scratch worktree (scratch `agent_UL/`, scripts `ul_cells.py`, `wide.py`,
+`spot.py`) measured the shipped engine vs itself with PvPoke's 52.5-55 CPM
+values added: 1,231 of 2,880 UL cells differ (64 opponents x 9 scenarios x
+5 IV sets), max |delta| 468, 59 of 500 winner flips (54 under-rate Minior);
+126/126 sampled cells and 36/36 spot-checked grid cells match PvPoke
+exactly after the addition, and 'Minior (Core only)' matched 45/45 before
+it. The six values are PvPoke's Pokemon.js cpms[103..108]; the Aegislash
+shield-level clamp (formchange.py:222) reads the same `max(CPM)`, so a
+merge must pin it. Shell stats at 15/15/15: L52 111.39 atk / 177.71 def,
+L55 113.35 / 180.85 (+1.764%). (2) Rule: Michael read the in-battle CP of
+three of his Miniors (no power-ups): Core L25 0/9/15 -> GL shell 48.5
+(community cap rule exact, PvPoke's GL formula 48.0), UL shell 37.5
+(PvPoke's UL formula exact); Core L15 12/15/7 -> UL shell 24.5 (formula
+22.5); Core L28 14/10/14 -> UL shell 46.0 (formula 41.5). The boost is not
+linear in Core level and no simple stat-matching rule fits; record and the
+proposed free follow-up readings:
+`docs/validations/2026-10-25_minior_ul_level_readings.md`;
+`docs/pvpoke_divergences.md` item 9 updated. The UL Core page now carries
+a league-conditional caveat callout (deep_dive.py) and both UL sets were
+re-rendered from their blobs to pick it up; the Core-only page is
+unaffected (no shell phase).
+
 ## 2026-10-24 (night) -- Minior GL dives rendered locally (both forms); GL pools regenerated; NOT published
 
 Michael, going to bed: "I want to have gotten to the point of having a
