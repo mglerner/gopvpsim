@@ -23,7 +23,15 @@ the default since 2026-09-09.
    from `move.damage`, which it refreshes only on use, so one move is current
    and the other init-stale -- an internally inconsistent cache bug. We evaluate
    both moves fresh at the current stage instead. Pinned in
-   `tests/test_nb1_selection_freeze.py` Group C.
+   `tests/test_nb1_selection_freeze.py` Group C. A second route into the
+   same cache bug (traced 2026-10-24): with Minior in seat 1, `Battle.start`
+   prices seat 0's moves against CORE before seat 1's battle-start flip to
+   Meteor, so a never-thrown move keeps a Core-priced `move.damage` all
+   fight. Medicham (seat 0) vs Minior reads Dynamic Punch 80 (Core) over Ice
+   Punch 40 (refreshed on use, vs Meteor), ratio 1.78, and swaps to Dynamic
+   Punch into a certain shield: PvPoke 373 / 391 at 1-2 / 2-2 where we (and
+   PvPoke with the seats swapped) read 351 / 734. Our dives put the focal in
+   seat 0, where every cell matches.
 2. **Morpeko toggles form on every charged move.** The game, and Morpeko's own
    gamemaster entry, toggles Full Belly <-> Hangry after each charged move.
    PvPoke changes it one way and then sticks in Hangry. Ours matches verified
