@@ -3,10 +3,11 @@
 # INDEX, not the working tree (step 2's live counts -- pytest collection, the
 # type chart -- and the checker scripts themselves necessarily come from the
 # working tree):
-#   1. Reject a ship-tracked TOML whose authored_by the renderer would read
-#      as "ai" -- any table, any quoting or case, mirroring
-#      deep_dive_rendering._authored_by_class -- and any symlinked one
-#      (CLAUDE.md "Ship-mode narrative policy").
+#   1. Reject a ship-tracked TOML with an authored_by whose value reads as
+#      "ai" (.strip().lower(), as deep_dive_rendering._authored_by_class
+#      does) in ANY table -- broader than the renderer, which reads only
+#      intro/meta_role/verdict -- and any symlinked one (CLAUDE.md
+#      "Ship-mode narrative policy").
 #   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
 #      (scripts/verify_dev_counts.py; only when an input is staged, incl.
 #      a deleted test file). The
@@ -17,11 +18,12 @@
 #      (scripts/verify_dev_notes.py; every commit, incl. deletion-only).
 #
 # Install by running: git config core.hooksPath .githooks
-# Escape hatch: git commit --no-verify. Rebase and clean cherry-pick/revert
-# replays never run pre-commit, so a replayed commit is unchecked until the
-# next one; a clean merge runs pre-merge-commit instead, which is a symlink
-# to this file; a conflict resolution finished with `git commit` or
-# `cherry-pick --continue` runs it normally.
+# Escape hatch: git commit --no-verify. Rebase (`rebase --continue` too),
+# clean cherry-pick/revert replays and fast-forward merges/pulls never run
+# pre-commit, so a commit that arrives that way is unchecked until the next
+# one; a non-fast-forward clean merge runs pre-merge-commit instead, which
+# is a symlink to this file; a conflict resolution finished with `git
+# commit`, `merge --continue` or `cherry-pick --continue` runs it normally.
 set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -100,12 +102,18 @@ fi
 
 # --- 1. Ship-mode narrative policy -----------------------------------
 
-# Mirrors scripts/deep_dive_rendering.py _authored_by_class: an authored_by
-# in ANY table whose value .strip().lower() is "ai" renders as AI prose, so
+# Value test as in scripts/deep_dive_rendering.py _authored_by_class
+# (.strip().lower() == "ai"), applied to an authored_by in ANY table --
+# deliberately broader than the renderer, which reads only the intro /
+# meta_role / verdict blocks, so the field cannot dodge the gate by moving.
 # `authored_by="ai"`, 'ai', "AI", an indented or dotted key and an inline
 # table all count (a literal `^authored_by = "ai"` grep missed every one).
-# A TOML that does not parse falls back to a tolerant line match, so a
-# syntax error cannot hide the field. Exit 0 = found.
+# A TOML that does not parse gets a tolerant line match instead, so a syntax
+# error does not switch the check off (the renderer cannot load such a file
+# anyway). Exit 0 = found, 3 = clean; anything else is a crash and BLOCKS
+# (an uncaught exception also exits 1, which used to read as "clean").
+# -I: ignore the cwd and the environment, so an untracked tomllib.py at the
+# repo root cannot shadow the stdlib.
 read -r -d '' AI_CHECK <<'PY' || true
 import re, sys, tomllib
 text = sys.stdin.buffer.read().decode('utf-8', 'replace')
@@ -118,11 +126,12 @@ try:
     hit = walk(tomllib.loads(text))
 except tomllib.TOMLDecodeError:
     hit = re.search(r'(?im)^\s*(?:[\w.-]+\.)?authored_by\s*=\s*["\']\s*ai\s*["\']', text) is not None
-sys.exit(0 if hit else 1)
+sys.exit(0 if hit else 3)
 PY
 
 AI_FILES=""
 LINK_FILES=""
+UNCHECKED=""
 while IFS= read -r -d '' f; do
     case "$f" in
         articles/*.toml|thresholds/*.toml)
@@ -132,12 +141,27 @@ while IFS= read -r -d '' f; do
             # and ls-files can list ANOTHER file's mode.
             if [[ "$(git ls-files -s -- ":(literal)$f" | cut -c1-6)" == 120000 ]]; then
                 LINK_FILES="$LINK_FILES$f"$'\n'
-            elif git show ":$f" | "$PY" -c "$AI_CHECK"; then
-                AI_FILES="$AI_FILES$f"$'\n'
+            else
+                set +e
+                git show ":$f" | "$PY" -I -c "$AI_CHECK"
+                rc=$?
+                set -e
+                case $rc in
+                    0) AI_FILES="$AI_FILES$f"$'\n' ;;
+                    3) ;;
+                    *) UNCHECKED="$UNCHECKED$f (exit $rc)"$'\n' ;;
+                esac
             fi
             ;;
     esac
 done < <(staged_names ACMT)
+
+if [[ -n "$UNCHECKED" ]]; then
+    echo "ERROR: could not check authored_by in ship-tracked TOMLs (a crash, not a" >&2
+    echo "       policy verdict; see the traceback above):" >&2
+    printf '%s' "$UNCHECKED" | sed 's/^/  /' >&2
+    exit 1
+fi
 
 if [[ -n "$LINK_FILES" ]]; then
     echo "ERROR: symlinked ship-tracked TOMLs (content cannot be checked):" >&2

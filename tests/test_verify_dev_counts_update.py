@@ -224,8 +224,11 @@ def test_rewrite_sentinel_will_not_cross_a_missing_closing_marker(mod):
     assert new == text
 
 
-def test_update_reports_a_malformed_sentinel_instead_of_eating_prose(
+def test_update_reports_a_malformed_sentinel_as_missing_instead_of_eating_prose(
         mod, tmp_path, monkeypatch, capsys):
+    # Round 7: the parser uses `[^<]*?` like the rewriter, so an orphaned
+    # opener is not a (bogus) key any more but a MISSING one; before, the
+    # `.+?` parse ran on to the next key's closer.
     notes = _write_notes(tmp_path)
     notes.write_text(notes.read_text().replace(
         '<!-- sync:test_count -->1733<!-- /sync -->',
@@ -236,7 +239,8 @@ def test_update_reports_a_malformed_sentinel_instead_of_eating_prose(
     err = capsys.readouterr().err
 
     assert rc == 3  # DRIFT_EXIT, distinct from a crash (1) or usage error (2)
-    assert 'could not rewrite sentinel' in err
+    assert 'missing sentinel: sync:test_count' in err
+    assert 'test_count' not in mod._parse_sentinels(before)
     # Nothing between the orphaned opener and the next key was touched.
     assert notes.read_text() == before
 
@@ -284,6 +288,13 @@ def test_collection_guard_halves_and_ansi_strip_each_hold(mod, monkeypatch):
         mod._derive_test_count()
     monkeypatch.setattr(mod.subprocess, 'run', runner(0, '\x1b[32m\x1b[1m7 tests collected\x1b[0m in 0.1s\n'))
     assert mod._derive_test_count() == 7
+
+
+def test_unknown_orphan_opener_does_not_swallow_the_next_key(mod):
+    text = NOTES_TEMPLATE.format(test_count=5, type_cells=324).replace(
+        '<!-- sync:test_count -->', '<!-- sync:draft --> <!-- sync:test_count -->')
+    parsed = mod._parse_sentinels(text)
+    assert parsed['test_count'] == 5 and 'draft' not in parsed
 
 
 def test_update_with_notes_is_a_usage_error(mod, tmp_path, monkeypatch):
