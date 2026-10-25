@@ -83,8 +83,10 @@ CUP_DIR_GLOB = f'*-{cup_slug_suffix("*")}'
 # checked against Sylveon and Primeape, which had LEFT the pool on 09-17, so
 # the morning gate printed 76 false "markers missing" lines. A test now
 # asserts every marker is in the committed pool.
-# 2026-09-17 regeneration entrants (+ Umbreon, in the pool throughout):
-DEFAULT_MARKERS = ['Charjabug (Shadow)', 'Diggersby', 'Forretress (Shadow)',
+# 2026-10-24 regeneration entrants (Dragonair/Kingdra Shadow; Diggersby
+# left) + the 09-17 survivors (+ Umbreon, in the pool throughout):
+DEFAULT_MARKERS = ['Charjabug (Shadow)', 'Dragonair (Shadow)',
+                   'Forretress (Shadow)', 'Kingdra (Shadow)',
                    'Oinkologne (Female)', 'Umbreon']
 
 

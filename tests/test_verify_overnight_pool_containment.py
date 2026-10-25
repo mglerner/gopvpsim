@@ -161,8 +161,8 @@ def test_a_marker_with_a_form_qualifier_is_matched_in_a_rendered_dive():
     """
     rendered = ['Umbreon', 'Charjabug', 'Charjabug (Shadow)',
                 'Forretress (Shadow)', 'Forretress (Bug Bite)',
-                'Forretress (Shadow) (Bug Bite)', 'Diggersby',
-                'Oinkologne (Female)']
+                'Forretress (Shadow) (Bug Bite)', 'Dragonair (Shadow)',
+                'Kingdra (Shadow)', 'Oinkologne (Female)']
     assert vo.missing_markers(rendered, vo.DEFAULT_MARKERS) == []
     # A moveset annotation on the marker itself still matches ...
     assert vo.missing_markers(['Umbreon (Foul Play)'], ['Umbreon']) == []
@@ -172,7 +172,8 @@ def test_a_marker_with_a_form_qualifier_is_matched_in_a_rendered_dive():
     # it could not see.
     prefix_only = [m for m in vo.DEFAULT_MARKERS
                    if not any(o.split(' (')[0] == m for o in rendered)]
-    assert prefix_only == ['Charjabug (Shadow)', 'Forretress (Shadow)',
+    assert prefix_only == ['Charjabug (Shadow)', 'Dragonair (Shadow)',
+                           'Forretress (Shadow)', 'Kingdra (Shadow)',
                            'Oinkologne (Female)']
 
 
