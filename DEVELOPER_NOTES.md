@@ -19,8 +19,8 @@ trimmed to its read-whole cap". -->
 ## PvPoke re-vetting log
 
 **2026-10-24 -- re-vetted against pvpoke `38f70320d`** (range
-`a93147bf1..38f70320d`). `e87448291` "Sandbox mode fix" is UI/sandbox only
-(the page-side double-simulate of bug-report draft 9;
+`a93147bf1..38f70320d`). `e87448291` "Sandbox mode fix" is UI only
+(the page-side double-simulate of report draft 9;
 `tests/test_pvpoke_sandbox.py` re-pinned to the fixed page, 662/[51,0]).
 `4d2908fac` + `38f70320d` add Minior: triggers `battle_start` and `hp`, the
 Meteor hold-energy rule (`ActionLogic.js:254-263`), the Meteor wouldShield
@@ -29,10 +29,11 @@ form-animation cooldown reset (`Battle.js:548`); every sim-relevant line is
 gated on `activeFormId == "minior_meteor"` except the trigger dispatch, so
 `pvpoke_dp` stays a valid PoGoDives baseline for every other species.
 **Ported as-is** (`tests/test_minior.py`; "Form change gotchas" 7, "PvPoke
-bugs found" #11); porting exposed four port-fidelity gaps, all fixed
+bugs found" #11); porting exposed four fidelity gaps, all fixed
 PvPoke-exact: fast-landing queue order ("Form change gotchas" 7(a)) and the
 TTL order, stack-two twins and battle-start freeze order ("Key implementation
-details"); class A followed the same day. Engine digests:
+details"); class A and the strat re-check (CHANGELOG "PoGoDives strat
+re-checked") followed that day. Engine digests:
 `tests/fixtures/pvpoke_engine_digests.json`.
 
 Earlier vettings are archived in CHANGELOG. Record a new entry here only for
