@@ -246,6 +246,11 @@ Called from:
 File: `.githooks/pre-commit` (or wire into existing `.claude/settings.json`
 hooks if you prefer tool-level over git-level).
 
+(Superseded: the sketch below is the original 2026 design. The shipped
+hook reads the staged content from the index rather than the working
+tree, lists renames as delete + add, rejects symlinked ship TOMLs, and
+also carries the DEVELOPER_NOTES gates; read `.githooks/pre-commit`.)
+
 ```bash
 #!/usr/bin/env bash
 # Reject authored_by = "ai" in ship-tracked TOMLs.
