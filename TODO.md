@@ -11,17 +11,20 @@ lines of mostly-completed chronological batches. -->
 Michael 2026-10-24: "take your recommendation. we can improve later" -- the
 port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 
-- **Untraced sweep cells** (`userdata/logs/minior_midflight_sweep_6.log`,
-  after the class-A port; 4 open of 702): Medicham vs Minior 1-2 (351 vs
-  373) and 2-2 (734 vs 391) -- same DP plan [IP,IP,IP] at e=95 vs 80-HP
-  1-shield Meteor, PvPoke's post-DP bandaid (ActionLogic.js ~838-990) swaps
-  slot 0 to Dynamic Punch, ours does not; suspect the frozen Core dpe gate
-  (1.775 vs 1.778). Morpeko 2-2 both seats = documented bug #8, no action.
-  (The log's ten Lickitung rows are a harness level-cap artifact, see
-  DEVELOPER_NOTES class A; pin `level=50` for Lickitung in any re-sweep.)
-  Tooling for the trace already exists: `scripts/pvpoke_trace.js`
-  decideLog/decisionLog/dpPlans vs `scripts/battle.py --log --trace-dp
-  --debug`.
+- **Sweep cells, all traced 2026-10-24** (`userdata/logs/minior_midflight_
+  sweep_6.log`, 4 open of 702): Medicham vs Minior 1-2 (351 vs 373) and 2-2
+  (734 vs 391) are PvPoke's don't-bait dpeRatio built from a Dynamic Punch
+  `move.damage` memo priced against CORE (seat 0 initialises before seat 1's
+  battle-start flip; ActionLogic.js:888-898, not the frozen-dpe gate the
+  earlier note suspected) -- the NB-1 carve-out route, now recorded at
+  docs/pvpoke_divergences.md item 1; PvPoke with the seats swapped gives our
+  numbers, and our dives put Minior in seat 0, where all 18 Medicham/Ariados
+  cells match. Ariados 2-0 closed by the class-A port (both 735). Morpeko
+  2-2 both seats = documented bug #8, no action. (The log's ten Lickitung
+  rows are a harness level-cap artifact, see DEVELOPER_NOTES class A; pin
+  `level=50` for Lickitung in any re-sweep.) Before linking any
+  Medicham-vs-Minior PvPoke battle from a page, check which seat PvPoke puts
+  Medicham in.
 - **Cache migrations before the next bake** (CLAUDE.md "Before a cold
   re-dive"). Gamemaster: `migrate_cache.py --from-gamemaster 9856aa366b5d
   --old-gamemaster-file <c15fb6f7e blob>` (new hash 03e7b77024e9; computed
@@ -39,11 +42,14 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   re-dive is cold; the class-A port is Minior-only by construction, the
   Phase B gate / TTL / DP rewrites are identity in normal flow -- the clean
   387-cell audit is the evidence, not a proof). Not implemented.
-- **Dives:** `run_website_dives.py minior --dry-run` fails because the
-  opponent pools have drifted; regenerate via `scripts/build_opponent_pool.py
-  <recipe>` (Michael's call), then `direnv exec . python
-  scripts/run_website_dives.py minior` -- with `--no-sweep-cache` until the
-  engine is trusted for a bake. No publish without Michael's go.
+- **Dives:** GL pools regenerated 2026-10-24 (383518b; Michael: "that
+  definitely means redoing the pool"); both Minior dives launched
+  2026-10-24 21:58 via `run_website_dives.py minior --allow-stale-pools`
+  (the hand-built UL/ML pools still read DRIFT and are not inputs; the
+  preflight checks every pool, not the selected dives' -- scoping it is a
+  small runner change). Sweep cache ON on purpose: the engine is committed
+  and PvPoke-verified, and no Minior column existed to overwrite. No publish
+  without Michael's go.
 - **Comment-pointer fixes riding the next engine bump** (engine-hash files;
   a comment-only edit would bump the sweep-cache hash, found by the
   2026-10-24 DEVELOPER_NOTES link audit, all pre-existing;
@@ -55,7 +61,12 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   a notes section); battle.py:2295 "DP stack-two branch" -> the exact heading;
   formchange.py:212 '"Known divergences" item 3' -> '"Form change gotchas"
   item 3'; formchange.py:203 docstring "max CPM table key, 51.0" -> 52.0
-  (Mega Level 4 added 51.5/52.0).
+  (Mega Level 4 added 51.5/52.0); formchange.py ~247-249 claims "Meteor
+  0/0/0 at 52 is over 1500" -- false (cp = 1454; 140 spreads fit at 52); the
+  52-clamp conclusion holds because the max GL start is 51.5 (Core max level
+  27.0), say that instead; `_minior_core_level` uses Python `round`
+  (banker's) where Pokemon.js uses `Math.round` (half-up) -- dead code for
+  our dives, which always store Core.
 - **UL Minior** is unverified in-game; our Meteor level clamps at 52 where
   PvPoke sits at 55 (deliberate, docs/pvpoke_divergences.md item 9). Revisit
   if a UL dive is ever wanted.
@@ -286,9 +297,16 @@ fresh-vs-frozen `move.damage` divergence (documented at the rule in
 battle.py) has no discriminating test -- needs a post-missile-debuff
 re-dive scenario where the two damage bases differ; write it if such an
 oracle cell ever drifts. (b) The opponent-pool question -- whether
-Cramorant (GL rank 13) enters `gl_top50_plus_cs.txt` / `ul_top60.txt`
-as an OPPONENT for other species' dives -- is a Michael curation call;
-until then no shipped dive sims against it.
+Cramorant enters `gl_top50_plus_cs.txt` / `ul_top60.txt` as an OPPONENT
+for other species' dives -- is a Michael curation call. CORRECTION
+2026-10-24: Cramorant (now GL #4) has in fact been IN `gl_top50_plus_cs.txt`
+since f92bec1 (2026-09-09) and has been an opponent in every GL bake since;
+the recipe does not apply the verifier's exclusion list, and
+`verify_opponent_pools.py` prints "curated out: Cramorant" only because
+`curated_out` is computed as `excluded & live`, not `excluded - committed`
+(scripts/verify_opponent_pools.py:181,208) -- a misleading label. Decide
+(keep it in, which is today's reality, or exclude it in the recipe) and fix
+the label either way.
 
 ## Worlds 2026 -- code DORMANT until 2027 (record: CHANGELOG 2026-08-10..27, 2026-08-31..09-25)
 
