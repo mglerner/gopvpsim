@@ -50,6 +50,22 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   small runner change). Sweep cache ON on purpose: the engine is committed
   and PvPoke-verified, and no Minior column existed to overwrite. No publish
   without Michael's go.
+- **Engine fix riding the next bump: Mimikyu break-disguise runs BEFORE
+  turnsToLive** (found 2026-10-24 by the pre-dive L1 sweep, 2,106 Minior
+  cells vs PvPoke 38f70320d, 31 mismatches, 30 catalogued, this the one
+  new). PvPoke's order is turnsToLive (ActionLogic.js:38-207), the lethal
+  throw (:210), THEN "opponent is Mimikyu, throw fastest charged ASAP"
+  (:236-251); `pvpoke_dp` (battle.py ~1834-1858) checks the disguise first,
+  so at low HP vs an intact disguise we throw the cheapest move where PvPoke
+  throws the TTL max-damage move. Both break the disguise for 1; only
+  leftover energy / debuff side effects differ. Pool scan (78 opponents x 9
+  vs Mimikyu, 693 cells): 10 cells fit the pattern (Araquanid x3, Charjabug
+  x2, Forretress (Shadow) x2, Oinkologne x2, Spidops), 2 change score
+  (Forretress (Shadow) 1-1 289 -> PvPoke 411, Rock Tomb debuff lands;
+  Oinkologne 1-2 439 -> 453), 0 winner flips; 8 of the 10 pattern-matched
+  only. Fix = move the block after the lethal throw; migration predicate
+  "Mimikyu on either side"; its own engine bump (one localized fix per bump).
+  Raw: scratch agent_L1/results_mimikyu_scan.json (session-local).
 - **Comment-pointer fixes riding the next engine bump** (engine-hash files;
   a comment-only edit would bump the sweep-cache hash, found by the
   2026-10-24 DEVELOPER_NOTES link audit, all pre-existing;
