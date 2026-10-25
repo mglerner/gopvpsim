@@ -31,7 +31,9 @@ the default since 2026-09-09.
    Punch 40 (refreshed on use, vs Meteor), ratio 1.78, and swaps to Dynamic
    Punch into a certain shield: PvPoke 373 / 391 at 1-2 / 2-2 where we (and
    PvPoke with the seats swapped) read 351 / 734. Our dives put the focal in
-   seat 0, where every cell matches.
+   seat 0, where every cell matches. The same Core-priced memo also flips the
+   swap the other way, log-only: Ninetales 2-2 (Energy Ball cached 63 vs 36
+   real) and Mantine 1-2 (Twister 51 vs 29) with Minior in seat 1.
 2. **Morpeko toggles form on every charged move.** The game, and Morpeko's own
    gamemaster entry, toggles Full Belly <-> Hangry after each charged move.
    PvPoke changes it one way and then sticks in Hangry. Ours matches verified
