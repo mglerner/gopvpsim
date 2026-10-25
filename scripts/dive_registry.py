@@ -110,6 +110,21 @@ EXTRA_DIVES = [
          slug='minior-core-only-great-league',
          extra_args=['--fast', 'ROLLOUT'],
          reference='ROLLOUT,ACROBATICS,POWER_GEM'),
+    # Minior UL (2026-10-25, on request; PvPoke UL rank ~550). Same pins as
+    # GL plus --no-single-charged: Michael does not want the one-charged-move
+    # pages the GL dives render (Minior has three charged moves, so the
+    # screen kept two singles alongside the three pairs). NB our Meteor
+    # level in UL is 52 where PvPoke's is 55 (docs/pvpoke_divergences.md
+    # item 9): the shell phase runs ~1.8% weaker than PvPoke's, so UL cells
+    # are not expected to be PvPoke-exact.
+    dict(species='Minior (Core)', league='ultra', shadow=False,
+         slug='minior-core-ultra-league',
+         extra_args=['--fast', 'ROLLOUT', '--no-single-charged'],
+         reference='ROLLOUT,ACROBATICS,POWER_GEM'),
+    dict(species='Minior (Core only)', league='ultra', shadow=False,
+         slug='minior-core-only-ultra-league',
+         extra_args=['--fast', 'ROLLOUT', '--no-single-charged'],
+         reference='ROLLOUT,ACROBATICS,POWER_GEM'),
 ]
 
 # Editorial per-dive settings, keyed by slug. Anything absent is derived.

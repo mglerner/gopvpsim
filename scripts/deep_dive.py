@@ -466,7 +466,8 @@ def get_legal_moves(species_name):
 
 
 def enumerate_movesets(species_name, user_fast=None, user_charged=None,
-                       cd_prep_fast=None, cd_prep_charged=None):
+                       cd_prep_fast=None, cd_prep_charged=None,
+                       no_single_charged=False):
     """
     Enumerate moveset combinations based on what the user specified.
 
@@ -480,7 +481,9 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
     cd_prep_charged: parallel list for charged moves.
 
     Returns list of (fast_id, [charged_id1, charged_id2]) tuples.
-    Single charged move movesets are included too (some mons only need one).
+    Single charged move movesets are included too (some mons only need one)
+    unless no_single_charged is set (``--no-single-charged``: a dive whose
+    one-charged-move pages are not wanted, e.g. Minior UL 2026-10-25).
 
     User-specified moves are validated against the gamemaster move database
     (not the species' legal list), allowing unreleased CD moves etc.
@@ -564,8 +567,9 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
     else:
         # No charged moves specified - all pairs from legal list
         charged_pairs = list(itertools.combinations(sorted(legal_charged), 2))
-        for cm in sorted(legal_charged):
-            charged_pairs.append((cm,))
+        if not no_single_charged:
+            for cm in sorted(legal_charged):
+                charged_pairs.append((cm,))
 
     movesets = []
     seen = set()
@@ -4030,6 +4034,10 @@ def main():
                              '(default 20).')
     parser.add_argument('--no-cache', action='store_true',
                         help='Disable disk cache for slayer iteration')
+    parser.add_argument('--no-single-charged', action='store_true',
+                        help='Do not enumerate one-charged-move movesets '
+                             '(only matters when --charged is not given). '
+                             'Two-move builds still screen as usual.')
     parser.add_argument('--split-movesets', action='store_true',
                         help='Emit one HTML file per moveset instead of one '
                              'big multi-moveset file. The moveset dropdown '
@@ -4502,7 +4510,8 @@ def main():
     # empty list here is the default no-op.
     movesets = enumerate_movesets(args.species, args.fast, user_charged,
                                   cd_prep_fast=_cd_prep_fast,
-                                  cd_prep_charged=_cd_prep_charged)
+                                  cd_prep_charged=_cd_prep_charged,
+                                  no_single_charged=args.no_single_charged)
     logger.info(f"  {len(movesets)} moveset combination(s) to evaluate")
 
     # Get opponents - from group or rankings
@@ -4740,7 +4749,8 @@ def main():
                       if args.union_charged else None)
         _p_movesets = enumerate_movesets(args.species, args.union_fast, _p_charged,
                                          cd_prep_fast=_cd_prep_fast,
-                                         cd_prep_charged=_cd_prep_charged)
+                                         cd_prep_charged=_cd_prep_charged,
+                                         no_single_charged=args.no_single_charged)
         _p_ref = resolve_reference_moveset(
             args.species, args.league, _partner_shadow, args.union_reference)
         logger.info(f"  Union with {args.union_with_form} form: screening its "
