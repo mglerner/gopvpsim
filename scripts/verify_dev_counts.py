@@ -103,8 +103,8 @@ DRIFT_EXIT = 3
 def _parse_sentinels(text: str) -> dict[str, int]:
     """Extract sentinel keys from DEVELOPER_NOTES.md as ints.
 
-    Non-integer values are rejected (returned as ``None`` slot) so the
-    verifier can flag them.
+    A non-integer value is kept as its raw string so the verifier can
+    flag it as implausible.
     """
     out: dict[str, int] = {}
     for m in _SENTINEL_RE.finditer(text):
@@ -207,6 +207,10 @@ def main() -> int:
                              'from the working tree; the every-key-present check '
                              'is skipped (see below).')
     args = parser.parse_args()
+    if args.update and args.notes is not None:
+        # --update would rewrite the COPY and report success while the real
+        # notes stay stale (the hook's export is deleted on exit).
+        parser.error('--update rewrites only the default DEVELOPER_NOTES.md; drop --notes')
     notes_path = args.notes if args.notes is not None else DEV_NOTES_PATH
 
     if not notes_path.is_file():
