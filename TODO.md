@@ -85,12 +85,15 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   Matching PvPoke = +6 CPM entries in pokemon.py, an engine-hash bump, and
   the Aegislash shield-level clamp (formchange.py:222, `max(CPM)`) must be
   pinned at 52 first or it moves too; predicate "Minior or Aegislash on
-  either side". (b) But three in-game UL readings (Core L15 / L25 / L28 ->
-  shell 24.5 / 37.5 / 46.0; docs/validations/2026-10-25_minior_ul_level_
-  readings.md) fit PvPoke's formula at one level of three and are not
-  linear in Core level, so the formula is wrong in UL, not just its
-  ceiling; the rule above Core L28 (where the dive's spreads live, L47-50)
-  is unconstrained. More free readings are listed in that doc. Until the
+  either side". **The 55 ceiling is now confirmed in-game** (Core 15/13/13
+  L35 -> shell CP 1829 = Meteor at exactly L55, 2026-10-25), so the +6 CPM
+  entries are owed regardless. (b) But seven in-game UL readings (Core L15
+  / L25 / L26 / L28 / L30 / L35 -> shell 24.5 / 37.5 / 42.5 / 46.0 / 47.5
+  / 55.0, plus one flagged outlier; docs/validations/2026-10-25_minior_ul_
+  level_readings.md) sit 2-4.5 levels ABOVE PvPoke's formula everywhere
+  but L25, and the boost is not a function of Core level alone, so the
+  formula is wrong in UL below the ceiling too; no closed form found yet.
+  More free readings are listed in that doc. Until the
   rule is pinned the UL Core page carries a caveat callout (deep_dive.py,
   league-conditional) and should not be published; the Core-only page is
   unaffected.
