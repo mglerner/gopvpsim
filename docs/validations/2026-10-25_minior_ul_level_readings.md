@@ -92,9 +92,10 @@ depend on the opponent.
 ## Further readings still wanted (all free)
 
 - Ultra, same-level pairs, now the decisive readings: 4/0/8 vs 13/10/7
-  (L22, Core CP 1273 / 1370; Core+0.5 would read 953 / 1023); 1/1/0 vs
-  13/5/3 (L8, 441 / 476; Core+0.5 = 465 / 500); 10/2/1 vs 6/3/8 (L29,
-  1699 / 1713); 8/2/6 L1 CP 29 (the floor). If the low-defense /
+  (L22, Core CP 1273 / 1370; Core+0.5 would read 856 / 941); 1/1/0 vs
+  13/5/3 (L8, 441 / 476; Core+0.5 = 305 / 343); 10/2/1 vs 6/3/8 (L29,
+  1699 / 1713; Core+0.5 = 1159 / 1150); 8/2/6 L1 CP 29 (the floor;
+  Core+0.5 = 40). If the low-defense /
   low-stamina partners come back at Core+0.5 while the others get large
   boosts, the condition is on those IVs.
 - Master, any Minior, to pin the Core+0.5 baseline (15/10/11 L26 -> 1140;
