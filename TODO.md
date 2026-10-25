@@ -70,6 +70,30 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   DRIFT and are not inputs; the preflight checks every pool, not the
   selected dives' -- scoping it is a small runner change. No publish
   without Michael's go.
+- **UL dives: RENDERED LOCALLY 2026-10-25, NOT PUBLISHED; the Core page's
+  shell phase is UNCONFIRMED** (record: CHANGELOG "2026-10-25 -- Minior UL
+  dives"). `minior-core-ultra-league` and `minior-core-only-ultra-league`
+  (registry 410bd5e; Rollout pinned + `--no-single-charged`, so three
+  two-move pages each and no one-move pages, per Michael); UL pool unioned
+  with today's top-60 (Golisopod (Shadow), Kingdra, Malamar, Toucannon
+  (Shadow)); 68 opponents; engine 3d125a0e165f. Selftests: Core 48/48 live,
+  6/12 PvPoke (expected, see below); Core-only 48/48 live, 12/12 PvPoke.
+  The decision Michael owns: **which shell level to use in UL.** (a) The
+  table ceiling: ours 52 vs PvPoke 55 moves 43% of a 2,880-cell UL grid and
+  flips 59/500 winners; adding PvPoke's 52.5-55 CPM values makes 126/126
+  sampled cells PvPoke-exact (Opus probe 2026-10-25, scratch agent_UL/).
+  Matching PvPoke = +6 CPM entries in pokemon.py, an engine-hash bump, and
+  the Aegislash shield-level clamp (formchange.py:222, `max(CPM)`) must be
+  pinned at 52 first or it moves too; predicate "Minior or Aegislash on
+  either side". (b) But three in-game UL readings (Core L15 / L25 / L28 ->
+  shell 24.5 / 37.5 / 46.0; docs/validations/2026-10-25_minior_ul_level_
+  readings.md) fit PvPoke's formula at one level of three and are not
+  linear in Core level, so the formula is wrong in UL, not just its
+  ceiling; the rule above Core L28 (where the dive's spreads live, L47-50)
+  is unconstrained. More free readings are listed in that doc. Until the
+  rule is pinned the UL Core page carries a caveat callout (deep_dive.py,
+  league-conditional) and should not be published; the Core-only page is
+  unaffected.
 - **Engine fix riding the next bump: Mimikyu break-disguise runs BEFORE
   turnsToLive** (found 2026-10-24 by the pre-dive L1 sweep, 2,106 Minior
   cells vs PvPoke 38f70320d, 31 mismatches, 30 catalogued, this the one

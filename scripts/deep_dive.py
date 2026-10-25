@@ -2117,6 +2117,23 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     _fc_note = _FORM_CHANGE_NOTES.get(species)
     if _fc_note:
         html += _fc_note
+    # Ultra League Minior (2026-10-25): the shell's battle level is not
+    # pinned. PvPoke's UL formula (which we port) puts the shell at the top of
+    # the level table for every Core in this dive (ours 52, PvPoke's 55), and
+    # the three in-game readings taken 2026-10-25 (Core L15 / L25 / L28 ->
+    # shell L24.5 / L37.5 / L46.0) fit that formula at one of the three
+    # levels. docs/validations/2026-10-25_minior_ul_level_readings.md.
+    if species == 'Minior (Core)' and league == 'ultra':
+        html += _form_change_callout(
+            '<b>Ultra League caveat.</b> Nobody has pinned the shell&#39;s '
+            'battle level in Ultra League. This page uses PvPoke&#39;s level '
+            'rule, which puts the shell at the top of the level table for '
+            'every spread here (level 52 in our table, 55 in PvPoke&#39;s, a '
+            'gap that alone changes about 4 cells in 10 against this pool). '
+            'Three in-game readings from 2026-10-25 agree with that rule at '
+            'one Core level out of three, so treat the shell phase on this '
+            'page as unconfirmed. The Core phase, and the Minior (Core only) '
+            'dive, are unaffected.')
 
     # Related article link (bidirectional link contract: docs/article_schema.md).
     # Gate emission on the built article dir EXISTING: a retired/deleted article

@@ -119,12 +119,21 @@ the default since 2026-09-09.
    never moves from the top of its level table (55); ours ends at 52, the top
    of our table. Great League is unaffected: every Great League answer is at
    or below 52 and the two engines agree exactly (`tests/test_minior.py`,
-   90 of 90 cells). Ultra League Minior is unverified in-game and outside
-   every pool we dive, so this is noted rather than fixed. (We port PvPoke's
-   level formula as it runs in its simulator, whole-level steps and all;
-   `formchange.MINIOR_HALF_LEVEL_STEP` switches to the half-level steps its
-   site display uses. Neither matches every in-game reading yet, and we
-   expect to revisit when the community settles the rule.)
+   90 of 90 cells). (We port PvPoke's level formula as it runs in its
+   simulator, whole-level steps and all; `formchange.MINIOR_HALF_LEVEL_STEP`
+   switches to the half-level steps its site display uses. Neither matches
+   every in-game reading yet, and we expect to revisit when the community
+   settles the rule.) **2026-10-25 update:** we now dive UL Minior
+   (`minior-core-ultra-league`, local only), so this is no longer
+   academic. The 52-vs-55 ceiling alone moves 43% of a 2,880-cell UL grid
+   and flips 59 of 500 winners (adding PvPoke's 52.5-55 CPM values makes
+   126/126 sampled cells PvPoke-exact, so the ceiling is the whole gap).
+   And three in-game UL readings (Core L15 / L25 / L28 -> shell L24.5 /
+   L37.5 / L46.0) fit PvPoke's formula at only one of the three levels, so
+   the formula itself is in doubt in UL, not just its ceiling:
+   `docs/validations/2026-10-25_minior_ul_level_readings.md`. Still noted
+   rather than fixed; the UL Core page carries a caveat callout and is not
+   published.
 10. **Minior's shell-break animation and fast moves in flight -- RESOLVED
     2026-10-24, we match PvPoke.** PvPoke treats Minior's five-second Meteor
     -> Core animation the way it treats a charged move: at the end of that
