@@ -178,6 +178,42 @@ def test_renamed_toml_and_deleted_test_file_are_not_skipped(clone):
     _git(clone, 'rm', '-q', victim)
     r = _commit(clone, 'del')
     assert 'dev-count' in r.stderr, (victim, r.stderr)  # drift or could-not-run: step 2 ran
+    _git(clone, 'reset', '-q', '--hard')
+    # Rename OUT of tests/ (round 5): with rename detection the diff listed
+    # only the destination, so the count change never triggered step 2.
+    _git(clone, 'mv', victim, 'docs/zz_moved_out.py')
+    r = _commit(clone, 'mv-out')
+    assert 'dev-count' in r.stderr, (victim, r.stderr)
+
+
+@pytest.mark.slow  # pytest collection of the whole suite (~5 s)
+def test_broken_test_module_is_an_environment_error_not_drift(clone):
+    # Round 5: pytest exits 2 with "N tests collected, 1 error"; the partial N
+    # was accepted and reported as drift (or matched and passed).
+    (clone / 'tests' / 'test_zz_broken.py').write_text('def (:\n')
+    _git(clone, 'add', 'tests/test_zz_broken.py')
+    r = _commit(clone, 'broken')
+    assert r.returncode == 1 and 'could not run' in r.stderr, r.stderr
+    assert 'exited 2' in r.stderr and 'dev-count drift' not in r.stderr, r.stderr
+
+
+def test_symlinked_ship_toml_is_rejected(clone):
+    # `git show :path` on a symlink prints the TARGET PATH, so the ai line in
+    # the target was invisible to step 1 (round 5, typechange/symlink lens).
+    (clone / 'zz_target.toml').write_text('authored_by = "ai"\n')
+    link = clone / 'thresholds' / 'zz_link_great.toml'
+    link.symlink_to('../zz_target.toml')
+    _git(clone, 'add', 'thresholds/zz_link_great.toml')
+    r = _commit(clone, 'ln')
+    assert r.returncode == 1 and 'symlinked ship-tracked' in r.stderr, r.stderr
+    # Typechange (T): a tracked TOML replaced by a symlink is also caught.
+    _git(clone, 'reset', '-q', '--hard')
+    toml = next(f for f in _run(clone, 'ls-files', 'thresholds') if f.endswith('.toml'))
+    (clone / toml).unlink()
+    (clone / toml).symlink_to('../zz_target.toml')
+    _git(clone, 'add', toml)
+    r = _commit(clone, 'ty')
+    assert r.returncode == 1 and 'symlinked ship-tracked' in r.stderr, r.stderr
 
 
 def test_step1_reads_the_index_not_the_working_tree(clone):
@@ -207,8 +243,8 @@ def test_step2_runs_under_stripped_path_and_reads_index_sentinels(clone):
     # Staging a tests/ file triggers step 2; the sibling script must find
     # its own interpreter (pre-fix: "derivation failed ... 'python'").
     # NOTE: test_count is checkout-dependent: modules skip themselves at
-    # import without a sibling ../pvpoke clone (10 tests) or a rendered
-    # userdata/ article (5), so a clean clone legitimately reports drift;
+    # import without a sibling ../pvpoke clone (15 tests), node (5) or a
+    # rendered userdata/ article (5), so a clean clone legitimately reports drift;
     # the pin here is "no interpreter error", not rc == 0.
     _append(clone / 'tests' / 'conftest.py', '# hook test\n')
     _git(clone, 'add', 'tests/conftest.py')

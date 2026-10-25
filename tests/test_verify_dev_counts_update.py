@@ -249,6 +249,51 @@ def test_rewrite_sentinel_does_not_double_whitespace_only_padding(mod):
     assert mod._parse_sentinels(new)['test_count'] == 99
 
 
+# --- round-5 pins -----------------------------------------------------------
+
+def test_collection_error_is_a_derivation_failure_not_a_count(mod, monkeypatch):
+    # pytest prints "2 tests collected, 1 error in 0.05s" and exits 2 when a
+    # module fails to import; the regex accepted the PARTIAL count, so a
+    # broken test file read as drift, or passed, or was written by --update.
+    import subprocess
+
+    def fake_run(*a, **k):
+        return subprocess.CompletedProcess(a, 2, stdout='x\n2 tests collected, 1 error in 0.05s\n', stderr='')
+    monkeypatch.setattr(mod.subprocess, 'run', fake_run)
+    with pytest.raises(RuntimeError, match='exited 2'):
+        mod._derive_test_count()
+
+    def fake_ok(*a, **k):
+        return subprocess.CompletedProcess(a, 0, stdout='2 tests collected in 0.05s\n', stderr='')
+    monkeypatch.setattr(mod.subprocess, 'run', fake_ok)
+    assert mod._derive_test_count() == 2
+
+
+def test_derivation_failure_still_prints_the_drift_it_found(mod, tmp_path, monkeypatch, capsys):
+    notes = _write_notes(tmp_path, type_cells=300)
+
+    def boom():
+        raise RuntimeError('no pytest')
+    monkeypatch.setattr(mod, 'DEV_NOTES_PATH', notes)
+    monkeypatch.setattr(mod, '_derive_test_count', boom)
+    monkeypatch.setattr(mod, '_derive_type_chart_cells', lambda: 324)
+    monkeypatch.setattr(sys, 'argv', ['verify_dev_counts.py', '--quiet'])
+    assert mod.main() == 1
+    err = capsys.readouterr().err
+    assert 'derivation failed (no pytest)' in err and '300 != live 324' in err, err
+
+
+def test_notes_flag_skips_the_presence_check_but_the_default_path_keeps_it(mod, tmp_path, monkeypatch):
+    # ALL_KEYS is the working-tree script's; under the hook's --notes (index
+    # export) an unstaged new key must not block unrelated commits.
+    notes = _write_notes(tmp_path)
+    notes.write_text(notes.read_text().replace(
+        '<!-- sync:pvpoke_bugs_documented -->5<!-- /sync -->', '5'))
+    assert _run(mod, monkeypatch, notes, ['--quiet']) == mod.DRIFT_EXIT
+    monkeypatch.setattr(sys, 'argv', ['verify_dev_counts.py', '--quiet', '--notes', str(notes)])
+    assert mod.main() == 0
+
+
 def test_rewrite_sentinel_updates_every_occurrence(mod):
     text = ('<!-- sync:test_count -->12<!-- /sync --> ... '
             'and again <!-- sync:test_count -->12<!-- /sync -->')

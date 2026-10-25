@@ -143,6 +143,7 @@ _PATH_PREFIXES = ('src', 'scripts', 'tests', 'docs', 'guides', 'articles',
 _PATH_RE = re.compile(
     r'^((?:' + '|'.join(_PATH_PREFIXES) + r')/[\w./-]+?\.(?:py|md|js|toml|json|'
     r'txt|sh|html|log|csv|cfg|ya?ml|gz|pkl))'
+    r'(?:#[\w-]+)?'  # a markdown anchor is tolerated, not resolved
     r'(?::\d[\d,\-]*)?((?:::[A-Za-z_]\w*)*)(?:\[[^\]]*\])?(?:\s.*)?$', re.S)
 # A span may wrap lines but not cross a blank line, so one stray backtick
 # cannot desynchronise every later span.
@@ -162,20 +163,43 @@ def _norm(s: str) -> str:
     return re.sub(r'\s+', ' ', s).strip().lower()
 
 
-def _strip_fences(text: str) -> str:
+def _strip_fences(text: str, keep_lines: bool = False) -> str:
+    """Drop fenced code blocks; with ``keep_lines`` each dropped line
+    becomes an empty one so line numbers still match the file."""
     out, fence = [], None
     for line in text.splitlines():
         m = _FENCE_RE.match(line)
         if m and fence is None:
             fence = m.group(1)
-            continue
-        if m and fence is not None and m.group(1)[0] == fence[0] \
+        elif m and fence is not None and m.group(1)[0] == fence[0] \
                 and len(m.group(1)) >= len(fence) and not m.group(2).strip():
             fence = None
-            continue
-        if fence is None:
+        elif fence is None:
             out.append(line)
+            continue
+        if keep_lines:
+            out.append('')
     return '\n'.join(out)
+
+
+def _odd_backtick_paragraphs(text: str) -> list[int]:
+    """First line of every blank-line-delimited paragraph (fences dropped)
+    with an odd number of backticks. A stray backtick inverts span pairing
+    for the rest of its paragraph and silently hides every ref there
+    (round-5 review: four refs vanished behind one typo)."""
+    out, start, count = [], None, 0
+    for i, line in enumerate(_strip_fences(text, keep_lines=True).splitlines(), 1):
+        if not line.strip():
+            if count % 2:
+                out.append(start)
+            start, count = None, 0
+            continue
+        if start is None:
+            start = i
+        count += line.count('`')
+    if count % 2:
+        out.append(start)
+    return out
 
 
 def _headings(text: str) -> list[str]:
@@ -203,11 +227,14 @@ def _cite_quote(m: re.Match) -> str:
 
 def _path_tokens(notes: str):
     """Yield (line_no, normalised token) for every backticked span that
-    starts with a repo path prefix. A span may wrap after ``::`` or at an
-    identifier ``_``; both are re-joined before matching."""
+    starts with a repo path prefix. A span may wrap on either side of
+    ``::`` or after an identifier ``_`` or a path ``/``; all are re-joined
+    before matching. NOT checked: a second ref in the same span
+    (`a.py::x b.py::gone` -- the tail after whitespace is read as CLI args).
+    """
     for m in _BACKTICK_SPAN_RE.finditer(notes):
-        tok = re.sub(r'::\s+', '::', m.group(1))
-        tok = re.sub(r'_\n\s*', '_', tok)
+        tok = re.sub(r'\s*::\s*', '::', m.group(1))
+        tok = re.sub(r'([_/])\n\s*', r'\1', tok)
         if re.match(r'(?:' + '|'.join(_PATH_PREFIXES) + r')/', tok):
             yield notes.count('\n', 0, m.start()) + 1, tok
 
@@ -396,12 +423,19 @@ def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
                 f'-- not found in {path.name}'
                 + (' headings' if headings_only else ''))
 
+    for line_no in _odd_backtick_paragraphs(notes):
+        failures.append(f'outbound: {NOTES}:{line_no} paragraph has an odd number of '
+                        f'backticks; every ref after the stray one is paired wrong')
+
     for line_no, tok in _path_tokens(notes):
         m = _PATH_RE.match(tok)
         if not m:
+            # A failure, not a warning: the hook runs --quiet and never shows
+            # warnings, so an unchecked ref would otherwise pass unseen.
             if not re.search(r'[*<{]|/$', tok):  # globs, placeholders, braces, dirs: by design
-                warnings.append(f'outbound: {NOTES}:{line_no} backticked `{tok}` looks '
-                                f'like a repo path but fits no checked form (unchecked)')
+                failures.append(f'outbound: {NOTES}:{line_no} backticked `{tok}` looks like a '
+                                f'repo path but fits no checked form (a directory ends in `/`, '
+                                f'a file carries its extension, a member is `::name`)')
             continue
         path_part, members = m.group(1), m.group(2)
         target = root / path_part

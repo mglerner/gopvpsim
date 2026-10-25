@@ -10,7 +10,8 @@ HTML-comment sentinels of the form ``<!-- sync:KEY -->VALUE<!-- /sync -->``
     asserts the sentinel matches,
   - for non-derivable keys (the PvPoke cross-check counts), sanity-
     checks the sentinel is a plausible positive integer,
-  - exits 1 on any mismatch so pre-commit can block drift.
+  - exits 3 (``DRIFT_EXIT``) on any mismatch so pre-commit can block
+    drift, and 1 when a live value could not be derived at all.
 
 Derivable keys
 --------------
@@ -28,7 +29,7 @@ Non-derivable keys (plausibility-checked only)
 ----------------------------------------------
 
 ``pvpoke_matchups_verified``, ``pvpoke_cells_verified``,
-``pvpoke_bugs_documented``
+``pvpoke_cells_exact``, ``pvpoke_bugs_documented``
     These depend on manual cross-reference against PvPoke and can't be
     recomputed from code alone. We trust the sentinel but reject values
     that are clearly wrong (non-int, <= 0).
@@ -39,8 +40,16 @@ Usage
     python scripts/verify_dev_counts.py
     python scripts/verify_dev_counts.py --quiet   # only emit mismatches
     python scripts/verify_dev_counts.py --update  # rewrite derivable sentinels
+    python scripts/verify_dev_counts.py --notes PATH  # check that copy of the
+        # notes (the hook passes its index export; live counts still come from
+        # the working tree, and the every-key-present check is left to the
+        # hook's index-consistent step 3)
 
-Exit code is 0 on full agreement, 1 on any mismatch or missing sentinel.
+Exit codes: 0 on full agreement; 3 (``DRIFT_EXIT``) on a mismatch, a
+missing or implausible sentinel, or a sentinel ``--update`` could not
+rewrite; 1 when the notes file is missing or a live value could not be
+derived (no pytest in the venv, a test module that fails to import);
+2 is argparse's usage error.
 
 ``--update`` (opt-in) turns the derivable-key check from a gate into a
 fix: each derivable sentinel whose value disagrees with the live
@@ -48,7 +57,7 @@ derivation is rewritten in place in DEVELOPER_NOTES.md (old -> new is
 printed) instead of being reported as drift.  Non-derivable keys are
 never rewritten, and missing/implausible sentinels still fail.  Without
 ``--update`` behavior is unchanged: nothing is written and any drift
-exits 1.
+exits 3.
 
 The flag exists because ``test_count`` is a serialization point --
 parallel work lanes that each add tests otherwise race to hand-edit the
@@ -164,6 +173,12 @@ def _derive_test_count() -> int:
             f'pytest --collect-only produced no output; '
             f'stderr={result.stderr!r}')
     tail = lines[-1]
+    # A module that fails to import still yields a tail -- "N tests
+    # collected, 1 error in Xs", exit 2 -- and N is the PARTIAL count. Until
+    # 2026-10-25 that read as drift (or passed, or was written by --update).
+    if result.returncode != 0 or re.search(r'\d+\s+errors?\b', tail):
+        raise RuntimeError(
+            f'pytest --collect-only exited {result.returncode}: {tail!r}')
     m = re.match(r'^(\d+)\s+tests?\s+collected\b', tail)
     if not m:
         raise RuntimeError(
@@ -186,12 +201,13 @@ def main() -> int:
                         help='Rewrite drifted DERIVABLE sentinels in '
                              'DEVELOPER_NOTES.md instead of failing on them. '
                              'Non-derivable keys are never touched.')
-    parser.add_argument('--notes', type=Path, default=DEV_NOTES_PATH,
+    parser.add_argument('--notes', type=Path, default=None,
                         help='DEVELOPER_NOTES.md to check (the pre-commit hook '
                              'passes its index export). Live counts always come '
-                             'from the working tree.')
+                             'from the working tree; the every-key-present check '
+                             'is skipped (see below).')
     args = parser.parse_args()
-    notes_path = args.notes
+    notes_path = args.notes if args.notes is not None else DEV_NOTES_PATH
 
     if not notes_path.is_file():
         print(f'error: {notes_path} missing', file=sys.stderr)
@@ -202,10 +218,13 @@ def main() -> int:
 
     problems: list[str] = []
 
-    # 1. Every expected key must exist.
-    missing = ALL_KEYS - sentinels.keys()
-    for key in sorted(missing):
-        problems.append(f'missing sentinel: sync:{key}')
+    # 1. Every expected key must exist. Skipped under --notes: ALL_KEYS is
+    # this WORKING-TREE script's, so an unstaged new key would block every
+    # unrelated commit; the hook's step 3 pins presence index-against-index.
+    if args.notes is None:
+        missing = ALL_KEYS - sentinels.keys()
+        for key in sorted(missing):
+            problems.append(f'missing sentinel: sync:{key}')
 
     # 2. Non-derivable keys: plausibility only.
     for key in sorted(PLAUSIBILITY_KEYS & sentinels.keys()):
@@ -265,11 +284,14 @@ def main() -> int:
     if derive_failures:
         # Not drift: the live value could not be computed at all (missing
         # pytest/certifi, a collection error). Exit 1 so the pre-commit hook
-        # reports an environment problem rather than a stale sentinel.
+        # reports an environment problem rather than a stale sentinel. Any
+        # drift found alongside is still printed so one run shows everything.
         print('\nERROR: dev-count derivation failed (environment, not drift):',
               file=sys.stderr)
         for d in derive_failures:
             print(f'  - {d}', file=sys.stderr)
+        for p in problems:
+            print(f'  - (also) {p}', file=sys.stderr)
         return 1
 
     if problems:

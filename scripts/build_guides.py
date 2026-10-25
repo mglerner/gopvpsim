@@ -75,7 +75,8 @@ from gopvpsim.theme import (  # noqa: E402
 # is the source of truth; the numbers live in prose, each wrapped in
 # HTML-comment sentinels ``<!-- sync:KEY -->VALUE<!-- /sync -->`` that
 # the markdown renderer hides but we parse here. ``verify_dev_counts.py``
-# cross-checks derivable keys against live code on each commit.
+# cross-checks derivable keys against live code on commits that stage
+# one of its inputs (pre-commit step 2) and in run_ship_gates.py.
 DEV_COUNTS_SOURCE_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 
 # Reference dive used for data-token resolution when a guide TOML

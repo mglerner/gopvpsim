@@ -77,10 +77,13 @@ elif [[ $rc -ne 0 ]]; then
 fi
 
 # Paths unquoted (core.quotePath=false) so a non-ASCII TOML name still hits
-# the `thresholds/*.toml` pattern. STAGED_ANY includes deletions, which can
-# change the derived test count but cannot carry an authored_by line.
-STAGED=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
-STAGED_ANY=$(git -c core.quotePath=false diff --cached --name-only)
+# the `thresholds/*.toml` pattern. --no-renames lists a rename as D + A: with
+# detection on, `git mv tests/x.py docs/` showed only the destination and
+# step 2 never saw the test count change. STAGED_ANY includes deletions,
+# which can change the derived test count but cannot carry an authored_by
+# line. T (typechange, e.g. a file replaced by a symlink) is checked too.
+STAGED=$(git -c core.quotePath=false diff --cached --no-renames --name-only --diff-filter=ACMT)
+STAGED_ANY=$(git -c core.quotePath=false diff --cached --no-renames --name-only)
 if [[ -z "$STAGED_ANY" ]]; then
     exit 0
 fi
@@ -88,17 +91,28 @@ fi
 # --- 1. Ship-mode narrative policy -----------------------------------
 
 AI_FILES=""
+LINK_FILES=""
 while IFS= read -r f; do
     case "$f" in
         articles/*.toml|thresholds/*.toml)
+            # A staged symlink (index mode 120000) shows its target PATH to
+            # `git show`, not the content, so it cannot be checked: reject.
+            if [[ "$(git ls-files -s -- "$f" | cut -c1-6)" == 120000 ]]; then
+                LINK_FILES="$LINK_FILES$f"$'\n'
             # No `grep -q`: under pipefail an early exit sends `git show`
             # SIGPIPE on a large blob and the file silently passes.
-            if git show ":$f" | grep '^authored_by = "ai"' >/dev/null; then
+            elif git show ":$f" | grep '^authored_by = "ai"' >/dev/null; then
                 AI_FILES="$AI_FILES$f"$'\n'
             fi
             ;;
     esac
 done <<< "$STAGED"
+
+if [[ -n "$LINK_FILES" ]]; then
+    echo "ERROR: symlinked ship-tracked TOMLs (content cannot be checked):" >&2
+    printf '%s' "$LINK_FILES" | sed 's/^/  /' >&2
+    exit 1
+fi
 
 if [[ -n "$AI_FILES" ]]; then
     echo "ERROR: AI-drafted prose in ship-tracked TOMLs:" >&2
@@ -117,9 +131,12 @@ fi
 # --- 2. Dev-count sentinel drift -------------------------------------
 
 # Only run when DEVELOPER_NOTES.md or any derivation input is staged (added,
-# modified, renamed OR deleted -- a deleted test file changes the count):
-# keeps the hook fast for unrelated commits. Derivation inputs are the
-# type chart (src/gopvpsim/moves.py) and the test suite (tests/**).
+# modified OR deleted -- a deleted test file changes the count, and a rename
+# out of tests/ is listed as its D side): keeps the hook fast for unrelated
+# commits. Derivation inputs are the type chart (src/gopvpsim/moves.py) and
+# the test suite (tests/**). Collection also depends on data.py and
+# pyproject.toml's pytest config; those are not triggers, so a commit that
+# changes only them is checked by the next commit that touches tests/.
 needs_dev_count_check=0
 while IFS= read -r f; do
     case "$f" in

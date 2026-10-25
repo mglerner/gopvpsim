@@ -355,10 +355,10 @@ def test_exit_codes_distinguish_drift_from_crash(tmp_path):
 
 def test_real_repo_passes_and_scan_is_non_trivial():
     fails, warns = vdn.run_checks(REPO_ROOT)
+    # `fails == []` also pins that every backticked repo path in the notes
+    # fits a checked form (the `::`/`_`/`/` line-wrap rejoins and the
+    # glob/placeholder suppressions) and that no paragraph has a stray backtick.
     assert fails == [], '\n'.join(fails)
-    # Every backticked repo path in the notes fits a checked form (pins the
-    # `::`/`_` line-wrap rejoin and the glob/placeholder suppressions).
-    assert not [w for w in warns if 'fits no checked form' in w], warns
 
     notes = (REPO_ROOT / 'DEVELOPER_NOTES.md').read_text()
     anchors = vdn._anchors(notes)
@@ -385,16 +385,45 @@ def test_wrapped_backticked_test_ref_is_checked(tmp_path):
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
     assert len(fails) == 1 and 'test_gone' in fails[0], fails
     notes = GOOD_NOTES + '`tests/test_thing.py::test_ok[case]::extra`\n'
-    fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
-    assert fails == [] and len(warns) == 1 and 'fits no checked form' in warns[0]
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'fits no checked form' in fails[0]
 
 
-def test_unparseable_path_like_token_warns(tmp_path):
+def test_unparseable_path_like_token_fails(tmp_path):
+    # Round 5: a FAILURE, not a warning -- the hook runs --quiet and would
+    # never show a warning, so the unchecked ref passed unseen. Globs,
+    # placeholders, braces and trailing-slash directories stay exempt;
+    # `#anchor` and a wrap after `/` are accepted forms since round 5.
     notes = (GOOD_NOTES + '`tests/test_thing.py::1bad` `docs/validations/` `articles/*.toml` '
-             '`userdata/<slug>.log` `userdata/x.{sh,log}`\n')
+             '`userdata/<slug>.log` `userdata/x.{sh,log}` `docs/notes.md#some-anchor` '
+             '`scripts/\ntool.py`\n')
     fails, warns = vdn.run_checks(make_repo(tmp_path, notes))
+    assert len(fails) == 1 and 'fits no checked form' in fails[0] and '1bad' in fails[0], fails
+    assert not [w for w in warns if 'fits no checked form' in w]
+    for tok in ('scripts/nope', 'docs/notes.md#'):  # no extension; empty anchor
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{tok}`\n'))
+        assert len(fails) == 1 and 'fits no checked form' in fails[0], (tok, fails)
+
+
+def test_member_chain_split_by_whitespace_is_rejoined(tmp_path):
+    # Round 5: only whitespace AFTER `::` was rejoined; these three forms
+    # dropped `::test_gone` into the CLI-args tail and passed silently.
+    for span in ('tests/test_thing.py\n::test_gone', 'tests/test_thing.py ::test_gone',
+                 'tests/test_thing.py::TestK\n::test_gone', 'tests/test_thing.py :: test_gone'):
+        fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + f'`{span}`\n'))
+        assert len(fails) == 1 and 'test_gone' in fails[0], (span, fails)
+    fails, _ = vdn.run_checks(make_repo(tmp_path, GOOD_NOTES + '`tests/test_thing.py\n::TestK::test_m`\n'))
     assert fails == []
-    assert len(warns) == 1 and 'fits no checked form' in warns[0] and '1bad' in warns[0]
+
+
+def test_odd_backtick_paragraph_fails_with_the_files_line_number(tmp_path):
+    base = GOOD_NOTES + '```\n` one backtick inside a fence does not count\n```\n\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, base + 'fine `tests/test_thing.py` here\n'))
+    assert fails == []
+    notes = base + 'first line of the paragraph\nhas a stray ` here\n'
+    fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
+    first_line = base.count('\n') + 1
+    assert len(fails) == 1 and f':{first_line} paragraph has an odd number' in fails[0], fails
 
 
 def test_citation_pairs_across_at_most_one_newline(tmp_path):
@@ -436,7 +465,7 @@ def test_markdown_heading_after_mention_is_not_a_citation(tmp_path):
 def test_stray_backtick_does_not_hide_later_refs(tmp_path):
     notes = GOOD_NOTES + 'a stray ` here\n\n`tests/test_thing.py::test_gone`\n'
     fails, _ = vdn.run_checks(make_repo(tmp_path, notes))
-    assert len(fails) == 1 and 'test_gone' in fails[0]
+    assert len(fails) == 2 and 'test_gone' in fails[1] and 'odd number' in fails[0], fails
 
 
 def test_attribute_and_subscript_assignments_bind_nothing(tmp_path):
@@ -463,10 +492,12 @@ def test_member_check_scoping_and_blocks(tmp_path):
            'else:\n    IN_ELSE = 1\n'
            'try:\n    A, B = 1, 2\nexcept ImportError:\n    FALLBACK = 1\nfinally:\n    FIN = 2\n'
            'with open(__file__):\n    def under_with(): pass\n'
+           '[L1, *L2] = 3, 4, 5\n'
            'class K:\n    def meth(self): pass\n')
     repo = make_repo(tmp_path, GOOD_NOTES + '`tests/test_blocks.py::under_if` `tests/test_blocks.py::B` '
                      '`tests/test_blocks.py::IN_ELSE` `tests/test_blocks.py::FALLBACK` '
                      '`tests/test_blocks.py::FIN` `tests/test_blocks.py::under_with` '
+                     '`tests/test_blocks.py::L1` `tests/test_blocks.py::L2` '
                      '`tests/test_blocks.py::K::meth`\n', **{'tests/test_blocks.py': src})
     fails, _ = vdn.run_checks(repo)
     assert fails == []

@@ -478,8 +478,10 @@ Claude-drafted prose. When drafting for these blocks:
    present. That's the way to ship expert-authored narrative without
    fighting the templates.
 
-The `.githooks/pre-commit` hook enforces this by rejecting any
-commit that leaves `authored_by = "ai"` in a ship-tracked TOML. The same
+The `.githooks/pre-commit` hook enforces this by rejecting a commit
+that stages (adds, modifies or renames) a ship-tracked TOML containing
+the literal line `authored_by = "ai"`; it does not rescan files the
+commit leaves untouched. The same
 hook also gates the DEVELOPER_NOTES dev-count sentinels
 (`scripts/verify_dev_counts.py`) and, on every commit, the notes' size
 cap and pointer integrity (`scripts/verify_dev_notes.py`); all three

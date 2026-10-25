@@ -39,7 +39,7 @@ the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3267<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3274<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
