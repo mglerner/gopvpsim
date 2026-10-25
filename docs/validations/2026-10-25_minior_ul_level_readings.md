@@ -17,7 +17,7 @@ and any Core at 1500 CP or below can enter a Great League (GL) one.
 | 1/4/3, L26               | 1484    | Great  | 1496     | 52.0        | +26.0 | 49.5 (1452)    | 52.0 (1496)        |
 | 12/15/7, L15             | 946     | Ultra  | 1029     | 24.5        | +9.5  | 22.5 (945)     | n/a                |
 | 0/9/15, L25              | 1500    | Ultra  | 1297     | 37.5        | +12.5 | 37.5 (1297)    | n/a                |
-| 1/4/3, L26               | 1484    | Ultra  | 978 (?)  | 26.5        | +0.5  | 39.0 (1274)    | n/a                |
+| 1/4/3, L26               | 1484    | Ultra  | 978      | 26.5        | +0.5  | 39.0 (1274)    | n/a                |
 | 15/10/11, L26            | 1653    | Ultra  | 1553     | 42.5        | +16.5 | 39.0 (1484)    | n/a                |
 | 14/10/14, L28            | 1789    | Ultra  | 1624     | 46.0        | +18.0 | 41.5 (1536)    | n/a                |
 | 15/9/8, L30              | 1884    | Ultra  | 1632     | 47.5        | +17.5 | 44.5 (1574)    | n/a                |
@@ -26,16 +26,9 @@ and any Core at 1500 CP or below can enter a Great League (GL) one.
 Every shell CP matches one half-level exactly (the neighbouring half-levels
 are 9-21 CP away), so the level column is pinned, not fitted. The second
 batch (rows 1, 3, 6-7, 9-10) was read on 2026-10-25 after the first four.
-The 1/4/3 Ultra reading is marked (?) because it is the only point that
-breaks every pattern the others share (see below); it wants a re-read with
-the bell CP confirmed as 1484.
-
-"PvPoke formula" is `formchange._minior_meteor_level` as ported (GL start
-`floor((47L/25 + 1) * 2) / 2`, UL start `floor((73L/50 + 26/25) * 2) / 2`,
-then the whole-level walk down under the cap). "Community cap rule" is the
-go-iv model for GL: the highest half-level whose Meteor CP is under 1500
-(jgmcelwain/go-iv#48). The cap rule has no UL answer because the shell can
-never reach 2500 CP.
+The 1/4/3 Ultra reading was re-read in a second Ultra battle against a
+different opponent (Spark) and gave 978 again, so it is real and does not
+depend on the opponent.
 
 ## What the readings say
 
@@ -52,11 +45,14 @@ never reach 2500 CP.
   reading at the ceiling). The boost (+9.5, +12.5, +16.5, +18.0, +17.5,
   +20.0 for L15, L25, L26, L28, L30, L35) is not a function of Core level
   alone: the two L25/L26 Cores differ by four levels of boost.
-- **The 1/4/3 L26 Ultra reading (978 = L26.5, boost +0.5)** is the outlier.
-  The same Minior reaches L52 in Great, and the other L26 Core (15/10/11)
-  reaches L42.5 in Ultra. 978 is not a Core-form CP at any half-level
-  (Core 1/4/3 reads 970 at L17 and 998 at L17.5), so it is a shell reading
-  of SOME Minior at L26.5; whether it was this one needs the re-read.
+- **The 1/4/3 L26 Ultra reading (978 = L26.5, boost +0.5)** is the outlier,
+  and it reproduced against a second opponent. The same Minior reaches L52
+  in Great, and the other L26 Core (15/10/11) reaches L42.5 in Ultra. +0.5
+  is exactly the go-iv Master League rule (Core + 0.5), which reads like a
+  boost condition that FAILED for this Minior rather than a formula giving
+  a small number. What is distinctive about it: the lowest defense IV (4;
+  every other reading has >= 9) and the lowest stamina IV (3; others >= 7).
+  Attack IV alone is not it (0/9/15 got +12.5).
 - Closed-form rules tried against the UL points (with and without the
   outlier), none fits: match the Core's CP, stat product with Meteor or
   Core HP, attack x defense, attack + defense, PvPoke's GL formula, a
@@ -95,12 +91,14 @@ never reach 2500 CP.
 
 ## Further readings still wanted (all free)
 
-- Re-read 1/4/3 L26 in Ultra, confirming 1484 at the bell (the flagged
-  row). If it is really 978, the rule has an IV or CP term that no other
-  reading shows.
-- Ultra, same-level pairs with opposite attack IVs: 10/2/1 vs 6/3/8 (L29,
-  Core CP 1699 / 1713); 13/10/7 vs 4/0/8 (L22, 1370 / 1273); 13/5/3 vs
-  1/1/0 (L8, 476 / 441); 8/2/6 L1 CP 29 (the floor).
+- Ultra, same-level pairs, now the decisive readings: 4/0/8 vs 13/10/7
+  (L22, Core CP 1273 / 1370; Core+0.5 would read 953 / 1023); 1/1/0 vs
+  13/5/3 (L8, 441 / 476; Core+0.5 = 465 / 500); 10/2/1 vs 6/3/8 (L29,
+  1699 / 1713); 8/2/6 L1 CP 29 (the floor). If the low-defense /
+  low-stamina partners come back at Core+0.5 while the others get large
+  boosts, the condition is on those IVs.
+- Master, any Minior, to pin the Core+0.5 baseline (15/10/11 L26 -> 1140;
+  15/13/13 L35 -> 1427; 0/9/15 L25 -> 980).
 - Great, away from the cap: 1/1/0 L8 CP 441; 13/10/7 L22 CP 1370; 8/2/6
   L1 CP 29. The 12/15/7 L15 reading (946 -> 1113) already shows the cap
   rule is not general in GL.
