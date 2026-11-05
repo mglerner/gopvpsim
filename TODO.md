@@ -147,6 +147,62 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   responded to the 2026-07-16 batch. Report 9 is superseded (e87448291);
   Report 10's mechanic is now ported, so it is moot for us.
 
+## PvPoke sync 2026-11-05 -- open items
+
+Checked pvpoke `38f70320d..e02bde78d` (six commits, 2026-10-24..11-03): no
+battle-JS change (`tests/test_rebalance_tripwire.py` passes; the engine pin
+stays at 38f70320d, no re-vet owed). Gamemaster delta is additive for every
+pool species: Mega Chandelure, Kowtow Cleave (no learner yet), Night Shade+
+and Ominous Wind+ (mega moves), Ominous Wind archetype label only, and Mega
+Sableye gained the `supermega` tag + Night Shade+. Thievul GL, Tinkaton GL
+and Tinkaton UL were checked with a stratified live-sim probe (every
+opponent x 3 focal IVs x 2 baits x 9 scenarios, pvpoke opponent IVs).
+
+- **Mega Sableye's GL default moveset changed upstream** to Shadow Claw /
+  Foul Play + Dazzling Gleam + Night Shade+ (three charged, one a mega move
+  at Mega Level 4). Every shipped GL page sims it with Foul Play + Dazzling
+  Gleam, which is still what the gamemaster the pages were baked at
+  produced, so no page is wrong today -- but the next GL bake sims a
+  different Mega Sableye in every dive. The gamemaster migration's computed
+  delta will re-sim `sableye_mega` and `OMINOUS_WIND` columns (whole-entry
+  compare; the archetype relabel is cosmetic but counts).
+- **Pool drift at the 2026-11-03 rankings:** `gl_top50_plus_cs` would gain
+  Feraligatr (Shadow), `gl_top30_plus_cs_top100` Rillaboom, `master_top60`
+  Zekrom (Shadow). Curation call before the next bake; the 11-05 Tinkaton
+  re-dives ran on the committed pools (`--allow-stale-pools`, Master drift
+  only) so they match the rest of the site.
+- **Thievul GL page is current**: 4,320/4,320 probe cells integer-exact at
+  engine 3d125a0e165f; live site byte-identical to the local render. No
+  action.
+- **Tinkaton GL + UL RE-DIVED LOCALLY 2026-11-05, NOT PUBLISHED.** The
+  shipped pages (engine 45cf73a2d23d / 5a813036625c) carried pre-Minior-port
+  numbers against Superpower / Psycho Boost users: GL 49/4,374 probe cells
+  moved (Malamar, Malamar (Mega), Snorlax (Shadow), Deoxys (Defense),
+  Lapras; one winner flip), UL 6/3,402 (Malamar (Shadow) 2v2, 710 -> 780).
+  Four moved cells cross-checked against headless PvPoke
+  (`audit_oracle_harness.run_harness`): all agree with the new engine, logs
+  equal. Re-dive: `run_website_dives.py tinkaton --allow-stale-pools` with
+  `GOPVPSIM_PIN_DATA_CACHE=1`, 15:12-16:03 (log
+  `userdata/logs/tinkaton_redive_20261105.log`); engine 3d125a0e165f /
+  gamemaster 03e7b77024e9; sweep cache ON (the old columns were stale, so
+  nothing trusted was overwritten). Verified: GL 4,374/4,374 and UL
+  3,618/3,618 probe cells integer-exact, one engine/gamemaster hash per dir,
+  every pool entry present. The UL page now has 67 opponents (the 10-25
+  union added Golisopod (Shadow), Kingdra, Malamar, Toucannon (Shadow));
+  the other shipped UL pages have 63. Publish on Michael's go
+  (`publish_website.sh --push` rebuilds the index).
+- **Data cache is at 2026-10-24** (`~/Documents/gopvpsim_cache`,
+  gamemaster 03e7b77024e9) and the Claude sandbox cannot refresh it: the
+  proxy truncates raw.githubusercontent.com fetches and `~/Documents` is
+  not writable. Refresh from the checkout outside the sandbox:
+  `cp ../pvpoke/src/data/gamemaster.json ~/Documents/gopvpsim_cache/` and
+  the three `rankings/all/overall/rankings-{1500,2500,10000}.json` to
+  `great.json` / `ultra.json` / `master.json`. Until then run project
+  Python with `GOPVPSIM_PIN_DATA_CACHE=1` to silence the fetch retries.
+- Not new, for the record: `thresholds/thievul.toml` `[cd_prep]` injects
+  Icy Wind, which the live gamemaster already lists as a Thievul elite move
+  (the TOML says so); retirement still rides the 2027 Worlds bundle.
+
 ## OPEN: Bake speed (2026-09-25 scout)
 
 Plan of record, with file:line evidence and the verified attribution of the
