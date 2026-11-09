@@ -199,6 +199,20 @@ opponent x 3 focal IVs x 2 baits x 9 scenarios, pvpoke opponent IVs).
   the three `rankings/all/overall/rankings-{1500,2500,10000}.json` to
   `great.json` / `ultra.json` / `master.json`. Until then run project
   Python with `GOPVPSIM_PIN_DATA_CACHE=1` to silence the fetch retries.
+- **Resume here (session closed 2026-11-08, decisions pending for
+  Michael):** (1) publish the re-dived Tinkaton GL/UL pages
+  (`scripts/publish_website.sh --push`); (2) refresh the data cache with
+  the `cp` commands above; (3) pool-drift curation call; (4)
+  `tests/fixtures/poke_genie_export.csv` sits MODIFIED and unstaged in the
+  working tree (his fresh 2026-10-25 Poke Genie export, 3000 rows) -- keep
+  or `git checkout` it, never sweep it in with a directory add. The probe
+  used for every page check above is now `scripts/probe_page_cells.py`
+  (usage in its docstring). Context for the Thievul/Tinkaton candidate
+  cull he is planning: Nickit, Tinkatink and Tinkatuff cannot reach either
+  league (hundo L51 ceilings 817 / 984 / 1495 CP), IVs carry through
+  evolution, so rank candidates by the evolved form's page -- paste the
+  Poke Genie export into the dive page's collection box (it walks
+  pre-evolutions to the final form) or run `owned_breakdown.py --csv`.
 - Not new, for the record: `thresholds/thievul.toml` `[cd_prep]` injects
   Icy Wind, which the live gamemaster already lists as a Thievul elite move
   (the TOML says so); retirement still rides the 2027 Worlds bundle.
