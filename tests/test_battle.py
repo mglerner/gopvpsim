@@ -1672,8 +1672,8 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
         f"got {score} (delta={score - expected_morpeko_score:+d})"
     )
     assert _extract_battle_log(result) == expected_log, (
-        f"{shields_m}v{shields_a}: chargedLog mismatch (pins our correct "
-        f"two-way toggle; see PvPoke bug #8)"
+        f"{shields_m}v{shields_a}: chargedLog mismatch (pins the in-game "
+        f"two-way toggle; PvPoke-exact since bug #8 was fixed upstream)"
     )
 
 

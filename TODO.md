@@ -12,7 +12,7 @@ Michael 2026-10-24: "take your recommendation. we can improve later" -- the
 port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 
 - **Sweep cells, all traced 2026-10-24** (`userdata/logs/minior_midflight_
-  sweep_6.log`, 4 open of 702): Medicham vs Minior 1-2 (351 vs 373) and 2-2
+  sweep_6.log`, 2 open of 702): Medicham vs Minior 1-2 (351 vs 373) and 2-2
   (734 vs 391) are PvPoke's don't-bait dpeRatio built from a Dynamic Punch
   `move.damage` memo priced against CORE (seat 0 initialises before seat 1's
   battle-start flip; ActionLogic.js:888-898, not the frozen-dpe gate the
@@ -20,7 +20,8 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   docs/pvpoke_divergences.md item 1; PvPoke with the seats swapped gives our
   numbers, and our dives put Minior in seat 0, where all 18 Medicham/Ariados
   cells match. Ariados 2-0 closed by the class-A port (both 735). Morpeko
-  2-2 both seats = documented bug #8, no action. (The log's ten Lickitung
+  2-2 both seats: exact since pvpoke 2ad2682e6 fixed bug #8 (re-checked
+  2026-11-17). (The log's ten Lickitung
   rows are a harness level-cap artifact, see DEVELOPER_NOTES class A; pin
   `level=50` for Lickitung in any re-sweep.) Before linking any
   Medicham-vs-Minior PvPoke battle from a page, check which seat PvPoke puts

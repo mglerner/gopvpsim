@@ -46,10 +46,9 @@ the CURRENT pin; move the previous one to CHANGELOG when you do.
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
 <!-- sync:pvpoke_matchups_verified -->43<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->387<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->367<!-- /sync --> exact on score+winner+chargedLog, 20 cells =
-documented divergences, each traced to a mechanism: 8 are bug #8 Hangry
-stickiness, 3 are our deliberate Shield-form Aegislash estimate-stage
-choice ("Form change gotchas" item 6), 9 are the #10 first-throw slot
+(<!-- sync:pvpoke_cells_verified -->387<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->375<!-- /sync --> exact on score+winner+chargedLog, 12 cells =
+documented divergences, each traced to a mechanism: 3 are our deliberate
+Shield-form Aegislash estimate-stage choice ("Form change gotchas" item 6), 9 are the #10 first-throw slot
 quirk (Aegislash-S vs Moltres-G; its GB-first positive control row is 9/9
 exact). Per-cell reasons live on the MATCHUPS entries in the audit script;
 the cell-count progression (108 -> 387, 2026-06..10) is in CHANGELOG.
@@ -345,28 +344,15 @@ ported -- doing so would diverge from PvPoke's observable behavior toward a
 feature it explicitly disabled. Revisit if PvPoke removes the `:570` reset or
 assigns `needsBoost = true`.
 
-### 8. Morpeko form change is one-way instead of a true toggle
+### 8. Morpeko form change was one-way -- FIXED UPSTREAM
 
-**File**: `Battle.js:1555-1573` (post-attack `charged_move` form trigger,
-`38f70320d`) and `pokemon.json` (`morpeko_hangry` has `formChange: null`).
-The gamemaster says `type: "toggle"`, and the real game toggles Full Belly
-<-> Hangry after **every** charged move (Michael verified in-game
-2026-06-06: Full Belly on battle start AND every switch-in, `resetOnSwitch:
-true`). PvPoke's
-trigger is gated on `activeFormId != alternativeFormId`, so Full Belly ->
-Hangry passes but Hangry never toggles back (`morpeko_hangry` carries no
-`formChange` of its own); Morpeko sticks in Hangry for the battle. The guard
-was written for one-way changers and wrongly catches a toggle.
-
-**Our code**: `formchange.py` makes the Hangry form inherit the
-`charged_move` trigger so it toggles back, so our chargedLog disagrees with
-PvPoke's whenever Morpeko throws a 2nd+ charged move (ours Aura Wheel
-Electric from Full Belly, PvPoke's Dark from a stuck Hangry); score-relevant
-wherever an unshielded 2nd+ Aura Wheel meets an Electric-vs-Dark
-effectiveness difference, where PvPoke's published numbers are wrong.
-**Stance: keep our toggle.** Pinned by the chargedLog assertion on
-`test_morpeko_vs_azumarill_form_change` and the 8 known-divergence cells in
-`scripts/audit_oracle_harness.py`. `docs/pvpoke_divergences.md` item 2.
+Fixed in pvpoke `2ad2682e6` (2026-11-16): `morpeko_hangry` now carries its
+own `toggle` formChange back to Full Belly, so PvPoke no longer sticks in
+Hangry after the first charged move (filed by us as pvpoke/pvpoke#379; the
+game toggles every charged move, Michael in-game 2026-06-06). Our
+`formchange.py` already toggled, so no behavior changed; the 8 audit xfail
+cells are exact and un-xfailed. Pinned by `test_morpeko_vs_azumarill_form_change`
+and `tests/test_form_change_oracle.py`. Kept for the record and the bug count.
 
 ### 9. Stale IV-rank chip on battle permalink loads (UI-only)
 
@@ -463,7 +449,7 @@ the factor (`breakpoints.py`): breakpoints ARE this project's deliverable,
 and PvPoke's solver is inconsistent with its own damage function. Not yet in
 `docs/pvpoke_divergences.md`.
 
-### Minior (2026-10-24): UL level clamp, animation clock, 4 open sweep cells
+### Minior (2026-10-24): UL level clamp, animation clock, 2 open sweep cells
 
 None of the gaps below is in the oracle audit (the 90 Minior oracle cells
 are, all exact).
@@ -479,14 +465,14 @@ are, all exact).
   PvPoke adds it to its wall-clock `time`, which only feeds the timeline
   display and the 240 s time-out ("Battle timeout" below); no score effect
   unless a fight nears the limit.
-- **4 of 702 scratch-sweep cells differ** (`userdata/logs/minior_midflight_
+- **2 of 702 scratch-sweep cells differ** (`userdata/logs/minior_midflight_
   sweep_6.log` vs `pvpoke_trace.js`; the log lists 14, but the ten Lickitung
-  cells are the harness level-cap artifact, "Key implementation details").
-  Morpeko 2-2 both seats = bug #8. Medicham vs Minior 1-2 (ours 351 / PvPoke
-  373) and 2-2 (734 / 391): same DP plan [Ice Punch x3] in both engines, then
-  PvPoke's post-DP bandaid region (`ActionLogic.js` ~838-990) swaps slot 0 to
-  Dynamic Punch and ours does not -- NOT traced to a line. Michael's call:
-  ship, improve later (TODO "Minior -- open items").
+  cells are the harness level-cap artifact, "Key implementation details", and
+  Morpeko 2-2 both seats became exact with bug #8's upstream fix, re-checked
+  2026-11-17). Medicham vs Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 /
+  391): PvPoke's don't-bait dpeRatio reads a Core-priced memo (seat order),
+  the NB-1 carve-out route (`docs/pvpoke_divergences.md` item 1; TODO
+  "Minior -- open items"). Minior in seat 0, as in our dives, matches.
 
 ### bandaid[929] stack-switch is ungated on bait_shields (no-bait only)
 

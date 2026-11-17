@@ -87,15 +87,15 @@ MATCHUPS = [
     dict(label='corviknight_mirror_both_buff',
          p1=P('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'], (4, 12, 14), 'corviknight'),
          p2=P('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'], (4, 12, 14), 'corviknight')),
-    # Morpeko cells 1v1/1v2/2v1/2v2 differ on chargedLog only (score+winner
-    # match). PvPoke bug #8: its Battle.js:1536 form-toggle guard makes
-    # Morpeko stick in Hangry after the first charged move instead of
-    # toggling back. OUR two-way toggle is correct (verified in-game
-    # 2026-06-06). See DEVELOPER_NOTES "PvPoke bugs found" #8.
+    # Morpeko two-way toggle (verified in-game 2026-06-06). EXACT since
+    # pvpoke 2ad2682e6 (2026-11-16) gave morpeko_hangry its own toggle
+    # formChange; before that PvPoke stuck in Hangry (bug #8) and
+    # 1v1/1v2/2v1/2v2 were chargedLog-only xfails. DEVELOPER_NOTES
+    # "PvPoke bugs found" #8.
     dict(label='morpeko_vs_azumarill_form_change',
          p1=P('Morpeko (Full Belly)', 'THUNDER_SHOCK', ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], (5, 14, 15), 'morpeko_full_belly'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
-         xfail_cells={(1, 1), (1, 2), (2, 1), (2, 2)}),
+         xfail_cells=set()),
     dict(label='aegislash_vs_azumarill_form_change',
          p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
@@ -233,17 +233,14 @@ MATCHUPS = [
     # Hangry where the Aura Wheel type flip matters: vs ground/steel the
     # Electric wheel is double-resisted but the Dark wheel is merely
     # steel-resisted, so Full Belly->Hangry changes effectiveness class.
-    # xfails, traced 2026-06-12: all four are PvPoke bug #8 (Hangry
-    # stickiness — its Battle.js:1536 guard leaves Morpeko stuck in
-    # Hangry; our two-way toggle is in-game-verified 2026-06-06).
-    # (2,0)/(2,1) are log-only (form label on the final move); (1,2)/
-    # (2,2) cascade into score differences (same winner) because
-    # G-Fisk's DP sees a different Aura Wheel threat from a stuck-
-    # Hangry Morpeko and times Earthquake differently.
+    # EXACT since pvpoke 2ad2682e6 (2026-11-16, Hangry toggles back).
+    # Before it, (1,2)/(2,0)/(2,1)/(2,2) were bug #8 xfails (traced
+    # 2026-06-12): (2,0)/(2,1) log-only, (1,2)/(2,2) score cascades from
+    # G-Fisk's DP facing a stuck-Hangry Morpeko.
     dict(label='morpeko_vs_stunfisk_galarian_form_change',
          p1=P('Morpeko (Full Belly)', 'THUNDER_SHOCK', ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], (5, 14, 15), 'morpeko_full_belly'),
          p2=P('Stunfisk (Galarian)', 'MUD_SHOT', ['ROCK_SLIDE', 'EARTHQUAKE'], (5, 15, 13), 'stunfisk_galarian'),
-         xfail_cells={(1, 2), (2, 0), (2, 1), (2, 2)}),
+         xfail_cells=set()),
     # UL Aegislash (2026-06-12): Aegislash opponent rows are live on the
     # published Tinkaton UL dive via ul_top60.txt, and UL
     # uses a different Blade-level formula (x0.75 vs GL's x0.5+1) — zero

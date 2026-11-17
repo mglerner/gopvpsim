@@ -233,17 +233,18 @@ def test_mimikyu_vs_medicham_fast_pressure(s1, s2, score0, score1,
     (0, 2, 95, 904, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Earthquake']),
     (1, 0, 450, 549, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Earthquake']),
     (1, 1, 450, 549, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Earthquake']),
-    (1, 2, 218, 781, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Psychic Fangs (shielded)', 'Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Earthquake']),  # PvPoke-divergent cell (see audit harness)
-    (2, 0, 771, 228, 0, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Earthquake (shielded)', 'Morpeko (Full Belly): Psychic Fangs']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 488, 511, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Full Belly): Psychic Fangs (shielded)', 'Stunfisk (Galarian): Rock Slide']),  # PvPoke-divergent cell (see audit harness)
-    (2, 2, 252, 747, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Psychic Fangs (shielded)', 'Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Stunfisk (Galarian): Rock Slide']),  # PvPoke-divergent cell (see audit harness)
+    (1, 2, 218, 781, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Psychic Fangs (shielded)', 'Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Earthquake']),
+    (2, 0, 771, 228, 0, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Earthquake (shielded)', 'Morpeko (Full Belly): Psychic Fangs']),
+    (2, 1, 488, 511, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Full Belly): Psychic Fangs (shielded)', 'Stunfisk (Galarian): Rock Slide']),
+    (2, 2, 252, 747, 1, ['Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Morpeko (Hangry): Psychic Fangs (shielded)', 'Morpeko (Full Belly): Psychic Fangs', 'Stunfisk (Galarian): Rock Slide (shielded)', 'Stunfisk (Galarian): Rock Slide']),
 ])
 def test_morpeko_vs_gfisk_aura_wheel_type_flip(s1, s2, score0, score1,
                                                winner, log):
     """Hangry toggle where the Aura Wheel type flip changes the
     effectiveness class (Electric double-resisted, Dark merely
-    steel-resisted vs ground/steel). Divergent cells are PvPoke bug #8
-    (Hangry stickiness); our two-way toggle is in-game-verified."""
+    steel-resisted vs ground/steel). All 9 cells PvPoke-exact since pvpoke
+    2ad2682e6 fixed bug #8 (Hangry stickiness); our two-way toggle is
+    in-game-verified."""
     ss0, ss1, sw, slog = _run((*MORPEKO, 5, 14, 15),
                               (*GFISK, 5, 15, 13), s1, s2)
     assert (ss0, ss1, sw) == (score0, score1, winner), \

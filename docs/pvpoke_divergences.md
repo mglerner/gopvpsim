@@ -34,10 +34,12 @@ the default since 2026-09-09.
    seat 0, where every cell matches. The same Core-priced memo also flips the
    swap the other way, log-only: Ninetales 2-2 (Energy Ball cached 63 vs 36
    real) and Mantine 1-2 (Twister 51 vs 29) with Minior in seat 1.
-2. **Morpeko toggles form on every charged move.** The game, and Morpeko's own
-   gamemaster entry, toggles Full Belly <-> Hangry after each charged move.
-   PvPoke changes it one way and then sticks in Hangry. Ours matches verified
-   in-game behavior.
+2. **Morpeko toggles form on every charged move -- RESOLVED upstream
+   2026-11-16; we match PvPoke.** The game toggles Full Belly <-> Hangry after
+   each charged move. PvPoke used to change form one way and then stay in
+   Hangry; its `2ad2682e6` update gave Hangry Morpeko its own toggle back, and
+   every Morpeko oracle cell now matches on score and on the charged-move log.
+   Our simulator already toggled, so its numbers did not change.
 3. **Aegislash's Shadow Ball vs Gyro Ball pick -- RESOLVED upstream
    2026-08-31; we match PvPoke.** Our Aegislash (Shield) threw Shadow Ball
    where PvPoke threw Gyro Ball (same energy, and Shadow Ball does strictly
