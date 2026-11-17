@@ -338,9 +338,27 @@ def normalize_policy_for_pair(policy, focal_species, opp_species):
     return policy
 
 
+_WRITE_FAILURE_WARNED = set()
+
+
+def warn_write_failure(kind, where, exc):
+    """Log a failed cache write: WARNING the first time per ``kind`` in this
+    process (so a bake that cannot write at all says so once, not once per
+    column), DEBUG after that. Shared with slayer_cache.SlayerCache.save."""
+    import logging
+    log = logging.getLogger('deep_dive')
+    if kind in _WRITE_FAILURE_WARNED:
+        log.debug(f'{kind}: write failed at {where} ({exc!r})')
+        return
+    _WRITE_FAILURE_WARNED.add(kind)
+    log.warning(f'{kind}: write failed at {where} ({exc!r}); results are NOT '
+                f'being cached (further failures this run logged at DEBUG)')
+
+
 class SweepCache:
     """Disk cache of per-opponent sweep score columns. Best-effort:
-    any I/O failure degrades to a miss / silent no-store."""
+    any I/O failure degrades to a miss / no-store (a failed store logs a
+    WARNING once per run; see warn_write_failure)."""
 
     def __init__(self, focal_fields):
         species_slug = focal_fields['species'].replace(' ', '_').replace('(', '').replace(')', '')
@@ -447,5 +465,8 @@ class SweepCache:
             write_sidecar(sidecar, {
                 'engine': engine_hash(), 'gamemaster': gamemaster_hash(),
                 'col': col_fields})
-        except Exception:
-            pass  # cache is best-effort
+        except Exception as e:
+            # Best-effort (no raise), but never SILENT: 2026-11-17 found three
+            # sandboxed bakes (10-24, 11-05, 11-17) that wrote nothing because
+            # ~/.cache was EPERM and this used to be a bare `pass`.
+            warn_write_failure('sweep cache', self.dir, e)

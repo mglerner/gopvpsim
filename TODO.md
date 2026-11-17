@@ -171,8 +171,8 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
   `except Exception: pass`), so no column is newer than 09-28. FIXED for the
   sandbox 11-17: `.claude/settings.local.json` `sandbox.filesystem.allowWrite`
   adds `~/.cache/gopvpsim` and `~/Documents/gopvpsim_cache` (probe-verified).
-  Still open: make a failed write warn (or preflight writability), with a
-  test. Sandboxed runs can now overwrite trusted columns, so
+  A failed write now logs one WARNING per run
+  (`tests/test_cache_write_failure_warns.py`). Sandboxed runs can now overwrite trusted columns, so
   `--no-sweep-cache` applies to WIP-engine runs in Claude sessions too.
 - **Headless PvPoke mega ML batches still run supermegas at 52** (bug #12):
   pin `--pN-level` or call `initialize(10000)` without IV edits.

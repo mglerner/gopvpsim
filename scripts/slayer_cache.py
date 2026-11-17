@@ -267,8 +267,10 @@ class SlayerCache:
             from sweep_cache import write_sidecar
             write_sidecar(sc, {'engine': eng, 'gamemaster': gm,
                                'scenario': self.scenario})
-        except Exception:
-            pass  # cache is best-effort
+        except Exception as e:
+            # Best-effort but never silent (see sweep_cache.warn_write_failure).
+            from sweep_cache import warn_write_failure
+            warn_write_failure('slayer cache', CACHE_DIR, e)
 
     def get(self, focal_iv_idx, opp_iv_idx):
         key = (focal_iv_idx, opp_iv_idx)
