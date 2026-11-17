@@ -7,6 +7,10 @@
 # #8, exactly as PvPoke ranks them. All opponents assumed hundo (15/15/15)
 # at the dive's build level.
 #
+# Unioned with the current PvPoke top-60 2026-11-17 (pvpoke d02018eb6):
+# Rhyperior, Zekrom (Shadow) added (verify_opponent_pools MISSING list);
+# nothing removed, so the 2026-06-19 snapshot stays a subset.
+#
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 # Re-generate the base top-60 with:
 #   from gopvpsim.data import load_rankings
@@ -73,3 +77,5 @@ Gyarados
 Togekiss
 Tapu Lele
 Enamorus (Therian)
+Rhyperior
+Zekrom (Shadow)

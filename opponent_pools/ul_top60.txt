@@ -4,6 +4,8 @@
 # Aegislash (Shield/Blade) removed 2026-06-25: not UL-viable as an opponent.
 # Unioned with the current PvPoke top-60 2026-10-25 (pvpoke 38f70320d): Golisopod (Shadow),
 # Kingdra, Malamar, Toucannon (Shadow) added (verify_opponent_pools MISSING list; Minior UL dive prerequisite).
+# Unioned with the current PvPoke top-60 2026-11-17 (pvpoke d02018eb6): Togekiss added
+# (verify_opponent_pools MISSING list).
 #
 # Regenerated 2026-09-09 against post-rebalance rankings (+12 / -20). Two
 # entries that carried HAND-TUNED moveset overrides fell out because the
@@ -87,3 +89,4 @@ Golisopod (Shadow)
 Kingdra
 Malamar
 Toucannon (Shadow)
+Togekiss

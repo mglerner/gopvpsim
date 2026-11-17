@@ -1,66 +1,66 @@
 # Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 75 unique species.
-# Generated 2026-10-24 by scripts/build_opponent_pool.py
+# Generated 2026-11-17 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 Melmetal
 Altaria
 Ninetales (Shadow)
-Cramorant
 Mimikyu
-Tinkaton
+Cramorant
 Altaria (Shadow)
-Corsola (Galarian)
+Tinkaton
 Corviknight
+Corsola (Galarian)
 Florges
 Quagsire (Shadow)
 Quagsire
 Corviknight (Shadow)
 Ninetales
 Hydreigon (Shadow)
+Sableye (Shadow)
 Clodsire
 Araquanid
-Sableye (Shadow)
 Jellicent
+Dunsparce
 Stunfisk
-Vigoroth
-Marowak
 Umbreon
+Vigoroth
 Annihilape
 Fearow
-Mantine
-Snorlax
+Marowak
+Rillaboom
 Azumarill
+Mantine
+Annihilape (Shadow)
+Carbink
 Electrode (Hisuian)
 Empoleon
-Empoleon (Shadow)
-Rillaboom
-Annihilape (Shadow)
-Araquanid (Shadow)
-Carbink
 Deoxys (Defense)
-Feraligatr
-Lapras
-Sableye
+Empoleon (Shadow)
 Guzzlord
-Vigoroth (Shadow)
-Malamar
 Malamar (Shadow)
+Sableye
+Vigoroth (Shadow)
+Araquanid (Shadow)
+Lapras
+Malamar
+Feraligatr
 Charjabug
-Snorlax (Shadow)
 Dondozo
-Charjabug (Shadow)
 Furret
 Hippowdon
+Medicham
+Charjabug (Shadow)
+Kingdra
+Forretress (Shadow)
 Mandibuzz
 Morpeko (Full Belly)
-Kingdra
-Medicham
-Forretress (Shadow)
-Jumpluff
 Blastoise
+Feraligatr (Shadow)
+Jumpluff
 Kingdra (Shadow)
-Hippowdon (Shadow)
 Dragonair (Shadow)
+Hippowdon (Shadow)
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,ICY_WIND
 Thievul | fast=SUCKER_PUNCH | charged=NIGHT_SLASH,PLAY_ROUGH
 Sableye (Mega)
