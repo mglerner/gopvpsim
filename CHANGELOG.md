@@ -2,6 +2,54 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-11-17 -- PvPoke sync at d02018eb6: re-vet, Mega Level 4 ML fix, pools, data cache, Tinkaton re-dive (NOT published)
+
+Commits 21710cd (Morpeko bug #8 fixed upstream; audit 375/387 exact),
+115538f (Mega Level 4: no +2 boost in Master League; engine `3d125a0e165f`
+-> `a6dffb536332`, slayer `0efb8d63e7d2` -> `1294f3bbff20`), 75d13b6 (pools:
+`gl_top50_plus_cs` + Dunsparce, + Feraligatr (Shadow), - Snorlax, - Snorlax
+(Shadow); `gl_top30_plus_cs_top100` + Dunsparce, + Rillaboom, - Snorlax,
+- Electrode (Hisuian); `ul_top60` + Togekiss; `master_top60` + Rhyperior,
++ Zekrom (Shadow)), 87d212c (re-vet, digests re-pinned). Michael refreshed
+the data cache outside the sandbox: gamemaster stamp `10d0d903c162`;
+great/ultra/master rankings and `group_championshipseries.json` equal pvpoke
+`d02018eb6` (md5). The mega rankings were missed (open item in TODO). The
+pending 10-24 migration plan matched no cached column (all at the 09-28
+bake); see TODO.
+Unlisted diggersby, snorlax and shadow-snorlax GL page dirs pruned from
+`userdata/website/` (Michael approved); UL Snorlax pages kept. Poke Genie
+exports committed: 10-25 in 9be1a56, 11-17 in 73b056d.
+
+**Tinkaton GL + UL re-dived** (`run_website_dives.py tinkaton`,
+`GOPVPSIM_PIN_DATA_CACHE=1`, 13:50-14:37, log
+`userdata/logs/tinkaton_redive_20261117.log`, exit 0): engine
+`a6dffb536332`, gamemaster `10d0d903c162` (`vintage.toml`), GL 81 opponents,
+UL 68. `probe_page_cells.py` on the default-moveset pages: GL 4,374/4,374
+and UL 3,672/3,672 cells integer-exact. The sandbox blocked the sprite
+fetch (cached sprite used) and the cache writes (0 hits, nothing written;
+`put_column` swallows the EPERM). GL still sims Mega Sableye with the stale
+mega-rankings default (no Night Shade+).
+
+## 2026-11-05 -- PvPoke sync 38f70320d..e02bde78d: no battle-JS change; Tinkaton re-dived (superseded 11-17)
+
+Six upstream commits (2026-10-24..11-03), no battle-JS change
+(`tests/test_rebalance_tripwire.py` passes; no re-vet owed). Gamemaster
+delta additive for every pool species: Mega Chandelure, Kowtow Cleave (no
+learner), Night Shade+ / Ominous Wind+ (mega moves), Ominous Wind archetype
+relabel, Mega Sableye + `supermega` tag + Night Shade+. Stratified live-sim
+probe (every opponent x 3 focal IVs x 2 baits x 9 scenarios): Thievul GL
+current (4,320/4,320 exact at 3d125a0e165f; live byte-identical). Shipped
+Tinkaton pages (engine 45cf73a2d23d / 5a813036625c) carried pre-Minior-port
+numbers vs Superpower / Psycho Boost users: GL 49/4,374 cells moved
+(Malamar, Malamar (Mega), Snorlax (Shadow), Deoxys (Defense), Lapras; one
+winner flip), UL 6/3,402 (Malamar (Shadow) 2v2, 710 -> 780); four cells
+cross-checked against headless PvPoke, all agree with the new engine.
+Re-dived (`--allow-stale-pools`, 15:12-16:03, log
+`userdata/logs/tinkaton_redive_20261105.log`, engine 3d125a0e165f /
+gamemaster 03e7b77024e9): GL 4,374/4,374, UL 3,618/3,618 exact; the cache
+was on but nothing was written (sandbox); never published, superseded by
+the 11-17 re-dive. New tool: `scripts/probe_page_cells.py`.
+
 ## 2026-10-25 -- Minior UL dives rendered locally (both forms, no one-move pages); UL shell level found unpinned in-game; NOT published
 
 Michael: "Now dive UL, same way, except we don't need the single-moved

@@ -26,29 +26,22 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   `level=50` for Lickitung in any re-sweep.) Before linking any
   Medicham-vs-Minior PvPoke battle from a page, check which seat PvPoke puts
   Medicham in.
-- **Cache migrations before the next bake** (CLAUDE.md "Before a cold
-  re-dive"). Gamemaster: `migrate_cache.py --from-gamemaster 9856aa366b5d
-  --old-gamemaster-file <c15fb6f7e blob>` (new hash 03e7b77024e9; computed
-  delta, no predicate). Engine: fixes 2-3 move non-Minior columns, so a
-  predicate must cover the WHOLE delta: sketch "Minior on either side OR a
-  SUPER_POWER / PSYCHO_BOOST user on either side OR either side's frozen
-  post-shuffle charged order != its LISTED slot order" -- the third clause
-  was "!= ascending-energy order" until 2026-10-24; that is unsound: the
-  pre-port TTL walked the defender's LISTED order, and Cramorant UL vs
-  Dusknoir (listed Dynamic Punch, Shadow Punch; frozen = ascending = Shadow
-  Punch first) moved 470 -> 487 onto PvPoke
-  (docs/validations/2026-10-24_cramorant_strat_recheck.md) -- needs a proof
-  (fix 1's queue-order change is new-mechanics-global: prove it is a no-op
-  without a same-turn form flip, or the predicate is unsound and the
-  re-dive is cold; the class-A port is Minior-only by construction, the
-  Phase B gate / TTL / DP rewrites are identity in normal flow -- the clean
-  387-cell audit is the evidence, not a proof). Not implemented.
+- **Cache migrations: SUPERSEDED 2026-11-17** -- the 9856aa366b5d ->
+  03e7b77024e9 plan matches no column (see "PvPoke sync 2026-11-17": the next
+  bake is effectively cold). Any combined engine+gamemaster migration needs a
+  predicate covering the port's whole delta: Minior on either side OR a
+  SUPER_POWER / PSYCHO_BOOST user OR either side's frozen post-shuffle
+  charged order != its LISTED order (not ascending-energy: Cramorant UL vs
+  Dusknoir 470 -> 487, docs/validations/2026-10-24_cramorant_strat_recheck.md),
+  plus a proof that fix 1's queue-order change is a no-op without a same-turn
+  form flip. Not implemented.
 - **Dives: RENDERED LOCALLY 2026-10-24, NOT PUBLISHED** (record: CHANGELOG
   "2026-10-24 (night) -- Minior GL dives rendered locally"). GL pools
   regenerated (383518b; Michael: "that definitely means redoing the pool");
   `run_website_dives.py minior --allow-stale-pools` ran 21:58-22:25 (Core
   17.4 min, Core-only 9.2 min; sweep cache ON on purpose: the engine is
-  committed and PvPoke-verified, and no Minior column existed to overwrite).
+  committed and PvPoke-verified, and no Minior column existed to overwrite;
+  but the sandboxed run wrote nothing -- see "PvPoke sync 2026-11-17").
   Artifacts: `userdata/website/minior-core-great-league/` and
   `minior-core-only-great-league/` (79 opponents each; engine 3d125a0e165f /
   gamemaster 03e7b77024e9), blobs `userdata/replay/20261024_221424_Minior_
@@ -135,105 +128,64 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   responded to the 2026-07-16 batch. Report 9 is superseded (e87448291);
   Report 10's mechanic is now ported, so it is moot for us.
 
-## PvPoke sync 2026-11-17 -- open items
+## PvPoke sync 2026-11-17 -- open items (record: CHANGELOG 2026-11-05, 2026-11-17)
 
-Re-vetted at pvpoke `d02018eb6` (DEVELOPER_NOTES "PvPoke re-vetting log").
-Commits 21710cd (Morpeko bug #8 fixed upstream, audit 375/387 exact),
-115538f (Mega Level 4: no ML boost; engine `3d125a0e165f` -> `a6dffb536332`,
-slayer `0efb8d63e7d2` -> `1294f3bbff20`), 75d13b6 (pools), and the re-vet.
+Re-vetted at pvpoke `d02018eb6` (DEVELOPER_NOTES "PvPoke re-vetting log"):
+engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
 
-- **Data cache refresh (Michael, outside the sandbox)** -- the `cp` commands
-  in the 11-05 section below, plus
-  `cp ../pvpoke/src/data/groups/championshipseries.json ~/Documents/gopvpsim_cache/group_championshipseries.json`.
-  New gamemaster stamp is `10d0d903c162`.
-- **Cache migrations before the next bake** (snapshot first, rebalance
-  checklist A.1): engine `migrate_cache.py --from-engine 3d125a0e165f
-  --predicate mega_ml_cap_20261117` (and `--slayer --from-engine
-  0efb8d63e7d2`); gamemaster `--from-gamemaster 03e7b77024e9
-  --old-gamemaster-file` (blob: pvpoke `38f70320d`). The still-pending
-  10-24 Minior migration (`9856aa366b5d`) comes first -- see "Minior -- open
-  items".
-- **Pools changed (75d13b6), so every GL/UL page is now one or more
-  opponents short** (Dunsparce / Feraligatr (Shadow) GL, Togekiss UL) until
-  re-dived. The publish gate lists unlisted dives: diggersby,
-  snorlax and shadow-snorlax (great). Shadow Feraligatr GL is back in the
-  registry but its local page is 09-27. Keeping Snorlax pages alive would
-  need a CURATED_INCLUSIONS entry or EXTRA_DIVES -- Michael's call.
-- **Tinkaton GL/UL local re-dives (11-05)** match the engine for GL/UL (the
-  mega change is ML-only) but predate the new pools; publishing them needs
-  the prune decision above, or a re-dive for the new opponents first.
+- **Mega rankings were NOT refreshed** (`rankings_mega_{1500,2500,10000}.json`
+  in `~/Documents/gopvpsim_cache/` are 09-27): Mega Sableye still resolves to
+  Shadow Claw / Foul Play + Dazzling Gleam (upstream GL adds Night Shade+),
+  including on the 11-17 Tinkaton GL page. Upstream, 11 GL mega defaults
+  differ (4 changed incl. Sableye (Mega), 7 newly ranked) and 18 UL (15
+  changed, 3 new). Refresh (recipe below) before the next bake, then re-dive
+  Tinkaton GL (UL has no mega opponents).
+- **Publish Tinkaton GL + UL on Michael's go** (re-dived 11-17 on the
+  current pools, local only, probe-verified; GL carries the Mega Sableye
+  caveat above). `scripts/publish_website.sh` (dry run), then `--push`,
+  outside the sandbox. It mirrors the WHOLE `userdata/website/` tree with
+  rsync `--delete` and rebuilds the index itself, so the push also
+  (a) ships the four local, unpublished Minior pages ("Minior -- open
+  items" -- needs his go too, or move them aside first) and (b) removes
+  the pruned diggersby / snorlax / shadow-snorlax GL pages from the live
+  site. UL Snorlax pages stay.
+- **Every other page is opponents short until re-dived.** The shipped pages
+  were baked 09-27 at the 09-17 pools (a85d62e), so they miss every pool change
+  since (383518b, 410bd5e, 75d13b6; `git diff a85d62e -- opponent_pools/`):
+  e.g. UL lacks Golisopod (Shadow), Kingdra, Malamar, Toucannon (Shadow),
+  Togekiss; GL top50 lacks Dunsparce, Dragonair (Shadow), Kingdra (Shadow) and
+  still sims Diggersby / Snorlax / Snorlax (Shadow). Unbuilt registry slugs
+  include dunsparce-great-league and togekiss-ultra-league
+  (`dive_registry.all_dives()`).
+- **The next bake is effectively COLD.** Every cached column is at engine
+  `4b42f9d83690` (slayer `3a2ed21a79ce`) / gamemaster `6d6e9a7bc32d`, the
+  09-28 bake (`migrate_cache.py --list-stamps`). The old migration plan
+  (from 9856aa366b5d / 3d125a0e165f / 03e7b77024e9) matches zero columns,
+  and each migrate mode needs the OTHER stamp current, so it cannot bless
+  a column stale on both. Warm-serving would need a combined
+  engine+gamemaster mode plus a predicate covering the whole
+  `4b42f9d83690 -> a6dffb536332` delta (Minior port + Mega Level 4) -- a
+  "tractable migration?" call (CLAUDE.md) before the next cold re-dive.
+- **Bakes inside the Claude sandbox never write the cache** (`~/.cache` is
+  EPERM there; `sweep_cache.put_column` / `SlayerCache.save` swallow it with
+  `except Exception: pass`), so no column is newer than 09-28. Run bakes
+  outside the sandbox; make a failed write warn (or preflight writability),
+  with a test.
 - **Headless PvPoke mega ML batches still run supermegas at 52** (bug #12):
   pin `--pN-level` or call `initialize(10000)` without IV edits.
-
-## PvPoke sync 2026-11-05 -- open items
-
-Checked pvpoke `38f70320d..e02bde78d` (six commits, 2026-10-24..11-03): no
-battle-JS change (`tests/test_rebalance_tripwire.py` passes; the engine pin
-stays at 38f70320d, no re-vet owed). Gamemaster delta is additive for every
-pool species: Mega Chandelure, Kowtow Cleave (no learner yet), Night Shade+
-and Ominous Wind+ (mega moves), Ominous Wind archetype label only, and Mega
-Sableye gained the `supermega` tag + Night Shade+. Thievul GL, Tinkaton GL
-and Tinkaton UL were checked with a stratified live-sim probe (every
-opponent x 3 focal IVs x 2 baits x 9 scenarios, pvpoke opponent IVs).
-
-- **Mega Sableye's GL default moveset changed upstream** to Shadow Claw /
-  Foul Play + Dazzling Gleam + Night Shade+ (three charged, one a mega move
-  at Mega Level 4). Every shipped GL page sims it with Foul Play + Dazzling
-  Gleam, which is still what the gamemaster the pages were baked at
-  produced, so no page is wrong today -- but the next GL bake sims a
-  different Mega Sableye in every dive. The gamemaster migration's computed
-  delta will re-sim `sableye_mega` and `OMINOUS_WIND` columns (whole-entry
-  compare; the archetype relabel is cosmetic but counts).
-- **Pool drift at the 2026-11-03 rankings:** `gl_top50_plus_cs` would gain
-  Feraligatr (Shadow), `gl_top30_plus_cs_top100` Rillaboom, `master_top60`
-  Zekrom (Shadow). Curation call before the next bake; the 11-05 Tinkaton
-  re-dives ran on the committed pools (`--allow-stale-pools`, Master drift
-  only) so they match the rest of the site.
-- **Thievul GL page is current**: 4,320/4,320 probe cells integer-exact at
-  engine 3d125a0e165f; live site byte-identical to the local render. No
-  action.
-- **Tinkaton GL + UL RE-DIVED LOCALLY 2026-11-05, NOT PUBLISHED.** The
-  shipped pages (engine 45cf73a2d23d / 5a813036625c) carried pre-Minior-port
-  numbers against Superpower / Psycho Boost users: GL 49/4,374 probe cells
-  moved (Malamar, Malamar (Mega), Snorlax (Shadow), Deoxys (Defense),
-  Lapras; one winner flip), UL 6/3,402 (Malamar (Shadow) 2v2, 710 -> 780).
-  Four moved cells cross-checked against headless PvPoke
-  (`audit_oracle_harness.run_harness`): all agree with the new engine, logs
-  equal. Re-dive: `run_website_dives.py tinkaton --allow-stale-pools` with
-  `GOPVPSIM_PIN_DATA_CACHE=1`, 15:12-16:03 (log
-  `userdata/logs/tinkaton_redive_20261105.log`); engine 3d125a0e165f /
-  gamemaster 03e7b77024e9; sweep cache ON (the old columns were stale, so
-  nothing trusted was overwritten). Verified: GL 4,374/4,374 and UL
-  3,618/3,618 probe cells integer-exact, one engine/gamemaster hash per dir,
-  every pool entry present. The UL page now has 67 opponents (the 10-25
-  union added Golisopod (Shadow), Kingdra, Malamar, Toucannon (Shadow));
-  the other shipped UL pages have 63. Publish on Michael's go
-  (`publish_website.sh --push` rebuilds the index).
-- **Data cache is at 2026-10-24** (`~/Documents/gopvpsim_cache`,
-  gamemaster 03e7b77024e9) and the Claude sandbox cannot refresh it: the
-  proxy truncates raw.githubusercontent.com fetches and `~/Documents` is
-  not writable. Refresh from the checkout outside the sandbox:
-  `cp ../pvpoke/src/data/gamemaster.json ~/Documents/gopvpsim_cache/` and
-  the three `rankings/all/overall/rankings-{1500,2500,10000}.json` to
-  `great.json` / `ultra.json` / `master.json`. Until then run project
-  Python with `GOPVPSIM_PIN_DATA_CACHE=1` to silence the fetch retries.
-- **Resume here (session closed 2026-11-08, decisions pending for
-  Michael):** (1) publish the re-dived Tinkaton GL/UL pages
-  (`scripts/publish_website.sh --push`); (2) refresh the data cache with
-  the `cp` commands above; (3) pool-drift curation call; (4)
-  `tests/fixtures/poke_genie_export.csv` sits MODIFIED and unstaged in the
-  working tree (his fresh 2026-10-25 Poke Genie export, 3000 rows) -- keep
-  or `git checkout` it, never sweep it in with a directory add. The probe
-  used for every page check above is now `scripts/probe_page_cells.py`
-  (usage in its docstring). Context for the Thievul/Tinkaton candidate
-  cull he is planning: Nickit, Tinkatink and Tinkatuff cannot reach either
-  league (hundo L51 ceilings 817 / 984 / 1495 CP), IVs carry through
-  evolution, so rank candidates by the evolved form's page -- paste the
-  Poke Genie export into the dive page's collection box (it walks
-  pre-evolutions to the final form) or run `owned_breakdown.py --csv`.
-- Not new, for the record: `thresholds/thievul.toml` `[cd_prep]` injects
-  Icy Wind, which the live gamemaster already lists as a Thievul elite move
-  (the TOML says so); retirement still rides the 2027 Worlds bundle.
+- **Thievul/Tinkaton candidate cull (Michael):** Nickit, Tinkatink and
+  Tinkatuff cannot reach GL or UL (hundo L51 817 / 984 / 1495 CP) and IVs
+  carry through evolution, so rank by the evolved form's page: paste the
+  Poke Genie export into its collection box, or `owned_breakdown.py --csv`.
+- **Data-cache refresh recipe** (outside the sandbox: the proxy truncates
+  raw.githubusercontent.com and `~/Documents` is not writable). From
+  `../pvpoke/src/data/` copy into `~/Documents/gopvpsim_cache/`:
+  `gamemaster.json`; `rankings/all/overall/rankings-{1500,2500,10000}.json`
+  as `great/ultra/master.json`;
+  `rankings/mega/overall/rankings-{1500,2500,10000}.json` as
+  `rankings_mega_{1500,2500,10000}.json`; `groups/championshipseries.json`
+  as `group_championshipseries.json`. Sandboxed runs always need
+  `GOPVPSIM_PIN_DATA_CACHE=1` (silences fetch retries).
 
 ## OPEN: Bake speed (2026-09-25 scout)
 

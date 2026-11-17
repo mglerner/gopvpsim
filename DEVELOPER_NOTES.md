@@ -204,11 +204,10 @@ archive, no copies are kept.
 
 Record the baseline here BEFORE a gamemaster move (`docs/rebalance_checklist.md`
 section A) as pvpoke commit + `gamemaster_hash()` stamp; move it to
-CHANGELOG once its migration is applied. **Pending (2026-10-24):** old stamp
-`9856aa366b5d` (blob: pvpoke `c15fb6f7e`) -> `03e7b77024e9` (the pinned
-cache, 10-24); command and engine side in TODO "Minior -- open items". Upstream
-moved on: pvpoke `d02018eb6` is `10d0d903c162`, so once the data cache is
-refreshed the target is that stamp, not `03e7b77024e9`. The 2026-08-31 Twilight
+CHANGELOG once its migration is applied. **Pending (2026-11-17):** every cached column is at
+`6d6e9a7bc32d` (the 09-28 bake; no blob pinned yet) and the data cache is now
+`10d0d903c162` (pvpoke `d02018eb6`). The older `9856aa366b5d` /
+`03e7b77024e9` pins match no column; see TODO "PvPoke sync 2026-11-17". The 2026-08-31 Twilight
 Trails pin (`46bd08a77` / `c431557dcc76`) is archived in CHANGELOG.
 
 Operational notes: hit log line per sweep is `sweep cache: N/M opponent
