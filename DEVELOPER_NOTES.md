@@ -41,7 +41,7 @@ the CURRENT pin; move the previous one to CHANGELOG when you do.
 
 ## Current status (updated 2026-10-24)
 
-<!-- sync:test_count -->3300<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->3301<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The oracle audit (`scripts/audit_oracle_harness.py`, GL + UL)
 verifies the simulator against PvPoke's live engine for
@@ -292,7 +292,7 @@ equality in `tests/test_js_shadow_constants.py`.
 
 ## PvPoke bugs found
 
-<!-- sync:pvpoke_bugs_documented -->8<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9, 10, 11 --
+<!-- sync:pvpoke_bugs_documented -->9<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9, 10, 11, 12 --
 numbering is discovery order; #4 was retracted 2026-04-15 and is excluded
 from the count; #5/#6 were never numbered entries). Filed upstream
 2026-07-16 as pvpoke/pvpoke #378 (#3 Gyro Ball), #379 (#8 Morpeko), #380
@@ -411,6 +411,19 @@ Neither path matches every in-game reading (go-iv's empirical rule fits
 11/11, PvPoke's 3/9 GL); Michael's call: trust PvPoke's model, revisit when
 the community settles. Impact <= ~2 Meteor levels. Draft:
 `docs/pvpoke_bug_reports.md` Report 11 (not filed).
+
+### 12. Mega Level 4's Master League retraction leaks through `initialize(false)`
+
+**File**: `Pokemon.js:294` (`d02018eb6`). `426e5e9f3` gated the Level 4
+cap of 52 on `targetCP < 10000` ("no longer receive a 2-level boost in Mega
+Master League"), but `setLevel(..., true)` (from `setIV` under autoLevel, or
+any custom level) calls `initialize(false)`, and `false < 10000` is true:
+the first IV edit puts the cap back to 52. Probed 2026-11-17: Mewtwo (Mega
+X) 15/15/15 is level 50 after `initialize(10000)` and 52 after `setIV`, so
+`pvpoke_trace.js` and any headless batch that sets IVs still sim ML
+supermegas at 52. **Ours follows the stated intent** (no boost; the ordinary
+ML ceiling), pinned by `tests/test_mega_level_cap.py`. No pool or oracle
+cell has an ML supermega. Not filed.
 
 ### 4. Mimikyu SS timing -- RETRACTED 2026-04-15
 

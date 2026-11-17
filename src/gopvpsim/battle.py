@@ -650,7 +650,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     for positive self-buffs and guaranteed opponent debuffs), so PvPoke
     simply always-shields it. We previously also routed incoming
     selfDefenseDebuffing moves through wouldShield -- a port error removed
-    2026-06-13 (see DEVELOPER_NOTES "Open divergences", RESOLVED entry).
+    2026-06-13 (see DEVELOPER_NOTES "Resolved engine divergences").
     """
     if defender.shields <= 0:
         if _shield_trace:
@@ -2292,8 +2292,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     # -- the same rule as the farm-down state. PvPoke skips
                     # only fm_stack == 0; with energy already above
                     # 2*energy the turn goes NEGATIVE and the state pops
-                    # ahead of everything (DEVELOPER_NOTES "DP stack-two
-                    # branch"). Kept verbatim.
+                    # ahead of everything (DEVELOPER_NOTES 'DP "stack two
+                    # self-debuffing moves" expansion'). Kept verbatim.
                     if cm_stack_ok[n]:
                         fm_stack = math.ceil((2 * move_e - curr_e) / fast_energy)
                         if fm_stack != 0:
@@ -2658,8 +2658,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # always slot 0 vs slot i). NB the PREDICATE below is still upstream's
     # OLD `not cm_self_buff[_i]`; 574aeb0da changed it to
     # `not cm_self_debuf[_i]`, which is a different test rather than a loop
-    # generalization and is a separate, measured decision -- see
-    # DEVELOPER_NOTES "ActionLogic n=2 semantic changes".
+    # generalization and is a separate, measured decision -- see the
+    # "ActionLogic n=2 semantic changes" block near the top of this module
+    # and tests/test_actionlogic_n2_knobs.py.
     if defender.shields > 0 and n_cms > 1:
         for _i in range(1, n_cms):
             _other_ok = (not cm_self_debuf[_i]) if _AL_PREFER_NON_DEBUFFING \

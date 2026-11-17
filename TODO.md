@@ -121,23 +121,10 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   only. Fix = move the block after the lethal throw; migration predicate
   "Mimikyu on either side"; its own engine bump (one localized fix per bump).
   Raw: scratch agent_L1/results_mimikyu_scan.json (session-local).
-- **Comment-pointer fixes riding the next engine bump** (engine-hash files;
-  a comment-only edit would bump the sweep-cache hash, found by the
-  2026-10-24 DEVELOPER_NOTES link audit, all pre-existing;
-  `scripts/verify_dev_notes.py` warns on the three battle.py ones, the two
-  formchange.py ones are invisible to it): battle.py:653
-  points at a notes section "Open divergences" -> "Resolved engine
-  divergences"; battle.py:2662 points at "ActionLogic n=2 semantic changes"
-  -> the block at battle.py:182 + tests/test_actionlogic_n2_knobs.py (never
-  a notes section); battle.py:2295 "DP stack-two branch" -> the exact heading;
-  formchange.py:212 '"Known divergences" item 3' -> '"Form change gotchas"
-  item 3'; formchange.py:203 docstring "max CPM table key, 51.0" -> 52.0
-  (Mega Level 4 added 51.5/52.0); formchange.py ~247-249 claims "Meteor
-  0/0/0 at 52 is over 1500" -- false (cp = 1454; 140 spreads fit at 52); the
-  52-clamp conclusion holds because the max GL start is 51.5 (Core max level
-  27.0), say that instead; `_minior_core_level` uses Python `round`
-  (banker's) where Pokemon.js uses `Math.round` (half-up) -- dead code for
-  our dives, which always store Core.
+- **`_minior_core_level` rounds with Python `round`** (banker's) where
+  Pokemon.js uses `Math.round` (half-up) -- dead code for our dives, which
+  always store Core; fix with a future engine bump. (The other comment-pointer
+  fixes listed here rode the 2026-11-17 Mega Level 4 bump.)
 - **UL Minior** is unverified in-game; our Meteor level clamps at 52 where
   PvPoke sits at 55 (deliberate, docs/pvpoke_divergences.md item 9). Revisit
   if a UL dive is ever wanted.

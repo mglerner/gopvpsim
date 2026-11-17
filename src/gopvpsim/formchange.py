@@ -200,7 +200,7 @@ def _aegislash_shield_level(blade_level, league_cp):
 
     Mirrors PvPoke getFormStats() aegislash_shield branch. The formula
     deliberately overshoots; the caller walks down whole levels until CP
-    fits. We clamp the start to our level cap (max CPM table key, 51.0):
+    fits. We clamp the start to our level cap (max CPM table key, 52.0):
     a low-IV Blade caps at level ~25 in GL, putting the raw formula at
     52+, past the end of OUR CPM table -- the eager per-IV config build
     crashed on it (KeyError: 52.0, first Aegislash (Blade) GL dive after
@@ -209,7 +209,7 @@ def _aegislash_shield_level(blade_level, league_cp):
     exist in-game (a genuine overflow needs a start past 55). The clamp
     is therefore a deliberate divergence, not a mirror -- PvPoke's
     shield-revert stats can sit above ours (up to CPM(55) vs our
-    CPM(51)). See DEVELOPER_NOTES "Known divergences" item 3 and
+    CPM(52)). See DEVELOPER_NOTES "Form change gotchas" item 3 and
     bug-hunt round-2 FC-2; the upstream bug-report draft claiming this
     overflow was PvPoke's was retracted 2026-07-16 (our bug only).
     """
@@ -247,7 +247,8 @@ MINIOR_HALF_LEVEL_STEP = False
 # start down in whole decrementer steps until it is on our table, so every
 # level the loop would visit at or below 52 is visited in the same order
 # and the result is identical whenever the answer is <= 52 -- which it is
-# for every Great League Core (Meteor 0/0/0 at 52 is over 1500). It is NOT
+# for every Great League Core (the highest GL start is 51.5: Core tops out
+# at level 27.0). It is NOT
 # identical in Ultra League: Meteor cannot reach 2500 CP at any level, so
 # PvPoke leaves it at 55 and we leave it at 52 (deliberate, documented;
 # UL Minior is unverified in-game anyway -- see DEVELOPER_NOTES).
@@ -531,8 +532,9 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
     if alt_trigger is not None:
         _check_trigger(alt_trigger, alt_species_id)
     # For toggle types, the alt form should use the same trigger as the default
-    # so it can toggle back (e.g. Morpeko Hangry has no formChange in gamemaster
-    # but needs to toggle back to Full Belly on the next charged move).
+    # so it can toggle back. Fallback only: Morpeko Hangry had no formChange of
+    # its own until pvpoke 2ad2682e6 (2026-11-16) added one with the same
+    # trigger, so with a current gamemaster this branch is not taken.
     form_type = fc.get('type')
     if form_type == 'toggle' and alt_trigger is None:
         alt_trigger = trigger

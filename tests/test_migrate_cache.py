@@ -442,6 +442,26 @@ def test_gm_delta_unresolvable_species_is_affected():
     assert affected(oldmon, a) is True
 
 
+def test_mega_ml_cap_20261117_predicate():
+    """Affected iff Master League AND a supermega on either side; capped
+    leagues always bless (the raise's condition is unchanged there)."""
+    p = migrate_cache.PREDICATES['mega_ml_cap_20261117']
+    mew = {'species': 'Mewtwo (Mega X)', 'league': 'master'}
+    dia = {'species': 'Dialga', 'league': 'master'}
+    assert p(dia, {'species': 'Groudon'}) is False
+    assert p(mew, {'species': 'Groudon'}) is True
+    assert p(dia, {'species': 'Dragonite (Mega)'}) is True
+    for lg in ('great', 'ultra', 'little'):
+        assert p({'species': 'Mewtwo (Mega X)', 'league': lg},
+                 {'species': 'Dragonite (Mega)'}) is False, lg
+    # Slayer shape: affected(scen, scen).
+    assert p(mew, mew) is True and p(dia, dia) is False
+    # Fail-safe.
+    assert p({'species': 'Dialga'}, {'species': 'Groudon'}) is True
+    assert p(dia, {}) is True
+    assert p(None, None) is True
+
+
 def test_cramorant_port_20260824_predicate():
     """The Cramorant-port engine predicate: affected iff either side is a
     Cramorant (any form) or an Aegislash (any form); fail-safe on missing

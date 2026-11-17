@@ -1,4 +1,4 @@
-"""Mega Level 4 raises the level ceiling to 52 (PvPoke Pokemon.js:294-297).
+"""Mega Level 4's level ceiling of 52 (PvPoke Pokemon.js:294-297).
 
 PvPoke published this on 2026-09-02 (`82a974ffa`, "Mega Level 4 CP Boost") as
 its quantification of Niantic's unquantified "greatly enhanced CP" for a
@@ -6,25 +6,36 @@ higher Mega Level. It is an INTERPRETATION, not a Niantic-published rule --
 see MEGA_LEVEL_4_MAX_LEVEL -- but it is the oracle we cross-check against, and
 before it PvPoke modelled no stat effect of Mega Level at all.
 
-It only bites where a CP cap does not already bind, i.e. Master League: a GL
-or UL mega sits far below level 50 anyway because its base stats are huge.
+pvpoke 426e5e9f3 (2026-11-11) RETRACTED it for Master League ("Level 4 Megas
+no longer receive a 2-level boost in Mega Master League"; the raise is now
+gated on targetCP < 10000). In GL/UL a mega sits far below level 50 anyway,
+so the raise never binds anywhere and a Master League supermega gets the
+ordinary ceiling. Before the retraction ours gave Mewtwo (Mega X) 15/15/15
+level 52 / 7076 CP in Master League (pre-fix value, pinned below).
 
-Expected values are captured from a RUNNING PvPoke at 79d04af74 (a probe that
-instantiates Pokemon.js directly and reports the resolved level/cp/stats), not
-derived from our own code.
+PvPoke's guard leaks: setLevel/setIV call initialize(false), and `false <
+10000` re-raises the cap to 52 (DEVELOPER_NOTES "PvPoke bugs found" #12). We
+follow the default-load path, initialize(10000).
+
+Expected values are captured from a RUNNING PvPoke at d02018eb6 (a debug copy
+of scripts/pvpoke_trace.js printing level/cp/stats right after
+initialize(10000), before any setIV), not derived from our own code. PvPoke's
+default ML ceiling is 50, ours is 51 (best buddy), so the stat comparison
+pins max_level=50.
 """
 import pytest
 
-from gopvpsim.pokemon import (CPM, MAX_CPM_LEVEL, MEGA_LEVEL_4_MAX_LEVEL,
-                              MEGA_LEVEL_SUPERMEGA, Pokemon, bestbuddy_caps,
-                              mega_level)
+from gopvpsim.pokemon import (CPM, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
+                              MEGA_LEVEL_4_MAX_LEVEL, MEGA_LEVEL_SUPERMEGA,
+                              Pokemon, bestbuddy_caps, mega_level)
 
-# speciesName -> PvPoke's resolved values at 15/15/15, CP cap 10000.
+# speciesName -> PvPoke's resolved values at 15/15/15, CP cap 10000, on the
+# default-load path (initialize(10000)) at d02018eb6.
 PVPOKE_ML = {
-    'Mewtwo (Mega X)': dict(level=52.0, cp=7076, atk=352.024205803871,
-                            def_=195.56900322437275, hp=206),
-    'Dragonite (Mega)': dict(level=52.0, cp=5583, atk=266.9942044019698,
-                             def_=229.58100378513325, hp=190),
+    'Mewtwo (Mega X)': dict(level=50.0, cp=6910, atk=347.88420975208254,
+                            def_=193.26900541782365, hp=204),
+    'Dragonite (Mega)': dict(level=50.0, cp=5452, atk=263.85420739650704,
+                             def_=226.88100636005385, hp=188),
 }
 
 
@@ -56,21 +67,22 @@ def test_the_ordinary_ceiling_did_not_move():
 
 
 @pytest.mark.parametrize('species', sorted(PVPOKE_ML))
-def test_supermega_master_league_stats_match_pvpoke_exactly(species):
-    """Level, CP and every battle stat, bit-for-bit.
+def test_supermega_master_league_stats_match_pvpoke(species):
+    """Level, CP and HP exact; atk/def to the documented CPM[50] gap.
 
-    Exact rather than approximate on purpose: the two mega-only CPM entries
-    are PvPoke's own full-precision values, so there is no truncation gap to
-    absorb here (unlike the rest of the table -- see
-    test_ordinary_levels_keep_the_game_published_cpm).
+    Level 50 uses Niantic's published 0.84029999 where PvPoke carries the
+    full float expansion (test_ordinary_levels_keep_the_game_published_cpm):
+    a ~3e-8 CPM gap times a ~250-350 stat, so atk/def differ by ~1e-5 -- the
+    same gap every ordinary level-50 mon has. max_level=50 because that is PvPoke's default ML ceiling.
     """
     want = PVPOKE_ML[species]
-    p = Pokemon.at_best_level(species, 15, 15, 15, league='master')
+    p = Pokemon.at_best_level(species, 15, 15, 15, league='master',
+                              max_level=50.0)
     assert mega_level(species) == MEGA_LEVEL_SUPERMEGA
     assert p.level == want['level']
     assert p.cp == want['cp']
-    assert p.atk == want['atk']
-    assert p.def_ == want['def_']
+    assert p.atk == pytest.approx(want['atk'], abs=1e-4)
+    assert p.def_ == pytest.approx(want['def_'], abs=1e-4)
     assert p.hp == want['hp']
 
 
@@ -89,7 +101,7 @@ def test_ordinary_levels_keep_the_game_published_cpm():
 
 
 def test_non_supermegas_and_non_megas_are_unaffected():
-    """Only Mega Level 4 gets the raise."""
+    """Ordinary Master League mons, supermega or not, stay <= 51."""
     for species in ('Dialga', 'Metagross', 'Sableye (Mega)'):
         p = Pokemon.at_best_level(species, 15, 15, 15, league='master')
         assert p.level <= MAX_CPM_LEVEL, (species, p.level)
@@ -122,14 +134,17 @@ def test_an_explicit_max_level_still_wins():
     assert p51.level == 51.0
 
 
-def test_mega_four_cap_is_flat_and_does_not_stack_with_best_buddy():
-    """PvPoke clamps setLevelCap with min(levelCap, baseLevelCap).
+def test_master_league_supermega_gets_the_ordinary_ceiling():
+    """No +2 levels in Master League since pvpoke 426e5e9f3.
 
-    Both caps are set to 52, so best buddy cannot push a supermega to 53. Our
-    table deliberately stops at 52 for the same reason -- a 53 entry would
-    invite exactly that stacking.
+    Pre-fix (pvpoke 82a974ffa..e02bde78d) ours gave 52.0 / 7076 CP here. Now a
+    supermega's default ceiling is the ordinary Master League one (51, best
+    buddy), the same as Dialga's. The table still stops at 52.
     """
     assert MEGA_LEVEL_4_MAX_LEVEL == 52.0
     assert 52.5 not in CPM and 53.0 not in CPM
-    p = Pokemon.at_best_level('Mewtwo (Mega X)', 15, 15, 15, league='master')
-    assert p.level == MEGA_LEVEL_4_MAX_LEVEL
+    for species in sorted(PVPOKE_ML):
+        p = Pokemon.at_best_level(species, 15, 15, 15, league='master')
+        assert p.level == LEAGUE_MAX_LEVEL['master'] == 51.0, (species, p.level)
+    assert Pokemon.at_best_level('Mewtwo (Mega X)', 15, 15, 15,
+                                 league='master').cp != 7076

@@ -123,8 +123,10 @@ MAX_CPM_LEVEL = 51.0
 #
 # UNVERIFIED MECHANIC. Niantic said only that a higher Mega Level "greatly
 # enhances CP"; +2 levels is PvPoke's quantification, published 2026-09-02.
-# It only bites where a CP cap does not already bind -- i.e. Master League;
-# a GL/UL mega sits far below any cap already.
+# Since pvpoke 426e5e9f3 (2026-11-11) it applies only below the 10000 CP cap
+# ("Level 4 Megas no longer receive a 2-level boost in Mega Master League"),
+# so it never binds anywhere: a GL/UL mega sits far below 50 already. Kept so
+# the capped-league path stays a line-for-line port of PvPoke's.
 MEGA_LEVEL_4_MAX_LEVEL = 52.0
 
 assert MAX_CPM_LEVEL in CPM and MEGA_LEVEL_4_MAX_LEVEL in CPM
@@ -445,14 +447,19 @@ class Pokemon:
         if max_level is None:
             max_level = LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
             # Mega Level 4 raises the ceiling to 52 (PvPoke Pokemon.js:294-297,
-            # applied AFTER the battle's own cap and clamped flat). Only
-            # relevant where a CP cap does not already bind -- in GL/UL a mega
-            # sits far below 50 anyway, so this changes nothing there.
+            # applied AFTER the battle's own cap and clamped flat) -- but only
+            # below the 10000 CP cap since pvpoke 426e5e9f3, where a CP cap
+            # always binds first, so a Master League supermega gets the
+            # ordinary ceiling. PvPoke's own guard leaks: initialize(false)
+            # from setLevel/setIV passes `false < 10000` and re-raises the cap
+            # (DEVELOPER_NOTES "PvPoke bugs found" #12); we follow the
+            # default-load path and the commit's stated intent.
             #
             # Skipped when the caller pinned an explicit max_level: an oracle
             # fixture or a re-dive against a historical build must be able to
             # ask for the level it actually means.
-            if mega_level(species_name) == MEGA_LEVEL_SUPERMEGA:
+            if (mega_level(species_name) == MEGA_LEVEL_SUPERMEGA
+                    and max_cp < LEAGUE_CAPS['master']):
                 max_level = max(max_level, MEGA_LEVEL_4_MAX_LEVEL)
         level = best_level(base_atk, base_def, base_sta,
                            atk_iv, def_iv, sta_iv,

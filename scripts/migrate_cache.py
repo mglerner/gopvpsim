@@ -784,9 +784,42 @@ def _signature_fix_slayer_20260923(f, c):
     return False
 
 
+def _mega_ml_cap_20261117(f, c):
+    """Mega Level 4 Master League ceiling (pin --from-engine 3d125a0e165f).
+
+    The hashed delta since 3d125a0e165f is ONE behavior edit plus comments:
+      (1) ``pokemon.Pokemon.at_best_level`` raises a supermega's ceiling to
+          52 only when ``max_cp < LEAGUE_CAPS['master']`` (pvpoke 426e5e9f3).
+          In a capped league the condition is unchanged, so every GL/UL/
+          Little column is byte-identical. In Master League only a
+          ``supermega``-tagged species (``mega_level == 4``) ever took the
+          raise, so a Master column with no supermega on either side is
+          identical too.
+      (2) comment/docstring-only edits in battle.py and formchange.py
+          (citation pointers, the Morpeko toggle fallback note).
+    Affected iff league is Master AND either side is a supermega. Slayer:
+    affected(scen, scen), same test. Fail-safe: missing league or species
+    -> AFFECTED. One-shot; never re-run against another --from-engine.
+    """
+    from gopvpsim.pokemon import MEGA_LEVEL_SUPERMEGA, mega_level
+    league = (f or {}).get('league') or (c or {}).get('league')
+    if not isinstance(league, str):
+        return True
+    if league != 'master':
+        return False
+    for side in (f, c):
+        sp = (side or {}).get('species')
+        if not isinstance(sp, str) or not sp:
+            return True
+        if mega_level(sp) == MEGA_LEVEL_SUPERMEGA:
+            return True
+    return False
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
+    'mega_ml_cap_20261117': _mega_ml_cap_20261117,
     'no_shadow_either_side_20260920': _no_shadow_either_side_20260920,
     'form_change_either_side_20260912': _form_change_either_side,
     # 2026-09-12 sheet v6 (pin --from-engine 1436a17ffbb2, the engine AFTER
