@@ -1,13 +1,13 @@
 {
  "digests": {
-  "../pokemon/Pokemon.js": "10893308f8e8b408d396d19e541d7482c9657dd9c07fd6c8c9bf8f783669c47d",
-  "Battle.js": "65765dc0214710f6587b4e5d5a07a7bf8d2639090be6a5a59270650d6d5225b4",
+  "../pokemon/Pokemon.js": "a3646035edfe30e8136e8121ed3981aec2bcf094dca582354234b79eca34321e",
+  "Battle.js": "93d7315b6f85294db87f23f6486ff14e1e65a39f3cd11f3875075b4c29db9a89",
   "DamageCalculator.js": "557b9345367a272e7822b47d346b67ae05d4124050e9d3876fb2446246915f31",
   "actions/ActionLogic.js": "9a5a7bb28a01c115e18e5b904646f5fb18bf1b17c2bf8757d2d90144ef7d0e30"
  },
- "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: DEVELOPER_NOTES.md 'PvPoke re-vetting log' 2026-10-24 (Minior port).",
- "pinned_at": "2026-10-24",
- "pvpoke_commit": "38f70320d",
- "vetted": "2026-10-24",
- "vetted_note": "Re-vetted per docs/rebalance_checklist.md section B. Upstream delta a93147bf1..38f70320d is three commits: e87448291 (sandbox-mode fix: previousTurnActions cleared in Battle.start, UI-only for us; our Report 9 sandbox test re-pinned to the fixed page), 4d2908fac + 38f70320d (Minior: battle_start/hp form-change triggers, the Meteor hold-energy rule in ActionLogic.js:254-263, the Meteor wouldShield rule at :1256, Pokemon.js level formulas). All sim-relevant lines are Minior-gated (activeFormId == 'minior_meteor') except the new form-change trigger dispatch, so pvpoke_dp remains a valid PoGoDives baseline for every other species. Ported as-is (tests/test_minior.py). Oracle audit at re-pin: 387 cells, Minior 90/90 exact, and the 20 non-Minior divergences are the identical set to the pre-port audit (userdata/logs/oracle_audit_full_2026-10-24e.log)."
+ "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: DEVELOPER_NOTES.md 'PvPoke re-vetting log' 2026-11-17.",
+ "pinned_at": "2026-11-17",
+ "pvpoke_commit": "d02018eb6",
+ "vetted": "2026-11-17",
+ "vetted_note": "Re-vetted per docs/rebalance_checklist.md section B. Upstream engine delta 38f70320d..d02018eb6 is two commits: 2ad2682e6 (Battle.js:422 action.priority -> action.settings.priority for SWITCH actions after a charged move; we do not model swaps, no effect) and 426e5e9f3 (Pokemon.js:294 Mega Level 4 cap of 52 gated on targetCP < 10000, setMegaLevel no longer re-levels; ported as the ML no-boost rule in 115538f; the guard leaks through initialize(false), DEVELOPER_NOTES bug #12). ActionLogic.js and DamageCalculator.js byte-identical, so pvpoke_dp and the PoGoDives baseline are unchanged. Gamemaster 2ad2682e6 fixed Morpeko bug #8 upstream. Oracle audit at re-pin: 387 cells, 375 exact, 12 documented divergences (all Aegislash); the 8 Morpeko cells un-xfailed in 21710cd (userdata/logs/oracle_audit_full_2026-11-17.log)."
 }

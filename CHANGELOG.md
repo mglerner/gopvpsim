@@ -181,6 +181,30 @@ re-derived; the 2026-10-24 fact-check found three of the inherited claims
 `little` row) already contradicted by the code, so read the archive as
 history, not as a second source of truth.
 
+### Archived: PvPoke re-vetting log: the 2026-10-24 entry (pin `38f70320d`)
+
+Superseded 2026-11-17 by the `d02018eb6` re-vet. Its bare PvPoke line refs
+are as of `38f70320d` (the Minior level formulas have since moved to
+`Pokemon.js:2554-2572`).
+
+**2026-10-24 -- re-vetted against pvpoke `38f70320d`** (range
+`a93147bf1..38f70320d`). `e87448291` "Sandbox mode fix" is UI only
+(the page-side double-simulate of report draft 9;
+`tests/test_pvpoke_sandbox.py` re-pinned to the fixed page, 662/[51,0]).
+`4d2908fac` + `38f70320d` add Minior: triggers `battle_start` and `hp`, the
+Meteor hold-energy rule (`ActionLogic.js:254-263`), the Meteor wouldShield
+rule (`:1256`), the level formulas (`Pokemon.js:2562-2580`) and the
+form-animation cooldown reset (`Battle.js:548`); every sim-relevant line is
+gated on `activeFormId == "minior_meteor"` except the trigger dispatch, so
+`pvpoke_dp` stays a valid PoGoDives baseline for every other species.
+**Ported as-is** (`tests/test_minior.py`; "Form change gotchas" 7, "PvPoke
+bugs found" #11); porting exposed four fidelity gaps, all fixed
+PvPoke-exact: fast-landing queue order ("Form change gotchas" 7(a)) and the
+TTL order, stack-two twins and battle-start freeze order ("Key implementation
+details"); class A and the strat re-check (CHANGELOG "PoGoDives strat
+re-checked") followed that day. Engine digests:
+`tests/fixtures/pvpoke_engine_digests.json`.
+
 ### Archived: PvPoke re-vetting log: the 2026-06-06 entries
 
 **2026-06-06 — re-vetted against pvpoke `bc532fbda`** (range

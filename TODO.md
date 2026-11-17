@@ -135,6 +135,36 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   responded to the 2026-07-16 batch. Report 9 is superseded (e87448291);
   Report 10's mechanic is now ported, so it is moot for us.
 
+## PvPoke sync 2026-11-17 -- open items
+
+Re-vetted at pvpoke `d02018eb6` (DEVELOPER_NOTES "PvPoke re-vetting log").
+Commits 21710cd (Morpeko bug #8 fixed upstream, audit 375/387 exact),
+115538f (Mega Level 4: no ML boost; engine `3d125a0e165f` -> `a6dffb536332`,
+slayer `0efb8d63e7d2` -> `1294f3bbff20`), 75d13b6 (pools), and the re-vet.
+
+- **Data cache refresh (Michael, outside the sandbox)** -- the `cp` commands
+  in the 11-05 section below, plus
+  `cp ../pvpoke/src/data/groups/championshipseries.json ~/Documents/gopvpsim_cache/group_championshipseries.json`.
+  New gamemaster stamp is `10d0d903c162`.
+- **Cache migrations before the next bake** (snapshot first, rebalance
+  checklist A.1): engine `migrate_cache.py --from-engine 3d125a0e165f
+  --predicate mega_ml_cap_20261117` (and `--slayer --from-engine
+  0efb8d63e7d2`); gamemaster `--from-gamemaster 03e7b77024e9
+  --old-gamemaster-file` (blob: pvpoke `38f70320d`). The still-pending
+  10-24 Minior migration (`9856aa366b5d`) comes first -- see "Minior -- open
+  items".
+- **Pools changed (75d13b6), so every GL/UL page is now one or more
+  opponents short** (Dunsparce / Feraligatr (Shadow) GL, Togekiss UL) until
+  re-dived. The publish gate lists unlisted dives: diggersby,
+  snorlax and shadow-snorlax (great). Shadow Feraligatr GL is back in the
+  registry but its local page is 09-27. Keeping Snorlax pages alive would
+  need a CURATED_INCLUSIONS entry or EXTRA_DIVES -- Michael's call.
+- **Tinkaton GL/UL local re-dives (11-05)** match the engine for GL/UL (the
+  mega change is ML-only) but predate the new pools; publishing them needs
+  the prune decision above, or a re-dive for the new opponents first.
+- **Headless PvPoke mega ML batches still run supermegas at 52** (bug #12):
+  pin `--pN-level` or call `initialize(10000)` without IV edits.
+
 ## PvPoke sync 2026-11-05 -- open items
 
 Checked pvpoke `38f70320d..e02bde78d` (six commits, 2026-10-24..11-03): no

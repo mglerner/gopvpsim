@@ -18,22 +18,15 @@ trimmed to its read-whole cap". -->
 
 ## PvPoke re-vetting log
 
-**2026-10-24 -- re-vetted against pvpoke `38f70320d`** (range
-`a93147bf1..38f70320d`). `e87448291` "Sandbox mode fix" is UI only
-(the page-side double-simulate of report draft 9;
-`tests/test_pvpoke_sandbox.py` re-pinned to the fixed page, 662/[51,0]).
-`4d2908fac` + `38f70320d` add Minior: triggers `battle_start` and `hp`, the
-Meteor hold-energy rule (`ActionLogic.js:254-263`), the Meteor wouldShield
-rule (`:1256`), the level formulas (`Pokemon.js:2562-2580`) and the
-form-animation cooldown reset (`Battle.js:548`); every sim-relevant line is
-gated on `activeFormId == "minior_meteor"` except the trigger dispatch, so
-`pvpoke_dp` stays a valid PoGoDives baseline for every other species.
-**Ported as-is** (`tests/test_minior.py`; "Form change gotchas" 7, "PvPoke
-bugs found" #11); porting exposed four fidelity gaps, all fixed
-PvPoke-exact: fast-landing queue order ("Form change gotchas" 7(a)) and the
-TTL order, stack-two twins and battle-start freeze order ("Key implementation
-details"); class A and the strat re-check (CHANGELOG "PoGoDives strat
-re-checked") followed that day. Engine digests:
+**2026-11-17 -- re-vetted against pvpoke `d02018eb6`** (range
+`38f70320d..d02018eb6`). `2ad2682e6` `Battle.js:422` re-prioritizes SWITCH
+actions (we model no swaps); `426e5e9f3` gates the Mega Level 4 cap of 52 on
+`targetCP < 10000` (`Pokemon.js:294`), ported as the ML no-boost rule (bug
+#12 for the leak). `ActionLogic.js` and `DamageCalculator.js` byte-identical,
+so `pvpoke_dp` and the PoGoDives baseline are unchanged (no strat re-check
+owed). Gamemaster `2ad2682e6` fixed bug #8. Full audit: 387 cells, 375 exact,
+12 documented (all Aegislash); `userdata/logs/oracle_audit_full_2026-11-17.log`.
+B.5 Opus pass: 9 claims fixed, two `Pokemon.js` refs re-anchored. Digests:
 `tests/fixtures/pvpoke_engine_digests.json`.
 
 Earlier vettings are archived in CHANGELOG. Record a new entry here only for
@@ -212,8 +205,10 @@ archive, no copies are kept.
 Record the baseline here BEFORE a gamemaster move (`docs/rebalance_checklist.md`
 section A) as pvpoke commit + `gamemaster_hash()` stamp; move it to
 CHANGELOG once its migration is applied. **Pending (2026-10-24):** old stamp
-`9856aa366b5d` (blob: pvpoke `c15fb6f7e`) -> live `03e7b77024e9`; command
-and engine side in TODO "Minior -- open items". The 2026-08-31 Twilight
+`9856aa366b5d` (blob: pvpoke `c15fb6f7e`) -> `03e7b77024e9` (the pinned
+cache, 10-24); command and engine side in TODO "Minior -- open items". Upstream
+moved on: pvpoke `d02018eb6` is `10d0d903c162`, so once the data cache is
+refreshed the target is that stamp, not `03e7b77024e9`. The 2026-08-31 Twilight
 Trails pin (`46bd08a77` / `c431557dcc76`) is archived in CHANGELOG.
 
 Operational notes: hit log line per sweep is `sweep cache: N/M opponent
@@ -284,7 +279,7 @@ are derived views for the ~30 dict-shaped call sites
 a CP cap / level ceiling changes simulated stats -- the same constants in an
 unhashed module would let the sweep cache serve columns computed under the
 old values. `data.py` reads it through a FUNCTION-level import
-(`data._league_cp`) because `pokemon` imports `data` at module scope. Little
+(`data._league`) because `pokemon` imports `data` at module scope. Little
 League has no open PvPoke rankings, so `data.load_rankings('little')` fails
 loudly; `load_cup_rankings` is the way in. The JS user-collection fallback
 tables carry the `little` row too (`d59e801`), pinned by whole-table
@@ -298,7 +293,7 @@ from the count; #5/#6 were never numbered entries). Filed upstream
 2026-07-16 as pvpoke/pvpoke #378 (#3 Gyro Ball), #379 (#8 Morpeko), #380
 (#1 dead pruning), #381 (the initializeMove DPE-overwrite, Report 4 only)
 and #382 (#2 bestChargedMove staleness); #7 was held back. Nothing has been
-filed since -- PvPoke has not responded -- and Michael's standing call
+filed since (no tracker reply seen; #3 and #8 were later fixed upstream), and Michael's standing call
 (2026-10-24) is NOT to file more; Reports 8 and 11 stay drafts and Report 10
 is moot (ported), all in `docs/pvpoke_bug_reports.md`.
 
@@ -314,15 +309,15 @@ consumers).
 
 ### 2. bestChargedMove not recomputed on opponent form change
 
-**File**: `Pokemon.js` `selectBestChargedMove` (~`:841-865` at `38f70320d`);
-`changeForm` (`:2471`) calls `resetMoves` on self only. PvPoke caches `bestChargedMove` at init and
+**File**: `Pokemon.js` `resetMoves`, the best-charged-move pick (~`:841-865`);
+`changeForm` (`:2463`) calls `resetMoves` on self only. PvPoke caches `bestChargedMove` at init and
 does NOT recompute it when the **opponent** changes form (e.g. Aegislash
 Shield->Blade). Since 2026-07-03 we MATCH this (divergence #3 below): the NB-1
 sweep showed our old per-turn recompute was not reliably better.
 
 ### 3. Aegislash selects Gyro Ball over Shadow Ball -- FIXED UPSTREAM
 
-Fixed in pvpoke `574aeb0da` (`ActionLogic.js:954`, `!selfBuffing` ->
+Fixed in pvpoke `574aeb0da` (`ActionLogic.js:964`, `!selfBuffing` ->
 `!selfDebuffing`), filed by us as pvpoke/pvpoke#378. PvPoke master throws 0
 Gyro Balls across the 36 pre-09-27 Aegislash oracle cells. Kept for the
 record and the bug count. The residual Gyro-Ball-vs-Shadow-Ball first-throw
@@ -397,7 +392,7 @@ control) and as nine audit xfail cells. `docs/pvpoke_divergences.md` item 8.
 
 ### 11. Minior's Meteor level: the simulator steps whole levels, the site shows half levels (ported with a switch)
 
-**File**: `Pokemon.js:2590-2612` (`getFormStats`, Minior branch; `38f70320d`).
+**File**: `Pokemon.js:2582-2604` (`getFormStats`, Minior branch; `d02018eb6`).
 The Meteor level walk steps `0.5` only when `this.activeFormId ==
 "minior_core"` or `this.decrementer == "minior_meteor"` (sic: `decrementer`
 is never assigned, a typo for a form-id check), else `1`. `changeForm` sets
@@ -416,10 +411,11 @@ the community settles. Impact <= ~2 Meteor levels. Draft:
 
 **File**: `Pokemon.js:294` (`d02018eb6`). `426e5e9f3` gated the Level 4
 cap of 52 on `targetCP < 10000` ("no longer receive a 2-level boost in Mega
-Master League"), but `setLevel(..., true)` (from `setIV` under autoLevel, or
-any custom level) calls `initialize(false)`, and `false < 10000` is true:
-the first IV edit puts the cap back to 52. Probed 2026-11-17: Mewtwo (Mega
-X) 15/15/15 is level 50 after `initialize(10000)` and 52 after `setIV`, so
+Master League"), but every IV or level edit calls `initialize(false)`
+(`setIV` directly, or via `setLevel(..., true)` under autoLevel), and `false
+< 10000` is true: the first IV edit puts the cap back to 52. Probed
+2026-11-17: Mewtwo (Mega X) 15/15/15 is level 50 after `initialize(10000)`
+and 52 after setting all three IVs, so
 `pvpoke_trace.js` and any headless batch that sets IVs still sim ML
 supermegas at 52. **Ours follows the stated intent** (no boost; the ordinary
 ML ceiling), pinned by `tests/test_mega_level_cap.py`. No pool or oracle
@@ -455,7 +451,7 @@ item).
 
 ### Breakpoint / bulkpoint solvers apply the Mega bonus (deliberate, 2026-09-02)
 
-PvPoke adds the 1.3x Mega bonus to `DamageCalculator.damage()` but NOT to
+PvPoke adds the Mega bonus (1.3x at Level 4) to `DamageCalculator.damage()` but NOT to
 its `breakpoint()` / `bulkpoint()` solvers, so upstream a supermega's
 breakpoint table disagrees with the damage printed beside it. Ours applies
 the factor (`breakpoints.py`): breakpoints ARE this project's deliverable,
@@ -704,8 +700,8 @@ at 51.0 when this crashed the first Aegislash (Blade) GL dive (`KeyError:
 and only higher starts are clamped. `_aegislash_shield_level` clamps its
 start to `max(CPM)` -- levels above the table don't exist in-game, so this
 is the defensible choice, but PvPoke's shield-revert stats can sit above ours
-where the clamp bites (`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`;
-the `formchange.py` docstring still says 51.0). Blade really reverts to
+where the clamp bites (`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`).
+Blade really reverts to
 Shield in-battle (`activate_shield`), so this is load-bearing.
 
 **4. A fast landing after a mid-flight revert credits the CURRENT form's
@@ -875,7 +871,8 @@ comments above `_wbLegendHeight` and `_wbFitLegend` in
 ## Article lifecycle
 
 Articles live in `articles/*.toml` and render to
-`userdata/website/articles/<slug>/` via `scripts/render_article.py`; schema
+`userdata/website/articles/<slug>/` via `scripts/generate_article.py`
+(`auto`/`both`) or `scripts/render_article.py` (`expert` only); schema
 in `docs/article_schema.md`. To mark one obsolete, set `[obsolescence]`
 `status = "obsolete"`, `as_of`, `note`, re-render, republish
 (`scripts/publish_website.sh --push`); the renderer shows a red banner with
