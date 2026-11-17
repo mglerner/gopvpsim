@@ -166,19 +166,22 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
   engine+gamemaster mode plus a predicate covering the whole
   `4b42f9d83690 -> a6dffb536332` delta (Minior port + Mega Level 4) -- a
   "tractable migration?" call (CLAUDE.md) before the next cold re-dive.
-- **Bakes inside the Claude sandbox never write the cache** (`~/.cache` is
-  EPERM there; `sweep_cache.put_column` / `SlayerCache.save` swallow it with
-  `except Exception: pass`), so no column is newer than 09-28. Run bakes
-  outside the sandbox; make a failed write warn (or preflight writability),
-  with a test.
+- **Sandboxed bakes before 2026-11-17 never wrote the cache** (`~/.cache`
+  was EPERM; `sweep_cache.put_column` / `SlayerCache.save` swallow it with
+  `except Exception: pass`), so no column is newer than 09-28. FIXED for the
+  sandbox 11-17: `.claude/settings.local.json` `sandbox.filesystem.allowWrite`
+  adds `~/.cache/gopvpsim` and `~/Documents/gopvpsim_cache` (probe-verified).
+  Still open: make a failed write warn (or preflight writability), with a
+  test. Sandboxed runs can now overwrite trusted columns, so
+  `--no-sweep-cache` applies to WIP-engine runs in Claude sessions too.
 - **Headless PvPoke mega ML batches still run supermegas at 52** (bug #12):
   pin `--pN-level` or call `initialize(10000)` without IV edits.
 - **Thievul/Tinkaton candidate cull (Michael):** Nickit, Tinkatink and
   Tinkatuff cannot reach GL or UL (hundo L51 817 / 984 / 1495 CP) and IVs
   carry through evolution, so rank by the evolved form's page: paste the
   Poke Genie export into its collection box, or `owned_breakdown.py --csv`.
-- **Data-cache refresh recipe** (outside the sandbox: the proxy truncates
-  raw.githubusercontent.com and `~/Documents` is not writable). From
+- **Data-cache refresh recipe** (`cp` from the local checkout; the sandbox
+  proxy truncates raw.githubusercontent.com fetches). From
   `../pvpoke/src/data/` copy into `~/Documents/gopvpsim_cache/`:
   `gamemaster.json`; `rankings/all/overall/rankings-{1500,2500,10000}.json`
   as `great/ultra/master.json`;
