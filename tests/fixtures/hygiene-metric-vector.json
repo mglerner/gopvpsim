@@ -1,0 +1,8 @@
+[
+  {"text": "a\fb\n", "lines": 1},
+  {"text": "x y\n", "lines": 1},
+  {"text": "a\rb\n", "lines": 1},
+  {"text": "a\r\nb\r\n", "lines": 2},
+  {"text": "no newline", "lines": 1},
+  {"text": "", "lines": 0}
+]

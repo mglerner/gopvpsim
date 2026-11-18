@@ -14,7 +14,10 @@
 #      sentinel VALUES are read from the index; the live counts (pytest
 #      collection, type chart) necessarily come from the working tree.
 #   3. Verify DEVELOPER_NOTES.md stays under its read-whole size cap and
-#      that its quoted section citations, repo paths and test refs resolve
+#      that its quoted section citations, repo paths and test refs resolve,
+#      plus the .hygiene.toml budgets (TODO.md done-lines no-rise and size
+#      cap, no new ISO dates in CLAUDE.md / DEVELOPER_NOTES.md, the Resume
+#      block when configured) against .hygiene-baseline.json
 #      (scripts/verify_dev_notes.py; every commit, incl. deletion-only).
 #
 # Install by running: git config core.hooksPath .githooks
@@ -75,6 +78,7 @@ set -e
 if [[ $rc -eq 3 ]]; then
     echo >&2
     echo 'Commit blocked by DEVELOPER_NOTES drift (size cap or dangling pointer)' >&2
+    echo 'or a process-file budget ("hygiene:" lines above; .hygiene.toml)' >&2
     echo 'in the content being committed. Run scripts/verify_dev_notes.py for the' >&2
     echo 'full working-tree report; stage the fix, or use --no-verify.' >&2
     exit 1

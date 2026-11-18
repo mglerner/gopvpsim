@@ -7,9 +7,11 @@ number of citations (an empty scan passing is the silent failure mode).
 from __future__ import annotations
 
 import importlib.util
+import json
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -81,7 +83,27 @@ class Other:
 FLAG == 3
 '''
 
+GOOD_HYGIENE = '''frozen = ["docs/reviews/*"]
+history = ["CHANGELOG.md"]
+[budgets]
+"TODO.md" = { chars = { hard = 200, warn = 100 }, done = "no-rise" }
+"CLAUDE.md" = { dates = "no-rise" }
+"memory:*" = { lines = { hard = 1 } }
+'''
+
+GOOD_BASELINE = '''{
+ "items": {},
+ "metrics": {
+  "dates:CLAUDE.md": {"added": "2026-11-18", "rule": "no-rise", "value": 0},
+  "done:TODO.md": {"added": "2026-11-18", "rule": "no-rise", "value": 0}
+ },
+ "version": 1
+}
+'''
+
 GOOD_FILES = {
+    '.hygiene.toml': GOOD_HYGIENE,
+    '.hygiene-baseline.json': GOOD_BASELINE,
     'CLAUDE.md': '## Ship-mode narrative policy\n\nBody phrase: a human override always wins.\n',
     'TODO.md': '## Reproducibility\n',
     'CHANGELOG.md': '## 2026-01-01 -- an archived entry\n\nbody mentions "not a heading".\n',
@@ -347,7 +369,8 @@ def test_hook_exports_the_checkers_scan_paths():
     assert '--print-scan-paths' in hook
     r = subprocess.run([sys.executable, str(SCRIPT), '--print-scan-paths'],
                        capture_output=True, text=True, check=True)
-    assert r.stdout.split() == [*vdn.SCAN_FILES, *vdn.SCAN_DIRS, vdn.NOTES, vdn.CHANGELOG]
+    assert r.stdout.split() == [*vdn.SCAN_FILES, *vdn.SCAN_DIRS, vdn.NOTES, vdn.CHANGELOG,
+                                vdn.HYGIENE_CONFIG, vdn.HYGIENE_BASELINE]
 
 
 def test_exit_codes_distinguish_drift_from_crash(tmp_path):
@@ -660,6 +683,124 @@ def test_gitignore_is_scanned(tmp_path):
     repo = make_repo(tmp_path, **{'.gitignore': '# see DEVELOPER_NOTES "Section gone"\n'})
     fails, _ = vdn.run_checks(repo)
     assert len(fails) == 1 and '.gitignore:1' in fails[0]
+
+
+# --- hygiene budgets and the Resume block (.hygiene.toml) -----------------
+# Pre-fix (2026-11-18, before these gates): none of these were checked, so
+# every planted violation below committed cleanly; TODO.md had regrown
+# +656 B/commit after the 2026-09-27 groom, with 17 done-marker lines.
+
+RESUME_CFG = '\n[resume]\nfile = "TODO.md"\nheading = \'^## Resume here\\b\'\nmax_lines = 4\n'
+
+
+def _hyg(fails):
+    return [f for f in fails if f.startswith('hygiene:')]
+
+
+def test_hygiene_good_repo_passes(tmp_path):
+    fails, warns = vdn.run_checks(make_repo(tmp_path))
+    assert fails == [] and warns == []
+
+
+def test_hygiene_new_done_line_in_todo_fails(tmp_path):
+    repo = make_repo(tmp_path, **{'TODO.md': '## Reproducibility\n- thing DONE 2026-11-18\n'})
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert len(fails) == 1 and 'done:TODO.md 1 > baseline 0' in fails[0], fails
+    assert 'CHANGELOG' in fails[0]          # the cheap way out comes first
+
+
+def test_hygiene_done_metric_skips_fences_comments_and_fixed_constant(tmp_path):
+    todo = ('## Reproducibility\n```\nDONE in a fence\n```\n<!--\nSHIPPED in a comment\n-->\n'
+            'a FIXED level, the FIXED value, ~~abc~~ (too short)\n')
+    fails = _hyg(vdn.run_checks(make_repo(tmp_path, **{'TODO.md': todo}))[0])
+    assert fails == [], fails
+    for line in ('is FIXED now', '~~old item text~~', 'fully executed', 'MERGED to main'):
+        fails = _hyg(vdn.run_checks(make_repo(tmp_path, **{'TODO.md': todo + line + '\n'}))[0])
+        assert len(fails) == 1 and 'done:TODO.md' in fails[0], (line, fails)
+
+
+def test_hygiene_todo_char_cap(tmp_path):
+    base = '## Reproducibility\n'
+    ok = base + 'x' * (200 - len(base))
+    assert _hyg(vdn.run_checks(make_repo(tmp_path, **{'TODO.md': ok}))[0]) == []
+    fails = _hyg(vdn.run_checks(make_repo(tmp_path, **{'TODO.md': ok + 'y'}))[0])
+    assert len(fails) == 1 and 'chars:TODO.md 201 > hard cap 200' in fails[0], fails
+
+
+def test_hygiene_dates_rise_in_claude_md_fails(tmp_path):
+    claude = GOOD_FILES['CLAUDE.md'] + 'Learned 2026-11-18.\n'
+    fails = _hyg(vdn.run_checks(make_repo(tmp_path, **{'CLAUDE.md': claude}))[0])
+    assert len(fails) == 1 and 'dates:CLAUDE.md 1 > baseline 0' in fails[0], fails
+
+
+def test_hygiene_missing_config_baseline_or_value_fails(tmp_path):
+    repo = make_repo(tmp_path)
+    (repo / '.hygiene.toml').unlink()
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert len(fails) == 1 and '.hygiene.toml missing' in fails[0], fails
+
+    repo = make_repo(tmp_path / 'b')
+    (repo / '.hygiene-baseline.json').unlink()
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert fails and all('.hygiene-baseline.json' in f for f in fails), fails
+
+    repo = make_repo(tmp_path / 'c', **{'.hygiene.toml': GOOD_HYGIENE.replace(
+        '"CLAUDE.md" = { dates', '"DEVELOPER_NOTES.md" = { story = "no-rise" }\n"CLAUDE.md" = { dates')})
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert len(fails) == 1 and 'story:DEVELOPER_NOTES.md' in fails[0] and 'baseline prune' in fails[0]
+
+    repo = make_repo(tmp_path / 'd', **{'.hygiene.toml': 'budgets = [\n'})
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert len(fails) == 1 and 'does not parse' in fails[0], fails
+
+
+def test_hygiene_lines_metric_matches_the_shared_vector():
+    cases = json.loads((REPO_ROOT / 'tests' / 'fixtures' / 'hygiene-metric-vector.json').read_text())
+    assert len(cases) >= 6
+    for c in cases:
+        assert vdn._metric('lines', c['text']) == c['lines'], c
+
+
+def test_hygiene_reads_bytes_not_universal_newlines(tmp_path):
+    repo = make_repo(tmp_path, **{'.hygiene.toml': GOOD_HYGIENE.replace(
+        'chars = { hard = 200, warn = 100 }', 'chars = { hard = 25 }')})
+    # 26 chars as stored; universal newlines would read 23 and pass.
+    (repo / 'TODO.md').write_bytes(b'## Reproducibility\r\na\r\nb\r\n')
+    fails = _hyg(vdn.run_checks(repo)[0])
+    assert len(fails) == 1 and 'chars:TODO.md 26' in fails[0], fails
+
+
+def test_hygiene_resume_block_rules(tmp_path):
+    cfg = {'.hygiene.toml': GOOD_HYGIENE + RESUME_CFG}
+    good = '## Resume here\nline\nline\n\n## Reproducibility\n'
+    assert _hyg(vdn.run_checks(make_repo(tmp_path, **cfg, **{'TODO.md': good}))[0]) == []
+    cases = {
+        'missing': ('## Reproducibility\n', {}),
+        'not the first section': ('## Reproducibility\n## Resume here\nx\n', {}),
+        '5 lines, cap 4': ('## Resume here\na\nb\nc\nd\n## Reproducibility\n', {}),
+        'second handoff block': (good, {'docs/notes.md': '## Resume here\n'}),
+    }
+    for why, (todo, extra) in cases.items():
+        fails = _hyg(vdn.run_checks(make_repo(tmp_path / why.replace(' ', '_'),
+                                              **cfg, **{'TODO.md': todo, **extra}))[0])
+        assert len(fails) == 1 and why in fails[0], (why, fails)
+    # A frozen doc, a history file and a fenced example are not handoff blocks.
+    extra = {'docs/reviews/old.md': '## Resume here\n', 'CHANGELOG.md':
+             GOOD_FILES['CHANGELOG.md'] + '## Resume here\n',
+             'docs/notes.md': '```\n## Resume here\n```\n'}
+    assert _hyg(vdn.run_checks(make_repo(tmp_path / 'ok2', **cfg,
+                                         **{'TODO.md': good, **extra}))[0]) == []
+
+
+def test_real_repo_hygiene_gate_is_live_and_passes():
+    # Non-trivial: the real config carries the decided rules, and the real
+    # files have dates to count (2026-11-18: dates CLAUDE.md 19, DN 57).
+    cfg = tomllib.loads((REPO_ROOT / '.hygiene.toml').read_text())
+    assert cfg['budgets']['TODO.md']['done'] == 'no-rise'
+    assert 'hard' in cfg['budgets']['TODO.md']['chars']
+    assert vdn._metric('dates', (REPO_ROOT / 'CLAUDE.md').read_text()) >= 5
+    fails, _ = vdn.hygiene_checks(REPO_ROOT)
+    assert fails == [], fails
 
 
 def test_real_repo_outbound_floors():

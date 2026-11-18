@@ -64,6 +64,18 @@ Checks (``run_checks`` returns ``(failures, warnings)``):
               ref in the paragraph), is a failure, and so is a code fence
               left open to the end of the file (it hides every later heading
               from the citation scan).
+  hygiene     the ``.hygiene.toml`` gates (``hygiene_checks``): every
+              ``[budgets]`` hard limit and metric rule (``no-rise`` against
+              ``.hygiene-baseline.json``, ``cap:N``) on repo files -- today
+              TODO.md's done-marker lines and char cap and the ISO-date count
+              of CLAUDE.md and the notes -- and, when ``[resume]`` is set,
+              exactly one capped "Resume here" block at the top of its file
+              (frozen / history / out-of-scope docs and fenced lines aside).
+              A missing or unparseable config or baseline, or a rule with no
+              recorded value, FAILS. ``warn`` limits and ``memory:`` targets
+              are left to the global project-hygiene scanner, which owns
+              ``baseline init / prune``; the metric definitions are copied
+              from it and must stay identical.
 
 NOT checked (so do not read a green run as "every pointer resolves"):
 unquoted prose references ("the re-dive entry"), ``file:line`` numbers in
@@ -101,9 +113,12 @@ from __future__ import annotations
 
 import argparse
 import ast
+import fnmatch
 import importlib.util
+import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -117,6 +132,8 @@ DRIFT_EXIT = 3
 
 NOTES = 'DEVELOPER_NOTES.md'
 CHANGELOG = 'CHANGELOG.md'
+HYGIENE_CONFIG = '.hygiene.toml'
+HYGIENE_BASELINE = '.hygiene-baseline.json'
 
 # Files whose bytes feed sweep_cache.engine_hash(); a comment edit there
 # invalidates every cached column, so a dangling pointer only WARNS.
@@ -411,7 +428,189 @@ def _read(p: Path) -> str:
     return p.read_text(encoding='utf-8', errors='replace')
 
 
+# --- hygiene budgets (.hygiene.toml) ------------------------------------
+# The commit-time half of the global project-hygiene skill (dotfiles
+# claude/skills/project-hygiene; its references/repo-gate.md is the
+# contract). This file must NOT depend on that skill: it shares only the
+# config, the baseline file format and the metric definitions below, which
+# are copied from the scanner's core.metric / core.done_line / core.Doc and
+# must stay identical (tests/fixtures/hygiene-metric-vector.json pins
+# `lines`). Values are read as UTF-8 bytes, never with universal newlines.
+
+_DONE_RE = re.compile(
+    r'\b(DONE|SHIPPED|RESOLVED|CLOSED|SUPERSEDED|MERGED|FIXED|LANDED|BUILT|'
+    r'EXECUTED|RETIRED|OBSOLETE)\b|~~[^~]{4,}~~|fully executed')
+# FIXED meaning "constant / hard-coded" ("a FIXED level", "is FIXED (`x`)").
+_FIXED_CONST_RE = re.compile(
+    r'\b(?:(?:a|an|the|vs\.?)\s+FIXED(?=\s*\(?`|\s+[a-z])|'
+    r'(?:is|are|was|were|be|been|stays|remains)\s+FIXED'
+    r'(?=\s*\(?`(?![0-9a-f]{7,40}`)))')
+_DATE_RE = re.compile(r'\b(20\d\d)-(\d\d)-(\d\d)\b')
+_STORY_RE = re.compile(r'History:|CORRECTED|learned the hard way|as of 20\d\d|'
+                       r'Was "|used to be|until 20\d\d')
+_HYG_HEADING_RE = re.compile(r'^(#{1,6})\s+(.*\S)')
+
+# What to do instead, per metric, said first in a failure (repo-gate.md).
+_WAY_OUT = {
+    'done': 'close the item instead: one condensed CHANGELOG.md entry citing the '
+            'commit, then delete the bullet (never mark it DONE in place)',
+    'dates': 'this file holds current state, not history: drop the date, or move '
+             'the dated story to CHANGELOG.md',
+    'story': 'move the history to CHANGELOG.md; keep only the current state here',
+    'chars': 'trim: close finished items into CHANGELOG.md and delete stale ones',
+    'lines': 'trim: close finished items into CHANGELOG.md and delete stale ones',
+}
+
+
+def _skip_flags(lines: list[str]) -> list[bool]:
+    """Per line: inside a code fence or a multi-line HTML comment."""
+    out, fence, comment = [], None, False
+    for ln in lines:
+        m = re.match(r'^ {0,3}(`{3,}|~{3,})', ln)
+        infence = fence is not None
+        if m:
+            if fence is None:
+                fence, infence = m.group(1)[0], True
+            elif m.group(1)[0] == fence:
+                fence = None
+        if '<!--' in ln and '-->' not in ln:
+            comment = True
+        out.append(infence or comment)
+        if comment and '-->' in ln:
+            comment = False
+    return out
+
+
+def _metric(name: str, text: str) -> int:
+    if name == 'lines':
+        return text.count('\n') + (1 if text and not text.endswith('\n') else 0)
+    if name == 'chars':
+        return len(text)
+    if name == 'dates':
+        return len(_DATE_RE.findall(text))
+    if name == 'story':
+        return len(_STORY_RE.findall(text))
+    if name == 'done':
+        lines = text.split('\n')
+        return sum(1 for ln, skip in zip(lines, _skip_flags(lines)) if not skip and
+                   _DONE_RE.search(_FIXED_CONST_RE.sub(lambda m: m.group(0)[:-5] + 'fixed', ln)))
+    raise ValueError(name)
+
+
+def _read_bytes(p: Path) -> str:
+    return p.read_bytes().decode('utf-8', errors='replace')
+
+
+def _match_any(path: str, globs) -> bool:
+    return any(fnmatch.fnmatchcase(path, g) for g in globs)
+
+
+def _resume_checks(root: Path, cfg: dict, rc: dict) -> list[str]:
+    """Exactly one capped "Resume here" block, the first section of rc.file."""
+    home_rel, rx, cap = rc['file'], re.compile(rc['heading']), int(rc['max_lines'])
+    skip_globs = [*cfg.get('history', []), *cfg.get('frozen', []), *cfg.get('out_of_scope', [])]
+    live = sorted({p.relative_to(root).as_posix()
+                   for p in (*root.glob('*.md'), *root.glob('docs/**/*.md')) if p.is_file()})
+    live = [r for r in live if not _match_any(r, skip_globs)]
+    if home_rel not in live and (root / home_rel).is_file():
+        live.insert(0, home_rel)
+    fails, home_seen = [], False
+    for rel in live:
+        lines = _read_bytes(root / rel).split('\n')
+        skip = _skip_flags(lines)
+        heads = [(i, len(h.group(1))) for i, ln in enumerate(lines, 1)
+                 if not skip[i - 1] and (h := _HYG_HEADING_RE.match(ln))]
+        for i, ln in enumerate(lines, 1):
+            if skip[i - 1] or not rx.search(ln):
+                continue
+            if rel == home_rel and not home_seen:
+                home_seen = True
+                if any(lv >= 2 and n < i for n, lv in heads):
+                    fails.append(f'hygiene: resume: the "Resume here" block ({rel}:{i}) is '
+                                 f'not the first section of {rel}; move it to the top')
+                lvl = next((lv for n, lv in heads if n == i), 7)
+                end = next((n for n, lv in heads if n > i and lv <= lvl), len(lines) + 1)
+                body = lines[i - 1:end - 1]
+                while body and not body[-1].strip():
+                    body.pop()
+                if len(body) > cap:
+                    fails.append(f'hygiene: resume: {rel}:{i} block is {len(body)} lines, cap '
+                                 f'{cap}. It is a handoff, not a log: replace it in place '
+                                 f'with the current state; history goes to CHANGELOG.md')
+            else:
+                fails.append(f'hygiene: resume: {rel}:{i} is a second handoff block; the only '
+                             f'one is at the top of {home_rel}. Merge it there and delete this')
+    if not home_seen:
+        fails.append(f'hygiene: resume: {home_rel} has no line matching /{rx.pattern}/ '
+                     f'(the block is missing; [resume] in {HYGIENE_CONFIG} requires it)')
+    return fails
+
+
+def hygiene_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
+    """The .hygiene.toml gates: every [budgets] hard limit and metric rule
+    (no-rise against .hygiene-baseline.json, cap:N), and [resume] when the
+    table is present. `warn` limits and memory: targets are scan-only."""
+    cfg_path = root / HYGIENE_CONFIG
+    if not cfg_path.is_file():
+        return [f'hygiene: {HYGIENE_CONFIG} missing (it holds the commit-time '
+                f'budgets for TODO.md, CLAUDE.md and {NOTES})'], []
+    try:
+        cfg = tomllib.loads(_read_bytes(cfg_path))
+    except tomllib.TOMLDecodeError as e:
+        return [f'hygiene: {HYGIENE_CONFIG} does not parse ({e})'], []
+    fails: list[str] = []
+    base_path, baseline = root / HYGIENE_BASELINE, None
+    try:
+        baseline = json.loads(_read_bytes(base_path)).get('metrics', {})
+    except (OSError, ValueError, AttributeError) as e:
+        base_err = f'{HYGIENE_BASELINE} missing or unreadable ({e.__class__.__name__})'
+    for target, spec in cfg.get('budgets', {}).items():
+        if target.startswith('memory:'):
+            continue  # per-machine, never in the repo
+        p = root / target
+        if not p.is_file():
+            continue
+        text = _read_bytes(p)
+        for m, rule in spec.items():
+            name = f'{m}:{target}'
+            try:
+                v = _metric(m, text)
+            except ValueError:
+                fails.append(f'hygiene: {name}: unknown metric in {HYGIENE_CONFIG}')
+                continue
+            way = _WAY_OUT[m]
+            if isinstance(rule, dict):
+                hard = rule.get('hard')
+                if hard is not None and v > hard:
+                    fails.append(f'hygiene: {name} {v:,} > hard cap {hard:,} '
+                                 f'({HYGIENE_CONFIG}). {way}; if that is not enough, '
+                                 f'run a /project-hygiene pass')
+            elif rule == 'no-rise':
+                if baseline is None:
+                    fails.append(f'hygiene: {name} has a no-rise rule but {base_err}')
+                elif name not in baseline:
+                    fails.append(f'hygiene: {name} has a no-rise rule but no baseline value; '
+                                 f'run the project-hygiene scanner\'s `baseline prune`')
+                elif v > baseline[name]['value']:
+                    fails.append(f'hygiene: {name} {v} > baseline {baseline[name]["value"]} '
+                                 f'(no-rise). {way}')
+            elif isinstance(rule, str) and rule.startswith('cap:'):
+                if v > int(rule[4:]):
+                    fails.append(f'hygiene: {name} {v} > cap {rule[4:]}. {way}')
+            else:
+                fails.append(f'hygiene: {name}: unknown rule {rule!r} in {HYGIENE_CONFIG}')
+    if 'resume' in cfg:
+        fails += _resume_checks(root, cfg, cfg['resume'])
+    return fails, []
+
+
 def run_checks(root: Path = REPO_ROOT) -> tuple[list[str], list[str]]:
+    failures, warnings = _notes_checks(root)
+    hf, hw = hygiene_checks(root)
+    return failures + hf, warnings + hw
+
+
+def _notes_checks(root: Path) -> tuple[list[str], list[str]]:
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -582,7 +781,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.print_scan_paths:
-        for p in (*SCAN_FILES, *SCAN_DIRS, NOTES, CHANGELOG):
+        for p in (*SCAN_FILES, *SCAN_DIRS, NOTES, CHANGELOG, HYGIENE_CONFIG, HYGIENE_BASELINE):
             print(p)
         return 0
 
