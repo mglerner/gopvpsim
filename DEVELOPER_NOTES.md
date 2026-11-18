@@ -10,7 +10,7 @@ here. An entry is: the RULE the code obeys, the PIN that fails if it stops
 (test or oracle cell), any PvPoke line ref WITH its pvpoke commit (a bare
 ref into the four tripwire engine files is as of the latest re-vetting-log
 pin; UI-file refs always carry one), and a CHANGELOG pointer for the story
--- never the story. Pre-trim (2026-10-24) text:
+-- never the story. Pre-trim text:
 `git show 0829b5a:DEVELOPER_NOTES.md`; archive: CHANGELOG "DEVELOPER_NOTES
 trimmed to its read-whole cap". -->
 
@@ -32,7 +32,7 @@ B.5 Opus pass: 9 claims fixed, two `Pokemon.js` refs re-anchored. Digests:
 Earlier vettings are archived in CHANGELOG. Record a new entry here only for
 the CURRENT pin; move the previous one to CHANGELOG when you do.
 
-## Current status (updated 2026-10-24)
+## Current status
 
 <!-- sync:test_count -->3314<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
@@ -44,7 +44,7 @@ documented divergences, each traced to a mechanism: 3 are our deliberate
 Shield-form Aegislash estimate-stage choice ("Form change gotchas" item 6), 9 are the #10 first-throw slot
 quirk (Aegislash-S vs Moltres-G; its GB-first positive control row is 9/9
 exact). Per-cell reasons live on the MATCHUPS entries in the audit script;
-the cell-count progression (108 -> 387, 2026-06..10) is in CHANGELOG.
+the cell-count progression is in CHANGELOG.
 
 ### Verified correct
 - **Type effectiveness**: All <!-- sync:type_chart_cells_verified -->324<!-- /sync --> matchups match PvPoke exactly
@@ -64,14 +64,14 @@ the cell-count progression (108 -> 387, 2026-06..10) is in CHANGELOG.
 
 ## Turn model: `mechanics='new'` (2026-06-23 PvP turn system; default since 2026-09-09)
 
-`simulate(...)` takes `mechanics='legacy'|'new'` (default `'new'` since
-2026-09-09, `7e6a82b`); `'new'` implements the in-game PvP turn changes of
-2026-06-23 (spec: pokemongo.com/news/pvp-updates2026). `--mechanics` on
+`simulate(...)` takes `mechanics='legacy'|'new'` (default `'new'`,
+`7e6a82b`); `'new'` implements the in-game PvP turn changes
+(spec: pokemongo.com/news/pvp-updates2026). `--mechanics` on
 `scripts/battle.py` and `scripts/deep_dive.py` defaults to `new`, as does
 `deep_dive_slayer.SLAYER_DEFAULT_MECHANICS` (pinned to the engine's default
 by `tests/test_dive_worker_form_change.py::
 test_the_slayer_default_mechanics_tracks_the_engine`). **Validated against
-PvPoke master** (its own implementation merged 2026-09-09); the oracle audit
+PvPoke master**; the oracle audit
 and the pytest suite run at the default. Both disk caches key on `mechanics`
 (a field only for non-legacy values).
 
@@ -79,7 +79,7 @@ and the pytest suite run at the default. Both disk caches key on `mechanics`
 `GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`2615c6e`; `conftest.py` opts a
 few tests in), kept only so the port-fidelity history stays runnable; every
 `'new'` behavior sits behind an explicit `if mechanics == 'new':` branch.
-(History 2026-06-23..09-10: CHANGELOG.)
+(History: CHANGELOG.)
 
 The 5 spec changes on our 1v1 core: **1** (damage+energy resolve at END of
 turn) and **2** (same-turn one-turn fasts TIE) -- modeled; the fast-landing
@@ -87,16 +87,13 @@ step snapshots damage/energy against the start-of-step state and applies all
 results together, so a higher-CMP fast cannot pre-empt a same-turn fast.
 **5** (charged attacks resolve BEFORE fast-attack damage, buffs included) --
 modeled: in `new` mode charged actions resolve at step 2.5 of the SAME turn,
-ahead of the step-3 fast landings. CORRECTED 2026-09-03 (`f1ff911`): the
-first port read the spec's "charged begins at the start of the next turn"
-literally and deferred the charged move a turn; the live game's order is a
-priority ordering WITHIN a turn (swaps > charged > fast), and PvPoke made
-and reverted the same mistake
-(`docs/validations/2026-09-03_new_turn_system_ground_truth.md`). **3** and
+ahead of the step-3 fast landings. The live game's order is a priority
+ordering WITHIN a turn (swaps > charged > fast; `f1ff911`,
+`docs/validations/2026-09-03_new_turn_system_ground_truth.md`). **3** and
 **4** (swaps) -- NOT MODELED: the 1v1 core never switches; documented, not
 faked.
 
-**Decision layer = PURE PLUMBING (2026-06-24).** `mechanics` is threaded
+**Decision layer = PURE PLUMBING.** `mechanics` is threaded
 through `pvpoke_dp`, `_calc_turns_to_live`, `_optimize_move_timing`,
 `would_shield`, `pvpoke_simulate_shield` and every policy, but under `new`
 the decision layer runs the LEGACY decisions unchanged. Corpus-tested: every
@@ -114,15 +111,15 @@ deep_dive_slayer.py bytes)[:12]` -- composed, not folded into
 sweep never reads the slayer worker). Pinned by
 `tests/test_slayer_engine_stamp.py`. `migrate_cache.py --slayer` blesses
 against the slayer stamp; `--list-stamps` prints a separate SLAYER section.
-(The 2026-09-22 close-out and its one-time invalidation: CHANGELOG.)
+(History: CHANGELOG.)
 
 ## Performance baseline (regression gate)
 
 **Rule: after any change to `battle.py`, `_dp_jit.py`, or `moves.py`,
 re-run the benchmark below and compare against the current baseline. A drop
-of more than ~10% means stop and investigate before committing.** The
-2026-04-15 correctness arc silently halved throughput and nobody noticed for
-eight weeks because the old figure kept being quoted.
+of more than ~10% means stop and investigate before committing.** (Why: a
+2x regression once shipped unnoticed; CHANGELOG "Archived: Performance
+baseline".)
 
 Canonical benchmark (single-process, ~10s, Annihilape mirror):
 
@@ -133,8 +130,8 @@ python scripts/profile_slayer.py --n-focal 60 --n-opp 20
 **Current baseline: 5,800 sims/s** at `6f99b08` (engine `5a813036625c`,
 2026-09-25), new turn system, post-2026-09-09 gamemaster, warm JIT cache
 (the first run after an engine edit pays ~1-2 s compile). NOT re-measured
-after the 2026-10-24 Minior / class-A engine edits -- run it before the next
-bake and record the number here. The earlier rows
+after the later engine edits (Minior / class A, Mega Level 4 `115538f`) --
+run it before the next bake and record the number here. The earlier rows
 (2026-04..06, in CHANGELOG) are NOT comparable: gamemaster data changes
 shift battle lengths and therefore sims/s, so after a rankings/gamemaster
 refresh re-baseline on a commit with a known-good number rather than
@@ -147,8 +144,7 @@ serves IV sweeps from the disk cache by default, so a repeated dive reports
 
 ## Sweep disk cache + replay-from-saved-state (arc S4)
 
-Two iteration-speed layers shipped 2026-06-10; design rationale in CHANGELOG
-("Sweep disk cache + replay-from-saved-state").
+Design rationale: CHANGELOG "Sweep disk cache + replay-from-saved-state".
 
 **Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 8, v7 schema):
 `iv_sweep` persists each opponent's column to `~/.cache/gopvpsim/sweep/` and
@@ -178,13 +174,10 @@ fresh sims (`tests/test_sweep_cache.py`). Shared `.npz` foundation:
 - **Energy is always captured + stored**, so the default `--compare-energy`
   dive serves warm.
 
-**Discipline when changing the engine (full text in CLAUDE.md).**
-`put_column` overwrites a column **in place**, so a dive with the cache on
-under a work-in-progress engine overwrites the trusted columns (a safe miss
-later, but the warm backup is gone). Iterating on an engine file: run dives
-with **`--no-sweep-cache`**. There is intentionally no flag to redirect the
-cache dir -- the guard is `--no-sweep-cache`, not a second location. GC
-never causes this: it buckets by gamemaster vintage, not engine.
+**Discipline when changing the engine:** CLAUDE.md "Sweep cache: use
+--no-sweep-cache" (a WIP-engine dive with the cache on overwrites trusted
+columns in place). There is intentionally no flag to redirect the cache dir
+-- the guard is `--no-sweep-cache`, not a second location.
 
 **Rule: before a cold re-dive, check for a tractable migration first**
 (policy and its two soundness guards: CLAUDE.md "Before a cold re-dive").
@@ -207,8 +200,8 @@ section A) as pvpoke commit + `gamemaster_hash()` stamp; move it to
 CHANGELOG once its migration is applied. **Pending (2026-11-17):** every cached column is at
 `6d6e9a7bc32d` (the 09-28 bake; no blob pinned yet) and the data cache is now
 `10d0d903c162` (pvpoke `d02018eb6`). The older `9856aa366b5d` /
-`03e7b77024e9` pins match no column; see TODO "PvPoke sync 2026-11-17". The 2026-08-31 Twilight
-Trails pin (`46bd08a77` / `c431557dcc76`) is archived in CHANGELOG.
+`03e7b77024e9` pins match no column; see TODO "PvPoke sync 2026-11-17". Earlier pins:
+CHANGELOG.
 
 Operational notes: hit log line per sweep is `sweep cache: N/M opponent
 columns hit`. `scripts/gc_cache.py` (`--dry-run` default) prunes stale
@@ -302,9 +295,8 @@ is moot (ported), all in `docs/pvpoke_bug_reports.md`.
 `:649`, `:697`, `:746` (pvpoke `38f70320d`). `BattleState` stores
 `.oppHealth` and `.oppShields`, but the dominance checks reference `.hp` and
 `.shields` (undefined in JS -> always false -> dead code). We replicate the
-dead-code behavior (no pruning); the `intended_pruning` toggle that offered
-the apparently intended pruning was deleted 2026-06-12 (`1558e31`, zero
-consumers).
+dead-code behavior (no pruning; the `intended_pruning` toggle is gone,
+`1558e31`).
 
 ### 2. bestChargedMove not recomputed on opponent form change
 
@@ -340,18 +332,17 @@ assigns `needsBoost = true`.
 
 ### 8. Morpeko form change was one-way -- FIXED UPSTREAM
 
-Fixed in pvpoke `2ad2682e6` (2026-11-16): `morpeko_hangry` now carries its
+Fixed in pvpoke `2ad2682e6`: `morpeko_hangry` now carries its
 own `toggle` formChange back to Full Belly, so PvPoke no longer sticks in
 Hangry after the first charged move (filed by us as pvpoke/pvpoke#379; the
 game toggles every charged move, Michael in-game 2026-06-06). Our
-`formchange.py` already toggled, so no behavior changed; the 8 audit xfail
-cells are exact and un-xfailed. Pinned by `test_morpeko_vs_azumarill_form_change`
+`formchange.py` already toggled. Pinned by `test_morpeko_vs_azumarill_form_change`
 and `tests/test_form_change_oracle.py`. Kept for the record and the bug count.
 
 ### 9. Stale IV-rank chip on battle permalink loads (UI-only)
 
 **File**: `Interface.js:1858-1875` vs `PokeSelect.js:418` (updateIVRank,
-at pvpoke `397d23dc1`; found 2026-08-10). Loading a permalink with custom IVs renders the "Rank #N /
+at pvpoke `397d23dc1`). Loading a permalink with custom IVs renders the "Rank #N /
 4096" chip for the DEFAULT spread and never refreshes it (typing an IV by
 hand does). GL Mimikyu 0/8/14 shows "#42" where PvPoke's own
 `getIVRank("overall")` gives #80, which is what our card prints.
@@ -361,7 +352,7 @@ Display-only; not filed. Related non-bug: PvPoke floors displayed atk/def to
 ### 10. Shield-start Aegislash's first throw follows the input order (quirk, not ported)
 
 **Files**: `Pokemon.js:757-763` (shuffle clause 1), `:790-796` (clause 4;
-`resetMoves` at `:711` re-pushes the same move objects). Found 2026-09-28.
+`resetMoves` at `:711` re-pushes the same move objects).
 
 **Mechanism.** `resetMoves()`'s priority shuffle has a clause 1 (same energy:
 move the buffing or higher-damage move to slot 0), gated on
@@ -427,15 +418,10 @@ behavior difference.
 
 ## Resolved engine divergences (historical index)
 
-Once-open divergences, all RESOLVED and test-pinned; the index with each
-item's mechanism, dates and pins is archived in CHANGELOG ("DEVELOPER_NOTES
-trimmed", 2026-10-24): the shadow-x1.2-in-CMP bug (fixed by `cmp_atk`), the
-2026-06-27 engine bug-hunt #2-#7 (`docs/reviews/2026-06-27_engine_bug_hunt.md`),
-the incoming selfDefenseDebuffing shield gate, the bait-wait hold, the
-Snorlax/Obstagoon OMT KO-override, the OMT `turns_planned` divisor, and the
-2026-04 arc. The one live invariant from that arc -- the SUPER_POWER
-DPE-edge > 0.3 carve-out -- is self-documented in `battle.py`
-`_estimate_best_cm`. Recurring lesson: "score-neutral" claims about
+Once-open divergences, all RESOLVED and test-pinned; the index (mechanism,
+dates, pins) is in CHANGELOG "Archived: Resolved engine divergences". The
+one live invariant from that arc -- the SUPER_POWER DPE-edge > 0.3
+carve-out -- is self-documented in `battle.py` `_estimate_best_cm`. Recurring lesson: "score-neutral" claims about
 decision-timing deviations need a trace, not reasoning -- each was an extra
 condition the reference lacks, with a plausible comment, producing real
 margin errors.
@@ -476,9 +462,8 @@ are, all exact).
 - **2 of 702 scratch-sweep cells differ** (`userdata/logs/minior_midflight_
   sweep_6.log` vs `pvpoke_trace.js`; the log lists 14, but the ten Lickitung
   cells are the harness level-cap artifact, "Key implementation details", and
-  Morpeko 2-2 both seats became exact with bug #8's upstream fix, re-checked
-  2026-11-17). Medicham vs Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 /
-  391): PvPoke's don't-bait dpeRatio reads a Core-priced memo (seat order),
+  Morpeko 2-2 both seats are exact since bug #8's upstream fix). Medicham vs
+  Minior 1-2 (ours 351 / PvPoke 373) and 2-2 (734 / 391): PvPoke's don't-bait dpeRatio reads a Core-priced memo (seat order),
   the NB-1 carve-out route (`docs/pvpoke_divergences.md` item 1; TODO
   "Minior -- open items"). Minior in seat 0, as in our dives, matches.
 
@@ -539,12 +524,9 @@ KEEP; `tests/test_both_self_debuff_divergence.py`) is unchanged.
 **PvPoke** freezes the activeChargedMoves ordering, each move's raw `.dpe`,
 `bestChargedMove`, and the farm-down constants in `resetMoves()` -- at battle
 start and again on *self* form change (only `move.damage` refreshes per use).
-We used to recompute them every `pvpoke_dp` call from current-stage damage,
-documented as strictly better; the NB-1 bounding sweep
-(`docs/reviews/2026-07-03_nb1_bounding_sweep.md`) FALSIFIED that (the
-recompute crosses PvPoke's init-tuned 0.3/1.5 guards mid-fight in BOTH
-directions, including a shipped winner flip against us: Forretress (Shadow)
-vs Cradily GL 1-0, ours 413 LOSS vs oracle 588 WIN). `_ensure_dp_init_cache`
+A per-call recompute from current-stage damage is NOT better: it crosses
+PvPoke's init-tuned 0.3/1.5 guards mid-fight in BOTH directions
+(`docs/reviews/2026-07-03_nb1_bounding_sweep.md`). `_ensure_dp_init_cache`
 now freezes those quantities once per battle (reset only on self form
 change); `_ensure_dp_cache` keeps the per-stage damage tables fresh. Pinned
 in `tests/test_nb1_selection_freeze.py` (Groups A/B).
@@ -581,8 +563,7 @@ Order within one pop: the farm-down state goes in FIRST, before the
 charged-move expansions (PvPoke inserts it inside the per-move loop, ahead of
 each move; once is equivalent). The two orders differ only on a same-turn tie
 with a ready move (a 1-turn fast whose single hit KOs), where the farm-down
-state pops first, as in PvPoke (ported 2026-09-28,
-`tests/test_farmdown_order_port.py`).
+state pops first, as in PvPoke (`tests/test_farmdown_order_port.py`).
 
 ### DP "stack two self-debuffing moves" expansion -- both twins (2026-10-24)
 
@@ -593,10 +574,8 @@ AFTER same-turn states with `<=`, skipped when `fm_stack == 0`, and it can
 produce negative turn counts when energy > 2E -- kept verbatim) and a
 NOT-READY twin (`:764-808`, inserted BEFORE same-turn states with `<`).
 Eligibility reads `buffs` directly, so the Aegislash `[0,0]` selfDebuffing
-stamp (bug #10) does not qualify. Both twins were missing until Minior's
-hold-to-100 AI made Malamar reach 2x Super Power energy routinely; porting
-only the ready twin regressed 36 cells; with both, a 14,022-cell GL scan
-moved 496 cells, every one onto PvPoke's value. GL default movesets that
+stamp (bug #10) does not qualify. Both twins are required (one alone
+regressed 36 cells; evidence: CHANGELOG "DP stack-two twins"). GL default movesets that
 qualify: Super Power and Psycho Boost (28 species). Plumbing: `cm_stack_ok`
 in `_ensure_dp_init_cache` ->
 int8 array into `_near_ko_dp_jit`; Python fallback `_dp_insert_farm_down`
@@ -627,9 +606,8 @@ changes) got seat 0 wrong whenever Minior sat in seat 1. Pinned:
 ### Cooldown gates DECISIONS, not landings; a form animation resets both (class A, 2026-10-24)
 
 `Battle.js:548`: at the end of a round, `if(roundChargedMoveUsed ||
-roundFormAnimation) poke.cooldown = 500` for BOTH Pokemon. The charged-move
-arm is from 2019 and our turn model always reproduced it; the
-`roundFormAnimation` arm (new in `4d2908fac`, set only by the `hp`-trigger
+roundFormAnimation) poke.cooldown = 500` for BOTH Pokemon; our turn model
+always reproduced the charged-move arm. The `roundFormAnimation` arm (new in `4d2908fac`, set only by the `hp`-trigger
 change at `Battle.js:1668`) fires only on Minior's Meteor -> Core flip. In
 PvPoke cooldown only gates `getTurnAction` (`:732`), while a queued fast
 resolves on its own turn clock (`:405-410`): after the reset BOTH Pokemon
@@ -642,8 +620,7 @@ the new-mechanics landing no longer zeroes the attacker's cooldown; TTL and
 the two DP adjustments test `defender.cooldown` as PvPoke does;
 `_optimize_move_timing` counts the attacker's own queued fasts
 (`ActionLogic.js:301-313`); a fast-triggered flip sets both cooldowns to 1.
-Sweep 41 -> 4 open cells, audit unchanged. Pinned: `tests/test_minior.py`
-fix 5. `docs/pvpoke_divergences.md` item 10.
+Pinned: `tests/test_minior.py` fix 5. `docs/pvpoke_divergences.md` item 10.
 
 Two lessons from attributing those cells: (1) PvPoke's decisionLog "uses X"
 is logged at RESOLUTION, not at queue time; (2) **pin `level=` in audit and
@@ -693,10 +670,9 @@ up need the Blade level to land on a favorable whole number.
 **3. The Blade->Shield reverse level formula can overshoot OUR CPM table
 (not PvPoke's) -- a deliberate divergence.** PvPoke's `aegislash_shield`
 branch overshoots the Shield level (`blade_level / 0.5 + 2` in GL) then
-walks down until CP fits, using cpms entries up to level 55. Our table ended
-at 51.0 when this crashed the first Aegislash (Blade) GL dive (`KeyError:
-52.0`, 2026-06-11); it now ends at 52.0 (Mega Level 4), so the GL start fits
-and only higher starts are clamped. `_aegislash_shield_level` clamps its
+walks down until CP fits, using cpms entries up to level 55. Our CPM table
+ends at 52.0 (Mega Level 4), so the GL start fits and only higher starts
+are clamped. `_aegislash_shield_level` clamps its
 start to `max(CPM)` -- levels above the table don't exist in-game, so this
 is the defensible choice, but PvPoke's shield-revert stats can sit above ours
 where the clamp bites (`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`).
@@ -731,10 +707,9 @@ cells (`tests/test_cramorant.py`). Policy tiers: `docs/cramorant_policy_plan.md`
 **6. Shield-form Aegislash prices its CHARGED moves at the Blade atk (FIXED
 2026-09-27).** Every Shield-form charged throw changes form
 (`activate_charged`) BEFORE damage resolves, so it lands with Blade stats;
-PvPoke's estimate knows this (`DamageCalculator.js:43-50`). Ours used the
-Shield atk (Shadow Ball estimated 44 vs Azumarill, dealt 91), so every
-consumer -- farm gate, DP plan, bandaid[918], TTL, the opponent's
-would_shield -- passed up KOs PvPoke takes. Fixed in
+PvPoke's estimate knows this (`DamageCalculator.js:43-50`); every consumer
+-- farm gate, DP plan, bandaid[918], TTL, the opponent's would_shield --
+reads that estimate. Fixed in
 `BattlePokemon._charged_atk_base`, the ONE source for the charged rows of all
 three damage builders (the fix must live in the caches, a gate-only fix fixes
 nothing); keyed on the current form's trigger, so every other case takes
@@ -832,15 +807,12 @@ names that file's moveset (why: CHANGELOG archive, 2026-06-10 history note).
 ## Dive-card spreads: `card_specs` is the only selection rule (2026-09-17)
 
 `deep_dive_which_build.card_specs` is the ONLY spread-selection rule on a
-dive page; the stat-extreme "poles" that the scatter overlay, the threat
-chips and "Top Picks" used to choose independently are gone, as is Top
-Picks: `data_obj['recIvs']` (overlay) = the card's spreads;
+dive page (no stat-extreme poles, no Top Picks): `data_obj['recIvs']` (overlay) = the card's spreads;
 `data_obj['recNames']` (chips) = the card titles' short forms; the L51 pass
 reuses the league-cap spreads. **Fallback when a page has no builds**:
 composite-score `rec_candidates`, filtered by the `efficient_frontier`
 strict-dominance guard, capped at `REC_MAX_SPREADS`, labelled "Top pick #N".
-Never a pole: `tests/test_card_pole_tiebreak.py` pins the retirement (the
-2026-06-24 UL Mimikyu dominated-spread bug).
+Never a pole: `tests/test_card_pole_tiebreak.py` pins the retirement.
 
 **Names and SP1.** One canonical short name per standout ("Most matchups
 won", "Highest avg battle score"; `CARD_SHORT` / `STANDOUT_KIND`), every
