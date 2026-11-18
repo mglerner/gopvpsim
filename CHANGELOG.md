@@ -29,6 +29,13 @@ and UL 3,672/3,672 cells integer-exact. The sandbox blocked the sprite
 fetch (cached sprite used) and the cache writes (0 hits, nothing written;
 `put_column` swallows the EPERM). GL still sims Mega Sableye with the stale
 mega-rankings default (no Night Shade+).
+- Cache writes under the sandbox: bakes before 11-17 never wrote the cache
+  (`~/.cache` EPERM swallowed by `put_column` / `SlayerCache.save`), so no
+  column is newer than 09-28. Fixed: `.claude/settings.local.json`
+  `sandbox.filesystem.allowWrite` adds `~/.cache/gopvpsim` and
+  `~/Documents/gopvpsim_cache`; a failed write now logs one WARNING per run
+  (e321598, `tests/test_cache_write_failure_warns.py`). Full pre-groom text:
+  TODO.md at 6c7a960.
 
 ## 2026-11-05 -- PvPoke sync 38f70320d..e02bde78d: no battle-JS change; Tinkaton re-dived (superseded 11-17)
 
@@ -1869,6 +1876,11 @@ changes automatically (blue -> green -> gold).
   side's fast move, or its form-change swap, is 1-turn; proof in its
   docstring). Dry run: sweep 155,610 blessed / 124,408 deleted; slayer 112
   blessed / 39 deleted. Not applied.
+- F2a (Pachirisu) was a sampler artifact, not a divergence: dives use L50,
+  the sampler's `_make_battle_pokemon` defaults to max_level=51. Migration
+  `farmdown_order_20260928` never applied; superseded by the 09-28 full bake
+  (cache now at engine 4b42f9d83690, post-port). Full pre-groom text:
+  TODO.md at 6c7a960.
 
 ## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above)
 
@@ -2123,6 +2135,24 @@ Closed out of TODO's post-Worlds checklist 2026-09-27.
   site (absent from `userdata/website/`, which publish rsyncs with
   `--delete`); the exact publish that removed them is not recorded. Open
   residue stays in TODO.
+
+## 2026-09-25 -- Bake speed R1-R6 merged (render layer); storage reclaim
+
+R1 render-side rank-1 IV memo (10c3124; sweep-side replacement ea32bd9,
+09-27), R2+R4 per-pass anchor-flip/boundary memo + vectorized aggregator
+(60972e9), R3 skip no-op best-buddy L51 pass (2e4c05d), R5 concurrent ship
+gates (71afca3), R6 sleep/all-miss attribution guards (298783c); none touches
+an engine-hashed file, every render change behind
+`scripts/replay_render_diff.py`. Root cause: more than half of the 09-20
+37.7 h bake ran single-core (render 12.4 h). Measured on the 09-26/27 bake
+(entry above). Storage: the two pre-Aegislash snapshots (~46 GB), 153,376
+legacy-mechanics `515a0a95171b` columns (46 GB) and 99 legacy slayer entries
+removed; both signature migrations applied (sweep 239,091 blessed / 43,077
+unlinked; slayer 150 / 0). Disk 752 -> 653 GiB used. The 258-blob replay
+prune (9.5 GB) was refused by the auto-mode classifier and left to Michael
+(per the perf doc's "Results"), not done. Plan + Results:
+docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md. Full pre-groom
+text: TODO.md at 6c7a960.
 
 ## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
 
@@ -2431,6 +2461,14 @@ silently wrong everywhere. Recorded c70ad94, fixed e8ac919:
 `run_website_dives.py` runs `verify_opponent_pools` as a preflight and
 hard-fails on DRIFT / MISSING / ERROR (`--allow-stale-pools` overrides). The
 season lifecycle policy recorded with it stays in TODO.
+
+## 2026-08-31 -- Article archiving tool (8732b54)
+
+`scripts/archive_article.py --slug <slug> --vintage YYYY-MM-DD [--stamp
+<hash>]` copies a live article to a dated snapshot slug and marks the copy;
+the index renders snapshots in a collapsed Archive block. `--vintage` is
+required (the live stamp at archive time is the NEW one). Design:
+`docs/article_archive_plan.md`. Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-08-27 -- L51 dead-tooltip fix + build_collection_data() strong pin
 
@@ -3036,6 +3074,10 @@ ledger: 15 render-changing commits await the next re-render+publish,
 GATED on Michael's visual sign-off of the plotly theme shim (8da55c4:
 theme-aware chart chrome, previews rendered for both themes; known
 limitation disclosed in 048bb3e -- two overlay hues alias a tier hue).
+- No-bait iv-tech oracles: 000ea87 (tests), cc64923 (retracts the
+  loose-threshold note's bulk-product resolution); the pvpoke.com/battle
+  browser round-trip stays a human step in TODO. Full pre-groom text:
+  TODO.md at 6c7a960.
 
 ## 2026-08-06/08 -- entries 12+13 shipped; v8 cold bake complete (18h sleep stall, recovered)
 
@@ -3266,7 +3308,7 @@ Also shipped: a 43-finding staleness audit + fixes across all 7 Reader's
 Guides (most rot predated this work: the 2026-06-25 Male->Female reference
 repoint broke both worked examples), a new **Matchup Clusters** guide
 (`guides/matchup-clusters/`, promoted to authorship=both), two screenshot
-retakes, and a new `pvpoke_cells_exact` sync sentinel so the how-this-works
+retakes (debcbe3), and a new `pvpoke_cells_exact` sync sentinel so the how-this-works
 guide's 170-exact/37-divergence claim can't drift. JS entry points for the
 new section: `_mcRenderRoot` / `mcSelectScenario` / `mcRefreshAll` in
 `deep_dive_engine.js`.
@@ -3922,6 +3964,11 @@ bare.
    the live site picks up the tooltip without re-diving.
 
 Single commit: `c3edb14`.
+
+## 2026-04-22 -- compare_loadouts renders N=3/N=4 (53ade3c)
+
+One all-N-in-row matchup-delta table for 3+ loadouts; N=2 keeps pairwise
+tables. Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-04-22 — Mirror CMP % semantic reframe + Highlight IVs scatter
 
