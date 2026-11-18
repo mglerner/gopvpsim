@@ -50,16 +50,6 @@
    "status": "debt",
    "text": "# 3. rsync to mglerner.com:/home/mglerner/pogodives.com/ with --delete"
   },
-  "e792e6a3fd1a8858": {
-   "added": "2026-11-18",
-   "check": "CODE",
-   "count": 1,
-   "file": "TODO.md",
-   "msg": "says `RENDER_MIRROR_POPULATION = False`; code has `True` (scripts/deep_dive_which_build.py)",
-   "note": "",
-   "status": "debt",
-   "text": "`RENDER_MIRROR_POPULATION = False` until the wording call above; mockups"
-  },
   "e8713e3f03544e34": {
    "added": "2026-11-18",
    "check": "ABS",
@@ -69,16 +59,6 @@
    "note": "",
    "status": "debt",
    "text": "MAIN_CLONE = Path('/Users/mglerner/coding/gopvpsim')"
-  },
-  "feebe0bcb43c131f": {
-   "added": "2026-11-18",
-   "check": "CODE",
-   "count": 1,
-   "file": "TODO.md",
-   "msg": "says `CAVEAT_SPECIES = ('Aegislash',)`; code has `()` (scripts/deep_dive_brief.py)",
-   "note": "",
-   "status": "debt",
-   "text": "- **`deep_dive_brief.py` G-caveat:** `CAVEAT_SPECIES = ('Aegislash',)`"
   }
  },
  "metrics": {
@@ -90,12 +70,12 @@
   "dates:DEVELOPER_NOTES.md": {
    "added": "2026-11-18",
    "rule": "no-rise",
-   "value": 57
+   "value": 34
   },
   "done:TODO.md": {
    "added": "2026-11-18",
    "rule": "no-rise",
-   "value": 17
+   "value": 1
   }
  },
  "version": 1

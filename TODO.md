@@ -6,11 +6,15 @@ one condensed CHANGELOG.md entry + delete the bullet (gated, .hygiene.toml). -->
 Current state and next steps only. Replace in place, max 40 lines (gated);
 detail lives in the sections below.
 
-- TODO.md is at its 90,000-char placeholder cap: trim before adding.
-- Next: the first hygiene cleanup pass, per
-  docs/reviews/2026-11-17_project_hygiene/REPORT.md section 6. Michael
-  approves the triage table before any edit; then reset the TODO cap to
-  ~1.5x the post-groom size.
+- First hygiene groom done (2f2e785..close-out): TODO 89,491 -> ~30k chars,
+  cap now 45,000 (`.hygiene.toml`). Over the cap: close or park, don't raise.
+- Still Michael's call from the groom: CLAUDE.md items b-i and memory items
+  m2-m12 (proposed one by one, not yet answered);
+  `opponent_pools/master_top60.txt:5` cites TODO "Reproducibility" (now in
+  docs/TODO_backlog.md; pool file is data, left alone).
+- 18 slow-tier `local_artifacts` tests in tests/test_which_build_section.py
+  fail at HEAD (e.g. expects "55 of 87", page says "guarantees 40"); likely
+  rankings drift from the 11-17 refresh. Look before the next full-suite gate.
 - Publishing waits on Michael's go: Tinkaton GL + UL and the Minior pages
   are local only ("PvPoke sync 2026-11-17", "Minior -- open items"); a
   Cramorant UL re-dive is owed before any Cramorant publish.

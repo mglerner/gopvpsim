@@ -69,10 +69,10 @@ stale_days = 60
 # done = "no-rise": no new done-lines (DONE / SHIPPED / RESOLVED / ...) in
 # TODO. Finishing an item means deleting its bullet and writing one
 # condensed CHANGELOG entry.
-# chars.hard is a PLACEHOLDER: today's size (89,491 chars, 2026-11-17)
-# rounded up, so the file cannot grow before the first groom. After the
-# first groom set it to about 1.5x the post-groom size.
-"TODO.md" = { chars = { hard = 90000, warn = 60000 }, done = "no-rise" }
+# chars.hard is about 1.5x the post-groom size (30,054 chars after the
+# 2026-11-18 groom; 89,491 before it). Over the cap: close or park items,
+# don't raise it.
+"TODO.md" = { chars = { hard = 45000, warn = 36000 }, done = "no-rise" }
 # Instructions and living notes hold no story: the ISO-date count may not
 # rise. (CLAUDE.md is 26,422 chars today; 18000 is a scan-only target.)
 "CLAUDE.md" = { chars = { warn = 18000 }, dates = "no-rise" }
