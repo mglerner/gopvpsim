@@ -1,18 +1,32 @@
 # PoGo PvP Battle Simulator
 
 ## Session startup
-At the start of every new session, before doing other work, read these
-files so you have current context on what's planned, what's broken, and
-what's been verified:
+At the start of every new session, before doing other work, read:
 
-- `TODO.md` — pending features, known bugs, design notes for upcoming work
-- `DEVELOPER_NOTES.md` — verification status, PvPoke comparison results,
-  known bugs we've found in PvPoke
+- the `Resume here` block at the top of `TODO.md` (current state, next
+  steps) and TODO's heading list (`grep -n '^#' TODO.md`). Not the whole
+  file: open a section when the work touches it.
+- `DEVELOPER_NOTES.md` in full — verification status, PvPoke comparison
+  results, known bugs we've found in PvPoke
 
-You don't need to re-read them every turn — once per session is enough.
-Mention briefly in your first substantive reply that you've read them
-(e.g., "Caught up on TODO.md and DEVELOPER_NOTES.md.") so the user
-knows the startup happened.
+Once per session is enough. Mention briefly in your first substantive
+reply that you've done it (e.g., "Caught up on the Resume block, TODO
+headings and DEVELOPER_NOTES.md.") so the user knows the startup happened.
+
+**Keeping TODO lean** (the pre-commit hook gates the first three via
+`.hygiene.toml`; the `/project-hygiene` skill does the periodic cleanup):
+
+- Finishing an item: in the same commit, delete its bullet and add one
+  condensed CHANGELOG.md entry (what, when, commit, root cause). Never
+  mark it DONE in place.
+- The Resume block is the only handoff: before a session ends, replace it
+  in place (delete resolved lines first), max 40 lines. No second handoff
+  in another doc, here, or in memory; a reminder that does not fit is an
+  open TODO bullet under its section.
+- CLAUDE.md and DEVELOPER_NOTES.md hold current state, not history: a new
+  ISO date in either blocks the commit. Dated stories go to CHANGELOG.md.
+- CHANGELOG.md is the single sink for finished work; `docs/TODO_archive.md`
+  is frozen (never appended to).
 
 **`CHANGELOG.md` is NOT part of the session-startup read.** It holds
 completed/shipped work for historical reference (dates, commit SHAs,

@@ -107,8 +107,13 @@ python = ".venv/bin/python"
 test_paths = ["tests"]
 pytest_args = ["-m", "not slow"]
 
-# [resume] (one capped "Resume here" block at the top of TODO.md) is
-# added together with the block itself, when CLAUDE.md's session-start
-# read changes to that block plus TODO's heading list. Until then the
-# table is absent, so neither the scan nor the commit check asks for it.
-# Shape: file = "TODO.md", heading = '^## Resume here\b', max_lines = 40.
+# The session-start read is ONE capped "Resume here" block at the top of
+# TODO.md plus TODO's heading list (CLAUDE.md "Session startup"). Enforced
+# so the bloat does not just move: exactly one such block in the live docs,
+# the first section of TODO.md, under the line cap, replaced in place. The
+# scan reports it as RESUME (memory included); scripts/verify_dev_notes.py
+# gates the repo side. max_lines = 40 is a placeholder, not a decision.
+[resume]
+file = "TODO.md"
+heading = '^## Resume here\b'
+max_lines = 40

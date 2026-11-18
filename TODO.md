@@ -1,10 +1,20 @@
-<!-- TODO.md is a LIVE BACKLOG, not an append-only chronological log. Keep it
-short: completed/shipped work moves to CHANGELOG.md (root-cause writeups,
-dates, SHAs) or docs/TODO_archive.md (verbatim session batches); only OPEN
-items and forward-looking design notes live here. When you finish an item,
-delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
-narrative inline. This convention was set 2026-06-27 after the file hit ~1980
-lines of mostly-completed chronological batches. -->
+<!-- Live backlog: open items and forward-looking notes only. Finished work =
+one condensed CHANGELOG.md entry + delete the bullet (gated, .hygiene.toml). -->
+
+## Resume here
+
+Current state and next steps only. Replace in place, max 40 lines (gated);
+detail lives in the sections below.
+
+- TODO.md is at its 90,000-char placeholder cap: trim before adding.
+- Next: the first hygiene cleanup pass, per
+  docs/reviews/2026-11-17_project_hygiene/REPORT.md section 6. Michael
+  approves the triage table before any edit; then reset the TODO cap to
+  ~1.5x the post-groom size.
+- Publishing waits on Michael's go: Tinkaton GL + UL and the Minior pages
+  are local only ("PvPoke sync 2026-11-17", "Minior -- open items"); a
+  Cramorant UL re-dive is owed before any Cramorant publish.
+- Before the next bake: refresh the mega rankings; the bake is cold.
 
 ## Minior -- open items (port shipped 2026-10-24; record: CHANGELOG 2026-10-24)
 
