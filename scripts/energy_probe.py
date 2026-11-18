@@ -10,11 +10,14 @@ of starting energy (focal side only) and reports which matchup cells
 flip, plus an aggregate SENSITIVE / MARGINAL / INSENSITIVE verdict.
 
 Generalizes the one-off scripts/check_sableye_energy_lead.py (2026-06-03
-precedent; see TODO.md "Energy-lead axis"). Calibration target from that
+precedent; the axis shipped in 9889555, CHANGELOG "2026-06-12 -- Energy-lead
+sweep axis"). Calibration target from that
 work: Shadow Sableye should come out SENSITIVE, and the bulk-corner rep
 must gain MORE cells from energy lead than the atk-corner rep does --
 if atk gains more on a Sableye-class species, that's a probe bug, not a
-finding (TODO.md "Counter-intuitive cross-check").
+finding (2026-06-03 Sableye cross-check: 0/15/15 gained +92/+231 wins at
+1/2-fast lead vs +80/+217 for 2/11/13; the text was dropped from the backlog
+in acf0c17, see `git show cb5f237:docs/TODO_backlog.md`).
 
 Usage:
     python scripts/energy_probe.py Sableye --shadow
@@ -338,7 +341,7 @@ def summarize(probe):
     else:
         verdict = 'INSENSITIVE'
 
-    # Bulk-vs-atk gain comparison (the TODO.md cross-check shape: bulk
+    # Bulk-vs-atk gain comparison (the 2026-06-03 cross-check shape: bulk
     # IVs should gain MORE from energy lead for chip-war species).
     # The explicit corner labels can dedup away (e.g. Sableye's
     # bulk-corner IS rank-1 SP at 0/15/15), so fall back to the reps

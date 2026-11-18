@@ -156,7 +156,7 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
   (as u/SpaceBearAI; open since 2026-08-15). Drafted bullets: 44W-44L
   -> 62W-25L at 1-1/rank-1 IVs/88-mon pool; IW+PR beats PvPoke's
   NS+IW default by ~14 wins; PvPoke overall GL rank 122 -> 41.
-  Context: docs/thievul_cd_plan.md:85-109. Their post-rebalance
+  Context: docs/thievul_cd_plan.md "The request". Their post-rebalance
   IV-reshuffle question is actionable now (the rebalance landed).
 - MICHAEL: HSH discord message (docs/hsh_message_notes.md) -- the
   draft is pre-Worlds stale (bullets 1 and 5 are written as future
@@ -205,7 +205,10 @@ raise `--selftest` N.
   `src/gopvpsim/battle.py` and `scripts/cramorant_sensitivity.py` as of
   2026-09-27) and their `cmp_dpt`/`cmp_dpt_e`/`cmp_ready_dpt`/`cheap`
   branches; needs `tests/test_pogodives.py`'s synthetic rows and
-  `cramorant_sensitivity.py` updated.
+  `cramorant_sensitivity.py` updated. Same hash bump: repoint
+  `log_cancel`'s `see TODO "KO-EDGE"` comment in battle.py (the KO-edge
+  cancelled-action record is the CHANGELOG 2026-08-27 KO-edge
+  entry; battle.py can't be touched alone).
 - **P-C / P-D, next cycle** (deep-vet doc): P-C = the KO guard at 1v1
   (measured positive in GL); P-D = the constant-free 1v2 `lead_drained`
   (costs most of the row).
@@ -390,7 +393,7 @@ findings dispositioned, record CHANGELOG 2026-07-03 + 2026-08-09.)
   documented at `deep_dive_engine.js:~1270` + `sp_rank_array`'s
   docstring.
 - **[render] matchup_clusters' own SP rank**
-  (`deep_dive_matchup_clusters.py:649-652`) is a FOURTH convention
+  (`deep_dive_matchup_clusters.py:~980-983`) is a FOURTH convention
   (argsort over the 2dp display arrays); it now diverges from the
   unified three post-`8c1f98e`. Fixing changes rendered cluster
   "SP #a-#b" labels.
@@ -455,12 +458,15 @@ legality-filter eval, app-side cup toggles (needs a coordinated
 
 ## Refactoring
 
-* **Pain points captured during real debugging** — see memory file
-  `project_post_ship_cleanup_pain_points.md` (silent early-returns
-  with no logging, no replay-from-saved-state mode, hardcoded magic
-  numbers assuming `nS=9`, parallel call-site duplication,
-  free-form-string opponent identity, `data_obj`-as-mutable-bag,
-  `id()`-keyed caches). Specific friction encountered while
+* **Pain points captured during real debugging** — memory file
+  `project_post_ship_cleanup_pain_points.md` in the retired
+  pogo-simulator project's dir
+  (`~/.claude/projects/-Users-mglerner-coding-MGLPoGo-pogo-simulator/memory/`):
+  silent early-returns with no logging, hardcoded magic numbers
+  assuming `nS=9`, parallel call-site duplication, free-form-string
+  opponent identity, `data_obj`-as-mutable-bag (the note's
+  replay-from-saved-state and `id()`-keyed-cache items are marked
+  resolved there, arc S4). Specific friction encountered while
   diagnosing the 2026-04-25 mirror-tier-synthesis no-fire bug;
   read this *before* starting the deep_dive.py split below so the
   cuts address actual pain rather than aesthetic ones.

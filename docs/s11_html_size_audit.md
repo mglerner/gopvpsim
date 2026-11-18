@@ -280,8 +280,9 @@ The plan limits S12 to 1-2 approaches; this is exactly two.
 
 ## Verification plan for S12
 
-Measurement harness (a small `scripts/measure_html_size.py` or inline
-in the audit script):
+Measurement harness (`scripts/measure_html_size.py`, built in 2f1145e
+and deleted as dead in 7126f1b on 2026-06-12; recover it from git if
+needed, or inline in the audit script):
 
 1. Pick the same 2 representative files before/after.
 2. Measure: uncompressed size, gzip-6 size, line count, DOM node

@@ -44,7 +44,8 @@ def charmer_context_line(species):
 
     Used at the top of the IV Flavor Guide when the moveset's fast move
     is classified as a charmer. Intentionally short and ASCII-only (no
-    em-dashes per ``feedback_no_em_dashes.md``).
+    em-dashes; ``scripts/verify_no_unicode_dashes.py`` enforces this at
+    ship time).
     """
     return (
         f'Charm-class fast moves typically favor stat product on {species}: '

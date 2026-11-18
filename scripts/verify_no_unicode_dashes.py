@@ -13,8 +13,9 @@ STRING LITERALS are in scope, because script-generated prose is real
 reader-visible prose. Script-driven pages (the joint-IV robustness
 pages render ~100% of their prose from inlined app JS) used to get a
 clean bill regardless of content -- the gate simply could not see
-them (TODO.md "Ship-gate gap", found by the 2026-08-17 thievul
-pre-publish review). ``js_string_literals()`` closes that: it is the
+them (former TODO "Ship-gate gap", found by the 2026-08-17 thievul
+pre-publish review; closed 52faac6, CHANGELOG 2026-08-27 "Unicode-dash
+ship gate now reads inlined app JS"). ``js_string_literals()`` closes that: it is the
 inverse of ``tests/test_win_boundary.strip_js`` -- that helper blanks
 literals to leave code, this one keeps literals and drops code.
 

@@ -513,16 +513,18 @@ CHANGELOG.md). The minor polish residue (the Favicon item stays in TODO.md
   Maybe 2-3 hours; deprioritize if scatter paste-box overlay +
   Mirror CMP columns are enough.
 
-- **P2 single-form opponent links.** `_render_matchup_delta_section`
-  (line 1954) doesn't yet link opponent cells — applies to
+- **P2 single-form opponent links.** `generate_article._render_matchup_delta_section`
+  (~:2047) doesn't yet link opponent cells — applies to
   non-CD articles that aren't per-form. Extend when the first
   such article actually ships.
 
-- **P3 article-surface design question.** Dive-side envelope-tag
-  retrofit shipped 2026-04-23 (`patch_dive_envelope_tags.py`);
-  a category-card surface on the CD article itself (linking
-  envelope-shape to a specific "Cost to XL" judgment) remains
-  the original P3 question and has not been addressed.
+- **P3 article-surface design question.** Dive-side envelope tags
+  are native now (`deep_dive_rendering._render_envelope_tag`; the
+  2026-04-23 retrofit script `patch_dive_envelope_tags.py` was
+  deleted in 7126f1b); a category-card surface on the CD article
+  itself (linking envelope-shape to a specific "Cost to XL"
+  judgment) remains the original P3 question and has not been
+  addressed.
 
 - **Cross-form opponent expansion (parked).** Item 4 (auto-
   form-sibling expansion in `build_opponent_pool.py`) — design
@@ -824,4 +826,4 @@ Non-gating polish, dormant with the rest: a11y (badge text 4.36:1 in
 pokemon-dark; hub mini-grids color-only), the optional session-6 survival
 strip (scoped 2026-08-11), the optional pooled-usage display
 (`usage_recent_pooled_pct`, unshown). Planning artifacts:
-`userdata/worlds_planning/`.
+`userdata/_preserved/worlds_planning/`.

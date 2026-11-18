@@ -152,7 +152,9 @@ can spot at a glance which sections are real vs. stubbed.
 
 ## Authorship precedence
 
-Per TODO.md "Python article generator — optional augmentation path."
+Modes are specified in `docs/article_schema.md` "Authorship modes"
+(origin: the former TODO "Python article generator — optional
+augmentation path", shipped and removed from TODO in 90a48e9).
 The `authorship` field on `articles/<slug>.toml` selects how the
 override TOML interacts with generator output:
 
@@ -192,7 +194,8 @@ The `both` path stays tested via `tests/test_generate_article.py`
   stays per-species — a Female article gets its own threshold TOML
   and its own `articles/*.toml`. S9 decides whether to cross-link
   the two articles.
-- **Non-interactive `generate_html`** (TODO.md "HTML output paths") —
+- **Non-interactive `generate_html`** (deleted in the S7 cleanup;
+  CHANGELOG "2026-06-12 (evening) — S7 cleanup pass") —
   unaffected; generator reads interactive-dive HTML for its data.
 
 ## Follow-ups explicitly punted out of S6

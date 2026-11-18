@@ -351,7 +351,8 @@ committed successor).
   are unchanged; a hash mismatch forces a full plane re-bake (by design). So
   batch late adds, and don't touch engine files mid-season.
 - Tests assert: no output path matches `*_great.toml` (iOS bundler collision,
-  topn_cup_filter_plan.md:281-306); the bake runs with the sweep cache
+  topn_cup_filter_plan.md "Feature 2 -- limited-cup dives", the THRESHOLD
+  EXPORT hazard); the bake runs with the sweep cache
   disabled; the driver leaves `src/gopvpsim/` untouched (engine-hash bump
   would stale the 42GB GL cache). Preflight in the bake script, not prose.
 - Sequencing: the pending behavior-neutral engine-hash batch (comment wording

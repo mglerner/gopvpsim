@@ -49,7 +49,7 @@ _K = damage_constant
 # a supermega's `*_PLUS` breakpoint table disagrees with the damage numbers
 # printed either side of it, by the full 1.3x. We apply the factor here.
 #
-# This fails CLAUDE.md's "don't diverge unless PvPoke is worse" gate in
+# This fails CLAUDE.md's "When our sim diverges from PvPoke" gate in
 # PvPoke's favour on all three questions: its solver is internally
 # inconsistent with its own damage function, breakpoints ARE this project's
 # deliverable, and matching the inconsistency would ship a knowingly wrong

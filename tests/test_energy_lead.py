@@ -1,4 +1,5 @@
-"""Energy-lead sim axis tests (TODO "Energy-lead axis", shipped 2026-06-12).
+"""Energy-lead sim axis tests (axis shipped 2026-06-12, 9889555; record:
+CHANGELOG "2026-06-12 -- Energy-lead sweep axis").
 
 The axis rides the composite mode string as ':eN' where N counts FAST
 MOVES of stored energy (not raw energy points) so mode keys stay uniform

@@ -3,7 +3,8 @@
 The deep-dive sweep/slayer workers construct BattlePokemon from raw
 effective stats and historically never wired up form-change state, so
 every Aegislash/Mimikyu/Morpeko dive simmed without form mechanics
-(TODO "Deep-dive workers never wire up form changes"). These tests pin
+(CHANGELOG 2026-06-10 "Form-change plumbing in dive workers", fix
+eae7293). These tests pin
 the fix: worker-path sims of Aegislash (Shield) must produce the same
 scores as direct BattlePokemon.from_pokemon sims of the identical
 matchups (the oracle-verified path), on both the focal and opponent

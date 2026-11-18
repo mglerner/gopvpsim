@@ -405,7 +405,8 @@ the `good_at` / `bad_at` renderer should:
 Picked criterion (1) as the morning default — keeps the RyanSwag-
 style prose shape but cleans the false positives. Revisit if the
 resulting flavor blocks become empty for most species (signal-loss
-rabbit hole connects to TODO.md "Slayer-card signal-loss audit").
+rabbit hole connects to `docs/TODO_backlog.md` "Slayer card UX" >
+"Slayer-card signal-loss audit (systemic)").
 
 ## Open questions
 

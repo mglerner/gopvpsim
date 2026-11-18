@@ -120,7 +120,7 @@ def test_fire_now_double_fire_gate_uses_cmp_atk(
 
 
 # ---------------------------------------------------------------------------
-# The exact shadow-vs-plain CMP tie (2026-09-20; TODO.md:514-518)
+# The exact shadow-vs-plain CMP tie (2026-09-20; fix ebf5944, CHANGELOG "2026-08-31..09-25 -- Worlds 2026 post-event")
 # ---------------------------------------------------------------------------
 
 Q = ('Quagsire', 'MUD_SHOT', ['AQUA_TAIL', 'STONE_EDGE'], 'great')

@@ -2,7 +2,9 @@
 
 **Status:** design only; planning output for S2 implementation.
 **Owning plan:** `~/.claude/plans/post-s5-oinkologne-arc.md` S1 → S2.
-**Motivation:** TODO.md "Diagnostics / observability" — stdout buffering
+**Motivation:** the former TODO "Diagnostics / observability" item
+(shipped 2026-04-15/16, Post-S5 S2a-S2d, first commit `2c87d31`; TODO
+entry removed in `bd85124`) — stdout buffering
 makes live `tail -f` unreliable, no per-run log file, no timestamps,
 no severity levels, no way to distinguish "stalled" from "quiet."
 
@@ -107,7 +109,7 @@ Severity taxonomy matches Python `logging` levels:
 | 4145                               | bookend                      | "Done."                                    | INFO       |
 
 (*) `scripts/deep_dive.py:954` is the one the "Better slayer iteration
-progress reporting" TODO calls out — it's currently the only progress
+progress reporting" TODO (former item; see §4 side-cleanup) calls out — it's currently the only progress
 signal across long chunked sims. Timestamps alone will make it more
 useful; see §5 opportunistic cleanup.
 
@@ -134,8 +136,8 @@ Default. No `structlog`, no JSON. Reasons:
 - One-developer project; no log aggregator consuming output.
 - Michael reads logs live (`tail -f`) and post-hoc. Human-readable wins.
 - `logging.FileHandler` auto-flushes per record, which solves the
-  stdout-buffering pain point from `project_unbuffered_dive_output.md`
-  without any custom code.
+  stdout-buffering pain point (see **Motivation** at the top of this
+  doc) without any custom code.
 - If a later use case demands JSON (e.g., a dashboard over cron'd
   overnight dives), the `Formatter` is swappable without re-porting
   call sites.
@@ -311,18 +313,22 @@ Per the plan, S2 may fold these in "only if the core logger port
 finishes comfortably."
 
 **Natural to fold into S2:**
-- **"Better slayer iteration progress reporting"** (TODO.md
-  Performance). The progress prints at `deep_dive.py:954` and
+- **"Better slayer iteration progress reporting"** (former TODO
+  Performance item, removed from `docs/TODO_backlog.md` 2026-11-18; the
+  chunking it credits is in CHANGELOG "2026-04-07 — Battle simulator
+  perf optimization"). The progress prints at `deep_dive.py:954` and
   `deep_dive_slayer.py:344` fire only on chunk completion. Once
   timestamps are attached via the logger, the `tail -f` gaps become
   *visible* (you can see "no new line for 30 min" at a glance), which
-  is often enough — the user's 2026-04-07 chunking commit 8498ec4
+  is often enough — the user's 2026-04-07 chunking commit 2681458
   already dropped the gap from 85 min to ~10 min per chunk. Don't
   add new progress prints in S2; just gain "the logger makes the
   existing ones useful" for free and close the TODO.
 
 **NOT natural to fold into S2:**
-- **"Incremental slayer cache flush"** (TODO.md Performance). Lives in
+- **"Incremental slayer cache flush"** (former TODO Performance item;
+  shipped as `3a98bd9`, per-round flush, recorded in CHANGELOG
+  "2026-06-28 — cold re-dive complete"). Lives in
   `scripts/slayer_cache.py`, which has zero prints. It's a durability
   fix (crash-mid-iteration loses all sims in the cache), not an
   observability fix. Different motivation, different file, different
@@ -339,7 +345,7 @@ Per plan S2 "Done when": a real Oinkologne-sized dive runs, writes a
 well-formed per-run log file, and `tail -f` on that file shows smooth
 timestamped progress without buffering stalls.
 
-Concrete S2 smoke test (small, per `feedback_small_dives_first.md`):
+Concrete S2 smoke test (a small dive first, before any full run):
 
 ```
 python scripts/deep_dive.py oinkologne --league great --opponents 10 \

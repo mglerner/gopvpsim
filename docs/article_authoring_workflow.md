@@ -51,9 +51,12 @@ with a `--no-cd-move` mode is a separate future task.
 Step-by-step, what ran on Oinkologne:
 
 1. **Deep dive** — run `scripts/deep_dive.py` for the focal species
-   (one invocation per form for dual-form species; see TODO.md
-   "Pre-ship: cross-form opponent coverage" for the form-sibling
-   opponent-pool rule). Output lands in `userdata/website/<slug>/`.
+   (one invocation per form for dual-form species; put the form
+   sibling in the opponent pool -- e.g. `Oinkologne (Female)` in
+   `opponent_pools/gl_top50_plus_cs.txt` -- so each dive sees the
+   other form. Auto-expansion is parked: `docs/TODO_backlog.md`
+   "Pre-ship arc -- residual open polish", "Cross-form opponent
+   expansion (parked)"). Output lands in `userdata/website/<slug>/`.
 
 2. **Form comparison (if applicable)** — for dual-form species, run
    `scripts/compare_loadouts.py <comparison-spec.toml>` to produce

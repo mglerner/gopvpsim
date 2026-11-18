@@ -331,9 +331,10 @@ def _thievul_entry(**over):
 # a caught-up gamemaster and AUTO-RE-ARM whenever the cache is re-pinned for
 # a Worlds render. (test_shipped_meta_declares_the_injection_it_needs is NOT
 # skipped -- its all-species legality half holds on any vintage and only its
-# anti-staleness half is vintage-gated inline.) Post-Worlds (after
-# 2026-08-30): retire the cd_prep table + injection declarations and delete
-# these guards per the test_icy_wind docstring (TODO "Worlds robustness").
+# anti-staleness half is vintage-gated inline.) Retire the cd_prep table +
+# injection declarations and delete these guards with the 2027 Worlds
+# decision (Worlds code is dormant until 2027; docs/TODO_backlog.md
+# "Worlds 2026 -- dormant residue", "Retire-together bundle").
 _icy_wind_caught_up = pytest.mark.skipif(
     'ICY_WIND' in (wb.legal_move_ids('Thievul')[1] or set()),
     reason='live gamemaster lists Icy Wind for Thievul (off the Worlds pin); '

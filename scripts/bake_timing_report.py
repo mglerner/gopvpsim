@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """How much of a bake runs parallel vs on a single core vs asleep.
 
-Written 2026-09-10 to re-derive the TODO "dives run serially" numbers from a
-COMPLETE chain log. The first pass at those numbers used a single cut point
+Written 2026-09-10 to re-derive the serial-dive numbers (then the TODO
+"dives run serially", renamed in f7a1e49; the plan and measurements now live
+in docs/parallelize_dive_plan.md) from a COMPLETE chain log. The first pass at those numbers used a single cut point
 per dive -- everything after the last "Running <moveset>..." line counted as
 serial tail -- which OVERSTATES the serial share, because the mirror-slayer
 rounds emit heavy parallel sim work ("Round 2: ... sims to run", "sim

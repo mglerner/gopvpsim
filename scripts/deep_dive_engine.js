@@ -3053,8 +3053,10 @@ var summarySort = { col: 'yrank', dir: 'asc' };
 // currentYLabel at render time since the Y-axis metric is dynamic).
 //
 // 'mirrorCmp' and the three per-shield Δ columns are the
-// XL-candy-decision helpers (docs/todo.md "XL-candy-decision tool" +
-// "Personal-collection decision tool follow-ups"). mirrorCmp is
+// XL-candy-decision helpers (shipped 2026-04-22, 3085f92; CHANGELOG
+// 2026-04-22 "Mirror CMP % semantic reframe"; the per-shield delta
+// columns came from the former TODO "Personal-collection decision tool
+// follow-ups"). mirrorCmp is
 // optional (cohort-gated); the three Δ columns are always present
 // when score arrays exist and always surface per-scenario splits
 // regardless of the Shields dropdown, so lead/mid/closer role

@@ -11,7 +11,8 @@ which opponents moved and whether any winner flipped.
 
 Used 2026-11-05 to clear Thievul GL (4,320/4,320) and to catch the stale
 Superpower / Psycho Boost cells on the shipped Tinkaton GL/UL pages
-(TODO.md "PvPoke sync 2026-11-05").
+(CHANGELOG 2026-11-05 "PvPoke sync 38f70320d..e02bde78d"; open residue in
+TODO "PvPoke sync 2026-11-17 -- open items").
 
 Usage (from the repo root, with the data cache pinned so nothing refetches):
 

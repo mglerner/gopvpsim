@@ -90,7 +90,8 @@ single IV can belong to both archetypes (cross-category badges mark the overlap)
 (Until 2026-06 the dive surfaced three post-hoc labels, Atk / Bulk / CMP Slayer,
 applied to the Nash survivor pool. They were retired: Atk and CMP membership are now
 visible directly in the per-row anchor checklist, and Bulk's HP+def-above-median
-rule was structurally saturated; see TODO "Slayer-card signal-loss audit.")
+rule was structurally saturated; see `docs/TODO_backlog.md` "Slayer card UX" >
+"Slayer-card signal-loss audit (systemic)".)
 
 ---
 

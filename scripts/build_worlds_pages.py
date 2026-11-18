@@ -726,7 +726,8 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
 # matrix: ~130 inert cells would otherwise need ~130 hidden divs. All
 # reader-visible strings are ASCII -- since 2026-08-27
 # verify_no_unicode_dashes reads <script> string literals too, so this
-# is now enforced rather than convention (TODO "Ship-gate gap").
+# is now enforced rather than convention (CHANGELOG 2026-08-27
+# "Unicode-dash ship gate now reads inlined app JS").
 POPOVER_HTML = """
 <div class="ndpop" id="ndpop" hidden role="dialog" aria-live="polite"
      aria-labelledby="ndpop-msg">

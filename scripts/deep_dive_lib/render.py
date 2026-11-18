@@ -1116,11 +1116,11 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             # Optional state pickle for offline iteration on the synth
             # gate. Set DUMP_SYNTH_STATE=/path/to/file.pkl on the dive
             # invocation; the dump fires once per (moveset, focal-
-            # species) pair. See cleanup pain point #2 in
-            # `project_post_ship_cleanup_pain_points.md` — this is the
-            # smallest-possible replay-from-saved-state mode for the
-            # mirror-tier synthesis pass; a generalized version could
-            # cover other analytical passes too.
+            # species) pair. This predates the general
+            # replay-from-saved-state path (`scripts/replay_analysis.py`,
+            # c07cca9; CHANGELOG 2026-06-10 "Sweep disk cache +
+            # replay-from-saved-state"); it covers only the mirror-tier
+            # synthesis pass.
             try:
                 import os as _os
                 if _os.environ.get('DUMP_SYNTH_STATE'):

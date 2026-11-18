@@ -4,7 +4,8 @@
 re-pitch.** Kept for reference only; the numbers below predate the
 35-entry matrix (they say 33 entries / 528 pairings / 505 amber). The
 surviving editorial lead is a Corviknight vs Shadow Quagsire
-per-spread scatter for r/TheSilphArena (see TODO.md, Worlds section).
+per-spread scatter for r/TheSilphArena (see docs/TODO_backlog.md,
+"Worlds 2026 -- dormant residue").
 
 Draft material for Michael's 2026-08-25 Discord post about the Worlds
 robustness pages (pogodives.com). Chat-draft, exploration-mode — edit
@@ -38,8 +39,9 @@ freely, numbers verified against the shipped pages as noted.
 
 ## Numbers verified from the shipped artifacts
 
-- 528 pairs / 33 entries / 505 amber: TODO.md Worlds section (final
-  overnight audit 2026-08-20, 1.36B sims).
+- 528 pairs / 33 entries / 505 amber: CHANGELOG "2026-08-18..20 --
+  Worlds: Thievul fork + IV-robustness deep pages" (final overnight
+  audit 2026-08-20, 1.36B sims).
 - Corvi/Quag 0-0 stats: embedded data of
   `userdata/website/corviknight-quagsire-shadow-robustness.html`
   (win_frac_all 0.8092; top-512 cov 0.0-100.0; corr_atk -0.645,
