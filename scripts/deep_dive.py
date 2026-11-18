@@ -1045,7 +1045,7 @@ def rankings_fingerprint(league):
     """Reproducibility fingerprint for a league's PvPoke rankings cache.
 
     Two dives with identical CLI args can produce different results when the
-    underlying rankings cache drifts (see TODO.md "Reproducibility"). This
+    underlying rankings cache drifts (see docs/TODO_backlog.md "Reproducibility"). This
     returns a dict capturing the drift-sensitive identity of the cache file:
     its path, mtime, a sha256 content hash, the rankings count, and the top-5
     species. Returns ``None`` if the cache file is missing/unreadable.
@@ -3147,7 +3147,7 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     # Footer: equivalent CLI invocation + rankings data fingerprint, kept
     # at the bottom of the page so they're discoverable but don't compete
     # with the actual analysis content. The fingerprint addresses the
-    # reproducibility gap noted in TODO.md "Reproducibility": two dives
+    # reproducibility gap noted in docs/TODO_backlog.md "Reproducibility": two dives
     # with identical CLI args can produce different results when the
     # underlying PvPoke rankings cache drifts. Fingerprint = the cache
     # mtime + first-5 species so a reader can spot drift between dives.

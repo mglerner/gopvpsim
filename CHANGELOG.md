@@ -3434,6 +3434,36 @@ PvPoke-default IVs (`5b474a3`, flips UL Mimikyu vs Shadow Raikou 2-2 from
 checks of the session-6 fixes — Registeel no-op toggle + "(no change)" hint,
 Carbink active L51 sweep, UL Mimikyu vs Shadow Raikou flip.
 
+**Same-day small fixes** (recorded at the 2026-11-18 backlog groom; full
+pre-groom text: docs/TODO_backlog.md at c861190): `_species_has_form_change`
+also detects sibling forms via `alternativeFormId` (e.g. Morpeko (Hangry)), so
+a future stat-divergent key-lacking form can't be misgrouped by the robustness
+dedup (`308589d`; now in `scripts/deep_dive_lib/robustness.py`); `SlayerCache`
+flushed to disk at the end of every slayer round, so a crash loses at most one
+round (`3a98bd9`); rankings-cache sha256 + run-start fingerprint log line
+(`70c7465`), completing options 1+3 of the dive-reproducibility gap on top of
+the 2026-04-09 HTML-footer rankings fingerprint (`ad9f089`).
+
+## 2026-06-22 -- Dive card + content/IA plan session (Phases A-E)
+
+Dive card (`e11ccc4`): compact spec-sheet card atop every dive + `--card-out`
+export, single-IV and top-512 opponent-IV robustness headlines (first: Shadow
+Corviknight GL). Same day: breakpoint-coverage card spreads (`600b9d9`,
+`ea1c76e`; superseded by "Which one to build?" v4 + pole retirement
+2026-09-17); Threats section + card-at-top (`a0f0985`, `e812914`); ML IV-guide
+Close calls (`d2f2f66`) + Check-my-IVs margins (`e7049e8`); ML IV-guides merged
+under Articles (`645f8aa`). Plan item 2 (dive content audit) stays in the
+backlog. Full pre-groom text: docs/TODO_backlog.md at c861190.
+
+## 2026-06-12 -- Energy-lead sweep axis (9889555)
+
+`--energy-lead` (default off): fast-move-multiple carry-over [0,1,2] converted
+to raw energy per moveset, clamped at the reachable bound, folded into the mode
+string + column cache key; pinned by `tests/test_energy_lead.py`. Calibration
+landed on Azumarill; no web-oracle calibration built or planned;
+`scripts/check_sableye_energy_lead.py` kept as the 2026-06-03 feasibility
+record. Full pre-groom text: docs/TODO_backlog.md at c861190.
+
 ## 2026-06-12 (evening) — S7 cleanup pass (arc COMPLETE)
 
 The perf+correctness arc's gated cleanup session (Michael's
@@ -3680,7 +3710,7 @@ JS trio W3/W4/W6 (`e302759`).
 **Features landed same day:** Notable-IVs "Copy for IV scanner"
 buttons emitting gobattlekit user-threshold JSON (`b97113f`); slayer
 signal-loss 4+3 hybrid — saturated-parent callout + rarity-coded
-badges, Oinkologne-verified, ~360KB/dive lighter (`2629fde`);
+badges, Oinkologne-verified, ~360KB/dive lighter (`5cb1c8e`);
 monitor watch-hints at dive/chain startup (`77fd880`).
 
 **Test infrastructure:** conftest pins the data-cache TTL (pytest
@@ -4488,7 +4518,7 @@ deep dive workload. Stack of optimizations:
   (commit `579aef7`)
 * Slayer iteration: keep all IVs tied at top win count (commit `eb145a2`)
 * Chunk count bumped from `n_workers` to ~100 for finer progress
-  reporting (commit `8498ec4`)
+  reporting (commit `2681458`)
 
 Round 3 (numba JIT for the entire inner sim loop) was deprioritized
 after round 1+2 made the workload tolerable; fastmath was confirmed
