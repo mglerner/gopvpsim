@@ -48,6 +48,14 @@ precedents) is preserved verbatim. Near-term actionable items live in
   an estimated P(opponent shields). P~0 → fire best-DPE move; P~1 → bait with
   cheapest.
 
+* **Cramorant UL Dive+Surf 2v2 tank discriminator (parked 2026-11-18 from
+  TODO; next strat campaign).**
+  - OPEN VALUE (next campaign): UL Dive+Surf 2v2 under the OLD tank was
+    +15-21k flips at passing rating; a per-build tank discriminator
+    would recover it (sheet v5 ships zero there).
+  [2026-11-18: the shipped sheet is now v8 (CHANGELOG 2026-09-28); whether
+  v6-v8 recover any of this cell was not re-checked.]
+
 ## Features to add
 
 (Form Change shipped 2026-04-14 for Morpeko/Aegislash/Mimikyu;
@@ -73,6 +81,133 @@ move selection closed 2026-04-15 as not-a-real-issue.)
     `scripts/check_sableye_energy_lead.py` was deliberately **KEPT**
     (not deleted) as the end-to-end engine-feasibility record from
     the 2026-06-03 scoping run.
+
+* **compare_loadouts N-way verdict** (parked 2026-11-18 from TODO): N=3/N=4
+  rendering shipped (53ade3c, 2026-04-22: all-N-in-row matchup table); the
+  verdict line still lists per-loadout win rates without an N-way ranking.
+  Stay loadout-list-keyed; N=4 ceiling (parse_spec hard-caps it).
+
+* **ML guide "what do I get by best-buddying these?" view** (parked
+  2026-11-18 from TODO) — the "All
+  cases" IV-compare view (shipped 2026-06-28, `5b882dc`) hides
+  best-buddy-conditional flips by default and badges their count
+  ("N best-buddy flips hidden"). A natural follow-up is a dedicated
+  summary that answers, for the user's candidate spreads, *what
+  matchups best-buddying unlocks/loses* — e.g. "best-buddy 15/15/14 to
+  win Solgaleo 2-1 + Kyurem 2-2; 15/14/15 gains nothing." The data is
+  already there (the alt grids / sibling quadrant rows); this is a
+  rendering/summarization feature, not new sim. Deferred 2026-06-28 by
+  Michael ("don't want to engineer that now").
+
+* **Team/multi-mon simulation** (parked 2026-11-18 from TODO) — currently
+  only 1v1; real PvP is 3v3 with
+  switching. Add team composition and switch-timing support. When this
+  lands, honor `reset_on_switch`: Morpeko must re-enter in Full Belly on
+  every switch-in (confirmed in-game 2026-06-06; see DEVELOPER_NOTES §8).
+  Also port the MATCH-level 240 s clock (Michael, 2026-06-11): the real
+  game's timer spans the whole 3v3, charged-move animations consume it,
+  and games are genuinely won on time — see DEVELOPER_NOTES "Battle
+  timeout" divergence entry for PvPoke's clock semantics to mirror.
+
+* **gobattlekit owned-mon breakdown screen** (parked 2026-11-18 from TODO;
+  queued 2026-06-21). Remaining: the Toga screen (model on gobattlekit
+  `screens/user_iv_checker.py`) reading the bundle from
+  `scripts/export_owned_breakdown_bundle.py` (`c1ea231`), + parity vectors.
+  Plan: `docs/owned_mon_breakdown_plan.md`.
+
+### PoGoDives strategy page (Michael, 2026-09-24) (parked 2026-11-18 from TODO)
+
+Expand the Cramorant strategy article into ONE PoGoDives-strategy page with
+a section per strat: Cramorant (the existing content), the stat-effect strat
+(Drain Punch-style "throw the effect move into a predicted shield"; plan:
+docs/statfx_strat_plan.md), and room for later ones. Not started.
+
+Today: `scripts/render_pogodives_strategy_article.py` ->
+`userdata/website/articles/cramorant-pogodives-strategy/`. Carry over its
+contracts: every number recomputed from the rendered dive tensors at render
+time; showcase links computed and gated by verify_url (never hardcoded --
+the 2026-09-12 stale-link incident); authorship "both" with Michael's
+review; ASCII-only prose; publish only on Michael's explicit go.
+
+Prerequisites for the stat-effect section: the rule ported into the engine
+behind the PoGoDives marker, certified per page it ships on (Sableye DP+FP
+pages first), a migrate_cache predicate for the tier change, and a rebake,
+so the section's numbers can come from real PoGoDives-tier tensors. Also
+decide: keep the old slug (Cramorant dive pages link to it) or move to a
+general slug with the old one redirecting. Toggle copy is already approved
+(plan doc, "Page copy"); the page should also state the shield-prediction
+dependence (the fragility results).
+
+### Cramorant strategy article pair (parked 2026-11-18 from TODO)
+
+Same article family as "PoGoDives strategy page" just above.
+
+- Hard-counters lists: RE-DERIVE from the current-sheet (v7) tensors
+  before any public surface carries one. Both earlier rosters (the
+  static-tank "five losers" and the lead40-derived set) predate the
+  shipped sheet. [2026-11-18: the current sheet is v8 (CHANGELOG
+  2026-09-28).]
+- Strategy article PAIR (Michael 2026-08-25, queued): (1) playing
+  Cramorant and (2) playing AGAINST Cramorant -- the shipped
+  cramorant-pogodives-strategy article covers the PoGoDives strat
+  itself, not this pair. Evidence base = the lab campaign: dive-early
+  numbers (the 1.5-vs-3.0 gate, the Kingdra exception), the prey-tank
+  rule + "tank unless clearly ahead", the shield-economy structure
+  (better with shields on the board, the shield-ahead tax), the
+  missile HP-breakpoint family (floor(15%*maxHP)+1 steps); vs-side:
+  energy stacking, don't-shield-weak-hits, the re-derived
+  hard-counters set (bullet above), and the carefully-caveated
+  withhold finding (our crude withhold counter-policy BACKFIRED --
+  baseline Cramorant won MORE vs withholding opponents, +628 vs +233
+  W-L -- don't oversell). TONE: warm toward PvPoke on public surfaces
+  (feedback-pvpoke-tone). SHIP-MODE POLICY applies: narrative TOML
+  blocks are Michael's prose or honest auto-gen; Claude supplies
+  verified bullets + data sections only. Vehicle: articles/*.toml +
+  render_article.py.
+
+### Condensed-meta funnel bundle (queued 2026-08-19, Michael) (parked 2026-11-18 from TODO, with Worlds dormant)
+
+Bundle the whole Worlds chain for reuse on future condensed metas
+(limited cups with ~20 real picks): meta table -> Tier-0/1 planes ->
+amber screen -> Tier-2 grids -> hub/matrix/cheat sheets -> joint-IV
+deep pages. The chain is now proven end-to-end (the 08-19..27 runs).
+Inventory: `worlds_bake/planes/tier0/tier2/
+render_data/build_worlds_pages/verify_worlds` are already meta.toml-
+driven; the Worlds-hardcoded parts are `worlds_meta.py` (entry list +
+badges are literals; needs a cup-roster config + a usage source that
+isn't the Worlds Dracoviz corpus), the `worlds/` output paths + page
+copy, and the `worlds_`-prefixed naming. `joint_iv_from_worlds.py` +
+`worlds_shortlist.py` bridge to the deep-page kit and generalize with
+the same meta-config handle. PvPoke publishes per-cup rankings
+(topn_cup_filter_plan.md), so cup default movesets have a source.
+Standing publish/bake/pin constraints: docs/worlds_prep_plan.md "Revival
+standing rules".
+
+### Old/new mechanics user toggle (POST-SHIP) (parked 2026-11-18 from TODO)
+
+*(2026-06-26, Michael)* Post-ship idea, flagged so it is not lost; do NOT
+pre-ship or design heavily yet. If the site/app gets traction, P!P-series /
+Worlds competitors may want it for prep, and **Worlds runs on the OLD battle
+mechanics**. So expose a user-facing toggle between old and new mechanics on
+the dive site. [Corrected 2026-11-18: that was true of the 2026 Worlds
+campaign, but our engine no longer treats legacy as a peer: legacy mechanics
+are opt-in only -- `simulate()` raises on `mechanics='legacy'` unless
+`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`2615c6e`;
+`src/gopvpsim/battle.py`), and nothing is hardcoded to legacy, Worlds
+included (`4b6342b`). A toggle would mean re-supporting legacy as a
+first-class mode.]
+
+Light design notes (not yet designed):
+- Preference storage: cookies (never used here) vs radio buttons vs a query
+  param. Look at what PvPoke does for its "Preview next season" version as
+  prior art before picking.
+- Cache: [corrected 2026-11-18: the sweep cache has keyed on the
+  turn-mechanics model since 2026-09-02 (`scripts/sweep_cache.py`
+  `mechanics` field; `scripts/deep_dive.py` cache_key), so old-vs-new
+  results already cache separately and a `new`-mechanics dive no longer
+  force-disables the cache. The original note said the cache-rework did not
+  key on the turn model and that keying it meant extending
+  `sweep_cache`/`migrate_cache`.]
 
 ## Analysis goals
 
@@ -205,6 +340,63 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   transition, or against something more niche (Shadow Ball / Night Slash).
   This is the missing context that would let us promote a specific
   bulkpoint to a Level 1 anchor with full provenance.
+
+* **Speed test** (parked 2026-11-18 from TODO) -- compare our speed vs the
+  PvPoke JS code, look for
+  ways we can speed ours up. *(Partly addressed 2026-06-10: holistic
+  perf review found and fixed a 2.0x engine regression dating to the
+  2026-04-15 correctness arc — see DEVELOPER_NOTES "Performance
+  baseline" for the regression gate and `docs/perf/` for the writeup.
+  The vs-PvPoke-JS throughput comparison itself remains open.)*
+
+* **Limited-availability mons: real IV floors for ML sweeps -- optional
+  residue** (parked 2026-11-18 from TODO).
+  Resolved slice (floor-10 resweeps, enumeration research, shadow-legendary
+  gap) recorded in TODO_archive + `docs/reviews/2026-07-03_limited_availability_iv_floors.md`.
+  STILL OPEN (both need Michael, both optional/low): (a) OPTIONAL belt-and-
+  suspenders -- evaluate Dialga/Latias/Lugia/Reshiram (Shadow) down to 6/6/6 in
+  their ML guides (the four Giovanni-primary legendaries whose grindability is
+  only medium-confidence; worst-case floor is a bounded 6/6/6); (b) re-run the
+  audit when Eternatus returns (Niantic announced it will).
+
+* **Aegislash 1080-sample residue (investigation, parked; parked 2026-11-18
+  from TODO):**
+  - *Still undetermined in the 1080 sample* (fwd seat, after emulating
+    both #10 and F2b; score mismatches unless marked log): Aegislash-S vs
+    Thievul (2,0) log, (2,1), (2,2); Feraligatr (1,2); Rillaboom (1,1),
+    (2,1); Dewgong (2,2); Seismitoad (1,1), (2,1); Cradily (0,0), (1,0),
+    (1,1), (2,0), (2,1), (2,2); Aegislash-B vs Deoxys-D (2,2);
+    Electrode-H (2,1), (2,2); Turtonator (1,0), (2,0); Cradily (1,1),
+    (2,1); Seismitoad (1,0), (2,0), (2,1); Stunfisk-G (2,2); Morpeko
+    Full Belly (Blade (2,1) score; Shield (1,x)/(2,x) and Blade (2,0)/(2,2)
+    log). Plausible but UNTRACED attributions: Morpeko cells = bug #8,
+    Cradily cells = the deliberate estimate-stage choice (the audited
+    Cradily row uses 4/14/14, the sample 15/15/15).
+
+* **"Does IV choice still matter once you're bulky?" metric** (parked
+  2026-11-18 from TODO):
+
+  IDEA, parked 2026-09-09 (Michael: re-think after more dives land): a
+  "does IV choice still matter once you're bulky?" number for the dive page.
+  Metric is the RATIO, not the absolute spread -- what fraction of the full
+  4096-spread score range still shows up among the bulkiest 10%:
+
+      Melmetal UL   full 25.8   top-10% 12.0   kept 47%
+      DD GL         full 31.2   top-10% 13.9   kept 45%
+      Melmetal GL   full 39.4   top-10% 12.7   kept 32%
+      DD UL         full 72.3   top-10% 12.8   kept 18%
+
+  The absolute top-decile range is nearly constant (12.0-13.9 across all four)
+  and so carries NO information; only the denominator separates them. DD UL has
+  the widest total spread of the four yet the flattest top end -- almost all its
+  value is in being bulky at all. Melmetal UL keeps its gradient all the way up,
+  which is the "worth digging in before spending resources" case.
+
+  Caveat that needs resolving with more data: points-gained tells a different
+  story than shape. Best-vs-median inside the top decile is 4.9 for Melmetal UL
+  vs 7.5 for DD UL, i.e. DD UL rewards optimization MORE in raw points while
+  having the flatter shape. Which of the two a reader actually needs is the open
+  question. Computable from the replay blob alone -- no re-simming.
 
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
@@ -597,6 +789,77 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   UX caps (`notable_max_count=5`, `max_members_shown=5`) under the
   extra shape-tag line.
 
+## Pre-ship arc -- residual open polish (parked 2026-11-18 from TODO)
+
+The 2026-04/06 pre-ship arc shipped (site published 2026-06-07; see
+CHANGELOG.md). The minor polish residue (the Favicon item stays in TODO.md
+"Site polish"):
+
+- **G16 — methodology-details guide pointers (remaining half).** The
+  comparison-page block shipped `95fcf74` (wrong win-rate boundary
+  fixed + derived counts + guide pointer) and the Meta Coverage half
+  shipped earlier (`e6d431c`). Remaining, both in
+  `generate_article.py` and both currently regeneration-unverifiable
+  (the male-Oinkologne article was retired in `7df5165`, so no article
+  renders from HEAD): (a) `:1835-1848` Opponent-IVs/Bait recap ->
+  pointer at `guides/cd-article/body.md#dropdown-control` (anchor
+  confirmed present); (b) `:2461-2469` "About these tiers" --
+  move-THEN-point: the no-1:1-mapping fact must first be ADDED to the
+  guide's IV Recommendations section, else a bare pointer deletes
+  information.
+
+- **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
+  recommended]. F1 Meta Role, F2 key-flips callout, and
+  F-fast/charge-moves shipped as deterministic rollups; JRE-style
+  prose ("Mud Slap takes Male Oinkologne from 0% to 76.6% vs
+  Steelix — the signature upgrade") would close the register
+  gap. Template change, not Claude-drafted prose, so
+  ship-policy-clean. 0.5-1 session. Benefits every future dive.
+  Bundles with **Row D** — bulk-vs-peers paragraph (micro-gap from
+  original §3.D, never made it through F1's auto-gen template).
+
+- **F-tier-name-cleanup** [post-ship] — simplify IV-rec tier card
+  names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
+  -   (Wigglytuff Atk))`) to RyanSwag's name/signature convention
+  per `docs/ryanswag_methodology_gap_analysis.md` (the earlier pointer,
+  the gitignored `docs/reference_deep_dives/ryanswag/STYLE_ANALYSIS.md`,
+  is no longer on disk; repointed 2026-11-18).
+  Bundles with S5a rename work in post-S5 arc.
+
+- **F-shadow-narrative** [post-ship] — Shadow-variant comparison
+  prose block for species that have shadow forms (not applicable
+  to Oinkologne ship).
+
+- **F5** [post-ship, gated ≥3-5 shipped articles] —
+  multi-article-reader cross-linking footer. Not worth building
+  until cross-reference surface is large enough.
+
+- **Personal-collection: `scripts/suggest_builds.py`.** CLI
+  helper: takes `--species`, `--league`, `--roles lead,closer`,
+  path to a PokeGenie CSV export, and the shipped dive HTML.
+  Parses Top IVs + Anchors + Matchup Flip tables, intersects with
+  the collection, prints a ranked shortlist per role with the key
+  tradeoffs (atk/HP/def, anchor flips, score Δ, XL/dust cost).
+  Maybe 2-3 hours; deprioritize if scatter paste-box overlay +
+  Mirror CMP columns are enough.
+
+- **P2 single-form opponent links.** `_render_matchup_delta_section`
+  (line 1954) doesn't yet link opponent cells — applies to
+  non-CD articles that aren't per-form. Extend when the first
+  such article actually ships.
+
+- **P3 article-surface design question.** Dive-side envelope-tag
+  retrofit shipped 2026-04-23 (`patch_dive_envelope_tags.py`);
+  a category-card surface on the CD article itself (linking
+  envelope-shape to a specific "Cost to XL" judgment) remains
+  the original P3 question and has not been addressed.
+
+- **Cross-form opponent expansion (parked).** Item 4 (auto-
+  form-sibling expansion in `build_opponent_pool.py`) — design
+  done but parked pending review of rendered Oinkologne article;
+  decide pool-level vs render-level filter for hypothetical-form
+  rows.
+
 ## Deep-dive narrative — open polish
 
 * **Move display-name shown two incompatible ways on one page (DRY, confirmed
@@ -700,6 +963,38 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   can never silently mix data vintages — but the HTML fingerprint /
   run-start logging for human-visible drift detection (options 1+3)
   remains open.
+
+## Cache GC: prune all namespaces + dive-script opt-in prompt (parked 2026-11-18 from TODO)
+
+Make `scripts/gc_cache.py` able to prune **every** cache namespace, and wire a
+prune option into the dive scripts wherever caches get created.
+
+- **GC coverage.** Today only `sweep/` has vintage-aware pruning (gamemaster in
+  `meta.json`); `slayer/` and `iv_envelope/` are report-only because they bake
+  gamemaster+engine into opaque filename hashes with no readable vintage. Give
+  those two a readable vintage (sidecar or meta file at write time) so GC can
+  apply the same N-1 retention to them. (`iv_envelope/` may be retired instead
+  once the ML path moves onto the sweep cache — cache-rework Phase 6.)
+  [2026-11-18: the sweep cache (v7) now stamps the gamemaster per column, not
+  in `meta.json` (`gc_cache.plan_v7_columns`); `slayer/` and `iv_envelope/`
+  are still report-only.]
+- **Dive-script opt-in.** Wherever a cache is created (`deep_dive.py`,
+  `deep_dive_slayer.py`, the IV-envelope/ML path, sweep), add a prune option
+  that **defaults to "don't prune."** When the run is a *full* dive of a whole
+  league (UL / GL / ML), **ask Michael whether to prune** before/after the dive
+  rather than silently keeping or silently deleting.
+- Retention target stays N-1 (current gamemaster + 1 prior), matching the
+  existing `gc_cache.py --keep-vintages 2` default.
+
+## Accepted test debt
+
+* **Cramorant dive-ASAP gate** (parked 2026-11-18 from TODO's Cramorant
+  section; item (b) of that record stays in TODO). ACCEPTED TEST DEBT (per
+  policy, recorded): (a) the dive-ASAP gate's
+  fresh-vs-frozen `move.damage` divergence (documented at the rule in
+  battle.py) has no discriminating test -- needs a post-missile-debuff
+  re-dive scenario where the two damage bases differ; write it if such an
+  oracle cell ever drifts.
 
 ## UI / Display
 
@@ -874,3 +1169,119 @@ bottleneck.
   (deep nesting, mandatory spread/anchor split for one-offs).
   Simplifications target the second category; don't accidentally cut
   the first.
+
+## User-facing documentation (Reader's Guides) (parked 2026-11-18 from TODO)
+
+- **Round-3 screenshots** if/when reader confusion surfaces a
+  specific gap (round-1 + round-2 screenshots shipped via `32fae84`
+  and `e449b38`).
+- **Add topics** beyond the five shipped — Michael asked that the
+  topic list be a conversation at the start of the task, not a
+  fixed scope. Plan a session to (a) add topics surfaced by
+  an HSH Discord member / new readers, (b) reorder by current reader
+  confusion, (c) decide whether related topics merge.
+
+[2026-11-18: `32fae84` and `e449b38` are not valid objects in this repo
+(the screenshots predate it or the shas were rewritten); `guides/` now holds
+9 guides, not five.]
+
+## Shared user_collection module — Option-2 migration prep (parked 2026-11-18 from TODO)
+
+*(from gobattlekit's 2026-06-11/12 deep review, sections F/J — CP9 +
+CP12. Not urgent; gobattlekit is otherwise ready to consume
+`gopvpsim.user_collection` and has aligned its matching semantics to
+ours. The CP4 over-leveled-mon fix and CP13 Burmy→Mothim fix shipped
+here 2026-06-12; these are the remaining seams.)*
+
+* **Split heavy deps into extras** — `pyproject.toml` hard-requires
+  `numpy` + `markdown`, but the `user_collection` import path
+  (user_collection → evolution_lines + pokemon → data) needs neither.
+  numpy on iOS via BeeWare is a real packaging problem. Move them to
+  an extra (e.g. `gopvpsim[sim]`) so a mobile app can take a core
+  dependency. Note the user_collection docstring's "stdlib only"
+  claim is false at package level until `certifi` (imported by
+  data.py at module load) is also dealt with.
+
+* **Injectable gamemaster/CPM source** — `match_mons` hardwires
+  `get_pokemon_index()` → data.py's network-backed cache
+  (`~/Documents/gopvpsim_cache/`, 24h TTL, NoDataError when offline
+  with no cache). gobattlekit needs to supply its own bundled +
+  ETag-cached gamemaster. Add a provider injection point (parameter
+  or settable loader) on match_mons / get_pokemon_index /
+  evolution_lines.
+
+* **Golden parity-vector emitter** *(seeded by the gobattlekit
+  threshold-pipeline session, 2026-06-12)* — a script that emits
+  (species, IVs, level) → (stats, CP, rank) fixtures from our
+  canonical primitives, checked into gobattlekit as test vectors so
+  its stat math can't drift from ours. Complements the CSV parity
+  corpus below (that one covers parsing/matching; this covers the
+  arithmetic).
+
+* **Shared CSV parity corpus (CP12)** — a small synthetic CSV
+  (shadow, over-cap, out-of-range, gendered, branched-evo rows) +
+  golden expected-results JSON, checked into BOTH repos and run by
+  both suites, so the row-for-row contract can't silently drift
+  again (it demonstrably did: gender, shadow, level-gating). Until
+  Option 2 deletes the duplicate implementation, this is the only
+  tripwire.
+
+* **Gobattlekit threshold schema compatibility** (from TODO "Deferred
+  cleanup: backwards-compatibility removal pass") in
+  `gopvpsim.user_collection.check_thresholds` (and `as_legacy_dict` in
+  thresholds.py) — once gobattlekit has actually migrated to use the
+  shared module and we've confirmed it works, we may want to simplify
+  the dict schema or unify with pogo-simulator's TOML anchor schema.
+  But not before gobattlekit's migration lands. **The gobattlekit
+  threshold pipeline actively consumes both as of 2026-06-12 — do not
+  touch without coordinating.**
+
+## Worlds 2026 -- dormant residue (parked 2026-11-18 from TODO)
+
+Moved from TODO.md "Worlds 2026 -- code DORMANT until 2027"; TODO keeps the
+revival trigger ("Worlds 2026 -- dormant until 2027": the Revival standing
+rules pointer and the 2027 test un-skip).
+
+Worlds (Aug 28-30) is over. Michael 2026-09-25 (perf-doc Q4 "no"): the
+Worlds code, tests and `worlds/planes` stay in the repo DORMANT until 2027
+-- no retire/delete pass now. The pages are off the site (no `worlds*.html`
+in `userdata/website/`; publish rsyncs with `--delete`). Plan of record for
+a revival: `docs/worlds_prep_plan.md`. Still open:
+
+- **Retire-together bundle (rides the 2027 decision):** `thresholds/thievul.toml`
+  `[Thievul.cd_prep]` (present 2026-11-18), the `worlds/meta.toml`
+  `injected_move_ids` declarations + their on-page disclosures in
+  `build_worlds_pages.py`, and the injection guards in
+  `tests/test_worlds_bake_guards.py`.
+- Link the IV Robustness guide FROM the Worlds hub/cheat sheets at the next
+  Worlds re-render (needs the gamemaster re-pin in docs/worlds_prep_plan.md
+  "Revival standing rules").
+
+DECISIONS / EDITORIAL for Michael:
+
+- Corviknight vs Shadow Quagsire per-spread scatter for
+  r/TheSilphArena (the surviving lead after the skipped Discord
+  post). OPEN QUESTION before drafting: which scenario? (memory says
+  the 2-2 scatter; the original reminder pointed at 0-shield;
+  re-verified data shows real structure in both 0-0, win_frac_all
+  0.809, and 2-2, 0.86, while 1-1 is near-hopeless at 0.004.)
+  Editorial findings, durable copy:
+  ~/coding/reports/gopvpsim-worlds-2026-refresh-2026-08-27.html
+  (core-breaker top-5: Medicham, Azumarill, Guzzlord, Aegislash-S,
+  Mantine -- Mantine out-breaks Greninja 2:1 IV-robustly; Greninja
+  27/35, its case is the energy-lead snowball; Annihilape 9th, #1 on
+  the strict tier; HSH Greninja verification: 5/6 breaks confirmed,
+  Tinkaton refuted).
+- Deferred mirror bakes (Michael-approved deferral):
+  empoleon__vs__empoleon and feraligatr__vs__feraligatr.
+- Deferred joint-IV review minors (all in the 319c8a2 commit
+  message): duplicate-grid double embedding (~826KB/page),
+  pareto-axis self-inclusion, one-option basis dropdown, wall-table
+  25-vs-12 wording, CSV dropped-row accounting, raw key fragments in
+  the answers dump, sim-count phrasing.
+
+Non-gating polish, dormant with the rest: a11y (badge text 4.36:1 in
+pokemon-dark; hub mini-grids color-only), the optional session-6 survival
+strip (scoped 2026-08-11), the optional pooled-usage display
+(`usage_recent_pooled_pct`, unshown). Planning artifacts:
+`userdata/worlds_planning/`.
