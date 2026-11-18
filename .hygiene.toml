@@ -1,0 +1,114 @@
+# Project-hygiene config for gopvpsim.
+# Everything here is optional; the scan runs with no config at all.
+# Schema: references/config.md in the project-hygiene skill.
+#
+# Read by two programs:
+#   the global project-hygiene scanner (reports; never blocks a commit)
+#   scripts/verify_dev_notes.py (the commit check).
+#     It must not depend on dotfiles; it shares only this file, the
+#     baseline format (.hygiene-baseline.json) and the key test vector.
+
+main_branch = "main"
+
+# Kinds. Unlisted root *.md and docs/**/*.md default to "living".
+# CHANGELOG.md is the single sink for finished work; docs/TODO_archive.md
+# is frozen (nothing new goes in, nothing in it is edited).
+open = ["TODO.md", "docs/TODO_backlog.md"]
+history = ["CHANGELOG.md"]
+frozen = [
+    "docs/TODO_archive.md",
+    "docs/validations/*",
+    "docs/reviews/*",
+    "docs/perf/*",
+    "docs/design/*",
+    "docs/reddit/*",
+    "docs/tournament_data/*",
+    # Static PvPoke reference write-ups the battle tests cite by line
+    # (untouched since 2026-04); frozen, so REFS-line skips them.
+    "docs/*_deep_dive_reference.md",
+]
+instructions = ["CLAUDE.md"]
+
+# Ship-mode narrative files: report dead pointers, never edit.
+out_of_scope = ["articles/*", "thresholds/*"]
+
+# Lines a groom must never drop. The sync sentinels feed
+# scripts/verify_dev_counts.py and the public guide pages (build_guides.py).
+protected_patterns = ["<!--\\s*/?sync"]
+
+# Terms that should not appear as live in current-state files
+# (sugar for a [[banned]] rule, severity warn).
+retired_terms = ["pole model"]
+
+# Not this repo's paths: PvPoke source paths, the sibling app (incl. its
+# tests/test_parity_vectors.py, cited from TODO), and the synthetic paths
+# inside the doc-checker's own tests.
+ref_ignore = [
+    "src/js/*",
+    "src/gobattlekit/*",
+    "tests/test_verify_dev_notes.py",
+    "scripts/verify_dev_notes.py",
+    "tests/test_precommit_hook.py",
+    "tests/test_parity_vectors.py",
+]
+
+# Run without --quiet so warnings are visible (the hook hides them).
+extra_checkers = ["scripts/verify_dev_notes.py"]
+
+section_lines = 60
+stale_days = 60
+
+# Hard cap of DEVELOPER_NOTES.md: read from the checker constant, which is
+# its one home.
+[caps_from]
+"DEVELOPER_NOTES.md" = "scripts/verify_dev_notes.py:CHAR_CAP"
+
+# Per-file limits and no-rise rules. A rule ("no-rise") is recorded in
+# .hygiene-baseline.json by `baseline init`; the commit check enforces it.
+[budgets]
+# done = "no-rise": no new done-lines (DONE / SHIPPED / RESOLVED / ...) in
+# TODO. Finishing an item means deleting its bullet and writing one
+# condensed CHANGELOG entry.
+# chars.hard is a PLACEHOLDER: today's size (89,491 chars, 2026-11-17)
+# rounded up, so the file cannot grow before the first groom. After the
+# first groom set it to about 1.5x the post-groom size.
+"TODO.md" = { chars = { hard = 90000, warn = 60000 }, done = "no-rise" }
+# Instructions and living notes hold no story: the ISO-date count may not
+# rise. (CLAUDE.md is 26,422 chars today; 18000 is a scan-only target.)
+"CLAUDE.md" = { chars = { warn = 18000 }, dates = "no-rise" }
+"DEVELOPER_NOTES.md" = { dates = "no-rise" }
+
+# ABS: the default regex also hits URL paths such as
+# https://img.pokemondb.net/sprites/home/... ; a machine path starts
+# its segment, so require a non-path character before the slash.
+[abs]
+regex = '(?<![\w.-])/(?:Users|home)/|/private/tmp/'
+
+# Engine-hash files (sweep_cache._ENGINE_FILES + deep_dive_signature.py).
+# A hygiene or lint commit never touches them; a heading they cite gets a
+# tombstone heading in the cited file instead.
+[[no_edit_group]]
+id = "engine-hash"
+consequence = "bumps the sweep-cache engine hash: every cached column goes stale and the next dive is a cold re-dive (many hours)"
+files = [
+    "src/gopvpsim/battle.py",
+    "src/gopvpsim/_dp_jit.py",
+    "src/gopvpsim/moves.py",
+    "src/gopvpsim/formchange.py",
+    "src/gopvpsim/pokemon.py",
+    "scripts/deep_dive_signature.py",
+]
+
+# The code extra: on the menu, not pre-selected. The fast test tier takes
+# about 5 minutes; the full suite about 17.
+[code]
+default = false
+python = ".venv/bin/python"
+test_paths = ["tests"]
+pytest_args = ["-m", "not slow"]
+
+# [resume] (one capped "Resume here" block at the top of TODO.md) is
+# added together with the block itself, when CLAUDE.md's session-start
+# read changes to that block plus TODO's heading list. Until then the
+# table is absent, so neither the scan nor the commit check asks for it.
+# Shape: file = "TODO.md", heading = '^## Resume here\b', max_lines = 40.
