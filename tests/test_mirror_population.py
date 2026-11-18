@@ -1,4 +1,5 @@
-"""The mirror POPULATION (TODO.md "NEXT BAKE: mirror population").
+"""The mirror POPULATION (docs/expert_verdict_plan.md "Mirror population:
+decision of record").
 
 ``deep_dive_lib/mirror_population.py`` chooses the mirrors a reader will
 meet -- PvPoke's top-20 IV rank list for the focal plus the page's own

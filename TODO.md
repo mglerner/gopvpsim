@@ -123,15 +123,16 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
   Tinkatuff cannot reach GL or UL (hundo L51 817 / 984 / 1495 CP) and IVs
   carry through evolution, so rank by the evolved form's page: paste the
   Poke Genie export into its collection box, or `owned_breakdown.py --csv`.
-- **Data-cache refresh recipe** (`cp` from the local checkout; the sandbox
-  proxy truncates raw.githubusercontent.com fetches). From
-  `../pvpoke/src/data/` copy into `~/Documents/gopvpsim_cache/`:
-  `gamemaster.json`; `rankings/all/overall/rankings-{1500,2500,10000}.json`
-  as `great/ultra/master.json`;
-  `rankings/mega/overall/rankings-{1500,2500,10000}.json` as
-  `rankings_mega_{1500,2500,10000}.json`; `groups/championshipseries.json`
-  as `group_championshipseries.json`. Sandboxed runs always need
-  `GOPVPSIM_PIN_DATA_CACHE=1` (silences fetch retries).
+- Data-cache refresh: docs/rebalance_checklist.md section C (`cp` from
+  ../pvpoke, incl. the mega rankings; sandboxed runs need
+  `GOPVPSIM_PIN_DATA_CACHE=1`).
+- Sub-entry gamemaster narrowing: hash only the sim-read FIELDS inside
+  pokemon/moves entries, so UI-only PvPoke churn stops cooling the cache.
+  Rides a bake ONLY if it is cold for its own reasons; never force a cold
+  bake for it (Michael 2026-09-22). Today `sweep_cache.gamemaster_subset`
+  hashes whole pokemon + moves.
+- Before a cold re-dive: docs/predive_checklist.md (launch + watch lines
+  are there).
 
 ## OPEN: Bake speed -- residue (record: CHANGELOG 2026-09-25, 2026-09-26/27)
 
@@ -140,8 +141,8 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
 - MICHAEL: the 258-blob superseded replay prune (9.5 GB; keep-set rule in
   `docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md` R7) was left to
   you on 2026-09-25, not run by the session.
-- Next lever: `--jobs N` dive overlap, the "parallelize the dive step" plan
-  below (memory-bound, 4.9-11.6 GB peak RSS per render).
+- Next lever: `--jobs N` dive overlap, `docs/parallelize_dive_plan.md`
+  (memory-bound, 4.9-11.6 GB peak RSS per render).
 
 ## FUTURE: PoGoDives strategy page (Michael, 2026-09-24)
 
@@ -204,17 +205,9 @@ strat re-checked"). `--check-record` is sha256-only and would pass it:
 before the next publish make it re-sim an opponent-stratified sample, or
 raise `--selftest` N.
 
-**Standing runbook after every bake that touches Cramorant** (post-bake
-verification last DONE 2026-09-28, sheet v8; the site published 2026-09-28):
-
-    python scripts/cramorant_certify.py --league both --selftest 5 --out \
-        userdata/certify/cramorant_record.json
-    python scripts/render_pogodives_strategy_article.py --out <scratch>   # rehearse
-    python scripts/render_pogodives_strategy_article.py
-    python scripts/cramorant_certify.py --check-record userdata/certify/cramorant_record.json
-
-`publish_website.sh` runs the last check itself and refuses to publish a
-rendered Cramorant page that is missing from, or differs from, the record.
+- After any bake touching Cramorant: run docs/cramorant_policy_plan.md
+  "Post-bake certification runbook" (certify -> rehearse -> render ->
+  `--check-record`; `publish_website.sh` enforces the last step).
 
 **Michael's open decisions** (leave as-is until answered):
 
@@ -325,18 +318,9 @@ a revival: `docs/worlds_prep_plan.md`. Still open:
   `injected_move_ids` declarations + their on-page disclosures in
   `build_worlds_pages.py`, and the injection guards in
   `tests/test_worlds_bake_guards.py`.
-- **Before ANY Worlds re-render:** re-pin the gamemaster the pages were baked
-  at (`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
-  ~/Documents/gopvpsim_cache/gamemaster.json`), restore the live blob after;
-  the render path reads live gamemaster/rankings while scores come frozen
-  from the blob. `WORLDS_RERENDER=1` is the opt-in in `publish_website.sh`;
-  `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
-  hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
-  new-mechanics bake.
-- **Standing Worlds bake/publish rules (carry into any revival):** publish
-  only on Michael's explicit per-instance go; long bakes detached and
-  run-to-completion; Worlds modules never touch the sweep cache (pinned by
-  `tests/test_worlds_bake_guards.py`); no `*_great.toml` from a Worlds bake.
+- Before ANY Worlds re-render or bake: docs/worlds_prep_plan.md "Revival
+  standing rules" (gamemaster re-pin, `WORLDS_RERENDER=1`, publish/bake
+  rules; a 2027 bake is new-mechanics).
 - Link the IV Robustness guide FROM the Worlds hub/cheat sheets at the next
   Worlds re-render (needs the gamemaster re-pin above).
 - **Un-skip at the 2027 cycle** (or earlier if IV-robustness needs them):
@@ -401,202 +385,31 @@ relevance in open + cups) folds into the season-start teardown
   before any authoring; Take Down 5->14 power can invert its Mud Slap vs
   Tackle/Take Down thesis.
 
-DECIDED (Michael, 2026-08-31) -- **no staleness markers; the live site
-is centered on current live stuff.** A no-regen article is REMOVED from
-the site rather than left up with a caveat. This satisfies the
-never-ship-unflagged-known-wrong rule by not shipping the wrong page at
-all, which is stronger than flagging it.
-
-Mechanism if you instead DELETE outright: remove the rendered dir from
-`userdata/website/articles/`, then re-run `build_website_index.py`.
-The index discovers articles by scanning
-`userdata/website/articles/*/meta.toml`
-(`build_website_index.py:49,1007`), so the card disappears on its own,
-and `publish_website.sh` rsyncs with `--delete` (:105), so the live
-page goes with it. No hand-editing of index.html.
-
-If a removed article is worth keeping, it archives in the **git repo**,
-not on the site. Wrinkle to solve when it first comes up: `userdata/`
-is gitignored (`.gitignore:43`), so archiving a *rendered* page needs a
-tracked path -- the cheap alternative is to keep only the source
-(`articles/*.toml` is already tracked) and re-render from it if ever
-wanted.
-
 Still open, Michael's: what counts as "in the meta" for the cups half,
 given the season ships eight of them (Willpower, Retro, Mega Color,
 Little, Fantasy, Halloween, GO LAIC, Mega Catch).
 
-## Site lifecycle policy (Michael, 2026-09-02)
+- At each new season's start ALL prior-season surfaces come down (Michael
+  2026-09-02; no staleness markers, removal not caveats): policy, removal
+  mechanism + season-start bake checklist in docs/article_archive_plan.md
+  "Site lifecycle and removal policy".
 
-Standing shape, seasons repeat:
+## Mirror population -- open residue (built 2026-09-28, 60481e5 / 6ad44b7; record: CHANGELOG 2026-09-28)
 
-1. A new season is announced.
-2. Things get added to the site progressively through the season
-   (cups, event/CD articles, condensed-meta surfaces).
-3. **At the start of the next season, ALL of it comes down**, and the
-   new season's surfaces get added as needed. Rinse, repeat.
+Decision of record: `docs/expert_verdict_plan.md` "Mirror population:
+decision of record". Schema: the `scripts/deep_dive_lib/mirror_population.py`
+module docstring.
 
-The live site is centered on current live content; nothing is left up
-carrying a staleness caveat (see "Article regen triage"). Retired
-surfaces are re-renderable from their replay blobs, and articles worth
-keeping archive as dated snapshots via
-`scripts/archive_article.py` (docs/article_archive_plan.md).
-
-What a season-start bake covers is the step list of
-`scripts/overnight_redive.sh` (`grep -n '^step \|\[STEP\]'
-scripts/overnight_redive.sh`; the IV-guide step runs outside `step()`):
-`run_website_dives.py` (all GL/UL/ML dive entries), the ML IV guides via
-`run_iv_guides.py` over `master_top60` (a separate multi-hour job, most of
-the article surface), the comparison renders + GL/UL matchup webs (need
-sims), then reader's guides, index rebuild and ship gates (render-only).
-
-## NEXT BAKE: mirror population as opponent columns (Michael, 2026-09-22)
-
-**BUILT 2026-09-28 (merged to main; bake ON; render gate OPENED the same
-day once Michael picked the wording, item (g)).** The prerequisite below is
-done; what is left is the next bake, which populates the blobs, so a page
-shows the population block from its next dive on.
-
-- Bake side: `scripts/deep_dive_lib/mirror_population.py`, called from
-  `deep_dive.main` after every other sweep and before the blob is dumped;
-  `--mirror-population` / `--no-mirror-population`, default ON (skipped
-  under `--no-replay-dump`, which has no reader for it). Schema in the
-  module docstring, stored as `state['mirror_population']` (version 1).
-  `iv_sweep` gained an opt-in `opp_ivs=` (explicit per-opponent IVs); column
-  keying and computation are unchanged, CACHE_VERSION unchanged.
-- Cost, measured 2026-09-28 on Melmetal GL (5 movesets, a machine at load
-  ~25 shared with other agents): 31 members, 224 column-sweeps (about 22
-  columns x 2 bait modes x 5 movesets), 39-47 s per dive including ~10 s of
-  build selection, against a ~4 min budget. The 2026-09-20 estimate of
-  ~0.7 s per column-sweep was ~4x high: one `iv_sweep` call covers all of
-  an arm's columns.
-- Page side: `deep_dive_builds.population_facts` (wins, ties, losses per
-  build, the column moveset per group) +
-  `deep_dive_which_build.population_lead` / `population_table_html` /
-  `_population_preset_html`; "The mirror" block reads the population where
-  the blob has one and falls back to the cohort paragraph otherwise (old
-  blobs render byte-identical; harness-verified 2026-09-28 twice, before
-  and after the gate opened).
-- Hash impact: NONE on the engine hash (45cf73a2d23d before and after; no
-  engine-hashed file touched). The BLOB schema changed, so a page shows the
-  population only after a re-dive; a warm re-dive re-sims just the
-  population's columns (~40-50 s per 5-moveset dive, cold).
-- Still open: (a) wording (Michael) -- DONE 2026-09-28, see (g); (b) one
-  scenario (the 1v1) is printed,
-  all nine are in the facts; (c) league cap only -- a best-buddy (L51)
-  section keeps the cohort paragraph; (d) the plot's mirror trace and its
-  caption still read the cohort; (e) the thresholds-TOML override list
-  (candidate 3) stays deferred; (f) the population paragraph is NOT gated on
-  the mirror being a decision cell (the cohort paragraph is), so it appears
-  on arms that had no mirror paragraph before (Melmetal GL arms 1-2) --
-  Michael to confirm; (g) first real numbers (Melmetal GL 09-27 blob): most
-  builds' median member beats 0-5% of the rank list in the 1v1 from the
-  focal's seat (the column always baits; no antisymmetry), so the 1v1
-  mirror reads as lost for nearly everyone -- worth a look before shipping.
-  **DONE 2026-09-28: wording decided and the gate opened**
-  (`RENDER_MIRROR_POPULATION = True`, pinned by
-  `test_render_gate_ships_the_population_block`). Michael picked the V4 lead
-  sentence plus the V2 table from the mockups: a lead sentence chosen by a
-  mechanical trigger -- (a) the column moveset differs from the arm's: "The
-  mirrors you will meet run {pool moveset}; with {arm's move} every build on
-  this page loses the 1v1 to all N of the top-N rank list." (only when every
-  build's typical member loses all N; else the counts); (b) same moveset, no
-  build's typical member beats more than 2 of N, some build's
-  out-prioritises at least half: "Priority does not win the {species}
-  mirror, bulk does: no build on this page beats more than {k} of the top-N
-  rank list in the 1v1."; (c) same moveset, some build beats at least half:
-  "{Build} beats {k} of the top-N rank list in the 1v1."; (d) otherwise no
-  lead -- then a table (Build | spreads | vs rank list W / T / L | wins CMP
-  | vs page picks (n) W / T / L | wins CMP; the page columns only when the
-  picks match), a caption naming the column moveset, and the CMP-cut
-  sentence. Melmetal GL 09-27 blob: Dynamic Punch -> (b); Hyper Beam, Rock
-  Slide, Thunderbolt -> (a) all-lose; Superpower -> (a) counts. The history
-  that led there: **Probed 2026-09-28: the counts are TRUE and the wording hides two
-  things.** (1) "beats" is a strict win, so on the Dynamic Punch arm the
-  bulk build (Build 1) TIES 13 of the top-20 rank list and loses 7, and the
-  attack build (Build 2) out-prioritises all 20 on CMP but loses the fight
-  to 19 -- the rank list is the bulkiest 20 spreads and bulk wins the
-  Melmetal mirror, a real IV finding that "beats 0% / beats 5%" flattens.
-  (2) Every population column carries the POOL's moveset (Thunder Shock /
-  Double Iron Bash + Dynamic Punch), so on the Hyper Beam, Rock Slide and
-  Thunderbolt arms the "mirror" is a cross-moveset fight and every build
-  loses 20 of 20: a moveset statement a reader would take for an IV one. A
-  true self-mirror (same IVs and moveset, both seats) scores 500 on every
-  arm (direct sim); the first note blaming the row/column AI convention was
-  wrong and is retracted. The paragraph was held behind
-  `RENDER_MIRROR_POPULATION = False` until the wording call above; mockups
-  in `~/coding/reports/gopvpsim-mirror-paragraph-mockups-2026-09-28.html`.
-
-**Did NOT ride the 2026-09-26/27 bake** (decision 2026-09-26: timing bake
-first -- measure the sped-up render layer on its own; this note is the only
-written record of that call). Verified
-2026-09-27: no population-sweep code has landed on main since c2bd1e9
-(09-22), so the prerequisite below is still unbuilt and still gates the
-next bake that carries it.
-
-**Clones cleaned up 2026-09-22:** the seeded-lattice and mirror-proto
-prototypes now live as branches `experiment/seeded-lattice-2026-09-17` and
-`experiment/mirror-proto-2026-09-21` in this repo (local only); the three
-clone directories are deleted.
-
-**Status 2026-09-22 (Michael): WAIT.** Not worth its own bake; it rides the
-next bake that happens for another reason. PRE-LAUNCH PREREQUISITE for that
-bake: build the population sweep + the block that reads it FIRST (one agent
-round, ~half a day, additive columns, no hash bump), so the bake carries it
-for free. The gamemaster_subset narrowing (sim-read fields only, prevents
-UI-only PvPoke churn from cooling the cache) also rides that bake ONLY IF it
-is cold for its own reasons; never force a cold bake for it.
-
-Decision: "the mirrors I will meet" = (1) PvPoke's rank-ordered IV list for
-the focal, top N (bulk-first by construction), PLUS (2) the page's own
-builds -- each named build's most-winning member and SP1 (what our readers
-will build once the page exists). Labelled separately on the page. The
-Nash mirror-slayer cohort is NOT this (prototype 2026-09-21,
-`userdata/analysis/2026-09-21_mirror_proto/report.md`: attack-first on
-Melmetal GL, bimodal on Shadow Sableye, never converged); it stays as the
-Slayer Builds input. The render-only CMP line against that cohort ships
-first (branch `mirror-line`) and is replaced by these numbers when the
-bake lands.
-
-Michael, 2026-09-22 (after the four previews on branch `mirror-line`,
-d66a78d): the cohort version is NOT rendered site-wide. Its content
-reduces to "pick the highest attack you have inside the build you chose"
-plus what that attack buys (Melmetal GL and Azumarill: nothing; Melmetal
-UL: the fork clears both cuts with every member). DONE on `mirror-line`:
-the block is two sentences under the builds table, and everything behind
-it is kept and still pinned for the population version to reuse --
-mirror_surface, the decision cells / cohort-rate / Spearman facts (now
-computed and NOT rendered), the trace, the glossary terms. The population
-version earns the block because it compares ACROSS builds ("Build 3 wins
-the 1v1 mirror against 40% of common Melmetals; Build 2 against 85% and
-gives up these four matchups").
-
-Shape (bake-side, changes the blob schema -- own bake, own hash bump):
-- After the main sweeps and BEFORE render, compute builds
-  (`deep_dive_builds.compute_builds`, ~2 s) so (2) is known; then sweep the
-  focal grid against the mirror population as extra opponent columns: same
-  species+form as the focal (and the other shadow form when it is in the
-  pool), explicit IVs, level = under-cap max, default moveset; sweep cache
-  keys columns on opponent IVs already (`sweep_cache.column_key_fields`),
-  so they warm like any other column.
-- Store under `state['mirror_population']`: the member list (source tag:
-  'pvpoke_rank' / 'build:<role>' / 'sp1', IVs, stats), and per-member
-  per-scenario scores (4096 x 9 x M), both bait modes; opponent-IV modes do
-  not apply (the IVs are the point).
-- Size cap: N = 20 from the rank list + up to ~6 build members => ~26
-  columns x 2 bait sweeps x movesets. Measured 2026-09-20: ~0.7 s per
-  column-sweep, so ~3 min per 5-moveset dive, ~6 h across the corpus,
-  warm afterwards.
-- Page: the "The mirror" block (from `mirror-line`) reads this instead of
-  the cohort: per scenario, the share of the population each build's
-  members beat (median, min); the CMP quantiles (a_50 / a_75, strict
-  engine rule) from the population's attack; "Build 2 beats 83% of common
-  Melmetal builds in the 1v1 and wins CMP against 71%". Optional: a
-  thresholds-TOML override list for species where Michael knows what the
-  community runs (candidate 3, deferred).
-- Guards: the population must include SP1 and the rank list's #1; a test
-  that the per-scenario mirror-vs-population numbers reproduce from the
-  stored scores; the vintage stamp covers it.
+- Corpus coverage: a page shows the population block only after a re-dive.
+  The 2026-11-17 Tinkaton blobs carry `state['mirror_population']`; the
+  rest of the corpus gets it on the next (cold) bake.
+- Residue: (b) only the 1v1 scenario is printed (all nine are in
+  `population_facts`); (c) league cap only -- an L51 section keeps the
+  cohort paragraph; (d) the plot's mirror trace + caption still read the
+  cohort; (e) a thresholds-TOML override list of what the community runs
+  (candidate 3) is deferred; (f) the block is not gated on the mirror being
+  a decision cell (the cohort paragraph was), so it appears on arms that had
+  none (Melmetal GL arms 1-2) -- Michael to confirm.
 
 ## "Which one to build?" -- what is next (record: CHANGELOG 2026-09-12..22)
 
@@ -642,100 +455,12 @@ the spread-sets and builds-lattice analyses and the section's v4 (rounds
   stamping") so replay re-renders cannot drift; other test modules that read
   live rankings were not audited.
 
-## PLAN ONLY: parallelize the dive step (re-scoped 2026-09-27: <=6.9 h ceiling, memory-bound)
+## PLAN ONLY: parallelize the dive step
 
-**PLAN ONLY -- do not implement without Michael's go** (his call 2026-09-12:
-"make a plan for it, but don't implement"). Was "HIGH PRIORITY, ~13h/bake";
-the 2026-09-25 render speedups (R1-R4, R3, the sweep-side rank-1 memo
-ea32bd9) shrank the serial tail this plan targets, so the prize is now
-smaller and the memory risk is the gating question.
-
-### Measured, on the 2026-09-26/27 bake (current numbers)
-
-`docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md` "Measured" (chain
-`overnight_20260926_102139.log`, 136 dives, pmset sleep windows subtracted):
-dive step **17.9 h awake**, of which the single-core render/analysis bucket is
-**6.9 h -> serial share 39%** (6.9 / 17.9); pool sims 11.0 h. The
-2026-09-12 version of this section reported 13.4 h serial / 32% of a 41.8 h
-step, from the old marker-inheriting report, which undercounted serial time
-(on the 09-20 bake it read 15.5 h serial vs 18.6 h by per-dive attribution,
-per 1f9ba3c) -- compare absolute hours, not shares. Absolute serial time fell
-from 19.0 h (09-20, same 136 dives) to 6.9 h, and the sweep-side memo
-(ea32bd9, merged after that bake, not yet in a measured bake) should take
-roughly another 2-2.4 h off it. `run_website_dives.py:304` still launches
-each dive with a blocking `subprocess.run` in a loop -- strictly serial, no
-`--jobs` -- so during those hours 17 of 18 cores idle.
-
-The 2026-09-12 report caveats are fixed: GL + UL rows of one species no
-longer merge (3c299aa keys on species + league), and 1f9ba3c attributes
-from the per-dive ms logs with a sleep bucket instead of inheriting chain-log
-markers.
-
-### The prize
-
-Overlapping 2-3 dives fills each other's render tails. Ceiling is the serial
-bucket: 6.9 h measured; ~4.5-5 h once the ea32bd9 memo lands in a bake
-(projection, not measured), so roughly 13 h instead of 17.9 h awake --
-about a third of the "~13 h" this section claimed on 2026-09-12.
-
-### The risk: memory, not cores
-
-The 2026-09-12 plan said "0.8 GB per dive process, 64 GB machine". That is
-contradicted by two measurements: the 2026-09-25 scout saw 2.5-8.5 GB RSS per
-dive's render state, and `scripts/replay_render_diff.py`'s harness measured
-4.9-11.6 GB **peak RSS per render** (tinkaton_great 4.9, melmetal_great 4.9,
-guzzlord_great 5.5, jellicent_ultra 6.3, cramorant_ultra 11.6 GB; measured
-at `--jobs 5` on a shared machine, 2026-09-25). Three concurrent
-Cramorant-sized render tails would reach ~35 GB before the sweep pools' own
-footprint, on a 64 GB machine. Needs a measured concurrent-RSS probe and a
-lens-grid review (`docs/predive_checklist.md`, resource/concurrency lens)
-before any `--jobs` default above 1.
-
-### Implementation plan
-
-1. **Per-dive log capture (do this FIRST, it is load-bearing).** Dive stdout is
-   currently inherited straight into the chain log. Concurrent dives would
-   interleave into mush AND break `chain_status.py`, which parses that log's
-   `[N/M] slug` banners and `Done in X.X min` markers. Give each dive its own
-   file, then have the parent emit the banner lines itself.
-2. **Split `--reserve-cpus` across workers.** The chain passes
-   `--reserve-cpus 0` and `deep_dive_lib/sweep.py:833` computes
-   `min(cpu_count() - reserve, len(chunks))`, so each dive asks for all 18.
-   Three concurrent dives would ask for 54. Divide the budget by the job count
-   (18 cores / 3 jobs -> `--reserve-cpus 12` each), and note the render tail
-   uses ONE core regardless, so the ideal is oversubscribing slightly.
-3. **Add `--jobs N` to `run_website_dives.py`**, defaulting to 1 so nothing
-   changes until asked for. A small process pool over the DIVES list.
-4. **Verify cache safety before trusting it.** `put_column`'s sidecar write is
-   atomic (tmp + `os.replace`, `sweep_cache.py:208-215`) but the tmp filename
-   is FIXED (`<name>.tmp`), so two writers to the SAME column collide.
-   Concurrent dives have different focals -> different columns -> safe today.
-   Confirm that still holds for the mirror-slayer and signature-dedup paths,
-   which are the ones that write outside the plain focal column.
-5. **Do NOT touch the ML guide tail.** `run_iv_guides.py --jobs 1` is serial ON
-   PURPOSE -- it is the fix for the 2026-06-27 oversubscription bug, and its
-   preflight hard-fails when `jobs x per-guide workers > cores`. Also pointless
-   now: the whole ML tail measured **3.9 min** for 60 guides on 2026-09-12
-   (48 profiles x 60 opponents at `DEFAULT_IV_FLOOR = 12`, vs 4096 IVs x 76
-   opponents x 9 scenarios for a GL dive); 204 s on the 2026-09-26/27 bake.
-6. **Memory IS the constraint** (see "The risk" above): cap concurrency by
-   measured peak RSS, not core count; the old "0.8 GB per dive" figure is
-   wrong by 3-15x.
-
-### Measurement pitfall
-
-Counting workers by grepping `deep_dive.py` in `ps` output MISSES the forked
-pool children and reports `procs=1 cpu%=0` during sweeps -- i.e. it makes a
-saturated machine look idle. Count the process tree by ppid. (This produced a
-wrong reading on 2026-09-10 that had to be retracted.)
-
-## Re-dive runbook
-
-**Don't use `publish_website.sh` (dry run) to ask "is the site current?"** It
-regenerates guides + `index.html` on every invocation, so it rewrites the files
-it then compares by mtime; it always reports a ~18-path delta even when the
-content is identical. Compare content instead (md5 vs the live URLs, or
-`rsync --checksum`). Detail in CHANGELOG "2026-08-04".
+- **Parallelize the dive step (`--jobs N` in run_website_dives.py): PLAN
+  ONLY** -- do not implement without Michael's go (2026-09-12).
+  Memory-bound (4.9-11.6 GB peak RSS per render), ceiling <=6.9 h serial.
+  Plan + measurements: `docs/parallelize_dive_plan.md`.
 
 ## Engine bug-hunt round 2 (2026-07-02) -- open residue
 

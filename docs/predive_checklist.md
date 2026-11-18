@@ -82,6 +82,11 @@ L5-affordance, change-propagation), not just the engine math.
      **with >=2 concurrent jobs** (the oversubscription only shows with >=2)
      while watching `top -l 0 -o cpu`, and confirm the emitted count == expected
      count (no silent drop).
+   - **Measurement pitfall** (moved from TODO.md 2026-11-18): Counting workers
+     by grepping `deep_dive.py` in `ps` output MISSES the forked pool children
+     and reports `procs=1 cpu%=0` during sweeps -- i.e. it makes a saturated
+     machine look idle. Count the process tree by ppid. (This produced a wrong
+     reading on 2026-09-10 that had to be retracted.)
 
 4. **Affordance / interaction contract** (L5). Every signifier of interactivity
    must map to a real behavior, and every element that should act must signal
@@ -234,6 +239,10 @@ auditing or whether anyone remembers the lens.
 ## Added after the 2026-08-06/08 bake (the 18h sleep stall)
 
 Pre-launch triggers, run at the launch keyboard:
+
+- **Launch and watch the chain.** Launch: `direnv exec .
+  scripts/overnight_redive.sh`. Watch: `scripts/chain_status.py --chain
+  overnight` (or `watch -n 5 scripts/chain_status.py --chain overnight`).
 
 - **Charger connected for the whole bake (added 2026-09-27).** `caffeinate -is`
   holds off idle and system sleep ONLY on AC power; on battery macOS puts the

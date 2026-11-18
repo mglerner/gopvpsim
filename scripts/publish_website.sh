@@ -23,6 +23,12 @@
 #
 # Default is dry-run. Pass --push to actually send the files.
 #
+# Don't use the dry run to ask "is the site current?" It regenerates guides
+# + index.html on every invocation, so it rewrites the files it then compares
+# by mtime; it always reports a ~18-path delta even when the content is
+# identical. Compare content instead (md5 vs the live URLs, or
+# rsync --checksum). Detail in CHANGELOG "2026-08-04".
+#
 # Usage:
 #     scripts/publish_website.sh                  # dry run (safe default)
 #     scripts/publish_website.sh --push           # actually push

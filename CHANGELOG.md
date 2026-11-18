@@ -1784,6 +1784,12 @@ changes automatically (blue -> green -> gold).
   from the stored scores; each lead trigger word for word; the table
   cells; the gate test inverted to "population present -> new block,
   absent -> cohort paragraph byte-identical").
+- **Commit:** 6ad44b7.
+- **Probe (pre-decision):** a true self-mirror (same IVs and moveset, both
+  seats) scores 500 on every arm; the first note blaming the row/column AI
+  convention was wrong and is retracted. Melmetal GL 09-27 blob: Dynamic
+  Punch -> lead (b); Hyper Beam, Rock Slide, Thunderbolt -> (a) all-lose;
+  Superpower -> (a) counts. Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-09-28 -- PoGoDives sheet v8: rule R, the Surf-gulp 0v1 gate reads HP (0a1df03)
 
@@ -1843,6 +1849,11 @@ changes automatically (blue -> green -> gold).
   (v7 + v8), pending Michael's review; not re-rendered.
 - **Still open:** apply the migration, Cramorant GL re-dive, certification
   record, article re-render, publish on Michael's go.
+- **Runbook status (from TODO, 0952963):** TODO's Cramorant runbook carried
+  "post-bake verification last DONE 2026-09-28, sheet v8; the site published
+  2026-09-28". Not independently verified, and it conflicts with the "Still
+  open" line above. Runbook now in docs/cramorant_policy_plan.md "Post-bake
+  certification runbook". Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-09-28 -- DP farm-down insertion order ported to PvPoke's (engine bump)
 
@@ -1882,7 +1893,7 @@ changes automatically (blue -> green -> gold).
   (cache now at engine 4b42f9d83690, post-port). Full pre-groom text:
   TODO.md at 6c7a960.
 
-## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above)
+## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above) (60481e5; gate-off 561e7d4)
 
 - **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
   built. After the main sweeps and before the blob is dumped, each dive
@@ -1917,6 +1928,16 @@ changes automatically (blue -> green -> gold).
   every population column carries the pool's moveset, so off-meta arms read
   a moveset loss as an IV one; the cohort paragraph renders until Michael
   settles the wording (TODO "NEXT BAKE: mirror population" (g)).
+- **Hash:** engine hash unchanged (45cf73a2d23d), CACHE_VERSION unchanged;
+  `iv_sweep` gained opt-in `opp_ivs=`. A warm re-dive re-sims only the
+  population columns (~40-50 s per 5-moveset dive).
+- **Timing:** did NOT ride the 2026-09-26/27 bake (decision 2026-09-26:
+  timing bake first -- measure the sped-up render layer on its own).
+- Michael 2026-09-22: WAIT -- not worth its own bake; build first, ride the
+  next bake.
+- Decision of record now in docs/expert_verdict_plan.md "Mirror population:
+  decision of record"; open residue in TODO "Mirror population -- open
+  residue". Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-09-28 -- Aegislash first-throw quirk documented as PvPoke #10 (docs + pins, no engine change)
 
@@ -2229,6 +2250,24 @@ text: TODO.md at 6c7a960.
   unlinked, slayer 150 / 0 (docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md
   "Results"). The corrected tensors reached the site with the 2026-09-26/27
   bake and the 2026-09-27 publish.
+
+## 2026-09-22 -- Mirror cohort line cut to two sentences (3b8913e, 02293e7)
+
+- Michael (after the four previews on `mirror-line`): the cohort version is
+  NOT rendered site-wide; it reduces to "pick the highest attack you have
+  inside the build you chose" plus what that attack buys (Melmetal GL and
+  Azumarill: nothing; Melmetal UL: the fork clears both cuts with every
+  member). Block cut to two
+  sentences under the builds table; mirror_surface, decision cells,
+  cohort-rate / Spearman facts (computed, not rendered), the trace and
+  glossary terms kept for the population version.
+- The render-only CMP line against the cohort shipped first (`mirror-line`)
+  and was to be replaced by the population numbers when the bake landed
+  (it was: 2026-09-28 entries above).
+- Prototype clones removed; seeded-lattice and mirror-proto prototypes kept
+  as local branches `experiment/seeded-lattice-2026-09-17` and
+  `experiment/mirror-proto-2026-09-21`.
+- Full pre-groom text: TODO.md at 6c7a960.
 
 ## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
 

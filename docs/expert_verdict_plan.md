@@ -997,3 +997,20 @@ corpus-wide on a bar nobody has swept. The corpus sweep now counts the
 blast radius (`sweep_all_summary.md`, "Counterfactual: the necessary-gate
 bar"), so the decision is Michael's with numbers in front of it. Both pages
 name the bar their rule missed today, so nothing is hidden.
+
+## Mirror population: decision of record
+
+(Michael, 2026-09-22. Moved verbatim from TODO.md "NEXT BAKE: mirror
+population as opponent columns" on 2026-11-18. Built 2026-09-28, 60481e5;
+schema in the `scripts/deep_dive_lib/mirror_population.py` module docstring;
+history in CHANGELOG 2026-09-22 and 2026-09-28; open residue in TODO.md
+"Mirror population -- open residue".)
+
+Decision: "the mirrors I will meet" = (1) PvPoke's rank-ordered IV list for
+the focal, top N (bulk-first by construction), PLUS (2) the page's own
+builds -- each named build's most-winning member and SP1 (what our readers
+will build once the page exists). Labelled separately on the page. The
+Nash mirror-slayer cohort is NOT this (prototype 2026-09-21,
+`userdata/analysis/2026-09-21_mirror_proto/report.md`: attack-first on
+Melmetal GL, bimodal on Shadow Sableye, never converged); it stays as the
+Slayer Builds input.

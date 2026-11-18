@@ -3815,8 +3815,8 @@ def builds_table_html(arm_builds, preset, facts=None):
 # 2026-09-22_mirror_line_preview/, branch mirror-line). Against THIS cohort
 # the whole block reduces to "pick the highest attack you have inside the
 # build you already chose" plus what that attack buys, and a block over-sells
-# a one-line rule. TODO.md "NEXT BAKE: mirror population" carries the
-# decision.
+# a one-line rule. docs/expert_verdict_plan.md "Mirror population: decision
+# of record" carries the decision.
 #
 # COMPUTED AND DELIBERATELY NOT RENDERED: ``deep_dive_builds.mirror_facts``
 # still returns the per-scenario decision cells (``cells``), the per-build and
@@ -4020,8 +4020,8 @@ def _mirror_preset_html(mf, bl, facts):
             + _esc(' '.join(mirror_sentences(mf, bl, facts))) + '</p>')
 
 
-# ---- "The mirror", population version (TODO.md "NEXT BAKE: mirror
-# population") ------------------------------------------------------------
+# ---- "The mirror", population version (docs/expert_verdict_plan.md
+# "Mirror population: decision of record") --------------------------------
 # Where the blob carries ``state['mirror_population']``, the block reads it
 # INSTEAD of the cohort: per build, how the mirrors a reader will meet go in
 # one shield scenario -- wins, ties (a score of exactly 500) and losses of

@@ -5554,7 +5554,8 @@ def main():
             'cup': args.cup,
             'cup_label': cup_pretty_name(args.cup),
         }
-        # The mirror population (TODO.md "NEXT BAKE: mirror population"):
+        # The mirror population (docs/expert_verdict_plan.md "Mirror
+        # population: decision of record"):
         # needs the finished state (it reads the page's own builds off it),
         # so it runs here, after every other sweep and BEFORE the blob is
         # dumped and the page rendered. Pvpoke policy tier only, because

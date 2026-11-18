@@ -1,7 +1,7 @@
 """The MIRROR POPULATION: the focal's own species as extra opponent columns.
 
-TODO.md "NEXT BAKE: mirror population as opponent columns" is the decision
-record (Michael, 2026-09-22). "The mirrors I will meet" are:
+docs/expert_verdict_plan.md "Mirror population: decision of record" is the
+decision record (Michael, 2026-09-22). "The mirrors I will meet" are:
 
 (1) PvPoke's rank-ordered IV list for the focal, top :data:`N_RANK`
     (``gopvpsim.pokemon.iv_rank``: stat product descending, IV sum as the

@@ -168,3 +168,18 @@ edits); experiments launch once dives finish.
   rounds 1-3 show the cheap knobs leave big wins on the table.
 - Game-tree/minimax opponents (standing out-of-scope).
 - Shipping any non-default policy as a dive default.
+
+## Post-bake certification runbook
+
+(Moved from TODO.md "Cramorant -- open items" on 2026-11-18.)
+
+**Standing runbook after every bake that touches Cramorant:**
+
+    python scripts/cramorant_certify.py --league both --selftest 5 --out \
+        userdata/certify/cramorant_record.json
+    python scripts/render_pogodives_strategy_article.py --out <scratch>   # rehearse
+    python scripts/render_pogodives_strategy_article.py
+    python scripts/cramorant_certify.py --check-record userdata/certify/cramorant_record.json
+
+`publish_website.sh` runs the last check itself and refuses to publish a
+rendered Cramorant page that is missing from, or differs from, the record.

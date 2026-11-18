@@ -6892,7 +6892,8 @@ def test_real_section_mirror_paragraph_is_the_two_sentences(shadow_sableye):
     too -- not a survey of what players build."), then per setting a
     seven-row table of the mirror decision cells, three CMP paragraphs and
     three cohort-rate paragraphs -- 6.8 KB of block for a finding that is two
-    sentences long (TODO.md "NEXT BAKE: mirror population").
+    sentences long (docs/expert_verdict_plan.md "Mirror population: decision
+    of record").
 
     The cohort is still named as what it IS -- the spreads the mirror-slayer
     protocol converges on, not a census of what players own -- which is the
@@ -6919,7 +6920,8 @@ def test_real_section_mirror_drops_the_readings_it_still_computes(
     """The three readings the cut removed from the PAGE are still computed
     and still true of the blob: the per-scenario decision cells, the
     cohort-rate surface, and the Spearman between them. They are the
-    population version's inputs (TODO.md "NEXT BAKE: mirror population"), so
+    population version's inputs (docs/expert_verdict_plan.md "Mirror
+    population: decision of record"), so
     they must not be deleted -- and they must not be rendered either.
 
     Pre-cut the page carried all three: a row per decision cell ("1v1 Sableye

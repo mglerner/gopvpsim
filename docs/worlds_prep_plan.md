@@ -379,3 +379,23 @@ Post-Worlds: the section retires by removing the index card and `worlds/`
 as the record. Re-poll the Dracoviz `2026-worlds` slug as the event
 approaches; if rosters land pre-event, the candidate table gains a "brought
 to Worlds" column — usage evidence, not a re-selection.
+
+## Revival standing rules
+
+(Code dormant since 2026-09-25. Moved verbatim from TODO.md "Worlds 2026 --
+code DORMANT until 2027" on 2026-11-18. The "Old mechanics" bullet under
+"Confirmed format facts" above describes the 2026 campaign only: legacy
+mechanics are gone, see the first rule.)
+
+- **Before ANY Worlds re-render:** re-pin the gamemaster the pages were baked
+  at (`git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
+  ~/Documents/gopvpsim_cache/gamemaster.json`), restore the live blob after;
+  the render path reads live gamemaster/rankings while scores come frozen
+  from the blob. `WORLDS_RERENDER=1` is the opt-in in `publish_website.sh`;
+  `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
+  hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
+  new-mechanics bake.
+- **Standing Worlds bake/publish rules (carry into any revival):** publish
+  only on Michael's explicit per-instance go; long bakes detached and
+  run-to-completion; Worlds modules never touch the sweep cache (pinned by
+  `tests/test_worlds_bake_guards.py`); no `*_great.toml` from a Worlds bake.

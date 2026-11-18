@@ -2273,8 +2273,8 @@ def mirror_facts(ctx, frame, block, level='l50', surface=None):
     block this became on 2026-09-22 and are not printed by the two sentences
     that replaced it (see the header comment in deep_dive_which_build.py).
     They stay computed and pinned: they are the inputs the population version
-    renders (TODO.md "NEXT BAKE: mirror population"), and none of them costs
-    a sweep.
+    renders (docs/expert_verdict_plan.md "Mirror population: decision of
+    record"), and none of them costs a sweep.
 
     None -- and therefore no block at all -- unless all three hold:
 
@@ -2369,8 +2369,8 @@ def mirror_facts(ctx, frame, block, level='l50', surface=None):
 # ---------------------------------------------------------------------------
 # the mirror POPULATION -- read-only
 # ---------------------------------------------------------------------------
-# ``state['mirror_population']`` (deep_dive_lib/mirror_population.py, TODO.md
-# "NEXT BAKE: mirror population") holds the focal grid swept against the
+# ``state['mirror_population']`` (deep_dive_lib/mirror_population.py,
+# docs/expert_verdict_plan.md "Mirror population: decision of record") holds the focal grid swept against the
 # mirrors a reader will actually meet: PvPoke's top-20 IV rank list for the
 # focal (and for the other shadow form when the pool carries it), plus the
 # page's own builds' most-winning members and SP1. Unlike the cohort above it

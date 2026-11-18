@@ -83,3 +83,17 @@ steps make either event a procedure instead of a scramble.
 
 Tone reminder for anything public that comes out of either event:
 warm toward PvPoke (memory: feedback-pvpoke-tone).
+
+## C. Refreshing the local data cache
+
+(Moved from TODO.md "PvPoke sync 2026-11-17" on 2026-11-18.)
+
+**Data-cache refresh recipe** (`cp` from the local checkout; the sandbox
+proxy truncates raw.githubusercontent.com fetches). From
+`../pvpoke/src/data/` copy into `~/Documents/gopvpsim_cache/`:
+`gamemaster.json`; `rankings/all/overall/rankings-{1500,2500,10000}.json`
+as `great/ultra/master.json`;
+`rankings/mega/overall/rankings-{1500,2500,10000}.json` as
+`rankings_mega_{1500,2500,10000}.json`; `groups/championshipseries.json`
+as `group_championshipseries.json`. Sandboxed runs always need
+`GOPVPSIM_PIN_DATA_CACHE=1` (silences fetch retries).
