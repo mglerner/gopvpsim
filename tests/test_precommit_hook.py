@@ -17,6 +17,7 @@ drift.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -100,8 +101,14 @@ def test_unstaged_overcap_notes_do_not_block_unrelated_commit(clone):
 
 
 def test_deletion_only_commit_still_runs_the_gate(clone):
-    # The notes name this file, so deleting it alone must be blocked.
-    _git(clone, 'rm', '-q', 'tests/test_pvpoke_sandbox.py')
+    # Delete a test file the notes name, so the deletion alone must be
+    # blocked. Picked from the notes at run time: the hard-coded
+    # tests/test_pvpoke_sandbox.py went stale when 87d212c dropped its
+    # citation, and the commit was then caught by the dev-count gate instead.
+    notes = (clone / 'DEVELOPER_NOTES.md').read_text()
+    cited = [m for m in re.findall(r'`(tests/test_\w+\.py)[`:]', notes) if (clone / m).is_file()]
+    assert cited, 'the notes name no existing tests/*.py file; pick another target'
+    _git(clone, 'rm', '-q', cited[0])
     r = _commit(clone, 'c')
     assert r.returncode == 1 and 'DEVELOPER_NOTES drift' in r.stderr
 
