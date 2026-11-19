@@ -22,6 +22,12 @@ pure-Python `_dp_jit` fallback. The 2026-08-09 test-suite review found
 `git config core.hooksPath .githooks` documented but never run in the
 working clone.
 
+Claude memory groomed the same day (m2-m12): snapshot in
+`userdata/hygiene/memory-snapshot-20261119-*.tgz`; the WOTB v4 state note was
+deleted (every open item already lives in TODO/backlog), the pvpoke-sync note
+became "pre-bake/publish traps", and status lines that had gone stale
+(unmerged branches, unapplied migrations, July blobs) were corrected.
+
 ## 2026-11-17 -- PvPoke sync at d02018eb6: re-vet, Mega Level 4 ML fix, pools, data cache, Tinkaton re-dive (NOT published)
 
 Commits 21710cd (Morpeko bug #8 fixed upstream; audit 375/387 exact),
@@ -76,6 +82,23 @@ Re-dived (`--allow-stale-pools`, 15:12-16:03, log
 gamemaster 03e7b77024e9): GL 4,374/4,374, UL 3,618/3,618 exact; the cache
 was on but nothing was written (sandbox); never published, superseded by
 the 11-17 re-dive. New tool: `scripts/probe_page_cells.py`.
+
+## 2026-10-24/25 -- DEVELOPER_NOTES gate: seven adversarial review rounds (moved from Claude memory 2026-11-19)
+
+`scripts/verify_dev_notes.py` became a pre-commit gate (b1f054e) after the
+notes were trimmed from 118k to ~51.9k chars (daf5175, 87589c5). Seven
+adversarial rounds hardened the hook: f88e230 (r1), 2ea85fd (r2), 85cd008
+(r3), 2154319 (r4), ded70aa (r5), 7b70e1f (r6), 9ce51bd (r7). Real silent
+passes found: working tree read instead of index; bare `python`; SIGPIPE on
+`grep -q`; argparse exit 2 vs drift; derivation failures read as drift; a
+pytest collection error accepted as a count; `::` chain split by whitespace;
+a literal `authored_by = "ai"` grep; C-quoted staged names; renamed-out test
+files; clean merges; orphan sentinel openers; crash = pass in the step-1
+snippet. Stopped at round 7 on purpose: its findings were edge cases of
+rounds 5-6's own additions and the fix was becoming a CommonMark parser, so
+the input was constrained instead (the single-backtick dialect rule). Tests:
+`tests/test_verify_dev_notes.py`, `tests/test_verify_dev_counts_update.py`,
+`tests/test_precommit_hook.py`.
 
 ## 2026-10-25 -- Minior UL dives rendered locally (both forms, no one-move pages); UL shell level found unpinned in-game; NOT published
 

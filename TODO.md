@@ -8,12 +8,8 @@ detail lives in the sections below.
 
 - First hygiene groom done (2f2e785..close-out): TODO 89,491 -> ~30k chars,
   cap now 45,000 (`.hygiene.toml`). Over the cap: close or park, don't raise.
-- CLAUDE.md groom b-i done 2026-11-19 (CHANGELOG). Awaiting Michael's
-  yes/no per item on the memory follow-ups (snapshot first to userdata/hygiene/memory-snapshot-*.tgz, OK?):
-  m2-m4 strip repo status from Minior/Cramorant/pvpoke-sync; m5 delete
-  wotb-v4-state; m6 DN-cap gate history -> CHANGELOG; m7-m10 fix stale
-  lines (Aegislash "unmerged", statfx "applied", sandbox-fidelity branch,
-  cluster "16/17"); m12 shorten MEMORY.md lines to <=150, drop "1.4h sims".
+- Groom follow-ups done 2026-11-19: CLAUDE.md b-i and memory m2-m12
+  (CHANGELOG 2026-11-19).
 - `opponent_pools/master_top60.txt:5` cites TODO "Reproducibility" (now in
   docs/TODO_backlog.md; pool file is data, left alone). Agent worktree
   .claude/worktrees/agent-ab8b90f5b273c7934 has an uncommitted edit to
