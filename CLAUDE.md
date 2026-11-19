@@ -279,8 +279,8 @@ Always finish current fast move before throwing a charge move (don't waste turns
 Charge move timing policy is pluggable.
 
 ## Baiting
-Start with fixed heuristic (throw cheap move first). Later: EV-based baiting
-parameterized by opponent shield probability.
+Baiting follows PvPoke's `pvpoke_dp` bait logic (`bait_shields` toggle).
+EV-based baiting: `docs/TODO_backlog.md`.
 
 ## Shielding
 Pluggable policy. Simulate all nine shield scenarios (0-2 x 0-2).
