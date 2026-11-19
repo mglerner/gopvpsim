@@ -245,24 +245,9 @@ affected set from the delta (DEVELOPER_NOTES "Sweep disk cache").
 `docs/predive_checklist.md`** (it carries a ready-to-paste prompt). The cold
 bake ties up the machine for hours; an engine/operational bug found *after* it
 starts costs a *second* multi-hour bake, so this is a gate, not a courtesy.
-
-The DRY principle (why the checklist exists):
-
-> Scope the assessment as a **{system-layer} x {failure-lens} grid**, each lens
-> carrying its own near-mechanical trigger (a git/grep/dry-run command) — NOT as
-> a walk of the files you happen to read. The costly bugs hide in the cells no
-> one's eyes land on: the layer that *runs* rather than renders (orchestration,
-> cache), and the lens that asks *"does it survive / does it act?"* rather than
-> *"is the number right?"* (resource/concurrency, affordance, change-propagation,
-> input-freshness).
-
-This was learned the hard way (2026-06-27): a thorough but *location*-oriented
-assessment ("look at the engine / the artifacts") missed an ML-oversubscription
-bug (orchestration layer) and a dead `(+N more)` UI affordance (rendered layer)
-because no probe was positioned in those grid cells. Two lenses are now baked
-into code as guards that can't silently regress: `run_iv_guides.py`'s
-concurrency preflight and `verify_overnight.py`'s ML-completeness check. See the
-checklist for the full grid, triggers, and the remaining TODO hardening.
+Two lenses are baked into code as guards: `run_iv_guides.py`'s concurrency
+preflight and `verify_overnight.py`'s ML-completeness check. The principle,
+the grid, its triggers and the story behind it live in the checklist.
 
 ## Key design decisions
 - Core `gopvpsim/` library is pure Python (keeps mobile option open).
