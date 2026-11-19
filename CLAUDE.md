@@ -410,15 +410,10 @@ automatically after Edit/Write/MultiEdit. To format manually: `python
 scripts/format_md.py [FILE ...]` (no args = walk the whole repo). The script is
 idempotent.
 
-This formatter was promoted to a general dotfiles tool: the canonical copy now
-lives at `~/coding/dotfiles/scripts/format_md.py` (symlinked to
-`~/.local/bin/format-md.py`) and runs on *every* repo via a global Claude
-`PostToolUse` hook in `~/.claude/settings.json`. This project keeps its **own**
-vendored copy + project hook on purpose, so it stays self-contained and its
-tests pass standalone — meaning `.md` edits here get formatted twice
-(idempotent, harmless). The two copies are intentional duplicates: if you change
-the formatter in either place, port the change to the other (the dotfiles copy
-uses a `python3` shebang; otherwise they're identical).
+A canonical copy lives at `~/coding/dotfiles/scripts/format_md.py` (global
+hook). This vendored copy is a deliberate duplicate so the repo stays
+self-contained: port any formatter change to the other copy (they differ only
+in the shebang).
 
 ## Ship-mode narrative policy
 Files under `articles/` and `thresholds/` render into public-facing
