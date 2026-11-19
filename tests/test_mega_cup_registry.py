@@ -85,19 +85,23 @@ def test_supermegas_get_three_charged_moves_through_the_real_path():
 
 
 def test_gl_excludes_are_honoured_upstream():
-    """Five species are banned at 1500 only; recorded so a roster build knows.
+    """The mega cup has NO 1500-only bans upstream since pvpoke 2ad2682e6.
 
-    Asserted against the gamemaster rather than a hand list, so it tracks
-    upstream. This is a fact-pin, not a behaviour test -- we do not yet build
-    mega rosters, and whoever does must apply it.
+    Until then five species were banned at 1500 only (groudon_primal,
+    kyogre_primal, mewtwo_mega_x, mewtwo_mega_y, rayquaza_mega; pvpoke
+    46bd08a77..e02bde78d). Asserted against the gamemaster rather than a hand
+    list, so it tracks upstream. This is a fact-pin, not a behaviour test --
+    we do not yet build mega rosters, and whoever does must re-read it.
     """
     cups = [c for c in load_gamemaster().get('cups', []) if c.get('name') == 'mega']
     assert len(cups) == 1, cups
     excl = cups[0].get('exclude') or []
     banned = {v for e in excl if 1500 in (e.get('leagues') or [])
               for v in (e.get('values') or [])}
-    assert 'mewtwo_mega_x' in banned and 'mewtwo_mega_y' in banned, banned
-    assert len(banned) >= 5, banned
+    assert banned == set(), banned
+    # Positive control: the field still exists (an upstream rename would make
+    # the empty set above pass trivially).
+    assert 'exclude' in cups[0], cups[0]
 
 
 def test_mega_editions_are_reported_live_not_archived():
