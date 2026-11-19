@@ -11,25 +11,19 @@ detail lives in the sections below.
 - Groom follow-ups done 2026-11-19: CLAUDE.md b-i and memory m2-m12
   (CHANGELOG 2026-11-19).
 - History rewritten 2026-11-19 (gopvpsim, gobattlekit, claude-memory) to
-  drop a contributor's handles; CHANGELOG 2026-11-19. Rollback mirrors sit
-  in that session's scratchpad: DELETE them next session (they still hold
-  the handles). Salvaged unreachable objects:
+  drop a contributor's handles; CHANGELOG 2026-11-19. Rollback mirrors
+  deleted the same day. Salvaged unreachable objects:
   `userdata/hygiene/unreachable-archive-20261119/` (skim or delete).
 - `opponent_pools/master_top60.txt:5` cites TODO "Reproducibility" (now in
   docs/TODO_backlog.md; pool file is data, left alone). The CPM 52.5-55
   experiment from the removed agent worktree is saved as
   `userdata/hygiene/agent-worktree-cpm-52.5-55.patch` (TODO "Minior").
-- 18 slow-tier tests in tests/test_which_build_section.py fail at HEAD and
-  ALL pass against the 09-27 data vintage (pvpoke `e87448291`): the brief
-  reads rankings + gamemaster live by design, so blob-pinned numbers drift
-  with every data refresh. Michael's call: re-pin to 11-17 data, or have
-  these tests load the blob's own data vintage from ../pvpoke git.
-- Fast tier (2026-11-19): 3 pins re-pinned to upstream data (f16a85b,
-  b245471, 6613b4b). Note Cramorant's PvPoke GL default is now Peck / Surf +
-  Fly (was Dive + Fly; UL unchanged) -- relevant to the Cramorant re-dive.
-  Still red, expected: pool containment (pages predate the 11-17 pools;
-  clears at the next bake); test_ml_guide_progress fails only in the
-  sandbox (`ps` blocked).
+- Tests (2026-11-19, CHANGELOG): blob-pinned which-build tests now run on
+  pvpoke `e87448291` data. Cramorant's PvPoke GL default is now Peck / Surf +
+  Fly (UL unchanged); Michael accepted it as the GL page default at the next
+  bake. Still red, expected: pool containment (pages predate the 11-17
+  pools; clears at the next bake); test_ml_guide_progress fails only in
+  the sandbox (`ps` blocked).
 - Publishing waits on Michael's go: Tinkaton GL + UL and the Minior pages
   are local only ("PvPoke sync 2026-11-17", "Minior -- open items"); a
   Cramorant UL re-dive is owed before any Cramorant publish.

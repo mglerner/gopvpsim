@@ -2,6 +2,20 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-11-19 -- Blob-pinned which-build tests run on fixed PvPoke data
+
+20 `local_artifacts` tests (18 in `test_which_build_section.py`, 2 in
+`test_wotb_v4_{dry,round10}.py`) went red after the 11-17 data refresh with
+no renderer change: `deep_dive_which_build.prepare` reads rankings and the
+gamemaster live by design, so numbers pinned from old replay blobs moved
+("55 of 87" -> "53 of 85"). All 20 pass on the 09-27 data. Fix (`8382141`):
+`conftest.pin_data_vintage(commit)` rebuilds the data cache from ../pvpoke
+git for a module; the three modules pin `e87448291`; without ../pvpoke the
+blob tests skip with a reason. Also on 11-19: three fast-tier fact pins
+followed upstream data (`f16a85b` Cramorant GL default now Peck / Surf + Fly,
+accepted as the page default at the next bake; `b245471` mega cup lost its
+1500 bans; `6613b4b` Mega Sableye is now supermega).
+
 ## 2026-11-19 -- History rewritten to remove a contributor's handles (they asked to stay anonymous)
 
 `git filter-repo` replaced both of the contributor's handles in every blob,
