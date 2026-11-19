@@ -2,6 +2,25 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-11-19 -- History rewritten to remove a contributor's handles (they asked to stay anonymous)
+
+`git filter-repo` replaced both of the contributor's handles in every blob,
+commit message and file path (two `docs/validations/2026-05_guide_reviews/`
+files renamed), then force-pushed `main` (with a lease on the old tip). Nearly
+every commit SHA changed; one commit that only fixed the handle's spelling
+became empty and was dropped. HEAD's tree was unchanged, so the engine and
+slayer cache stamps did not move (`a6dffb536332` / `1294f3bbff20`). The SHA
+citations in tracked files were remapped old -> new (662 in 111 files,
+hex-only, commit `d0e0389`), except two left stale on purpose in
+hash-stamped files (`scripts/deep_dive_signature.py`,
+`scripts/deep_dive_slayer.py`). Citations elsewhere were remapped too: Claude
+memory (33), the reports repo (152) and gobattlekit (1). gobattlekit and
+claude-memory got the same history rewrite. **Still on old SHAs:** gitignored
+artifacts (replay blobs, `vintage.toml`, logs) and anything already published.
+Any other clone must be re-cloned, not pulled. Local unreachable garbage was
+pruned (`.git` 796M -> 24M; reachable objects unchanged, `fsck` clean). The
+local experiment branches were rewritten as well.
+
 ## 2026-11-19 -- CLAUDE.md groom: history moved here (items b-i)
 
 Test-suite timing history (was in CLAUDE.md "Testing"): fast tier "~36s"
