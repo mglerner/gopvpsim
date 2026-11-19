@@ -12,11 +12,11 @@ directions, including a shipped winner flip against us.
 Groups A and B are the ACCEPTANCE test of the fix: after the freeze these must
 equal the PvPoke oracle exactly. Group C pins the ONE dpe site kept
 intentionally FRESH (the don't-bait dpeRatio carve-out). Group D pins the
-separate OMT ``turns_planned`` divisor fix (0acdc8e), which also matches the
+separate OMT ``turns_planned`` divisor fix (06cbe77), which also matches the
 oracle now.
 
 The A/B/D values were RE-DERIVED 2026-09-09 under the new turn system
-(c01aa6a, which names the cells it trace-verified against PvPoke master; the
+(964691a, which names the cells it trace-verified against PvPoke master; the
 rest were re-pinned on that sample plus the engine-wide oracle agreement).
 Per-cell comments that quote a pre-freeze or legacy number say so.
 
@@ -84,7 +84,7 @@ FLORGES_GL = ('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], 'g
     (ORANGURU, ORTHWORM, 2, 0, 441),
     # 6: Wigglytuff L27 vs Florges L16, 1-1 (was ours-better +56 under
     #    legacy, where the freeze matched oracle 576). Re-derived 2026-09-09:
-    #    476, trace-verified against PvPoke master in c01aa6a.
+    #    476, trace-verified against PvPoke master in 964691a.
     (WIGGLY, FLORGES_GL, 1, 1, 476),
 ])
 def test_group_a_zeroguard_matches_oracle(focal, opp, sf, so, oracle):
@@ -170,5 +170,5 @@ def test_group_d11_omt_divisor_matches_oracle():
     # floating Mud Slap (+24); we used to divide by cheapest-affordable (35e)
     # and fire 3 turns early (ours 280). After the divisor fix: 304 == oracle
     # under legacy. Re-derived 2026-09-09 (new turn system): 320,
-    # trace-verified against PvPoke master in c01aa6a.
+    # trace-verified against PvPoke master in 964691a.
     assert _score0(OINK_F, FORRE_S, 0, 1) == 320

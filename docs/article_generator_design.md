@@ -154,7 +154,7 @@ can spot at a glance which sections are real vs. stubbed.
 
 Modes are specified in `docs/article_schema.md` "Authorship modes"
 (origin: the former TODO "Python article generator — optional
-augmentation path", shipped and removed from TODO in 90a48e9).
+augmentation path", shipped and removed from TODO in 8eb35f2).
 The `authorship` field on `articles/<slug>.toml` selects how the
 override TOML interacts with generator output:
 

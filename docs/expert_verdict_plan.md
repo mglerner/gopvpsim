@@ -1001,7 +1001,7 @@ name the bar their rule missed today, so nothing is hidden.
 ## Mirror population: decision of record
 
 (Michael, 2026-09-22. Moved verbatim from TODO.md "NEXT BAKE: mirror
-population as opponent columns" on 2026-11-18. Built 2026-09-28, 60481e5;
+population as opponent columns" on 2026-11-18. Built 2026-09-28, e83a834;
 schema in the `scripts/deep_dive_lib/mirror_population.py` module docstring;
 history in CHANGELOG 2026-09-22 and 2026-09-28; open residue in TODO.md
 "Mirror population -- open residue".)

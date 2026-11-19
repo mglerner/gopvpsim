@@ -166,7 +166,7 @@ of the slice's -2.
   diffs are `unlisted: None -> True` on the two Gulp Missiles -- a display
   flag, not a sim input.
 * **Pool composition.** Re-running the whole UL 0v1 slice against the pool as
-  it stood at 83b8929 (2026-06-25, 67 opponents, pre-dating the August
+  it stood at 20bf88a (2026-06-25, 67 opponents, pre-dating the August
   campaign) gives the SAME -2, and the same two Dondozo cells.
 
 So it was there in August, under the old pool, the old moves and the legacy

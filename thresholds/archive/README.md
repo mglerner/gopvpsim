@@ -76,7 +76,7 @@ Each archived file carries this in its own header, repeated here:
 | pvpoke commit   | `79d04af74` (last vetted pre-rebalance)                      |
 | turn system     | **legacy** — the live game stopped running it on 2026-09-02  |
 | gamemaster      | `cd ~/coding/pvpoke && git show 79d04af74:src/data/gamemaster.json` |
-| our engine      | repo `fba4d4c`; engine-hash files are `battle.py`, `_dp_jit.py`, `moves.py`, `formchange.py`, `pokemon.py` |
+| our engine      | repo `86a3587`; engine-hash files are `battle.py`, `_dp_jit.py`, `moves.py`, `formchange.py`, `pokemon.py` |
 
 The turn system is the easy one to miss. These came from community in-game
 testing under the **legacy** clock, so re-deriving one needs both the old

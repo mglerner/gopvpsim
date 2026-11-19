@@ -14,7 +14,7 @@ to both tiers.
 ## Headline
 
 - **The strat's margins did not move.** Lab grid at today's engine vs the
-  pre-port engine (`87e73e3`, worktree): 0 of 2,430 PoGoDives-tier cells
+  pre-port engine (`de229f0`, worktree): 0 of 2,430 PoGoDives-tier cells
   changed; 2 plain-tier cells changed, both UL Cramorant vs Dusknoir 1v2
   (470 -> 487, bait and nobait), and headless PvPoke reads 487. Net vs
   plain is +76 on both engines.
@@ -51,7 +51,7 @@ to both tiers.
    single-spread cost, not an exception; `2026-09-12_cramorant_deep_vet.md`);
    UL 2v1 0 / 0.000 (exempt since 2026-09-10; it read -1.325 then). Same
    picture as the 2026-09-10 run.
-3. The same lab at the pre-port commit (`git worktree add ... 87e73e3`,
+3. The same lab at the pre-port commit (`git worktree add ... de229f0`,
    `PYTHONPATH` on its `src`): identical totals; per-cell diff above.
 4. `cramorant_mini_sweep.py --check-tensor --stride 13`, both leagues,
    `index.html`, all nine scenarios, PvPoke-IV opponents, bait
@@ -132,6 +132,6 @@ predicate as a whole still needs its proof.
   Rank-1-IV and nobait slices, and the other opponents on the four
   non-default UL pages, were not re-simmed; the re-dive makes them right
   regardless.
-- Pre-port means `87e73e3`; the pre-port lab numbers are not the 09-28
+- Pre-port means `de229f0`; the pre-port lab numbers are not the 09-28
   bake's engine (`4b42f9d83690`) but the last commit before the port, which
   is the delta this check is about.

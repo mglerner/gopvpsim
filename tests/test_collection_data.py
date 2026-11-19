@@ -3,7 +3,7 @@
 `DATA.collection.maxLevel` is what the in-page IV scanner feeds into
 `ivsToStatsAtCap` / `matchMons` (`deep_dive_engine.js`), so a re-hardcode
 to a bare 51.0 silently shows GL/UL owned mons one level too high -- the
-bug fixed by `9f55e38` and never pinned since. Design:
+bug fixed by `e827e12` and never pinned since. Design:
 `docs/reviews/2026-06-28_iv_scanner_maxlevel_strong_pin_design.md`
 (Option 1: `build_collection_data()` extracted from
 `generate_interactive_html` so this is a fast unit test, not a render).
@@ -40,7 +40,7 @@ def test_collection_maxlevel_is_league_capped_all_leagues():
     """maxLevel == the league's ceiling for EVERY league, not a constant.
 
     Great/Ultra cap at 50.0 and Little/Master at 51.0, so a re-hardcode to
-    51.0 (the pre-`9f55e38` value) fails the great/ultra legs, and a
+    51.0 (the pre-`e827e12` value) fails the great/ultra legs, and a
     hardcode to 50.0 fails the little/master legs.
     """
     # The pin is only as strong as the table's spread: assert up front that

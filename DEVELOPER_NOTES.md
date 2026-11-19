@@ -11,7 +11,7 @@ here. An entry is: the RULE the code obeys, the PIN that fails if it stops
 ref into the four tripwire engine files is as of the latest re-vetting-log
 pin; UI-file refs always carry one), and a CHANGELOG pointer for the story
 -- never the story. Pre-trim text:
-`git show 0829b5a:DEVELOPER_NOTES.md`; archive: CHANGELOG "DEVELOPER_NOTES
+`git show 07ed2a1:DEVELOPER_NOTES.md`; archive: CHANGELOG "DEVELOPER_NOTES
 trimmed to its read-whole cap". -->
 
 # Developer Notes
@@ -65,7 +65,7 @@ the cell-count progression is in CHANGELOG.
 ## Turn model: `mechanics='new'` (2026-06-23 PvP turn system; default since 2026-09-09)
 
 `simulate(...)` takes `mechanics='legacy'|'new'` (default `'new'`,
-`7e6a82b`); `'new'` implements the in-game PvP turn changes
+`143f3d9`); `'new'` implements the in-game PvP turn changes
 (spec: pokemongo.com/news/pvp-updates2026). `--mechanics` on
 `scripts/battle.py` and `scripts/deep_dive.py` defaults to `new`, as does
 `deep_dive_slayer.SLAYER_DEFAULT_MECHANICS` (pinned to the engine's default
@@ -76,7 +76,7 @@ and the pytest suite run at the default. Both disk caches key on `mechanics`
 (a field only for non-legacy values).
 
 `'legacy'` is retired: `simulate()` raises `ValueError` unless
-`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`2615c6e`; `conftest.py` opts a
+`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`cc87298`; `conftest.py` opts a
 few tests in), kept only so the port-fidelity history stays runnable; every
 `'new'` behavior sits behind an explicit `if mechanics == 'new':` branch.
 (History: CHANGELOG.)
@@ -88,7 +88,7 @@ results together, so a higher-CMP fast cannot pre-empt a same-turn fast.
 **5** (charged attacks resolve BEFORE fast-attack damage, buffs included) --
 modeled: in `new` mode charged actions resolve at step 2.5 of the SAME turn,
 ahead of the step-3 fast landings. The live game's order is a priority
-ordering WITHIN a turn (swaps > charged > fast; `f1ff911`,
+ordering WITHIN a turn (swaps > charged > fast; `efd6574`,
 `docs/validations/2026-09-03_new_turn_system_ground_truth.md`). **3** and
 **4** (swaps) -- NOT MODELED: the 1v1 core never switches; documented, not
 faked.
@@ -127,10 +127,10 @@ Canonical benchmark (single-process, ~10s, Annihilape mirror):
 python scripts/profile_slayer.py --n-focal 60 --n-opp 20
 ```
 
-**Current baseline: 5,800 sims/s** at `6f99b08` (engine `5a813036625c`,
+**Current baseline: 5,800 sims/s** at `2932e8d` (engine `5a813036625c`,
 2026-09-25), new turn system, post-2026-09-09 gamemaster, warm JIT cache
 (the first run after an engine edit pays ~1-2 s compile). NOT re-measured
-after the later engine edits (Minior / class A, Mega Level 4 `115538f`) --
+after the later engine edits (Minior / class A, Mega Level 4 `cc80efb`) --
 run it before the next bake and record the number here. The earlier rows
 (2026-04..06, in CHANGELOG) are NOT comparable: gamemaster data changes
 shift battle lengths and therefore sims/s, so after a rankings/gamemaster
@@ -274,7 +274,7 @@ old values. `data.py` reads it through a FUNCTION-level import
 (`data._league`) because `pokemon` imports `data` at module scope. Little
 League has no open PvPoke rankings, so `data.load_rankings('little')` fails
 loudly; `load_cup_rankings` is the way in. The JS user-collection fallback
-tables carry the `little` row too (`d59e801`), pinned by whole-table
+tables carry the `little` row too (`9253bd9`), pinned by whole-table
 equality in `tests/test_js_shadow_constants.py`.
 
 ## PvPoke bugs found
@@ -296,7 +296,7 @@ is moot (ported), all in `docs/pvpoke_bug_reports.md`.
 `.oppHealth` and `.oppShields`, but the dominance checks reference `.hp` and
 `.shields` (undefined in JS -> always false -> dead code). We replicate the
 dead-code behavior (no pruning; the `intended_pruning` toggle is gone,
-`1558e31`).
+`efcc01a`).
 
 ### 2. bestChargedMove not recomputed on opponent form change
 

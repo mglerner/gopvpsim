@@ -4,7 +4,7 @@ The deep-dive sweep/slayer workers construct BattlePokemon from raw
 effective stats and historically never wired up form-change state, so
 every Aegislash/Mimikyu/Morpeko dive simmed without form mechanics
 (CHANGELOG 2026-06-10 "Form-change plumbing in dive workers", fix
-eae7293). These tests pin
+36f829d). These tests pin
 the fix: worker-path sims of Aegislash (Shield) must produce the same
 scores as direct BattlePokemon.from_pokemon sims of the identical
 matchups (the oracle-verified path), on both the focal and opponent
@@ -299,7 +299,7 @@ def test_the_slayer_default_mechanics_tracks_the_engine():
     ``slayer_worker_init``'s kwarg, ``slayer_iter_worker``'s
     ``ws.get('mechanics', ...)`` and ``iterative_slayer_discovery``'s kwarg
     -- while ``simulate``'s default had been ``'new'`` since 2026-09-09
-    (7e6a82b). Both product call sites pass ``args.mechanics``, so no
+    (143f3d9). Both product call sites pass ``args.mechanics``, so no
     shipped page ran on the wrong clock; a caller that omitted it did.
     """
     import inspect

@@ -141,7 +141,7 @@ wanted.
 
 ### Season-start regen triage (from TODO)
 
-(Copied verbatim from TODO.md "Article regen triage" as of 6c7a960. The
+(Copied verbatim from TODO.md "Article regen triage" as of b2df247. The
 counts are as of 2026-08-31; on 2026-11-18 there are 61 rendered dirs, 60
 of them `*-ml-iv-guide`.)
 

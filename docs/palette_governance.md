@@ -151,7 +151,7 @@ When you revalue one of an alias group, revalue ALL of it, or the
 alias-equal tokens stay equal is a good guard; see section 8.)
 
 **Accepted same-canvas aliasing (Michael, 2026-08-08, plotly sign-off):**
-the plotly shim (8da55c4) moved the anchor-overlay ring to
+the plotly shim (7fc22b4) moved the anchor-overlay ring to
 `--cat-anchors` (== `--tier-1`, byte-identical all four themes) and the
 slayer-overlay gold to `--notable` (~1.1:1 from `--tier-8`). In the
 scatter's default threshold color mode both overlays can therefore draw
@@ -178,7 +178,7 @@ The palette has TWO live consumers, and both must move together:
 
 1. CSS tokens: `var(--token)` resolved by the browser from the
    `theme_css()` blocks. This is the primary surface.
-2. The Plotly `getComputedStyle` shim (LANDED, commit 8da55c4 --
+2. The Plotly `getComputedStyle` shim (LANDED, commit 7fc22b4 --
    this paragraph described it as a plan until then): Plotly markers
    cannot read CSS variables directly, so `deep_dive_engine.js`
    resolves them itself. `themeColor('--tier-1')` calls

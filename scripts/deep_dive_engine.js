@@ -3053,7 +3053,7 @@ var summarySort = { col: 'yrank', dir: 'asc' };
 // currentYLabel at render time since the Y-axis metric is dynamic).
 //
 // 'mirrorCmp' and the three per-shield Δ columns are the
-// XL-candy-decision helpers (shipped 2026-04-22, 3085f92; CHANGELOG
+// XL-candy-decision helpers (shipped 2026-04-22, 3f97ed4; CHANGELOG
 // 2026-04-22 "Mirror CMP % semantic reframe"; the per-shield delta
 // columns came from the former TODO "Personal-collection decision tool
 // follow-ups"). mirrorCmp is
@@ -4452,7 +4452,7 @@ function _mcRenderRoot(root) {
         // exact coordinates of a gl cluster point loses the hover contest
         // (verified live during review: 3/24 stars hovered as the wrong
         // spread) - same mechanism as the main plot's user overlay, same
-        // fix (c0e782d precedent).
+        // fix (c74e2d3 precedent).
         var ymin = Infinity, ymax = -Infinity;
         for (var yi = 0; yi < n; yi++) {
           if (ys[yi] < ymin) ymin = ys[yi];

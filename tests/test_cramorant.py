@@ -16,7 +16,7 @@ Rankings" + the commit):
   opposing Gulp Missile.
 
 FAILING-FIRST RECORD (testing policy): against the pre-port tree
-(HEAD 6a7e534), every test in this file dies in collection-to-setup with
+(HEAD cf452d9), every test in this file dies in collection-to-setup with
 ``KeyError: 'variable'`` from formchange.build_form_change_state:204 --
 base Cramorant's gamemaster ``alternativeFormId: "variable"`` was
 unresolvable, so no Cramorant BattlePokemon could be constructed at all.

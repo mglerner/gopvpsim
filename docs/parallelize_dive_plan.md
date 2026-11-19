@@ -10,7 +10,7 @@ pointer fixes noted inline. The "Measurement pitfall" subsection moved to
 **PLAN ONLY -- do not implement without Michael's go** (his call 2026-09-12:
 "make a plan for it, but don't implement"). Was "HIGH PRIORITY, ~13h/bake";
 the 2026-09-25 render speedups (R1-R4, R3, the sweep-side rank-1 memo
-ea32bd9) shrank the serial tail this plan targets, so the prize is now
+c4083f1) shrank the serial tail this plan targets, so the prize is now
 smaller and the memory risk is the gating question.
 
 ## Measured, on the 2026-09-26/27 bake (current numbers)
@@ -22,27 +22,27 @@ dive step **17.9 h awake**, of which the single-core render/analysis bucket is
 2026-09-12 version of this section reported 13.4 h serial / 32% of a 41.8 h
 step, from the old marker-inheriting report, which undercounted serial time
 (on the 09-20 bake it read 15.5 h serial vs 18.6 h by per-dive attribution,
-per 1f9ba3c) -- compare absolute hours, not shares. Absolute serial time fell
+per c0f1037) -- compare absolute hours, not shares. Absolute serial time fell
 from 19.0 h (09-20, same 136 dives) to 6.9 h, and the sweep-side memo
-(ea32bd9, merged after that bake, not yet in a measured bake) should take
+(c4083f1, merged after that bake, not yet in a measured bake) should take
 roughly another 2-2.4 h off it. `run_website_dives.py:304` still launches
 each dive with a blocking `subprocess.run` in a loop -- strictly serial, no
 `--jobs` -- so during those hours 17 of 18 cores idle.
 
 (Note 2026-11-18: the 2-2.4 h saving is still a projection. The 2026-09-27/28
-GL-only re-dive ran after ea32bd9 -- 76 dives in 209 min, CHANGELOG
+GL-only re-dive ran after c4083f1 -- 76 dives in 209 min, CHANGELOG
 "2026-09-27/28 -- Great League re-dive" -- but was not serial/parallel
 attributed.)
 
 The 2026-09-12 report caveats are fixed: GL + UL rows of one species no
-longer merge (3c299aa keys on species + league), and 1f9ba3c attributes
+longer merge (ac2d7e1 keys on species + league), and c0f1037 attributes
 from the per-dive ms logs with a sleep bucket instead of inheriting chain-log
 markers.
 
 ## The prize
 
 Overlapping 2-3 dives fills each other's render tails. Ceiling is the serial
-bucket: 6.9 h measured; ~4.5-5 h once the ea32bd9 memo lands in a bake
+bucket: 6.9 h measured; ~4.5-5 h once the c4083f1 memo lands in a bake
 (projection, not measured), so roughly 13 h instead of 17.9 h awake --
 about a third of the "~13 h" this section claimed on 2026-09-12.
 

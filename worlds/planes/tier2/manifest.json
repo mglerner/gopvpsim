@@ -25443,7 +25443,7 @@
  "stamp_bless": {
   "date": "2026-08-10",
   "from": "ee5c175f65ae",
-  "reason": "producer-stamp narrowing (worker moved verbatim to worlds_tier2_worker.py; driver loop excluded from hash; commit cdba48c)",
+  "reason": "producer-stamp narrowing (worker moved verbatim to worlds_tier2_worker.py; driver loop excluded from hash; commit 71f1f9a)",
   "to": "c8cdc65ff46b"
  },
  "tier2_code": "c8cdc65ff46b"

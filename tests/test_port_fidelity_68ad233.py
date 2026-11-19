@@ -1,5 +1,5 @@
 """Regression tests pinning the two PvPoke port-fidelity micro-fixes shipped in
-commit 68ad233 (2026-06-27): the bandaid[910] defer-self-debuff INDEX and the
+commit 342c859 (2026-06-27): the bandaid[910] defer-self-debuff INDEX and the
 buffApplyChance float() coercion (two code sites). Both rode the 2026-06-28 cold
 re-dive with no dedicated test; a "simplify" pass could silently revert either.
 

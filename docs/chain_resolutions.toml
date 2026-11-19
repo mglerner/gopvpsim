@@ -23,14 +23,14 @@
 [[resolution]]
 chain_log = "overnight_20260706_204813.log"
 step = "Running article link verification"
-fix_commit = "73747e6"
+fix_commit = "a2b6698"
 resolved_on = "2026-08-04"
 reason = """\
 The bake ran on a fresh laptop, where userdata/website/guides/ did not exist \
 yet -- the Reader's Guides are a build product and userdata/ is gitignored. \
 Every dive page hardcodes ~5 links into that tree, so link-verify reported \
 1580 dangling hrefs, all of the form '../guides/...'. No dive output was \
-wrong; the link target was simply absent. 73747e6 added chain step 7c \
+wrong; the link target was simply absent. a2b6698 added chain step 7c \
 (build_guides.py), which builds the tree after the dives and before \
 index+link-verify, so the chain is now self-sufficient on a fresh machine. \
 The guides were built by hand at 22:28 the same evening, but the gate was \
@@ -48,7 +48,7 @@ all HTTP 200).\
 [[resolution]]
 chain_log = "overnight_20260920_164044.log"
 step = "Which one to build?: omitted"
-fix_commit = "aaffd3f + 5873cd1"
+fix_commit = "134f6f5 + e585519"
 resolved_on = "2026-09-22"
 reason = """\
 Arm 6 of shadow-alolan-ninetales-ultra-league raised G-recompute on a Floor \
@@ -59,8 +59,8 @@ RIGHT. group_rungs gives a rung the kind of its STRONGEST cell, so the merged \
 rung at T=181.784877804 held two exact cells plus the mirror 2v2 against the \
 non-shadow form -- a one-sided gate there (n_wrong=25, no clean cut at any \
 value) that 25 of the floor's 1235 clearers lose -- and the export shipped all \
-three under the exact-only "also buys" claim. aaffd3f filters a merged rung's \
-cells to the ones it partitions; 5873cd1 makes the degrade per arm, so one \
+three under the exact-only "also buys" claim. 134f6f5 filters a merged rung's \
+cells to the ones it partitions; e585519 makes the degrade per arm, so one \
 arm's guard failure can no longer take six healthy arms' sections with it.\
 """
 verified = """\
@@ -80,7 +80,7 @@ tests/test_which_build_section.py (the per-arm degrade).\
 [[resolution]]
 chain_log = "overnight_20260920_164044.log"
 step = "Running ship gates (roster: run_ship_gates.py)"
-fix_commit = "2ed4539"
+fix_commit = "2c787c0"
 resolved_on = "2026-09-22"
 reason = """\
 One gate, one test: verify_tests.py failed on \
@@ -91,7 +91,7 @@ top tier (Corviknight GL, "Aegislash (Shield) Slayer") cut on atk 112.79 and \
 HP 142 with def 0 -- so the published page read "def >= 0" and never named the \
 cutoff the tier does carry. No reference swap could fix it: 0 of the 76 Great \
 League dives in this bake have all three top-tier cutoffs nonzero (measured \
-2026-09-22 across userdata/website/*-great-league). 2ed4539 made the sentence \
+2026-09-22 across userdata/website/*-great-league). 2c787c0 made the sentence \
 data-driven -- dive:top_tier_axes / dive:top_tier_rule print only the axes the \
 tier cuts on -- and rewrote the test to assert the rendered rule names a \
 nonzero cutoff and never prints a zero one. No dive output was wrong; the \

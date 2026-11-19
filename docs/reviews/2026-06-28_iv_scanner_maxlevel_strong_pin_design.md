@@ -3,8 +3,8 @@
 > **Drift warning (2026-08-09):** every line number below predates the
 > deep_dive.py split (2026-08-06/08) and is WRONG at HEAD; two of the
 > three side-fixes have since shipped (`verify_js_parser.py`
-> league-aware `c20071e`; `user_collection.py` None-means-derive
-> `c956ed7`). The Option-1 extraction itself is still open and still
+> league-aware `03dbb96`; `user_collection.py` None-means-derive
+> `b1e4731`). The Option-1 extraction itself is still open and still
 > applies -- but take current anchors and the two implementation traps
 > (emitted-key order, `LEAGUE_MAX_LEVEL` mutated at call time) from
 > TODO.md "Tests to add", not from this doc.
@@ -42,8 +42,8 @@ The TODO/task SHAs and line numbers have drifted. Corrected:
 
 | Reference in TODO/task         | Stale value       | VERIFIED current value                                 |
 | ------------------------------ | ----------------- | ------------------------------------------------------ |
-| Fix commit (IV-scanner)        | `725c184`         | `9f55e38` "dry: single-source the IV-scanner maxLevel" |
-| owned_breakdown commit         | `786d437`         | `8fa4517` "dry: league-aware level ceiling"            |
+| Fix commit (IV-scanner)        | `725c184`         | `e827e12` "dry: single-source the IV-scanner maxLevel" |
+| owned_breakdown commit         | `786d437`         | `cc59889` "dry: league-aware level ceiling"            |
 | `_collection_data['maxLevel']` | deep_dive.py:4602 | **deep_dive.py:4667**                                  |
 
 Data path (all VERIFIED this session):
@@ -223,7 +223,7 @@ low priority.
 
 ### Option A (preferred): default `None` + derive from league
 
-Mirror the `owned_breakdown.py` fix (`8fa4517`): change the signature
+Mirror the `owned_breakdown.py` fix (`cc59889`): change the signature
 default to `None` and, inside each function that already receives
 `league`, derive `_ceiling = LEAGUE_MAX_LEVEL.get(league, 51.0)` and set
 `max_level = _ceiling if max_level is None else max_level`.

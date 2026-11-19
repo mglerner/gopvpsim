@@ -1363,7 +1363,7 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # Round 6b (2026-09-17) raised it again, 175 KB -> 180 KB. The wide
     # region's new ranking key picks a LARGER region on this page (D,H, 644
     # spreads, against round 6's E,F at 292), so its table row's member list
-    # is longer: measured 175.6 KB here against 174.4 KB at 62c4b6d, which
+    # is longer: measured 175.6 KB here against 174.4 KB at d1da422, which
     # was already inside 1 KB of the old ceiling. Nothing per-IV entered the
     # section; the two numbers below cap the part that would show it.
     #
@@ -1373,7 +1373,7 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # entries here against two, each with its own where-it-sits sentence and
     # rarest-wins list), and every family added a table row with its
     # staircase stepped out. Measured 190.1 KB here against 175.6 KB at
-    # 7bc9b51. Nothing per-IV entered the section; the payload cap below is
+    # 508e46d. Nothing per-IV entered the section; the payload cap below is
     # the number that would show it.
     #
     # Round 11 (2026-09-22) raised it 196 KB -> 206 KB for "The mirror" --
@@ -1397,7 +1397,7 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # would have been cheaper. Measured 34 KB on this blob when v4 shipped.
     #
     # Round 6b raised it 48 KB -> 50 KB, measured 48.4 KB against 47.3 KB at
-    # 62c4b6d. The whole delta is accounted for: the wide region's new
+    # d1da422. The whole delta is accounted for: the wide region's new
     # ranking key makes it a region no build already carries under the flat
     # and Even presets, so ``bp.regions`` gains ONE 684-character mask
     # (+782 B, 15 regions -> 16), and the collapsed lines gain the "and
@@ -1425,7 +1425,7 @@ def test_real_section_is_ascii_deterministic_and_small(shadow_sableye):
     # two (a rule string plus a 684-character membership mask each), an
     # index array per preset, and a ``family`` field on each standout.
     # The notable list itself is server-rendered HTML and costs the
-    # payload nothing. Measured 28.2 KB here against 26.3 KB at 7bc9b51.
+    # payload nothing. Measured 28.2 KB here against 26.3 KB at 508e46d.
     assert len(json.dumps(payload['bp'])) < 30_000, len(json.dumps(payload['bp']))
 
 
@@ -2794,7 +2794,7 @@ def test_the_section_renders_one_builds_block_per_preset(shadow_sableye):
     # table, and its notable entries -- because the two sentences that
     # CANNOT vary with the setting (species/moveset, and the single-stat
     # line) render once each, between the first two groups (DRY rule D1).
-    # Pre-fix (9cb2b26) it was two, with the verdict lead and the
+    # Pre-fix (e9f705b) it was two, with the verdict lead and the
     # line-status sentence inside the first.
     #
     # Round 11 (2026-09-22) makes it FOUR: "The mirror" names builds in its
@@ -3321,7 +3321,7 @@ def test_the_builds_table_replaces_the_per_build_paragraphs(shadow_sableye):
     most-winning member, SP1 -- between the verdict and the table a reader
     was scrolling to.
 
-    Pre-fix (0ca9693) ``build_paragraphs_html`` returned three paragraphs
+    Pre-fix (b21c4c0) ``build_paragraphs_html`` returned three paragraphs
     whose text began "Build 1 has Sableye (Shadow) running Shadow Claw /
     Drain Punch, Foul Play at Atk >= 150.24 with Def >= 97.15 to 99.63
     depending on HP (119-122)." and ended "Its most-winning member is 8/7/5
@@ -5027,8 +5027,8 @@ def test_the_wide_region_rings_every_member_and_draws_underneath(tmp_path):
     """Run the ring code on a synthetic grid whose wide region CONTAINS
     Build 1 -- the shape the round-6 trace could not draw.
 
-    Pre-fix values, measured by running THIS file against 0afbee9's
-    engine (`git show 0afbee9:scripts/deep_dive_engine.js`); the eval
+    Pre-fix values, measured by running THIS file against 1257ee9's
+    engine (`git show 1257ee9:scripts/deep_dive_engine.js`); the eval
     export list is tolerant of the two helpers that engine lacks, so
     the same harness reproduces both sides:
 
@@ -5166,7 +5166,7 @@ def test_a_standout_the_collapsed_line_holds_is_named_not_counted():
 def test_the_builds_caption_describes_the_ring_and_not_the_retired_trace():
     """The captions that INTRODUCE the ring described round 6's trace.
 
-    Pre-fix values (round 7, commit c11431e):
+    Pre-fix values (round 7, commit 3be179b):
 
         'carrying only the spreads no build holds' in BUILDS_CAPTION -> True
         'hollow ring'                              in BUILDS_CAPTION -> False

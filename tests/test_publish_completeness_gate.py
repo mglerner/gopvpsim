@@ -15,7 +15,7 @@ site:
 
 2. The gate's own failure message offered ``--partial (safe, pulls live
    content down first)``.  It does neither.  The pull-down was in an early
-   draft of 986cc01 and Michael dropped it; the commit message says so and
+   draft of 8322098 and Michael dropped it; the commit message says so and
    the code comment says so ("It does not pull anything down"), but the
    message a human reads at the exact moment they are deciding whether to
    mirror an incomplete site over the live one was never updated.  Under

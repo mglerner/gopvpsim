@@ -1,7 +1,7 @@
 # DRY / Single-Sourcing Review -- 2026-08-05
 
 > **Status (2026-08-05, same day):** entries 1-3 SHIPPED, commits
-> `d81c4ad..1db4f65` (entry 1: all five wrong-output fixes; entry 2: the
+> `58949e0..7a86215` (entry 1: all five wrong-output fixes; entry 2: the
 > gender+min-level evolution walk; entry 3: all five ops/gate items),
 > each with regression tests -- suite 1322 passed. Entry-1 render fixes
 > live in the generators; shipped HTML updates on the next re-render.
@@ -20,7 +20,7 @@
 >
 > **Status update (2026-08-05, evening): entries 4-11 + 14 + the two
 > entry-12 "safe-any-time" cherries SHIPPED**, commits
-> `caeded9..7e66ba2` (12 commits; 30-agent lane-partitioned workflow,
+> `a8ab18a..8d3e8f6` (12 commits; 30-agent lane-partitioned workflow,
 > 2 adversarial verifiers per entry, 3 must-fix findings caught and
 > fixed in-flight). Suite 1514 passed / 14 xfailed (+192 tests today);
 > ship gates green; engine-hash files verified untouched. STILL OPEN:
@@ -115,7 +115,7 @@ These are all load-bearing wire strings between the Python bake and the shipped 
 - **Moveset label `FAST / CM1, CM2`:** ship structured `fast`/`charged` fields in `DATA.movesets` and have `cmpBattleUrl` (`engine.js:3552-3556`) read those instead of string-splitting the display label; consider `generate_article.py:1372`'s parser in the same pass.
 - **Tier-card slug:** emit the slug into the tiers payload from the one Python helper (`deep_dive_rendering.py:1896-1899`); JS (`engine.js:1752-1754`) stops recomputing; `generate_article.py:2409`'s divergent variant uses the same helper. Three implementations currently converge on real data -- latent deep-link break, silent no-op failure mode.
 
-### 6. July cup-plumbing consolidation (bundle) -- M; all files touched by the 2026-07-03 commit family (aa8dac8 / 96c9bc9 / c8c761b / 27cd097)
+### 6. July cup-plumbing consolidation (bundle) -- M; all files touched by the 2026-07-03 commit family (d9c482f / 1777dad / ee5932e / 0e4719f)
 
 The July cup work reproduced the same conventions in parallel across layers. One session closes all of it:
 
@@ -154,7 +154,7 @@ Add a `gopvpsim.invalidate_caches()` that clears all nine gamemaster/rankings-de
 Everything the verifiers marked "bundles with the deep_dive.py split" (TODO.md:352-358, 527-556):
 
 - **T8 first:** conftest `deep_dive` loader fixture registering ONE shared `sys.modules['deep_dive']` object (the guarded files' own comments say worker pickling requires it; ten unguarded files currently mint fresh objects, so behavior is collection-order dependent). Collapses 14 exec_module preambles + 2 variants. Doing this first also enables the dom-id test below.
-- **D9:** a SweepConfig (or kwargs dict) for the 8-line pass-through block re-typed at five `iv_sweep` call sites (+2 external). The "missed kwarg already fired" evidence was refuted (see Do NOT do), but one-feature-edits-five-blocks is proven by commit 06bedca.
+- **D9:** a SweepConfig (or kwargs dict) for the 8-line pass-through block re-typed at five `iv_sweep` call sites (+2 external). The "missed kwarg already fired" evidence was refuted (see Do NOT do), but one-feature-edits-five-blocks is proven by commit 7803f90.
 - **D10:** extract the ~20-line `build_battle_pair()` core shared by `_sweep_worker` and `slayer_iter_worker` -- NOT a merged worker (they iterate different grids); bring `profile_slayer.run_sims` onto it, which also fixes its missing `mechanics=` (benchmarks currently measure 'legacy' regardless of what the real workers run).
 - **D14:** route the inline clone at `deep_dive.py:3686` through `_recompute_tier_assignments` (drop-in, S -- can land any time); unify `classify_iv` (`:654`) and the `:4211` copy here where the data shapes get reworked.
 - **L11 scripts side:** route the 7 scripts/ linear gamemaster scans through a `.get()`-style accessor (None-on-miss -- a naive swap to the KeyError-raising `get_pokemon_entry` changes failure modes; see Do NOT do). The 4 non-engine library sites (anchors.py x3, breakpoints.py:160) can come along; the battle.py:2035 hop waits for entry 13.

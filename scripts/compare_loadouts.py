@@ -227,7 +227,7 @@ def _sweep_dims_phrase(ld: dict) -> str:
     Every rendered mention of the sweep dimensions goes through here, so
     the page can't carry a stale hardcoded "4096 x 9" in a tooltip next
     to the real numbers in the methodology block. Same derivation the
-    methodology block has used since 95fcf74: ``n_ivs`` and the parsed
+    methodology block has used since 3c766ab: ``n_ivs`` and the parsed
     ``scenarios`` list, both filled in by load_loadout_data.
     """
     n_ivs = ld.get('n_ivs', 0)

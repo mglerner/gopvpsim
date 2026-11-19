@@ -141,9 +141,9 @@ win = score>=500), diffs every IV's even-shield win set against
 opponents, NOT the CLI's 15/15/15. **It does NOT match the website
 "Gives up vs #1" column**: the JS column references the #1 IV on the
 CURRENT y-axis metric over the user-selected shields, not
-`rank1RefIvIdx` over even shields (see `c911eff` and
+`rank1RefIvIdx` over even shields (see `22489d1` and
 `scripts/owned_breakdown.py`'s header — the three surfaces are siblings,
-not ports). Also: dives rendered before `8c1f98e` carry a
+not ports). Also: dives rendered before `881d415` carry a
 pre-convention `rank1RefIvIdx` (rounded-SP ranking), so bundles from
 the old corpus differ in their reference spread too.
 
@@ -158,7 +158,7 @@ even-shield (opponent × scenario) cells dropped vs rank-1 — 82 opp × 3 = 246
 header `{opponents:[...], scenarios:[...]}`. The on-device screen decodes the
 mask to render the dropped list. The human-readable JSON the extractor emits now
 is fine for the website-equivalent / debugging, but the iOS bundle needs the
-bitmask form. **The bitmask exporter variant shipped 2026-06-29 (`c1ea231`:
+bitmask form. **The bitmask exporter variant shipped 2026-06-29 (`27c7827`:
 `bitmask_from_dive` + `--bitmask`, roundtrip/size tests in
 `tests/test_export_owned_breakdown.py`). Remaining: the Toga screen + parity
 vectors.**

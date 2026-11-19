@@ -28,7 +28,7 @@
 #                                this on 2026-09-02)
 #   gamemaster      cd ~/coding/pvpoke &&
 #                   git show 79d04af74:src/data/gamemaster.json
-#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#   our engine      git log --oneline -1 86a3587   (repo HEAD when the
 #                                rebalance landed; engine-hash files are
 #                                battle.py, _dp_jit.py, moves.py,
 #                                formchange.py, pokemon.py)

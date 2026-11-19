@@ -1,10 +1,10 @@
 # Test-suite review -- 2026-08-09
 
 > **Status (2026-08-09, same day): ALL FOUR PHASES EXECUTED.** Phase 1
-> (mechanize) shipped in `2a12efd` -- verify_tests.py gate on every
+> (mechanize) shipped in `2fada17` -- verify_tests.py gate on every
 > publish path, hook activated. Phases 2-4 shipped via 5
-> adversarially-verified lanes (`e6dcc2e` S8a replants, `d27f481` dead
-> weight, `aa74af1` + `8a78c4e` pin conversions, `64b3e29` blind
+> adversarially-verified lanes (`3eec542` S8a replants, `2988aa1` dead
+> weight, `d3f5c90` + `97b93fd` pin conversions, `8071fe2` blind
 > spots) -- every replanted/converted test proven to fail against
 > broken code. Testing policy adopted into CLAUDE.md. Suite 1783: fast
 > tier 36s, full ~79s, last permanent xfail gone, all 13 remaining
@@ -27,7 +27,7 @@
 > scratch tree, the cache hole by monkeypatching and re-hashing. Where
 > reviewers contradicted each other, the contradiction was resolved by
 > re-derivation and the loser is recorded in "Corrections" below.
-> Baseline: 1776 tests at `281a40a` (1781+ with the 2026-08-09
+> Baseline: 1776 tests at `9e98de4` (1781+ with the 2026-08-09
 > lanes), 115 files, 24,020 test LOC vs 52,590 source LOC.
 
 ## Verdict
@@ -226,7 +226,7 @@ constant drifted three times before its scans existed. The fix is
 
 Explicitly LEFT OPEN (verified as fine): `cache_base.py` (the
 "zero refs" was a matcher artifact -- 14 sweep-cache tests drive it
-through real disk I/O), `patch_iv_guide_nav_width.py` (deleted 2026-09-25, source at commit deb007f; legacy-only,
+through real disk I/O), `patch_iv_guide_nav_width.py` (deleted 2026-09-25, source at commit d841796; legacy-only,
 self-reporting), `render_article.py` (dormant: zero valid TOML inputs
 exist today), `rerender_dive_cards.py` (fails loud), and the ~14
 one-off analysis scripts.

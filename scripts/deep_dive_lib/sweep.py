@@ -555,7 +555,7 @@ class SweepConfig:
     hand-typed at five call sites (Phase 2, the extra composite modes, the
     reference sweep, the base-form census, the best-buddy pass), so adding a
     knob meant editing five argument lists and any miss was silent (commit
-    06bedca is the worked example).
+    7803f90 is the worked example).
 
     Defaults MIRROR ``iv_sweep``'s own defaults, so an omitted field passes
     through unchanged.

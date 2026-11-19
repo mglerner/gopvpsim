@@ -1,7 +1,7 @@
 """Seat-ambiguous stage-probe attribution (scripts/joint_iv_breakpoints.py).
 
-Guard commit 373bae8 ("joint_iv: seat-aware stage-probe attribution for
-same-species pairs"); pre-guard SHA 438a5ef.
+Guard commit b2415cb ("joint_iv: seat-aware stage-probe attribution for
+same-species pairs"); pre-guard SHA d798dfa.
 
 On a same-species pair whose OPPONENT also carries the focal's
 attack-debuff move, a timeline line ("Thievul uses Icy Wind -> ...")
@@ -158,14 +158,14 @@ def _extract_meter_can_fire():
 
     It lives inside ``main()`` (it closes over nothing), so a direct
     unit test has to lift the FunctionDef out of the source.  Pre-guard
-    438a5ef defines it 0 times.
+    d798dfa defines it 0 times.
     """
     tree = ast.parse(_SCRIPT.read_text())
     fns = [n for n in ast.walk(tree)
            if isinstance(n, ast.FunctionDef) and n.name == '_meter_can_fire']
     assert len(fns) == 1, (
         'expected exactly one _meter_can_fire definition in %s, found %d '
-        '(pre-guard 438a5ef: 0 -- the buff-meter bound did not exist)'
+        '(pre-guard d798dfa: 0 -- the buff-meter bound did not exist)'
         % (_SCRIPT.name, len(fns)))
     ns = {'math': math}
     exec(compile(ast.Module(body=fns, type_ignores=[]), str(_SCRIPT), 'exec'),
@@ -205,7 +205,7 @@ def test_opponent_only_throws_record_debuff_unreachable(tmp_path,
                                                         monkeypatch):
     """Opponent-only Icy Wind + atk_stage 0 -> honest debuff_unreachable.
 
-    Pre-guard 438a5ef: the shielded 'Thievul uses Icy Wind' line made
+    Pre-guard d798dfa: the shielded 'Thievul uses Icy Wind' line made
     `iw_count > 0` -> any_thrown True -> SystemExit
     "ABORT: no stage probe observed the Icy Wind debuff (tried 6
     candidate fights; the move WAS thrown in at least one ...)".
@@ -222,7 +222,7 @@ def test_negative_opponent_atk_stage_counts_as_thrown(tmp_path, monkeypatch):
     """No 'uses Icy Wind' line at all, but lp.atk_stage < 0 -> thrown.
 
     The debuff landed (the opponent ended the fight at -1) even though
-    the pooled name count is 0.  Pre-guard 438a5ef recorded
+    the pooled name count is 0.  Pre-guard d798dfa recorded
     `debuff_unreachable: True` here -- a false NEGATIVE, the mirror of
     case (a).
     """
@@ -244,7 +244,7 @@ def test_guaranteed_opponent_self_atk_buff_aborts(tmp_path, monkeypatch):
 
     With Night Slash's buff guaranteed, a post-fight stage cannot be
     read as "the focal threw the debuff N times", so the pair must be
-    refused loudly.  Pre-guard 438a5ef had no such check: it completed
+    refused loudly.  Pre-guard d798dfa had no such check: it completed
     and recorded `debuff_unreachable: True` from the name count.
     """
     cfg_path = _write_pair(tmp_path)
@@ -268,7 +268,7 @@ def test_meter_bound_skips_candidate_at_seven_night_slashes(tmp_path,
     """7 pooled Night Slashes (12.5%) can fire the meter -> skip the fight.
 
     All 6 candidates are skipped, so the recorded finding must disclose
-    the skips and count 0 fights tried.  Pre-guard 438a5ef: no skip
+    the skips and count 0 fights tried.  Pre-guard d798dfa: no skip
     logic and `iw_count > 0` -> SystemExit "ABORT: no stage probe
     observed the Icy Wind debuff".
     """
@@ -287,7 +287,7 @@ def test_meter_bound_keeps_candidate_at_six_night_slashes(tmp_path,
 
     Same canned fight as the 7-throw case bar one Night Slash: nothing
     is skipped, so all 6 candidates are tried and the disclosure is
-    absent.  Pre-guard 438a5ef: SystemExit, as above.
+    absent.  Pre-guard d798dfa: SystemExit, as above.
     """
     chk = _run_main(tmp_path, monkeypatch,
                     timeline=[_FAST_LINE, _IW_SHIELDED] + [_NS_SHIELDED] * 6,
@@ -304,7 +304,7 @@ def test_meter_can_fire_boundaries():
 
     A chance of exactly 0.5 starts the meter at 0.0 rather than at the
     chance (Pokemon.js:696-700), which moves its first firing from throw
-    1 to throw 2.  Pre-guard 438a5ef: `_meter_can_fire` does not exist.
+    1 to throw 2.  Pre-guard d798dfa: `_meter_can_fire` does not exist.
     """
     fn = _extract_meter_can_fire()
     assert fn(0.125, 6) is False

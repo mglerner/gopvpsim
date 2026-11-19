@@ -1,6 +1,6 @@
-"""Proportional GTO fills + the sliver floor (guard ba557ad).
+"""Proportional GTO fills + the sliver floor (guard e87b3b0).
 
-Pre-guard commit: e84d825. There, a mixed (IV-decided) cell rendered
+Pre-guard commit: 6de996d. There, a mixed (IV-decided) cell rendered
 FLAT amber in both surfaces -- the cheat-sheet strip emitted
 ``<span class="sc sc-amber" title=...>?</span>`` and the hub mini
 sub-square emitted ``<i class="a"></i>``, with NO inline gradient
@@ -8,7 +8,7 @@ anywhere (observed pre-fix value: zero ``linear-gradient`` stops in
 either helper's output, so a 93/7 cell and a 50/50 cell were
 byte-identical).
 
-ba557ad splits a mixed cell green/red at the win share and clamps each
+e87b3b0 splits a mixed cell green/red at the win share and clamps each
 side to a visible sliver: percentage stops in [5%, 95%] on the 20px
 cheat-sheet box, pixel stops in [1px, 6px] on the 7px hub box. The
 floor is the whole point -- a 99.9% cell must still read as mixed, not
@@ -123,7 +123,7 @@ def test_sheet_gradient_stops_stay_inside_the_5_95_band():
 
 def test_sheet_fill_is_proportional_between_the_clamps():
     """Interior fractions render at their own win share, so 93/7 does
-    not look like 50/50 (the point of ba557ad)."""
+    not look like 50/50 (the point of e87b3b0)."""
     stops = _sheet_stops(_grid_html())
     for i in AMBER_IDX:
         f = FRACS[i]
@@ -192,7 +192,7 @@ def test_hub_floor_and_ceiling_never_pass_as_solid():
 
 def test_class_fallbacks_survive_the_inline_fill():
     """The no-inline-style fallbacks (sc-amber / class "a") and the
-    W/L/? letters are the scanner anchors ba557ad promised to keep."""
+    W/L/? letters are the scanner anchors e87b3b0 promised to keep."""
     sheet = _grid_html()
     hub = bwp._mini_cell(_row(FRACS), 'Alpha', 'Beta')
     assert sheet.count('class="sc sc-amber') >= len(AMBER_IDX)

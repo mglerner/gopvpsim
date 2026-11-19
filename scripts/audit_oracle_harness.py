@@ -134,7 +134,7 @@ MATCHUPS = [
     # the fast move per Pokemon.js changeForm:2386-2394). All nine cells
     # EXACT since 2026-09-27. History: the 2026-06-12 legacy xfails
     # (1,1)/(1,2) had long since VANISHED ((1,1) matched at the first
-    # new-mechanics measurement, (1,2) at f1ff911); (1,0)/(2,0) then
+    # new-mechanics measurement, (1,2) at efd6574); (1,0)/(2,0) then
     # diverged because our Shield-form charged-move ESTIMATE used the
     # Shield atk, so the reverted Shield form farmed past a KO PvPoke
     # takes -- fixed by pricing it at the Blade atk

@@ -81,7 +81,7 @@ misleading unless flagged (never-present-unflagged-known-wrong rule):
 | Top Picks / recIvs                                                                                                          | avg rank over all opponents                | `deep_dive.py:2995-3037, 3446-3449`  |
 | IV Flavor Guide narrative                                                                                                   | derives from full-pool tiers/boundaries    | `deep_dive.py:2721-2859`             |
 | Notable-IVs census counts                                                                                                   | sweeps damage boundaries over whole pool   | `deep_dive.py:3136-3138`             |
-| ~~clusterGaps overlay~~ (RETIRED 2026-07, 58bbd8f -- replaced by the matchup-clusters section, itself full-pool + bannered) | Python-precomputed full-pool averages      | n/a                                  |
+| ~~clusterGaps overlay~~ (RETIRED 2026-07, 113a028 -- replaced by the matchup-clusters section, itself full-pool + bannered) | Python-precomputed full-pool averages      | n/a                                  |
 | Slayer "anchors N/M" checklist                                                                                              | denominator from pool-derived auto anchors | `deep_dive.py:7287-7295, 7373-7375`  |
 
 Subset-SAFE: the mirror-slayer categories themselves (focal-vs-focal
@@ -188,7 +188,7 @@ unchecked:
   selection. The infographic card, tiers, Top Picks, Notable IVs, and
   narrative below are computed against the full pool of M opponents."
 - ~~Hide the clusterGaps overlay~~ (RETIRED 2026-07 with the experimental
-  section, 58bbd8f; the replacement matchup-clusters section is full-pool
+  section, 113a028; the replacement matchup-clusters section is full-pool
   and carries its own does-not-follow-the-filter caption).
 - Leave ivTiers scatter coloring available but covered by the banner text
   (tier definitions are full-pool). Optional later polish: auto-switch

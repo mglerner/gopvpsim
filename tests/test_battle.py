@@ -1971,7 +1971,7 @@ _REUSE_MATCHUPS = [
     # in place. Pre-fix, reset_for_battle never undid that, so scenarios
     # after the first shield burn ran Blade with self-debuffing Shadow Ball
     # and Gyro Ball: 5/9 scenarios diverged (winner flips at 1v1), and every
-    # baked Aegislash (Blade) column since 9fe11e2 (2026-09-02) carried it.
+    # baked Aegislash (Blade) column since 6fe5f6e (2026-09-02) carried it.
     # The Shield param above is the fixed point of that stamp and passed.
     pytest.param(
         ('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'],

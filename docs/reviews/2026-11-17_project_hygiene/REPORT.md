@@ -5,7 +5,7 @@
 > dirs no longer exist. The skill is installed at
 > `~/coding/dotfiles/claude/skills/project-hygiene/` (dotfiles `affa74d`).
 
-Date: 2026-11-17. Repo state: main @ e321598, clean. Nothing was written in the repo or in `~/.claude`.
+Date: 2026-11-17. Repo state: main @ 1b6904d, clean. Nothing was written in the repo or in `~/.claude`.
 
 **REPORT.md was not written to disk.** The Write tool refused it ("Subagents should return findings as text, not write report files") and I did not work around that. The full report text is below; save it as `REPORT.md` if you want the file. The other files were written (list at the end).
 
@@ -35,7 +35,7 @@ Root causes, in order of impact:
    - Audit: with DN full, sessions wrote to TODO instead.
    - Caveat: this is one file over about 3.5 weeks of low activity. Treat "only hard gates hold" as suggestive, not proven.
 4. **Grooming moves text; it does not remove it.**
-   - Measured with the new `removed` check on the 08-27 groom (b3ac80d): TODO -22.7k, CHANGELOG +6.4k, TODO_archive +31.6k. The set grew 15.3k.
+   - Measured with the new `removed` check on the 08-27 groom (454f95f): TODO -22.7k, CHANGELOG +6.4k, TODO_archive +31.6k. The set grew 15.3k.
    - Measured: live (non-frozen) process files grew +73.6k in the last 30 days and +390k in the last 90.
 5. **Dated narrative sits in files that must be true now.** Measured: DN has 57 ISO dates, project CLAUDE.md 19, global CLAUDE.md 1.
 6. **Nothing checks truth, and pointers into TODO have no gate.**
@@ -45,7 +45,7 @@ Root causes, in order of impact:
    - Measured: `.githooks/pre-commit:72` runs the checker with `--quiet`, so its warnings are never seen.
 7. **The always-loaded layer has the same problem.**
    - Measured: 20 of 27 MEMORY.md index lines are over 150 chars (longest 469); 11 memory lines hold volatile repo status.
-   - Measured examples: the Aegislash memory description says "not merged" (audit: the fix commit is on main); the WOTB memory names main as c2bd1e9, which is 190 commits behind.
+   - Measured examples: the Aegislash memory description says "not merged" (audit: the fix commit is on main); the WOTB memory names main as 679541e, which is 190 commits behind.
    - Measured: the project CLAUDE.md repeats the global Karpathy block (2 near-copy paragraphs).
 8. **TODO is the only place guaranteed to be read next session**, so it is the rational place to dump "don't forget" text (inferred; raised by the root-cause critique). A cap on TODO works against that incentive unless the startup read changes. See open question 3.
 
@@ -62,7 +62,7 @@ What was tried and why it did not hold (audit, except where noted):
 
 Corrections to the draft diagnosis, from the evidence critique:
 
-- CLAUDE.md was not "never groomed"; it had one partial refresh (f085100, per the critique; I did not re-check that commit).
+- CLAUDE.md was not "never groomed"; it had one partial refresh (a9e0fac, per the critique; I did not re-check that commit).
 - The data-cache recipe currently has one home. Measured: the full recipe is in TODO under "PvPoke sync 2026-11-17", and `feedback_sandbox_data_cache_refresh.md` points to it. The scan finds no duplicate. The divergent copy that caused the Mega Sableye miss is no longer there.
 - "TODO exceeds the Read cap" is an inference; at 1,521 lines it is under the line limit.
 
@@ -251,7 +251,7 @@ Can wait:
 - `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/project-hygiene/hygiene_scan.py` -- the helper (`scan`, `removed`).
 - `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/project-hygiene/write-time-rules.md` -- template rules to propose for a project's CLAUDE.md.
 - `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/project-config/gopvpsim.hygiene.toml` -- example config (would be installed as `.hygiene.toml`).
-- `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/scan_output_gopvpsim.txt` -- the scan of gopvpsim @ e321598 (`--max 40`).
+- `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/scan_output_gopvpsim.txt` -- the scan of gopvpsim @ 1b6904d (`--max 40`).
 - `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/removed_output_2026-08-27_groom.txt` -- `removed` run on the 08-27 groom, as a worked example.
 
 Not written: `/private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/079d4594-feed-4ac3-969a-9c296bd84fdc/scratchpad/skill/REPORT.md` (Write tool refused; text is above).

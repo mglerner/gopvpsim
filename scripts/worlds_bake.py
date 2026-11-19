@@ -108,7 +108,7 @@ _ENGINE_SRC_FILES = ('battle.py', '_dp_jit.py', 'moves.py', 'formchange.py',
 WORLDS_CODE_LINEAGE = {
     '653d776f9028': (
         '2026-08-18, Thievul Icy Wind. FULL producer delta since '
-        '653d776f9028 (git diff 157bf71..HEAD over the four '
+        '653d776f9028 (git diff 198ab01..HEAD over the four '
         '_WORLDS_SOURCE_FILES): worlds_bake.py only -- (a) the '
         'injected_move_ids carve-out in preflight_moveset_legality plus its '
         'load_gamemaster import and all_move_ids helper, (b) this lineage '
@@ -125,7 +125,7 @@ WORLDS_CODE_LINEAGE = {
     'e8a362c4dcc7': (
         '2026-08-18, Thievul moveset fork (Michael: Thievul enters as TWO '
         'builds, NS+IW and IW+PR). FULL producer delta since e8a362c4dcc7 '
-        '(git diff 2c8816d..HEAD over the four _WORLDS_SOURCE_FILES): '
+        '(git diff da30ba5..HEAD over the four _WORLDS_SOURCE_FILES): '
         'worlds_bake.py only -- (a) preflight_moveset_legality now resolves '
         'the gamemaster entry via e.get("gamemaster_name") or e["name"], '
         'because a fork arm\'s display name is not a speciesName, (b) this '

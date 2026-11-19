@@ -18,7 +18,7 @@ the whole chain step with it.
 
 **Decision, 2026-09-22 (Michael): the Forretress comparison is REMOVED, not
 parked.** `forretress-fast-move-shadow.toml` is deleted from this directory
-(recoverable from git history at 3206ba4). Its source dive is back in the
+(recoverable from git history at 52f023b). Its source dive is back in the
 registry and baked, so the page could be rebuilt any time; it comes back only
 if the Volt Switch vs Bug Bite split turns out to matter in the current
 season. `shadow-jumpluff-great-league` did not come back and

@@ -516,7 +516,7 @@ def test_pogodives_sheet_v5_predicate():
 
 
 def test_form_change_either_side_predicate():
-    """Aegislash reuse-leak fix (2e8d36b): affected iff a form-change
+    """Aegislash reuse-leak fix (e3de87d): affected iff a form-change
     species is on EITHER side; fail-safe on missing metadata."""
     from migrate_cache import PREDICATES
     pred = PREDICATES['form_change_either_side_20260912']
@@ -631,7 +631,7 @@ def test_no_shadow_either_side_20260920_predicate():
 
 
 # ---------------------------------------------------------------------------
-# 2026-09-23 signature-dedup fix (a4ca14e) + legacy guard (2615c6e)
+# 2026-09-23 signature-dedup fix (f2401cd) + legacy guard (cc87298)
 # ---------------------------------------------------------------------------
 
 def _sig_meta(species, league, fast, charged, shadow=False):

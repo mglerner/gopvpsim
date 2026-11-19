@@ -43,7 +43,7 @@ from gopvpsim.data import (  # noqa: E402
 #   extra_args: []           (escape hatch for unusual flags)
 
 # DIVES is now DERIVED FROM THE OPPONENT POOLS (2026-09-10). The 949-line
-# hand-written literal that used to live here is in git history at cc5363c~1.
+# hand-written literal that used to live here is in git history at fa9d892~1.
 #
 # It was replaced because the two lists had drifted badly: 31 of the 71 GL
 # pool species had no page (everything the rebalance and the tier lists

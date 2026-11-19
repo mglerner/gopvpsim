@@ -46,13 +46,13 @@ precedents) is preserved verbatim. Near-term actionable items live in
 ## Features to add
 
 * **compare_loadouts N-way verdict** (parked 2026-11-18 from TODO): N=3/N=4
-  rendering shipped (53ade3c, 2026-04-22: all-N-in-row matchup table); the
+  rendering shipped (c756663, 2026-04-22: all-N-in-row matchup table); the
   verdict line still lists per-loadout win rates without an N-way ranking.
   Stay loadout-list-keyed; N=4 ceiling (parse_spec hard-caps it).
 
 * **ML guide "what do I get by best-buddying these?" view** (parked
   2026-11-18 from TODO) — the "All
-  cases" IV-compare view (shipped 2026-06-28, `5b882dc`) hides
+  cases" IV-compare view (shipped 2026-06-28, `41fd490`) hides
   best-buddy-conditional flips by default and badges their count
   ("N best-buddy flips hidden"). A natural follow-up is a dedicated
   summary that answers, for the user's candidate spreads, *what
@@ -75,7 +75,7 @@ precedents) is preserved verbatim. Near-term actionable items live in
 * **gobattlekit owned-mon breakdown screen** (parked 2026-11-18 from TODO;
   queued 2026-06-21). Remaining: the Toga screen (model on gobattlekit
   `screens/user_iv_checker.py`) reading the bundle from
-  `scripts/export_owned_breakdown_bundle.py` (`c1ea231`), + parity vectors.
+  `scripts/export_owned_breakdown_bundle.py` (`27c7827`), + parity vectors.
   Plan: `docs/owned_mon_breakdown_plan.md`.
 
 ### PoGoDives strategy page (Michael, 2026-09-24) (parked 2026-11-18 from TODO)
@@ -155,9 +155,9 @@ mechanics**. So expose a user-facing toggle between old and new mechanics on
 the dive site. [Corrected 2026-11-18: that was true of the 2026 Worlds
 campaign, but our engine no longer treats legacy as a peer: legacy mechanics
 are opt-in only -- `simulate()` raises on `mechanics='legacy'` unless
-`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`2615c6e`;
+`GOPVPSIM_ALLOW_LEGACY_MECHANICS=1` is set (`cc87298`;
 `src/gopvpsim/battle.py`), and nothing is hardcoded to legacy, Worlds
-included (`4b6342b`). A toggle would mean re-supporting legacy as a
+included (`d5281ed`). A toggle would mean re-supporting legacy as a
 first-class mode.]
 
 Light design notes (not yet designed):
@@ -342,7 +342,7 @@ Light design notes (not yet designed):
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
 * **Slayer-card signal-loss audit (systemic)** -- Slayer Builds remedy
-  shipped (4+3 hybrid, 5cb1c8e; CHANGELOG 2026-06-11); Anchors-First
+  shipped (4+3 hybrid, 063eae3; CHANGELOG 2026-06-11); Anchors-First
   saturation is structural. Open: sweep the other surfaces for 'everyone
   passes the lowest tier' -- threshold-tier color/tier cards, Notable-IVs
   badges, CMP Slayer top-quartile fallback. First test case: Oinkologne GL
@@ -390,7 +390,7 @@ Light design notes (not yet designed):
 ## HTML output paths
 
 * **Orphaned-artifact detector beyond dive dirs** (noted 2026-06-21) --
-  `scripts/prune_unlisted_dives.py` (78dde59, 2026-09-17) already
+  `scripts/prune_unlisted_dives.py` (e16420a, 2026-09-17) already
   gates/prunes `*-league` dive dirs missing from the registry. Still
   missing: orphans in `userdata/dives/*.json` and non-dive
   `userdata/website/**` paths (enumerate, cross-ref site links, report;
@@ -466,11 +466,11 @@ CHANGELOG.md). The minor polish residue (the Favicon item stays in TODO.md
 "Site polish"):
 
 - **G16 — methodology-details guide pointers (remaining half).** The
-  comparison-page block shipped `95fcf74` (wrong win-rate boundary
+  comparison-page block shipped `3c766ab` (wrong win-rate boundary
   fixed + derived counts + guide pointer) and the Meta Coverage half
-  shipped earlier (`e6d431c`). Remaining, both in
+  shipped earlier (`a58a3da`). Remaining, both in
   `generate_article.py` and both currently regeneration-unverifiable
-  (the male-Oinkologne article was retired in `7df5165`, so no article
+  (the male-Oinkologne article was retired in `a415218`, so no article
   renders from HEAD): (a) `:1835-1848` Opponent-IVs/Bait recap ->
   pointer at `guides/cd-article/body.md#dropdown-control` (anchor
   confirmed present); (b) `:2461-2469` "About these tiers" --
@@ -521,7 +521,7 @@ CHANGELOG.md). The minor polish residue (the Favicon item stays in TODO.md
 - **P3 article-surface design question.** Dive-side envelope tags
   are native now (`deep_dive_rendering._render_envelope_tag`; the
   2026-04-23 retrofit script `patch_dive_envelope_tags.py` was
-  deleted in 7126f1b); a category-card surface on the CD article
+  deleted in ef92f96); a category-card surface on the CD article
   itself (linking envelope-shape to a specific "Cost to XL"
   judgment) remains the original P3 question and has not been
   addressed.
@@ -816,7 +816,7 @@ DECISIONS / EDITORIAL for Michael:
   Tinkaton refuted).
 - Deferred mirror bakes (Michael-approved deferral):
   empoleon__vs__empoleon and feraligatr__vs__feraligatr.
-- Deferred joint-IV review minors (all in the 319c8a2 commit
+- Deferred joint-IV review minors (all in the 71284d9 commit
   message): duplicate-grid double embedding (~826KB/page),
   pareto-axis self-inclusion, one-option basis dropdown, wall-table
   25-vs-12 wording, CSV dropped-row accounting, raw key fragments in

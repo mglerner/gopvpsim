@@ -14,7 +14,7 @@ master 78b1e66db via scripts/pvpoke_trace.js (score, winner, and chargedLog
 all exact). The side whose DP moves is the one with the 1-turn fast move:
 Corviknight (Sand Attack) and Kingdra (Dragon Breath).
 
-REVERT-FAILS PROPERTY. Pre-port values (our engine at main b82ca59), recorded
+REVERT-FAILS PROPERTY. Pre-port values (our engine at main b031a98), recorded
 so a revert is caught:
   vs Corviknight (1,1)  pre 434/565 w1, log ended "... Aegislash: Shadow Ball,
                         Corviknight: Air Cutter"; PvPoke 444/555 w1

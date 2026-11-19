@@ -300,7 +300,7 @@ def _assert_groups_fight_identically(species, fast_id, charged_ids, ivs_list,
 
 def test_exact_cmp_tie_vs_shadow_is_not_signed_as_win_or_loss():
     """Gap 1: the CMP column stripped shadow as atk/1.2, which is one ULP
-    low for some spreads (the round trip ebf5944 removed from the engine).
+    low for some spreads (the round trip 18e4be4 removed from the engine).
     Florges 12/5/9 exactly TIES Shadow Annihilape on CMP but was grouped
     with 8/1/6 (loses CMP); 15/8/5 (loses) was grouped with 12/4/2 (ties)."""
     opp = _opp_entry_l('Annihilape', 'LOW_KICK', ['RAGE_FIST', 'ICE_PUNCH'],

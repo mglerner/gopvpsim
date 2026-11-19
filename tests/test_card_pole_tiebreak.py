@@ -9,7 +9,7 @@ taxonomy ("Attack Weight", "High Defense", "High HP", "Matchup Hunter",
 ties ``0/15/15`` and ``1/15/15`` on def+hp at max level, and keys maxed on
 ``(coverage, def, hp)`` / ``(coverage, hp, def)`` with no attack tie-break
 returned the FIRST maximal index -- the lower-atk, strictly-dominated spread.
-The fix (810f53c) appended ``data_obj['ivAtk'][iv]``; the two source tripwires
+The fix (65831c2) appended ``data_obj['ivAtk'][iv]``; the two source tripwires
 here asserted exactly that:
 
     assert _pole_key_last_element("atk_iv") == "data_obj['ivAtk'][iv]"

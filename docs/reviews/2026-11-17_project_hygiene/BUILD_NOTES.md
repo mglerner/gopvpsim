@@ -175,7 +175,7 @@ Edits made in this step:
 
 ## Scan results (checked, 2026-11-17)
 
-### gopvpsim @ e321598, `project-config/gopvpsim.hygiene.toml`
+### gopvpsim @ 1b6904d, `project-config/gopvpsim.hygiene.toml`
 
 | Run                                       | Time  |
 | ----------------------------------------- | ----- |
@@ -341,7 +341,7 @@ was lost (TODO.md:171 "FIXED for the sandbox" still counts). DNA: 44 ->
 41, all "the FIXED row(s)" in a frozen audit doc.
 
 Count deltas (`_runs/round2_*`; same machine, same commits as the
-`round2_before_*` runs; gopvpsim @ e321598, DNA @ e8b0359 with
+`round2_before_*` runs; gopvpsim @ 1b6904d, DNA @ e8b0359 with
 `_tmp/round2-dna-noplugin.hygiene.toml`):
 
 | Repo     | Check            | Before | After  | Why                                                                                          |
@@ -459,13 +459,13 @@ Needs Michael:
 4. The 6 failing gopvpsim fast-tier tests above.
 5. A dangling commit in gopvpsim's reflog: a build agent committed by
    mistake and reset (`5012d82 "verbatim move"`, HEAD is back at
-   e321598; checked with `git reflog`). Nothing is on a branch; it will
+   1b6904d; checked with `git reflog`). Nothing is on a branch; it will
    expire on its own.
    A SECOND stray commit (`2518127 "j"`, author `a <a@b>`, from a
    round-2 verifier whose throwaway dir vanished so its commands ran in
    gopvpsim) was REMOVED by the main session with `git reset --keep
-   e321598` after checking its diff (3 lines in .gitignore/README.md,
-   unpushed). HEAD is e321598 again.
+   1b6904d` after checking its diff (3 lines in .gitignore/README.md,
+   unpushed). HEAD is 1b6904d again.
 6. A fix-round agent ran DNA's plugin
    `hygiene/plugins/snakemake_inputs.py` three times through a full scan,
    against the rule for this build. It reported DNA's status unchanged.

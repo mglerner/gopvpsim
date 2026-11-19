@@ -113,7 +113,7 @@ def test_methodology_guide_anchor_exists_in_the_guide_body():
 
 
 # --- the OTHER three places the page names the sweep dimensions ----------
-# 95fcf74 taught the methodology block to derive them but left the pairwise
+# 3c766ab taught the methodology block to derive them but left the pairwise
 # table's two column tooltips and the 3+-loadout abbreviation note spelling
 # "4096 focal IVs x 9 shield scenarios" by hand -- so a non-4096 dive would
 # have rendered two contradictory counts on one page.

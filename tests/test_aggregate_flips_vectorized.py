@@ -8,7 +8,7 @@ cumulative sum over the HP-sorted passing IVs instead of a masked sum per
 floor. It is a perf refactor: the records must be IDENTICAL.
 
 ``_reference`` below is the pre-vectorisation implementation, copied
-verbatim from scripts/deep_dive_analysis.py at 3db37f0 (only its docstring
+verbatim from scripts/deep_dive_analysis.py at bc74f83 (only its docstring
 dropped and three non-ASCII comment glyphs spelled out). It lives here, not
 in production, because nothing but this test may call it. The comparison
 is exact: same record count and order, the SAME anchor object, and every

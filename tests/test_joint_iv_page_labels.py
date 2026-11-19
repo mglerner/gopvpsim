@@ -2,7 +2,7 @@
 
 ``scripts/joint_iv_page.js`` renders one page per analyzed pair, so both
 arms are named from ``TL_DATA.meta`` rather than from any literal in the
-file. Before 6a7e534 the two name vars were the SPECIES keys
+file. Before cf452d9 the two name vars were the SPECIES keys
 (``meta.focal`` / ``meta.opponent``), which made the Thievul moveset-fork
 page ("Thievul (NS+IW) vs Thievul (IW+PR)") say bare "Thievul" for both
 arms -- the panels could not tell the reader which side they described.
@@ -21,7 +21,7 @@ for exactly that. It is a silent-wrong-prose failure: nothing throws, the
 page still renders, and only a reader notices.
 
 Both tests run the REAL page source under a stub DOM in node (the same
-harness shape the 6a7e534 smoke-render used) and read the rendered HTML
+harness shape the cf452d9 smoke-render used) and read the rendered HTML
 back out. Test one pins the display-label plumbing, test two pins the
 escaping independently of where the label came from.
 """
@@ -180,7 +180,7 @@ def _render(focal, opponent):
 def test_cross_arm_page_names_both_arms():
     """A moveset-fork page must name its two arms, not say "Thievul" twice.
 
-    Pre-fix (ba557ad) FOCAL/OPP were meta.focal/meta.opponent -- the same
+    Pre-fix (e87b3b0) FOCAL/OPP were meta.focal/meta.opponent -- the same
     species key on both sides -- so neither "(NS+IW)" nor "(IW+PR)" ever
     reached the page and every panel said bare "Thievul".
     """

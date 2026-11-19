@@ -34,7 +34,7 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
 
 ## Evidence base
 
-- **Tournament usage:** 36 Dracoviz events captured (commit `9a5fd67`), 33
+- **Tournament usage:** 36 Dracoviz events captured (commit `4999d92`), 33
   open-GL (EUIC/LAIC/NAIC are limited-meta and excluded from open-meta
   stats; see docs/tournament_data/README.md). Recent bucket = 16 events with
   event date >= 2026-03, 1,801 teams; top-cut = final_rank <= 8, n=128.
@@ -393,8 +393,8 @@ mechanics are gone, see the first rule.)
   ~/Documents/gopvpsim_cache/gamemaster.json`), restore the live blob after;
   the render path reads live gamemaster/rankings while scores come frozen
   from the blob. `WORLDS_RERENDER=1` is the opt-in in `publish_website.sh`;
-  `verify_worlds.py` is out of the ship-gate roster (5985777) and runs by
-  hand only. Legacy mechanics are gone (4b6342b), so a 2027 bake is a
+  `verify_worlds.py` is out of the ship-gate roster (bc9cc9d) and runs by
+  hand only. Legacy mechanics are gone (d5281ed), so a 2027 bake is a
   new-mechanics bake.
 - **Standing Worlds bake/publish rules (carry into any revival):** publish
   only on Michael's explicit per-instance go; long bakes detached and

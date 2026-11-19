@@ -2,7 +2,7 @@
 
 Decision material for Michael. READ-ONLY investigation (no engine edits, no
 dive/sweep run). Follows up TODO.md "#3-followup" and the bug-#3 commit
-(`50e8cd2`) note that the farm-stack fix's oracle surfaced ~117 pre-existing
+(`1123648`) note that the farm-stack fix's oracle surfaced ~117 pre-existing
 both-self-debuff PvPoke divergences (~7 winner-flips) on Lurantis / Blaziken /
 non-default movesets.
 
@@ -228,12 +228,12 @@ migration is needed.**
 
 ---
 
-## Addendum 2026-07-03 — re-measured on c7f9ba2 (post-bandaid[910] ffb582b)
+## Addendum 2026-07-03 — re-measured on e02ee17 (post-bandaid[910] 4e1ec72)
 
 Everything above was measured one commit BEFORE the bandaid[910] fix
-(`ffb582b`, 2026-06-29 15:29), whose proven touched set
+(`4e1ec72`, 2026-06-29 15:29), whose proven touched set
 (`self_debuff_either_side`) contains this entire cluster. Re-measured on
-`c7f9ba2` (our engine) vs pvpoke `00f0afe7f`; only `ffb582b` touched engine
+`e02ee17` (our engine) vs pvpoke `00f0afe7f`; only `4e1ec72` touched engine
 files in between, so the A/B attribution is complete.
 
 **KEEP verdict: STILL HOLDS, strengthened.**

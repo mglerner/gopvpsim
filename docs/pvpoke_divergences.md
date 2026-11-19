@@ -152,10 +152,10 @@ upstream and never runs, so copying it would make us diverge from PvPoke's
 actual behavior rather than match it.
 
 Turn system: the in-game turn changes (`mechanics='new'`) are the default
-everywhere since 2026-09-09 (7e6a82b), the day PvPoke merged its own
+everywhere since 2026-09-09 (143f3d9), the day PvPoke merged its own
 implementation to master; every published score since the 2026-09-10/12
 bake uses them, and `simulate()` refuses the retired legacy system unless
-explicitly opted in (2615c6e). The oracle audit is cross-checked against
+explicitly opted in (cc87298). The oracle audit is cross-checked against
 PvPoke master under the new system (CHANGELOG 2026-09-09..10).
 
 ## Keeping this list current
@@ -163,7 +163,7 @@ PvPoke master under the new system (CHANGELOG 2026-09-09..10).
 - **When you add or remove a divergence, update this document and
   `DEVELOPER_NOTES.md` together.** The `CLAUDE.md` policy ("When our sim
   diverges from PvPoke") requires every divergence to carry a test with a
-  specific reason and an inline code comment (since 9f1da69, 2026-09-25,
+  specific reason and an inline code comment (since 3c988de, 2026-09-25,
   `tests/test_battle.py`'s divergence cells are real pins at our value with
   PvPoke's value in the message, not xfails); this document is the
   human-readable index of those.

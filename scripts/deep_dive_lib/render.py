@@ -1118,7 +1118,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             # invocation; the dump fires once per (moveset, focal-
             # species) pair. This predates the general
             # replay-from-saved-state path (`scripts/replay_analysis.py`,
-            # c07cca9; CHANGELOG 2026-06-10 "Sweep disk cache +
+            # b23b522; CHANGELOG 2026-06-10 "Sweep disk cache +
             # replay-from-saved-state"); it covers only the mirror-tier
             # synthesis pass.
             try:

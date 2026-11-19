@@ -1,4 +1,4 @@
-"""Stage-probe guards in ``scripts/joint_iv_breakpoints.py`` (f47e87f).
+"""Stage-probe guards in ``scripts/joint_iv_breakpoints.py`` (1f5afc6).
 
 Two guards ship in that commit, and neither had a test:
 
@@ -27,7 +27,7 @@ Two guards ship in that commit, and neither had a test:
    ``ABORT: no stage probe observed the Icy Wind debuff`` (reproduced
    at HEAD by removing only the item-4 branch).
 
-Pre-fix values, observed by running this file against efd93ba:
+Pre-fix values, observed by running this file against 9fac099:
 
 * every ``simulate`` call in the run carried ``{'log': True}`` only --
   ``charged_policy_0`` / ``charged_policy_1`` were never passed;
@@ -102,7 +102,7 @@ def test_shipped_anchor_configs_pass_key_validation():
     declared in ``_BP_KNOWN``.
 
     Pre-fix observed value: ``stage_probe_engine_default_policy`` was
-    READ at the probe (f47e87f) but never added to ``_BP_KNOWN``, so
+    READ at the probe (1f5afc6) but never added to ``_BP_KNOWN``, so
     both shipped anchor pages died at startup with ``ABORT:
     [breakpoints] unknown keys ['stage_probe_engine_default_policy']``
     and could not be rebuilt at all (found by the 2026-08-27
@@ -283,7 +283,7 @@ def test_debuff_thrown_but_every_slot1_hit_shielded_records_the_key(
         tmp_path, monkeypatch):
     """Canned fights: the debuff flies, every slot-1 hit is shielded.
 
-    Observed at efd93ba: no abort -- the old default-policy probes
+    Observed at 9fac099: no abort -- the old default-policy probes
     never threw Icy Wind, so the run recorded ``debuff_unreachable``
     and this test fails with ``KeyError:
     'debuff_thrown_only_shielded'``.  (The ``ABORT: no stage probe

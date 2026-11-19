@@ -12,7 +12,7 @@ deselected, 0 xfailed), 238 s on 2026-09-28 from a worktree at load ~10-14
 (`test_deep_dive_brief.py` ~108 s of it: 230 tests, ~134 blob-backed;
 `small_dive_html` Marill render 42 s under load, shared by eleven modules).
 The 13 `tests/test_battle.py` xfails became real pins 2026-09-25
-(`9f1da69`); 260 passed there as of 2026-09-28. Full suite "~80s" until
+(`3c988de`); 260 passed there as of 2026-09-28. Full suite "~80s" until
 2026-09-20, then 960 s and 1,042 s on that date.
 
 Python env history (was in CLAUDE.md "Running Python"): switched from pyenv
@@ -30,13 +30,13 @@ became "pre-bake/publish traps", and status lines that had gone stale
 
 ## 2026-11-17 -- PvPoke sync at d02018eb6: re-vet, Mega Level 4 ML fix, pools, data cache, Tinkaton re-dive (NOT published)
 
-Commits 21710cd (Morpeko bug #8 fixed upstream; audit 375/387 exact),
-115538f (Mega Level 4: no +2 boost in Master League; engine `3d125a0e165f`
--> `a6dffb536332`, slayer `0efb8d63e7d2` -> `1294f3bbff20`), 75d13b6 (pools:
+Commits dbb9a35 (Morpeko bug #8 fixed upstream; audit 375/387 exact),
+cc80efb (Mega Level 4: no +2 boost in Master League; engine `3d125a0e165f`
+-> `a6dffb536332`, slayer `0efb8d63e7d2` -> `1294f3bbff20`), e7478a5 (pools:
 `gl_top50_plus_cs` + Dunsparce, + Feraligatr (Shadow), - Snorlax, - Snorlax
 (Shadow); `gl_top30_plus_cs_top100` + Dunsparce, + Rillaboom, - Snorlax,
 - Electrode (Hisuian); `ul_top60` + Togekiss; `master_top60` + Rhyperior,
-+ Zekrom (Shadow)), 87d212c (re-vet, digests re-pinned). Michael refreshed
++ Zekrom (Shadow)), f23eaea (re-vet, digests re-pinned). Michael refreshed
 the data cache outside the sandbox: gamemaster stamp `10d0d903c162`;
 great/ultra/master rankings and `group_championshipseries.json` equal pvpoke
 `d02018eb6` (md5). The mega rankings were missed (open item in TODO). The
@@ -44,7 +44,7 @@ pending 10-24 migration plan matched no cached column (all at the 09-28
 bake); see TODO.
 Unlisted diggersby, snorlax and shadow-snorlax GL page dirs pruned from
 `userdata/website/` (Michael approved); UL Snorlax pages kept. Poke Genie
-exports committed: 10-25 in 9be1a56, 11-17 in 73b056d.
+exports committed: 10-25 in fe9a5d8, 11-17 in c527bdb.
 
 **Tinkaton GL + UL re-dived** (`run_website_dives.py tinkaton`,
 `GOPVPSIM_PIN_DATA_CACHE=1`, 13:50-14:37, log
@@ -60,8 +60,8 @@ mega-rankings default (no Night Shade+).
   column is newer than 09-28. Fixed: `.claude/settings.local.json`
   `sandbox.filesystem.allowWrite` adds `~/.cache/gopvpsim` and
   `~/Documents/gopvpsim_cache`; a failed write now logs one WARNING per run
-  (e321598, `tests/test_cache_write_failure_warns.py`). Full pre-groom text:
-  TODO.md at 6c7a960.
+  (1b6904d, `tests/test_cache_write_failure_warns.py`). Full pre-groom text:
+  TODO.md at b2df247.
 
 ## 2026-11-05 -- PvPoke sync 38f70320d..e02bde78d: no battle-JS change; Tinkaton re-dived (superseded 11-17)
 
@@ -85,10 +85,10 @@ the 11-17 re-dive. New tool: `scripts/probe_page_cells.py`.
 
 ## 2026-10-24/25 -- DEVELOPER_NOTES gate: seven adversarial review rounds (moved from Claude memory 2026-11-19)
 
-`scripts/verify_dev_notes.py` became a pre-commit gate (b1f054e) after the
-notes were trimmed from 118k to ~51.9k chars (daf5175, 87589c5). Seven
-adversarial rounds hardened the hook: f88e230 (r1), 2ea85fd (r2), 85cd008
-(r3), 2154319 (r4), ded70aa (r5), 7b70e1f (r6), 9ce51bd (r7). Real silent
+`scripts/verify_dev_notes.py` became a pre-commit gate (53f7c3a) after the
+notes were trimmed from 118k to ~51.9k chars (abc1a2d, d6405ab). Seven
+adversarial rounds hardened the hook: d9a4ac1 (r1), 96e2310 (r2), f491d27
+(r3), 77a47a7 (r4), 06ce908 (r5), 1b95fa8 (r6), b30b8ae (r7). Real silent
 passes found: working tree read instead of index; bare `python`; SIGPIPE on
 `grep -q`; argparse exit 2 vs drift; derivation failures read as drift; a
 pytest collection error accepted as a count; `::` chain split by whitespace;
@@ -103,10 +103,10 @@ the input was constrained instead (the single-backtick dialect rule). Tests:
 ## 2026-10-25 -- Minior UL dives rendered locally (both forms, no one-move pages); UL shell level found unpinned in-game; NOT published
 
 Michael: "Now dive UL, same way, except we don't need the single-moved
-miniors" (the one-charged-move entries in the GL dropdown). Commits 410bd5e
+miniors" (the one-charged-move entries in the GL dropdown). Commits 9a762de
 and this one. Nothing published.
 
-**Setup (410bd5e).** `deep_dive.py --no-single-charged` drops the
+**Setup (9a762de).** `deep_dive.py --no-single-charged` drops the
 one-charged-move candidates from the no-`--charged` enumeration (Minior
 with Rollout pinned: 6 candidates -> 3; `tests/test_no_single_charged.py`).
 Registry entries `minior-core-ultra-league` / `minior-core-only-ultra-league`
@@ -162,10 +162,10 @@ unaffected (no shell phase).
 ## 2026-10-24 (night) -- Minior GL dives rendered locally (both forms); GL pools regenerated; NOT published
 
 Michael, going to bed: "I want to have gotten to the point of having a
-minior dive. that definitely means redoing the pool." Commits 383518b,
-472235a, eea3705, 580a808 and this one. Nothing was published.
+minior dive. that definitely means redoing the pool." Commits 99e1219,
+d5fda19, 56f78be, 6cd36fd and this one. Nothing was published.
 
-**Pools (383518b).** `opponent_pools/gl_top50_plus_cs.txt` regenerated
+**Pools (99e1219).** `opponent_pools/gl_top50_plus_cs.txt` regenerated
 against today's rankings (pvpoke 38f70320d, fetched 2026-10-24 12:03):
 adds Dragonair (Shadow) and Kingdra (Shadow), drops Diggersby and
 Feraligatr (Shadow). `gl_top30_plus_cs_top100.txt`: adds Annihilape,
@@ -173,7 +173,7 @@ Azumarill, Electrode (Hisuian), Hydreigon (Shadow); drops Araquanid
 (Shadow), Empoleon, Empoleon (Shadow), Feraligatr. The hand-built
 `ul_top60.txt` / `master_top60.txt` still read DRIFT (Michael's curation
 call; not inputs to a GL dive). `verify_overnight.py` DEFAULT_MARKERS
-follow the regeneration (472235a): Dragonair (Shadow) and Kingdra (Shadow)
+follow the regeneration (d5fda19): Dragonair (Shadow) and Kingdra (Shadow)
 in, Diggersby out.
 
 **Pre-dive gate** (docs/predive_checklist.md grid, four Opus reviewers, all
@@ -182,9 +182,9 @@ pinned data cache; sweep cache ON is safe because no Minior column existed);
 input freshness (gamemaster, rankings and the default moveset ROLLOUT /
 ACROBATICS, POWER_GEM all match the registry); engine (2,106 Minior cells vs
 PvPoke: 31 mismatches, 30 already catalogued, one new = the Mimikyu
-break-disguise ordering, now TODO "Minior -- open items", 580a808); trace
+break-disguise ordering, now TODO "Minior -- open items", 6cd36fd); trace
 (Medicham = PvPoke's seat-order route, docs/pvpoke_divergences.md item 1;
-Ariados closed by the class-A port, eea3705). Fast tier: 3,119 passed, 2
+Ariados closed by the class-A port, 56f78be). Fast tier: 3,119 passed, 2
 failed, both known (`test_ml_guide_progress` cannot spawn `ps` under the
 sandbox; `test_real_dives_contain_their_declared_pools` fails on the old
 shipped pages until the next full bake brings the two re-entrants in). Smoke
@@ -236,7 +236,7 @@ after the sprite re-render; the callout re-render changes prose only.
 
 - **What:** the strat leg of the 2026-10-24 re-vet, deferred when Minior
   was ported. Record: `docs/validations/2026-10-24_cramorant_strat_recheck.md`.
-- **Strat:** unchanged. Lab grid today vs the pre-port engine (`87e73e3`):
+- **Strat:** unchanged. Lab grid today vs the pre-port engine (`de229f0`):
   0 of 2,430 PoGoDives-tier cells moved, 2 plain-tier cells moved onto
   PvPoke (UL Cramorant vs Dusknoir 1v2, 470 -> 487); net vs plain +76 on
   both engines; the 720-cell strict bar passes from the shipped tensors;
@@ -263,13 +263,13 @@ DEVELOPER_NOTES.md had grown to 2,034 lines / 118k chars against its own
 stated cap (~52k chars, so that a session-startup read gets the WHOLE file).
 It was rewritten to live invariants + open divergences only. The blocks below
 are the REMOVED sections and the long-form originals of the most heavily
-condensed ones, VERBATIM from the file at `0829b5a` (headings demoted one
+condensed ones, VERBATIM from the file at `07ed2a1` (headings demoted one
 level, nothing else changed), grouped under the section they came from. It is
 NOT the complete pre-trim text: sections condensed in place (Engine constant
 sourcing, bugs #1/#2, bandaid[929], Battle timeout, the move-selection
 freeze, Threshold model, DP queue / TTL / CMP / selfBuffing, Form change
 gotchas 1-4 and 7, and parts of Turn model and Sweep cache) have no block
-here; for those, `git show 0829b5a:DEVELOPER_NOTES.md` is the record. Where
+here; for those, `git show 07ed2a1:DEVELOPER_NOTES.md` is the record. Where
 a block was condensed rather than removed, the condensed version in
 DEVELOPER_NOTES is the current statement and this is the evidence behind it.
 Dates inside the blocks are the original dates. Code-line references inside
@@ -413,7 +413,7 @@ ground truth before PvPoke merged to master.
 **Threaded, and the default now tracks the engine (corrected
 2026-09-20).** The paragraph here used to say `deep_dive_slayer.py` was
 "not threaded" and simmed on the legacy clock. That went stale at
-`37344e6`, which threaded `mechanics` through
+`ac2dfd2`, which threaded `mechanics` through
 `iterative_slayer_discovery` -> the pool `initargs` -> `_slayer_state`
 -> every `simulate(...)` call, and `deep_dive.py` has passed
 `mechanics=args.mechanics` at BOTH `--mirror-slayer` sites (the main
@@ -422,7 +422,7 @@ mirror section ever ran on the wrong clock.
 
 What WAS wrong until 2026-09-20: the three fallback defaults in that
 module still read `'legacy'` while `battle.simulate`'s default went
-`'new'` on 2026-09-09 (`7e6a82b`), so a caller that named no mechanics
+`'new'` on 2026-09-09 (`143f3d9`), so a caller that named no mechanics
 got a legacy mirror beside new-clock sims. They now read
 `deep_dive_slayer.SLAYER_DEFAULT_MECHANICS`, pinned to the engine's own
 default by `tests/test_dive_worker_form_change.py::
@@ -478,7 +478,7 @@ reads the right `--from-engine`.
 | 2026-06-10 | `154536a` (DP setup cache + log gate) | 2,278     | Post-regression-fix baseline                       |
 | 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | 3,160     | Previous baseline (warm JIT cache; first run       |
 |            | reachability, DP-cache precompute)    |           | after an engine edit pays ~1-2s compile)           |
-| 2026-09-25 | `6f99b08` (engine `5a813036625c`)     | **5,800** | **Current baseline** (CHANGELOG 2026-09-25;        |
+| 2026-09-25 | `2932e8d` (engine `5a813036625c`)     | **5,800** | **Current baseline** (CHANGELOG 2026-09-25;        |
 |            |                                       |           | 5,846 at the parent engine `d78c67fd06a7`). New    |
 |            |                                       |           | turn system, post-2026-09-09 gamemaster: NOT       |
 |            |                                       |           | comparable with the rows above                     |
@@ -858,7 +858,7 @@ messages.
   `shadow_cmp` family (all 30 GL top-20 winner flips). Pinned by
   `test_shadow_quagsire_vs_feraligatr_cmp`, `test_cmp_atk_strips_shadow_bonus`.
   - **Missed 10th site, the fire_now double-fire gate — RESOLVED 2026-06-27**
-    (`582f7d7`): same `.atk`->`cmp_atk` fix. Shadow-XOR only; oracle-repro
+    (`b55748e`): same `.atk`->`cmp_atk` fix. Shadow-XOR only; oracle-repro
     Shadow Quagsire vs Gastrodon 2v1 (625/375 -> 459/540). Pinned by
     `test_fire_now_cmp_shadow`. Impact 35/20,178 cells, 6 flips (window-
     defenders Talonflame/Milotic/Guzzlord/Gourgeist/Dusclops). Pre-fix dives
@@ -867,20 +867,20 @@ messages.
 - **Engine bug-hunt #2–#7 (2026-06-27) — all RESOLVED.** Report:
   `docs/reviews/2026-06-27_engine_bug_hunt.md`; shipped record in CHANGELOG
   "2026-06-28".
-  - **#2** float32-truncated damage constants (`f1538ff`) + shadow-def
-    `float32(5/6)` (`805cdc3`) — boundary-scattered, forced the cold re-dive.
-  - **#3** farm-down stacks self-debuffing moves (`50e8cd2`,
+  - **#2** float32-truncated damage constants (`b2683ba`) + shadow-def
+    `float32(5/6)` (`d264251`) — boundary-scattered, forced the cold re-dive.
+  - **#3** farm-down stacks self-debuffing moves (`1123648`,
     `test_bug3_farm_stack`); 0/2160 default-meta cells changed. Follow-up
     (~117 both-self-debuff divergences) CLOSED 2026-07-03: KEEP, every flip
     ours-favorable. Pins: `test_both_self_debuff_divergence.py`; writeup +
-    post-`ffb582b` re-measure addendum:
+    post-`4e1ec72` re-measure addendum:
     `docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md`.
   - **#4** slayer-cache key includes `focal_max_level` (`slayer_cache` v4).
   - **#5** bandaid[929] no-bait swap kept ungated as an INTENTIONAL divergence
     (see below); `test_bandaid929_nobait_divergence`.
   - **#7** `_cm_debuf_delta` dead str-vs-int branch -> `float(...)==1.0`
     (matches PvPoke loose-equality); 0/10458 dive cells. `test_cm_debuf_delta`.
-  - **#6 bandaid[910] — RESOLVED 2026-06-29** (`ffb582b`). The [910] defer-gate
+  - **#6 bandaid[910] — RESOLVED 2026-06-29** (`4e1ec72`). The [910] defer-gate
     picked the defender's max-damage charged move where PvPoke
     (`ActionLogic.js:929`) uses `bestChargedMove`; an accidental port infidelity,
     not a defended divergence. **Winner-stable but NOT score-stable** (the old
@@ -1473,7 +1473,7 @@ spreads always carried, capped at `REC_MAX_SPREADS`, and labelled "Top pick
 with it.
 
 `tests/test_card_pole_tiebreak.py` now pins the RETIREMENT (its old content,
-the 810f53c attack tie-break tripwires, is quoted in the module docstring):
+the 65831c2 attack tie-break tripwires, is quoted in the module docstring):
 a pole that came back would silently re-open the 2026-06-24 UL Mimikyu
 dominated-spread bug, whose tie-break lives nowhere now.
 
@@ -1822,19 +1822,19 @@ changes automatically (blue -> green -> gold).
   lower middle by (wins, ties), so w + t + l = N); each group carries its
   `moveset`, the facts the `arm_label`. `beat` and `cmp` are unchanged.
 - **Old pages:** blobs without a population render byte-identical
-  (replay-render harness, five default blobs, vs a main@3beb843 baseline).
+  (replay-render harness, five default blobs, vs a main@912437f baseline).
 - **Pins:** `tests/test_mirror_population.py` (recount of ties and losses
   from the stored scores; each lead trigger word for word; the table
   cells; the gate test inverted to "population present -> new block,
   absent -> cohort paragraph byte-identical").
-- **Commit:** 6ad44b7.
+- **Commit:** d5ca413.
 - **Probe (pre-decision):** a true self-mirror (same IVs and moveset, both
   seats) scores 500 on every arm; the first note blaming the row/column AI
   convention was wrong and is retracted. Melmetal GL 09-27 blob: Dynamic
   Punch -> lead (b); Hyper Beam, Rock Slide, Thunderbolt -> (a) all-lose;
-  Superpower -> (a) counts. Full pre-groom text: TODO.md at 6c7a960.
+  Superpower -> (a) counts. Full pre-groom text: TODO.md at b2df247.
 
-## 2026-09-28 -- PoGoDives sheet v8: rule R, the Surf-gulp 0v1 gate reads HP (0a1df03)
+## 2026-09-28 -- PoGoDives sheet v8: rule R, the Surf-gulp 0v1 gate reads HP (fd236b2)
 
 - **Why:** sheet v7's `surf_gate_dpe` 2.25 (entry 2026-09-27) fixed the GL
   Peck / Fly + Surf 0v1 Araquanid bar failure but also sent Jumpluff and
@@ -1892,11 +1892,11 @@ changes automatically (blue -> green -> gold).
   (v7 + v8), pending Michael's review; not re-rendered.
 - **Still open:** apply the migration, Cramorant GL re-dive, certification
   record, article re-render, publish on Michael's go.
-- **Runbook status (from TODO, 0952963):** TODO's Cramorant runbook carried
+- **Runbook status (from TODO, bb026e2):** TODO's Cramorant runbook carried
   "post-bake verification last DONE 2026-09-28, sheet v8; the site published
   2026-09-28". Not independently verified, and it conflicts with the "Still
   open" line above. Runbook now in docs/cramorant_policy_plan.md "Post-bake
-  certification runbook". Full pre-groom text: TODO.md at 6c7a960.
+  certification runbook". Full pre-groom text: TODO.md at b2df247.
 
 ## 2026-09-28 -- DP farm-down insertion order ported to PvPoke's (engine bump)
 
@@ -1923,7 +1923,7 @@ changes automatically (blue -> green -> gold).
   pin moved.
 - **Pins:** `tests/test_farmdown_order_port.py`, four cells verified on
   PvPoke master 78b1e66db via `scripts/pvpoke_trace.js`, each failing on
-  b82ca59 (pre-port values recorded in the test).
+  b031a98 (pre-port values recorded in the test).
 - **Hashes:** engine 20d9f018970b -> 9f1947ee5614; slayer 5dfdafc264f6 ->
   587f61940e6f.
 - **Cache:** predicate `farmdown_order_20260928` (affected iff either
@@ -1934,9 +1934,9 @@ changes automatically (blue -> green -> gold).
   the sampler's `_make_battle_pokemon` defaults to max_level=51. Migration
   `farmdown_order_20260928` never applied; superseded by the 09-28 full bake
   (cache now at engine 4b42f9d83690, post-port). Full pre-groom text:
-  TODO.md at 6c7a960.
+  TODO.md at b2df247.
 
-## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above) (60481e5; gate-off 561e7d4)
+## 2026-09-28 -- Mirror population as opponent columns (bake ON, paragraph render-gated OFF; gate opened later that day, entry above) (e83a834; gate-off 32b6182)
 
 - **What:** TODO.md "NEXT BAKE: mirror population" (Michael, 2026-09-22),
   built. After the main sweeps and before the blob is dumped, each dive
@@ -1980,7 +1980,7 @@ changes automatically (blue -> green -> gold).
   next bake.
 - Decision of record now in docs/expert_verdict_plan.md "Mirror population:
   decision of record"; open residue in TODO "Mirror population -- open
-  residue". Full pre-groom text: TODO.md at 6c7a960.
+  residue". Full pre-groom text: TODO.md at b2df247.
 
 ## 2026-09-28 -- Aegislash first-throw quirk documented as PvPoke #10 (docs + pins, no engine change)
 
@@ -1994,7 +1994,7 @@ changes automatically (blue -> green -> gold).
   `tests/test_form_change_oracle.py`. The F2b farm-down insertion-order
   port gap is a TODO decision item.
 
-## 2026-09-28 -- In-hash dead-code removal, fully-blessing bump (1a05c60)
+## 2026-09-28 -- In-hash dead-code removal, fully-blessing bump (79b609f)
 
 - **What:** the in_hash=true items from the 2026-09-25 cruft scout that
   re-verified as zero-caller: battle.py unused imports
@@ -2020,7 +2020,7 @@ changes automatically (blue -> green -> gold).
   --from-engine 0c54e07bc21b`); dry-run: 280,018 columns and 151 slayer
   entries blessed, 0 deleted.
 
-## 2026-09-27 -- Shield-form Aegislash prices charged moves at the Blade atk (03993a4)
+## 2026-09-27 -- Shield-form Aegislash prices charged moves at the Blade atk (4d25662)
 
 - **Symptom:** six Aegislash x Azumarill oracle cells open since the 09-09
   new-mechanics re-baseline, same winner, 50-142 rating points apart:
@@ -2042,7 +2042,7 @@ changes automatically (blue -> green -> gold).
   scores but 0/6 logs -- score coincidence); the fix has to live in the
   caches. It became six cells on 09-09 because PvPoke's SHADOW_BALL 100 ->
   90 (2ab0fc395) moved Azumarill's HP into the window between the two
-  estimates; b0c4fb0 was right that the nerf does not change move
+  estimates; c7699c3 was right that the nerf does not change move
   selection, but it was the trigger.
 - **Fix:** `BattlePokemon._charged_atk_base`, one helper for all three
   sites: when the current form's trigger is `activate_charged` (only
@@ -2061,7 +2061,7 @@ changes automatically (blue -> green -> gold).
   docs/pvpoke_divergences.md item 7).
 - **Measured:** full oracle audit 243 cells, 8 documented Morpeko
   divergences, 0 new, 0 vanished (was 14 diverging). Four new non-Azumarill
-  Aegislash opponent rows (69b9212: Electrode-H, Mimikyu, Clodsire, Cradily;
+  Aegislash opponent rows (b5346c4: Electrode-H, Mimikyu, Clodsire, Cradily;
   pre-fix 8/36 diverged incl. 4 winner flips): 33/36 exact + the 3 Cradily
   stage cells; 279 cells total. 1080-cell sample (Shield + Blade 4/14/15 vs
   top-60 GL at 15/15/15, 9 scenarios, both seats): matches PvPoke on
@@ -2069,16 +2069,16 @@ changes automatically (blue -> green -> gold).
   cells move, 149 onto PvPoke; 8 winner flips, all to PvPoke; 1 cell that
   matched before no longer does (Shield vs Cradily 2-2, the stage choice).
 - **Cache:** engine 32a20be48379 -> 45cf73a2d23d (slayer 9b90c8d8b434 ->
-  0c54e07bc21b; includes 654061d, a comment-only rewording of the stale
+  0c54e07bc21b; includes 60a3b3e, a comment-only rewording of the stale
   "EXPERIMENTAL / UNVALIDATED" mechanics='new' header). Predicate
-  `aegislash_blade_atk_20260927` (89cb264): affected iff either side's
+  `aegislash_blade_atk_20260927` (1a2b7ec): affected iff either side's
   species starts with Aegislash (Blade starts revert to Shield; the other
   side's would_shield / TTL read the Aegislash's estimates); slayer mirrors
   iff the scenario species does. Both Aegislash GL dives and every GL dive's
   Aegislash opponent rows were baked with the bug.
 - **Cleanup:** `scripts/mechanics_notice.py` deleted with its call sites and
-  the tests that pinned its wording (24971d9); the stale blade xfails
-  {(1,1),(1,2)} cleared (69b9212).
+  the tests that pinned its wording (ef09bba); the stale blade xfails
+  {(1,1),(1,2)} cleared (b5346c4).
 - **Brief caveat stamp retired:** `scripts/deep_dive_brief.py`
   `CAVEAT_SPECIES` is now `()` (branch `swing/retire-aegislash-caveat`), so
   Aegislash cells no longer print "(engine divergence vs PvPoke)" and
@@ -2102,14 +2102,14 @@ changes automatically (blue -> green -> gold).
 - Chain note: without `PYTHONUNBUFFERED=1` the dive runner's banners are
   block-buffered; read per-dive logs for progress.
 
-## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (dfebbd8)
+## 2026-09-27 -- PoGoDives sheet v7: Surf-normalized 0v1 dive gate (e3e752f)
 
 - **Finding:** the post-bake Cramorant certification (owed since 09-20, run
   after the 09-26/27 bake) showed 8 bar failures, all one cell: GL page
   PECK / FLY, SURF, start 0v1, vs plain Araquanid -- PoGoDives tier -1,971
   net wins / -155.7 mean vs plain; 3,214 of 4,096 spreads worse, none
   better. Not a regression: that page did not exist before the 09-20 bake
-  (a85d62e regenerated the GL opponent pool on 09-17, the top-20 screening
+  (68b7f1a regenerated the GL opponent pool on 09-17, the top-20 screening
   set changed, and Fly+Surf edged out Hydro Pump+Surf by 1.2 points), so it
   had never been certified.
 - **Mechanism:** row (0,1) 'cmp' raises the Dive/Surf-ASAP DPE threshold
@@ -2138,11 +2138,11 @@ changes automatically (blue -> green -> gold).
   clean -- so a page that enters through the moveset screen can no longer
   ship uncertified. Wired into publish_website.sh's gate section.
 
-## 2026-09-27 -- Sweep-side rank-1 IV memo (ea32bd9), no CACHE_VERSION bump
+## 2026-09-27 -- Sweep-side rank-1 IV memo (c4083f1), no CACHE_VERSION bump
 
 - `deep_dive_lib.opponents.resolve_opp_ivs` is memoized per process
   (species, league, shadow, base opp-IV mode; cleared by
-  `gopvpsim.invalidate_caches()`); the render-side memo from R1 (dc34ab0)
+  `gopvpsim.invalidate_caches()`); the render-side memo from R1 (2556b7e)
   is removed as redundant. Michael reversed the 09-25 Q2 ruling on 09-26:
   no CACHE_VERSION bump, because the function is parent-side and
   `tests/test_resolve_opp_ivs_memo.py` proves output identity over all 104
@@ -2178,19 +2178,19 @@ changes automatically (blue -> green -> gold).
 Closed out of TODO's post-Worlds checklist 2026-09-27.
 
 - **08-31 (Michael):** the Worlds surfaces retire with the Twilight Trails
-  site update. `verify_worlds.py` left the ship-gate roster (5985777) -- it
+  site update. `verify_worlds.py` left the ship-gate roster (bc9cc9d) -- it
   failed from main on all six gamemaster stamps and, the roster being
   shared, blocked every publish path; the publish-time Worlds re-render
   became opt-in (`WORLDS_RERENDER=1`). The pinned `gopvpsim-worlds` worktree
   was removed after its one delta (`scripts/worlds_meta.py`) was verified
   byte-identical to main. The `.cards_rerender_pending` sentinel set that
-  day (L51 dead-tooltip fix 061d93c; the cup banner's false "dated archive"
+  day (L51 dead-tooltip fix af85996; the cup banner's false "dated archive"
   claim) cleared with the September full re-renders.
 - **09-10:** the three Worlds artifact tests marked dormant, not broken
-  (066e528). **09-20:** the deferred cmp_atk 1-ULP shadow-tie fix landed on
-  its own hash bump (ebf5944; pin now
+  (e044959). **09-20:** the deferred cmp_atk 1-ULP shadow-tie fix landed on
+  its own hash bump (18e4be4; pin now
   `test_cmp_shadow_roundtrip_artifact_no_longer_reaches_cmp`). **09-22:**
-  nothing is hardcoded to legacy mechanics, Worlds included (4b6342b).
+  nothing is hardcoded to legacy mechanics, Worlds included (d5281ed).
 - **Aegislash rebake question: moot.** Cramorant was not Worlds-legal
   (eligible 09-01), the surface retired, and Aegislash was fixed and rebaked
   site-wide (CHANGELOG 2026-09-12/15).
@@ -2202,10 +2202,10 @@ Closed out of TODO's post-Worlds checklist 2026-09-27.
 
 ## 2026-09-25 -- Bake speed R1-R6 merged (render layer); storage reclaim
 
-R1 render-side rank-1 IV memo (10c3124; sweep-side replacement ea32bd9,
+R1 render-side rank-1 IV memo (b0f8d2d; sweep-side replacement c4083f1,
 09-27), R2+R4 per-pass anchor-flip/boundary memo + vectorized aggregator
-(60972e9), R3 skip no-op best-buddy L51 pass (2e4c05d), R5 concurrent ship
-gates (71afca3), R6 sleep/all-miss attribution guards (298783c); none touches
+(61f8a86), R3 skip no-op best-buddy L51 pass (2345b79), R5 concurrent ship
+gates (e665362), R6 sleep/all-miss attribution guards (be5fabb); none touches
 an engine-hashed file, every render change behind
 `scripts/replay_render_diff.py`. Root cause: more than half of the 09-20
 37.7 h bake ran single-core (render 12.4 h). Measured on the 09-26/27 bake
@@ -2216,7 +2216,7 @@ unlinked; slayer 150 / 0). Disk 752 -> 653 GiB used. The 258-blob replay
 prune (9.5 GB) was refused by the auto-mode classifier and left to Michael
 (per the perf doc's "Results"), not done. Plan + Results:
 docs/perf/2026-09-25_bake_attribution_and_cruft_scout.md. Full pre-groom
-text: TODO.md at 6c7a960.
+text: TODO.md at b2df247.
 
 ## 2026-09-25 -- Moltres-G near-KO plan: match PvPoke (engine bump d78c67fd06a7 -> 5a813036625c)
 
@@ -2263,30 +2263,30 @@ text: TODO.md at 6c7a960.
   unchanged iff neither side owns one; same Zap-Cannon-mutation caveat
   as `self_debuff_either_side`, measured harmless 2026-07-03).
 
-## 2026-09-23..25 -- Signature dedup made exact (a4ca14e); migrations applied
+## 2026-09-23..25 -- Signature dedup made exact (f2401cd); migrations applied
 
 - **Found 2026-09-23** by the statfx lab, which re-sims plain PvPoke for every
   cell it touches: on 25 of 165 class pages (engine 9ac12a2754a1, the bake
   stamp) 1-92 cells per page (~0.01-0.1%) did not reproduce, e.g. Florges GL
   vs Shadow Annihilape (an exact-CMP-tie spread's score rows swapped) and
   Zygarde (Complete) UL vs Mimikyu (1044 1v1/2v1 = 325/337 vs 400/414).
-- **Root cause (a617f98):** `deep_dive_signature.py` dedup was not exact.
+- **Root cause (41ca721):** `deep_dive_signature.py` dedup was not exact.
   Dedup ON reproduced the tensors, OFF (per-profile truth) did not: 396 /
   774 / 6 cells on Florges, Zygarde, Blastoise UL vs Forretress. Two gaps:
   (1) the CMP column divided shadow attack by 1.2 -- the lossy round trip
-  ebf5944 had removed from the engine -- so exact CMP ties vs a shadow side
+  18e4be4 had removed from the engine -- so exact CMP ties vs a shadow side
   were signed win/loss; (2) `movable_axes` missed the attack axis that
   `pvpoke_dp`'s `_cm_buff_delta` moves for a chance-1 opponent-DEFENSE
   debuff (Sand Tomb, Bulldoze), so `atk*1.25/def` vs `atk/(def*0.8)` floored
   differently at rare boundaries.
-- **Fix (a4ca14e):** `cmp_atk = (base atk + atk IV) * CPM` like the engine's
+- **Fix (f2401cd):** `cmp_atk = (base atk + atk IV) * CPM` like the engine's
   `raw_atk`; def-debuff charged moves make the owner's atk axis movable.
   Failing-first tests on the three pairs; two pins that encoded gap 2
   corrected with pre-fix values recorded. Dedup ON == OFF on all three
   pages; `verify_signature_dedup.py` default corpus EXACT MATCH.
 - **Cache:** the signature module is in the sweep engine hash, so the hash
   moved 9ac12a2754a1 -> d78c67fd06a7 (every column a safe miss). Predicates
-  (b6e369a): `signature_regroup_20260923` (old grouping rebuilt from a frozen
+  (80fcc0b): `signature_regroup_20260923` (old grouping rebuilt from a frozen
   pre-fix module, matched 1,504/1,504 sampled columns) and
   `signature_fix_slayer_20260923`; the unsafe `legacy_guard_20260922` was
   removed unrun. Applied by hand 2026-09-25: sweep 239,091 blessed / 43,077
@@ -2294,7 +2294,7 @@ text: TODO.md at 6c7a960.
   "Results"). The corrected tensors reached the site with the 2026-09-26/27
   bake and the 2026-09-27 publish.
 
-## 2026-09-22 -- Mirror cohort line cut to two sentences (3b8913e, 02293e7)
+## 2026-09-22 -- Mirror cohort line cut to two sentences (8bf3c5a, ed08818)
 
 - Michael (after the four previews on `mirror-line`): the cohort version is
   NOT rendered site-wide; it reduces to "pick the highest attack you have
@@ -2310,12 +2310,12 @@ text: TODO.md at 6c7a960.
 - Prototype clones removed; seeded-lattice and mirror-proto prototypes kept
   as local branches `experiment/seeded-lattice-2026-09-17` and
   `experiment/mirror-proto-2026-09-21`.
-- Full pre-groom text: TODO.md at 6c7a960.
+- Full pre-groom text: TODO.md at b2df247.
 
 ## 2026-09-22 -- Three TODO items closed: Sableye GL bands, ml_tail ETA, --mechanics comment
 
-- **Shadow Sableye GL "the bands are wild"** (reminder 2438093, 09-11):
-  answered from the published page, no re-sim (034646c). The 0v1 band is
+- **Shadow Sableye GL "the bands are wild"** (reminder 316ffa6, 09-11):
+  answered from the published page, no re-sim (ee01922). The 0v1 band is
   the CMP (charge move priority) line against a PvPoke-default Annihilape
   4/13/13 at 148.10 attack, 2220 of 4096 spreads, 100% rule accuracy,
   named both in "Which one to build?" and in the Matchup clusters table.
@@ -2325,16 +2325,16 @@ text: TODO.md at 6c7a960.
   "wild" (unelaborated; reopen with the specific reading). The
   band-crosser glossary gap stays open in TODO.
 - **ml_tail ETA:** self-calibration from `run_iv_guides.py`'s own
-  `Done in` line landed 3c299aa (09-12,
+  `Done in` line landed ac2d7e1 (09-12,
   `overnight_eta.measured_ml_tail_min()`), but the fallback constant
   stayed 420 min, so a machine with no ML history still printed a phantom
-  ~7 h. 399ae72 set it to 10.0 (3.9 min measured for 60 guides on 09-12,
+  ~7 h. d9854d8 set it to 10.0 (3.9 min measured for 60 guides on 09-12,
   ~2.5x headroom), put `ML_TAIL_MEASUREMENT` beside it, and pinned the
   fallback within [1x, 5x] of it in `tests/test_eta_and_timing_report.py`
   (fails on 420).
-- **`--mechanics` comment:** the help string was fixed 79ecb48 (09-12;
+- **`--mechanics` comment:** the help string was fixed aaad93a (09-12;
   "DEFAULT IS new ... 237 of 243"), but the `warn_mechanics` call-site
-  comment still called legacy the default. Fixed 2ecac26 with
+  comment still called legacy the default. Fixed 8dfe9a5 with
   `test_no_comment_names_the_wrong_turn_model_as_the_default` (tokenize
   scan that joins contiguous comment lines into blocks -- the stale claim
   straddled a line break -- plus a positive control on the pre-fix text).
@@ -2345,14 +2345,14 @@ text: TODO.md at 6c7a960.
 
 Closed out of TODO's "BUILD BRIEF (2026-09-12)" section 2026-09-27.
 
-- **Build brief:** standalone compute core + renderer + tests (b6e6263, v2);
-  v3 floors on Def and HP with bulkpoint mechanisms (d65c509; acceptance
+- **Build brief:** standalone compute core + renderer + tests (f10c161, v2);
+  v3 floors on Def and HP with bulkpoint mechanisms (04ea2a0; acceptance
   cases Altaria Def >= 148.29 vs 2v2 Clodsire, Furret Def >= 102.06 vs 1v1
   Lapras). Michael 2026-09-12: split placement (D11; superseded by v4's
-  one-section, answer-first layout, 94c201e), retire the flavor badge +
+  one-section, answer-first layout, db17905), retire the flavor badge +
   catch phrase (D10, still open in TODO), Cramorant first (done, entries
   2026-09-12/15). Named "Which one to build?" 2026-09-13; merged
-  with the all-scenario matchup clusters 09-15 (9b5e86d).
+  with the all-scenario matchup clusters 09-15 (d931aea).
 - **Analyses:** spread sets (2026-09-15; 108 dives / 448 arms / 7944 named
   sets; two-/three-stat structure in 88% of arms but only 1.8% of decision
   cells after the materiality bar; the explicit list stays the primitive)
@@ -2360,25 +2360,25 @@ Closed out of TODO's "BUILD BRIEF (2026-09-12)" section 2026-09-27.
   single set by a median 6 guaranteed cells; 79% of arms name a fork).
   Reports in `~/coding/reports/` (spread-sets 09-15, builds-lattice 09-16).
 - **v4:** the section shows 2-3 BUILDS (primary / fork / rank-1 region)
-  with a three-preset Build-criteria knob (a06a74f, d9fbb09; review rounds
-  2-10 through 65e78cc), merged cfbbb98 (09-20), live since the 2026-09-22
-  publish of the 2026-09-20 bake. Rankings-vintage drift found on the way (9adc094: tests
+  with a three-preset Build-criteria knob (e7ab2f9, acb02da; review rounds
+  2-10 through c35d07d), merged 008eeef (09-20), live since the 2026-09-22
+  publish of the 2026-09-20 bake. Rankings-vintage drift found on the way (49507a3: tests
   freeze `tests/fixtures/pvpoke_rankings_20260908.json`); the chain pins
-  the data cache for the whole bake (88bec7b). The Cramorant hand-off rules
+  the data cache for the whole bake (7090ce0). The Cramorant hand-off rules
   (local clone, no engine edits during a bake) were followed and the clones
   deleted 09-22.
 
 ## 2026-09-15 -- Cramorant close-out: merges + cache migrations (re-dive deferred)
 
 Michael: "Do the first four, don't do the redive." Merged in one pass:
-0afbf6b (Aegislash fix), 1374a70 (predicates), 8a8afcd (v6), 9b5e86d
+7964395 (Aegislash fix), a9c706a (predicates), 7d7306c (v6), d931aea
 (scenario clusters + "Which one to build?"); engine e4d380ec3e5e ->
 1436a17ffbb2 -> 36037e51a2ee, fast tier green after each engine merge.
 After a hardlink snapshot (`sweep_pre_aegislash_20260915`, slayer
 likewise): `form_change_either_side_20260912` (235,768 blessed / 25,320
 re-sim; only Blade columns actually moved), gamemaster 51dfa745457a and
 66b3cba2840d -> 9de08819ae0f (0 further deletions), then
-`pogodives_sheet_v6_20260912` (all blessed). f783255 fixed
+`pogodives_sheet_v6_20260912` (all blessed). 29a1a41 fixed
 `--from-gamemaster` ignoring `--slayer`; 129 slayer entries migrated.
 **Gamemaster-vintage swap recipe:** the 09-12 rebake was launched with
 `run_website_dives.py` directly (no TTL keeper), so the live gamemaster
@@ -2392,10 +2392,10 @@ migrations. The re-dive was deferred behind Michael's cluster review; the
 
 ## 2026-09-12 -- Aegislash (Blade) reuse leak found + fixed; Cramorant sheet v6
 
-**Engine bug (found 09-12, fixed 2e8d36b):** Aegislash (Blade) columns
+**Engine bug (found 09-12, fixed e3de87d):** Aegislash (Blade) columns
 were contaminated across battles on a reused BattlePokemon pair (sweep,
 slayer, robustness and joint-IV workers reuse one pair across the 9
-scenarios). Priority-shuffle clause 4 (`aegislash_shield`, 9fe11e2) stamped
+scenarios). Priority-shuffle clause 4 (`aegislash_shield`, 6fe5f6e) stamped
 the shared charged-move dicts in place and `reset_for_battle` never undid
 it; and a fight ending in Blade skipped the form swap on reset, so
 `_dp_init_cache` / `_dp_cache` were never invalidated. Found because
@@ -2407,13 +2407,13 @@ unconditional DP-cache invalidation for form-changers; failing-first test =
 the `aegislash-blade-azumarill` param of
 `test_reset_for_battle_reuse_matches_fresh`. Merged 09-15 (entry above).
 
-**Sheet v6** (8a639e2; record `docs/validations/2026-09-12_cramorant_deep_vet.md`):
+**Sheet v6** (ea631ee; record `docs/validations/2026-09-12_cramorant_deep_vet.md`):
 (1,0) terminal-KO guard, (2,2) last-shield chip guard; stride-1
 re-certification of the changed rows 90/90 PASS on 09-15 (net 937,116 ->
-931,522, -0.6%; the four failing GL cells fixed; fbbc213). Render side, no
-hash impact: computed + page-verified article showcases (6f79ab9, 258e11b),
-instruments (9dd51f5, c926558), lab loader fix (dcf33a1), docs (491f819,
-0397089).
+931,522, -0.6%; the four failing GL cells fixed; 8c752b1). Render side, no
+hash impact: computed + page-verified article showcases (27c7904, e603205),
+instruments (d3f6823, 109b710), lab loader fix (ec46857), docs (6665f95,
+0ce2f87).
 
 ## 2026-09-10..12 -- Cramorant: rebalance re-verify, deep re-verification, stale-article audit
 
@@ -2421,11 +2421,11 @@ Closed out of TODO 2026-09-27 (every thread below finished with the sheet v7
 re-dive, re-certification and article re-render, entry 2026-09-27).
 
 - **Rebalance re-verify (09-10):** sheet v5 FAILED the bar under the new
-  move data (d492963): UL 2v1 -1.325 mean (all Jellicent), UL 0v1 -2 win
-  cells (Dondozo). The LEAD constant is inert (460a63e: lead 30-45 vs static
-  differ in 12 of 2,394 cells). Fix option A: (2,1) re-exempted (f116674);
+  move data (0579c2e): UL 2v1 -1.325 mean (all Jellicent), UL 0v1 -2 win
+  cells (Dondozo). The LEAD constant is inert (5b29e84: lead 30-45 vs static
+  differ in 12 of 2,394 cells). Fix option A: (2,1) re-exempted (d11b694);
   the UL 0v1 -2 is pre-existing, byte-identical under legacy and new
-  mechanics and against the June pool (8c5c219) -- a standing dive-early
+  mechanics and against the June pool (2a930f9) -- a standing dive-early
   cost, kept as the one accepted exception (the 09-12 full-resolution read
   then found the -2 was a single-spread artefact of the PvPoke-default IV
   run). Writeup:
@@ -2433,20 +2433,20 @@ re-dive, re-certification and article re-render, entry 2026-09-27).
 - **Deep re-verification (09-12):** instruments `cramorant_certify.py`
   (strict bar over the full 720-cell grid from the dive tensors;
   `--selftest N`) and `cramorant_mini_sweep.py` (`--check-tensor`,
-  coprime `--stride`) plus a changed-row recert driver (9dd51f5, c926558).
+  coprime `--stride`) plus a changed-row recert driver (d3f6823, 109b710).
   First full-grid read 716/720; the 4 failures (GL Peck/Hydro Pump+Surf 2v2
   nobait, Corviknight-driven) led to sheet v6 (entry below; stride-1 15/15
-  priority slices fbbc213, 90/90 changed rows 09-15).
+  priority slices 8c752b1, 90/90 changed rows 09-15).
 - **Live article stale (09-12 audit):** the four hardcoded 08-27 sandbox
   links replayed differently after PvPoke's post-charge cooldown (Twilight
   Trails merge acb3ce461), Jellicent's 2-1 premise died with Shadow Ball
   100->90, Blastoise's default moved Rollout -> Bite, and every number on the
   page was a legacy-clock value. Fixes: showcases computed and page-verified
-  at render time (6f79ab9); `verify_url` emulates pvpoke.com's double run of
+  at render time (27c7904); `verify_url` emulates pvpoke.com's double run of
   a sandbox link (`hasActed` survives `Pokemon.reset()`, PvPoke Report 9
-  drafted, 491f819) and the encoder shifts by DISTINCT prior resolved turns,
+  drafted, 6665f95) and the encoder shifts by DISTINCT prior resolved turns,
   not charged-action count (17/17 same-turn-pair cells had been mis-encoded;
-  258e11b); the policy lab's GL pool loads again (dcf33a1). The article was
+  e603205); the policy lab's GL pool loads again (ec46857). The article was
   re-rendered from rebaked new-clock pages 2026-09-27; its fixed prose pass
   stays open in TODO.
 
@@ -2454,8 +2454,8 @@ re-dive, re-certification and article re-render, entry 2026-09-27).
 
 Michael 09-11: the old movesets, meta and mechanics are dead; "bake" means
 "bake with a legit set of moves". Rules in `scripts/dive_registry.py`
-("MOVESET RULES"; e7342f2, built in a separate clone during the 09-10
-bake, merged b80f93e 09-12): every dive renders `DEFAULT_TOP_MOVESETS` (5)
+("MOVESET RULES"; 7503a83, built in a separate clone during the 09-10
+bake, merged 5d28a33 09-12): every dive renders `DEFAULT_TOP_MOVESETS` (5)
 screened movesets (the 42 per-slug overrides are gone; Sableye had 1 and
 Shadow Sableye 4, sharing none); PvPoke's default moveset is always a page
 (`--reference auto`); shadow/plain pairs render the UNION of both forms'
@@ -2465,58 +2465,58 @@ unpublished as the warm-cache baseline and a dives-only rebake with the
 cache on launched 09-12 18:02; it did not publish as-is (the Aegislash
 leak, 2026-09-12 entry, went first) and the 2026-09-20 chain superseded it. The
 fast-tier red `test_entry_points_route_through_the_roster` (tripped by
-`publish_website.sh --partial`, 986cc01) was fixed by 0af9da4 (`--exclude`
+`publish_website.sh --partial`, 8322098) was fixed by af1b4e4 (`--exclude`
 routes `--partial` through the roster). The dead
 `forretress-shadow-volt-switch-great-league` registry entries came alive
-when a85d62e (09-17) brought Forretress (Shadow) into the GL pool (29913bd).
+when 68b7f1a (09-17) brought Forretress (Shadow) into the GL pool (393cfd6).
 
 ## 2026-09-09..10 -- Turn system: PvPoke master merge, default flip everywhere, re-baseline
 
 - **09-09:** PvPoke shipped mechanics + moves + rankings to master
-  (5ca1b89): master `src/js` byte-identical to twilight-trails, tripwire
+  (86ada86): master `src/js` byte-identical to twilight-trails, tripwire
   fired on Battle.js only; 29 moves / 105 pokemon changed. The gamemaster
   cache migration was moot (never baked under new). Re-measure vs master
-  (1211b0a; raw `docs/validations/2026-09-09_oracle_new_vs_master_raw.txt`):
+  (db9c131; raw `docs/validations/2026-09-09_oracle_new_vs_master_raw.txt`):
   223 exact + 14 documented + 6 new, all one Aegislash x Azumarill
   form-change cluster (open in TODO); SHADOW_BALL hypothesis killed
-  (b0c4fb0). Default flipped to new everywhere, `simulate()` and the audit
-  harness included (7e6a82b): seven scripts had silently inherited legacy.
+  (c7699c3). Default flipped to new everywhere, `simulate()` and the audit
+  harness included (143f3d9): seven scripts had silently inherited legacy.
 - **Re-baseline:** the pull left 102 fast-tier failures in 19 files (pinned
   scores, loud rather than rotting); oracle pins re-derived against PvPoke
-  in tranches f9923e0, fa7d801, 935c38b, d7e9e26, c01aa6a, 5e19bc5,
-  540ce46, 67da3d2. Pools rebuilt against post-rebalance rankings with the
-  ItsAxn augmentation (f92bec1 + follow-ons). Threshold TOMLs re-vetted as
+  in tranches f533e8a, 4143783, f7e3b93, efaf9b7, 964691a, 7ccb791,
+  17e1aee, aa20a65. Pools rebuilt against post-rebalance rankings with the
+  ItsAxn augmentation (c0968bc + follow-ons). Threshold TOMLs re-vetted as
   inputs: 58 derived stat-cutoff spreads archived, 15 IV-list spreads kept
-  (d363b1d); of the cd_prep blocks, Oinkologne's retired 3f28221 (08-27),
+  (e35db9f); of the cd_prep blocks, Oinkologne's retired 5392cc6 (08-27),
   Thievul's rides the Worlds checklist, Baxcalibur's is a deliberate
   hypothetical. Tripwire re-vetted per checklist section B and re-pinned
-  (4407c01; 229 exact + 8 documented + the 6 Aegislash cells). The cold
+  (11ac226; 229 exact + 8 documented + the 6 Aegislash cells). The cold
   bake under new followed (2026-09-10/12).
-- **09-10 also:** sandbox-link encoder turn-clock fix (e6827a0; PvPoke's
-  post-charge cooldown, auto-fired Gulp Missile excluded; refined 258e11b
+- **09-10 also:** sandbox-link encoder turn-clock fix (32fb66d; PvPoke's
+  post-charge cooldown, auto-fired Gulp Missile excluded; refined e603205
   to one cooldown per round); Worlds artifact tests marked dormant
-  (066e528); the "dead" pogodives constants were found deliberately kept
+  (e044959); the "dead" pogodives constants were found deliberately kept
   (synthetic-row tests in `test_pogodives.py`) and their removal reverted.
-- **Follow-on:** slayer follows the engine's mechanics (36b10da, 09-20);
+- **Follow-on:** slayer follows the engine's mechanics (bed2c9e, 09-20);
   `simulate()` refuses legacy unless `GOPVPSIM_ALLOW_LEGACY_MECHANICS=1`
-  (2615c6e, 09-22); nothing hardcoded to legacy (4b6342b, 09-22).
+  (cc87298, 09-22); nothing hardcoded to legacy (d5281ed, 09-22).
 
 ## 2026-09-02..03 -- Turn system: new-mechanics A/B, product-CLI default flip, re-port
 
 - **09-02:** the legacy turn system left the live game. Our
   `mechanics='new'` disagreed with PvPoke's unmerged branch on 104 of 243
-  oracle cells (5f16035; `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`),
-  45 of them from PvPoke's own "for now" revert 442a4afe8 (39dab5d). Both
-  disk caches keyed on `mechanics` (32400af); both models print a CLI
-  caveat (e5ec153, `scripts/mechanics_notice.py`); product CLIs default to
-  new (2228cff; Michael: "It is literally impossible to play an actual game
+  oracle cells (c6d6cc0; `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`),
+  45 of them from PvPoke's own "for now" revert 442a4afe8 (548da63). Both
+  disk caches keyed on `mechanics` (7882e51); both models print a CLI
+  caveat (7b64f08, `scripts/mechanics_notice.py`); product CLIs default to
+  new (3ae44e5; Michael: "It is literally impossible to play an actual game
   with the old turn system now"). Decision: wait for the merge, do not
   chase `origin/twilight-trails`.
 - **09-03:** a Caleb Peng breakdown of the live game
   (`docs/validations/2026-09-03_new_turn_system_ground_truth.md`) gave
   swaps > charged > fast within a turn; the re-port resolves charged moves
   the same turn ahead of fast landings: 104 -> 1 mismatch, legacy control
-  still 0 (f1ff911).
+  still 0 (efd6574).
 
 ## 2026-09-02 -- PvPoke mega drift re-vetted; stale opponent pools now hard-fail a bake
 
@@ -2528,29 +2528,29 @@ multiplier, bd8c5d889 Mega Level select, feba66f47 Super Mega tag with
 default Mega Level 4, e86688bd1 mega rankings. Our engine never had an
 `n_cms > 2` guard (every occurrence is `n_cms > 1`), which is why a 3-move
 build used to run silently wrong; the downstream third-charged-move
-plumbing landed the same day (1b2290c). Re-vetted per `docs/rebalance_checklist.md` section B
-and re-pinned 420d829 (`docs/validations/2026-09-02_pvpoke_mega_revet.md`):
+plumbing landed the same day (4538afc). Re-vetted per `docs/rebalance_checklist.md` section B
+and re-pinned 2201568 (`docs/validations/2026-09-02_pvpoke_mega_revet.md`):
 not a rebalance (moves.json byte-unchanged), oracle 208+35 -> 222+21; the
 pre-rebalance baseline pin (46bd08a77 / c431557dcc76) unaffected. Re-pinned
-again 4407c01 (09-10, entry above); green on the 09-20 pre-dive grid.
+again 11ac226 (09-10, entry above); green on the 09-20 pre-dive grid.
 
 Same day, the opponent-pool gap: `build_opponent_pool.py` appeared in zero
 of `overnight_redive.sh` / `run_website_dives.py` / `publish_website.sh` /
 `phase2_preship.sh`, and `gl_top50_plus_cs.txt` was still stamped
 2026-06-10. Pools are the INPUT to every dive and a new member is a new,
 un-migrate-able column, so a season-start bake against stale pools was
-silently wrong everywhere. Recorded c70ad94, fixed e8ac919:
+silently wrong everywhere. Recorded 645534c, fixed 7c16acc:
 `run_website_dives.py` runs `verify_opponent_pools` as a preflight and
 hard-fails on DRIFT / MISSING / ERROR (`--allow-stale-pools` overrides). The
 season lifecycle policy recorded with it stays in TODO.
 
-## 2026-08-31 -- Article archiving tool (8732b54)
+## 2026-08-31 -- Article archiving tool (432dbb8)
 
 `scripts/archive_article.py --slug <slug> --vintage YYYY-MM-DD [--stamp
 <hash>]` copies a live article to a dated snapshot slug and marks the copy;
 the index renders snapshots in a collapsed Archive block. `--vintage` is
 required (the live stamp at archive time is the NEW one). Design:
-`docs/article_archive_plan.md`. Full pre-groom text: TODO.md at 6c7a960.
+`docs/article_archive_plan.md`. Full pre-groom text: TODO.md at b2df247.
 
 ## 2026-08-27 -- L51 dead-tooltip fix + build_collection_data() strong pin
 
@@ -2561,9 +2561,9 @@ a REAL adjacent bug present: the tooltip hydration pass cannot see
 into inert <template> content, and setBestBuddyLevel swapped
 templates in without re-running it, so EVERY tooltip on the
 best-buddy L51 half of every shipped dive page was dead (760 on the
-Cramorant dive). Fixed 061d93c (window.ddPopulateTooltips re-run
+Cramorant dive). Fixed af85996 (window.ddPopulateTooltips re-run
 after the swap; render-only, no engine-hash impact); shipped pages
-need a re-render at the next publish. Same day (7c7d5ab): the
+need a re-render at the next publish. Same day (516ee28): the
 2026-06-28 Option-1 maxLevel strong pin landed --
 build_collection_data() extracted with 4-league / call-time /
 key-order pins, byte-identical replay-render verified, and the two
@@ -2573,7 +2573,7 @@ single source.
 ## 2026-08-27 -- Article-slug durable home (thresholds/cramorant.toml)
 
 The Cramorant dive->article link no longer depends on a
-replay-injection wrapper (83cc3c0): `[Cramorant.article] slug` lives
+replay-injection wrapper (909d1b5): `[Cramorant.article] slug` lives
 in a structural-minimum thresholds/cramorant.toml; deep_dive.py
 resolves it on the --no-thresholds path AND as a render-time fallback
 when a replay blob carries an empty slug, so both a plain CLI rebake
@@ -2586,7 +2586,7 @@ Thievul precedent; 8 tests in tests/test_article_slug_wiring.py.
 
 ## 2026-08-27 -- Unicode-dash ship gate now reads inlined app JS
 
-Closes the TODO "Ship-gate gap" (725734d) opened by the 2026-08-17 thievul
+Closes the TODO "Ship-gate gap" (6ba5485) opened by the 2026-08-17 thievul
 pre-publish review. `verify_no_unicode_dashes.py` parsed page HTML and
 skipped `<script>` wholesale, so any page that RENDERS its prose from
 an inlined bundle -- the joint-IV robustness pages are ~100% that --
@@ -2642,7 +2642,7 @@ verified via `migrate_cache.py --list-stamps` + sidecar scans):
 - The final leg ran today: `migrate_cache.py --from-engine
   03aff90d1e71 --predicate pogodives_sheet_v5_20260826 --apply` —
   144,336 blessed / 0 re-sim / 9,040 already-current. Soundness: the
-  entire v4->v5 engine delta is one commit (`56a68b3`, battle.py
+  entire v4->v5 engine delta is one commit (`307a88d`, battle.py
   only, gated on `policy == 'pogodives'`), and every stale column was
   pvpoke-default tier (no `policy` key).
 - End state: all 153,376 columns stamp engine bff4191c3cfe +
@@ -2671,7 +2671,7 @@ the Ranker.js rating formula `floor((health+damage)*500)` where the
 battle page uses `floor(500*damage + 500*health)` (Pokemon.js:2124) --
 sum-then-scale lands 1 low on exact fractions, the only 2 non-encoder
 mismatches in the sample. Both tool-layer fixes SHIPPED same day
-(3a041cb): cancelled charged decisions are now logged + encoded (the
+(f3f576b): cancelled charged decisions are now logged + encoded (the
 reference cell round-trips 662 exact), the three Node harnesses use
 the battle-page formula, and the log-only engine bump (bff4191c3cfe
 -> 515a0a95171b) was fully blessed via the
@@ -2682,13 +2682,13 @@ cancelled_charged_log_20260827 predicate (153,376/153,376 warm).
 Full site push to pogodives.com (Michael's explicit go): both
 Cramorant dives (sheet v5 tensors, blobs 20260826_124234/140322), the
 strategy article (final authorship "both" after Michael's review; 4
-verify_url-gated sandbox showcases, 8fc7ec4/96acaba), the site-wide
+verify_url-gated sandbox showcases, 785b3b3/509e839), the site-wide
 all-scenarios 3x3 checkbox grid, and the frozen Worlds surfaces. Ship
 gates all green (verify_worlds run from the pinned worktree; live
 gamemaster restored + hash-verified 1398b001cf86 after). Same
 morning (~04:30): Greninja + Annihilape entered the Worlds matrix (35
-entries, 555 pair pages, 0 deferred; 31a7361), executed from the
-vintage-pinned worktree gopvpsim-worlds at 6a7e534 -- the Worlds
+entries, 555 pair pages, 0 deferred; d7070c6), executed from the
+vintage-pinned worktree gopvpsim-worlds at cf452d9 -- the Worlds
 surface stays FROZEN at the pre-Cramorant engine until after Aug 30.
 Core-breaker scan + HSH Greninja verification findings:
 ~/coding/reports/gopvpsim-worlds-2026-refresh-2026-08-27.html.
@@ -2707,13 +2707,13 @@ lab (80 variants x 4 opponent models x 4 IV spreads; synthesis
 docs/validations/cramorant_policy_lab_2026_08_24.md), lead40 adaptive
 tank frozen 08-25, pogodives_dp/pogodives_shield overlay landed
 08-25 (byte-identical pvpoke_dp fallback for every non-Cram
-situation, test-pinned), render side same day (b67b8d4 policy tier
-through sweep/cache + 744c4a5 --policy axis & Strategy dropdown).
+situation, test-pinned), render side same day (c546006 policy tier
+through sweep/cache + 54bcc06 --policy axis & Strategy dropdown).
 Round 6 closed 08-25: nothing ships, lead40 stands. Michael's
 strict bar 08-26 (every start scenario >= 0 on BOTH mean rating delta
 and net flips vs plain PvPoke) superseded uniform lead40:
-_POGODIVES_SHEET landed (8fc5764), v3 certified 360/360 cells at full
-4096-IV resolution (90d8811), v5 shipped (56a68b3) after the 0v0
+_POGODIVES_SHEET landed (1da3703), v3 certified 360/360 cells at full
+4096-IV resolution (05baa89), v5 shipped (307a88d) after the 0v0
 oracle capture + 1v0 loaded-tank skeptic round; full record incl. the
 blob-vintage rule: docs/validations/cramorant_strict_bar_2026_08_26.md.
 GL + UL dives baked --policy both --bait both; published 08-27
@@ -2730,8 +2730,8 @@ worlds_bake.preflight_moveset_legality, disclosed on every Worlds
 page; two worlds_code bumps blessed forward with written proofs,
 verified additive). Tier-1 grew to 2,112 keys / amber 455.
 2026-08-19: worlds_shortlist.py shipped (455 amber pairs by combined
-usage); the joint_iv_* kit replaced thievul_licki_* (8feec47,
-319c8a2). Overnight into 08-20, three site pushes: 11 deep pages +
+usage); the joint_iv_* kit replaced thievul_licki_* (e1e9f9c,
+71284d9). Overnight into 08-20, three site pushes: 11 deep pages +
 grid-amber squares; the 73-clean-pair audit (1.36B sims, FINAL amber
 505/528, 50 squares recolored -- the hub FN block now reports 11/73,
 retiring the 4/21 original-sample figure); three MIRROR pages
@@ -2740,9 +2740,9 @@ combinations() exclusion; heavily IV-decided, e.g. Licki mirror best
 build rank-3182 15/3/3) + a latent renderYourDenial crash fix.
 Round-2 mirrors built 08-24 (thievul x3 incl. the cross-arm,
 quagsire-shadow, altaria); the 11 deferred review minors shipped
-28f2a4d, [meta.oracle] pins on all 18 eligible pairs 7360eb2; mirror
-seat-asymmetry finding baked into the kit (8ebb642). The kit's
-untested-guard debt was closed 2026-08-27 (37ccc01 + 93b6d91).
+a20ca6f, [meta.oracle] pins on all 18 eligible pairs 6d5b70e; mirror
+seat-asymmetry finding baked into the kit (9366734). The kit's
+untested-guard debt was closed 2026-08-27 (cd5fd06 + a61d950).
 Operational lesson: run long bakes DETACHED (os.fork/os.setsid
 double-fork; two harness-managed bakes were killed mid-run, per-grid
 manifest keying lost nothing).
@@ -2760,12 +2760,12 @@ joint IV grids vs Lickilicky (4 moveset/bait grids) + Lickitung,
 published as thievul-lickilicky-robustness.html +
 thievul-lickitung-robustness.html with an index card (pipeline
 contract docs/thievul_licki_analysis.md). CD-day poke_genie fixture
-committed 1b5ce69 (Michael's ok, 2026-08-19).
+committed c7dca4b (Michael's ok, 2026-08-19).
 
 ## 2026-08-14 -- Worlds 2026 PUBLISHED (pogodives.com)
 
 Full amber coverage shipped: 401/401 IV-decided pairs baked
-(`c80889d`; three resumable legs across a suspend + a monitor-standby
+(`e5f4f53`; three resumable legs across a suspend + a monitor-standby
 power loss, zero partial pairs, ~5.1B sims total for the completion
 run) and all surfaces rendered + live (hub, 31 cheat sheets, 401 pair
 pages, CMP board, IV explorer). Gamemaster pinned at the pre-Worlds
@@ -2773,14 +2773,14 @@ vintage 8f1d6cca5c0f for every leg and render (upstream delta since:
 three mega forms, sim-irrelevant; old blob restored from pvpoke
 `f60a41199` on each cache TTL expiry).
 
-Same-day pre-publish polish (`157bf71`, each with a fails-without-it
+Same-day pre-publish polish (`198ab01`, each with a fails-without-it
 test): cheat-sheet 3x3 grids link to pair pages (802 links, all
 resolve); trivial 512/512 deny cells annotated "(moot: rank-1 never
 reaches)" with an atk-citing hover tip (17 cells; strictly-between
 counts stay bare); robustness curves got a cursor-following IV
 readout (8-hex-per-rank WPACK, JS-injected hint so no-JS shows no
 dead affordance). Adversarially verified: WPACK decodes == fresh
-iv_rank, data-bins bit-match npz re-derivation. Also `6a45bba`:
+iv_rank, data-bins bit-match npz re-derivation. Also `9368a99`:
 meta current_rank refreshed to PvPoke's live rankings (Mimikyu 1 ->
 5) and the ==1 moving-external test pin relaxed.
 
@@ -2905,7 +2905,7 @@ test-suite-review F5 (damage-affecting but unhashed) -- 21 call sites
 repointed, `data.py` keeps a lazy PEP-562 alias because gobattlekit's
 `export_thresholds.py` imports it from `gopvpsim.data` by name
 (`test_gobattlekit_api_pin`); alias removal is a post-Worlds TODO. FC-2's
-formchange.py half turned out to have already landed in `281a40a` (the
+formchange.py half turned out to have already landed in `9e98de4` (the
 2026-08-09 diagnosis doc listed it stale). Neutrality proven, not assumed:
 token-stream diff (battle.py comment-only), AST-identical parse_types body,
 1,539-battle differential vs a HEAD tree bit-identical (JIT active) + an
@@ -2929,7 +2929,7 @@ input -- the "five files" shorthand in older notes undercounts it.
 ## 2026-08-10 -- S8a tie semantics decided: exact 500 is a tie, not a win
 
 Resolution of lane A's 2026-08-09 escalation (Michael's call): KEEP the
-strict `>` that the S8a vectorization (`8a7fdc7`, 2026-04-17) silently
+strict `>` that the S8a vectorization (`c496d97`, 2026-04-17) silently
 introduced in `aggregate_flips_by_anchor` -- it matches
 `battle.is_win`, PvPoke (exact 500 = tie), the sibling probe/losses
 paths, and everything shipped since April. The frozen test oracle
@@ -2948,7 +2948,7 @@ today; test-only.
 5 adversarially-verified lanes (20 agents; every replanted/converted
 test proven to FAIL against broken code before landing):
 
-- **Phase 2 dead weight** (`e6dcc2e`, `d27f481`): the three vacuous
+- **Phase 2 dead weight** (`3eec542`, `2988aa1`): the three vacuous
   S8a oracle-parity files replanted (scores now couple to the swept
   stat; all 14 tests fail under a type-correct stub, previously 13
   passed) with non-emptiness asserts on every comparison; the 33.9s
@@ -2958,13 +2958,13 @@ test proven to FAIL against broken code before landing):
   turn-mechanics grid shrunk to its 3 distinct signatures; duplicate
   conftest TTL fixtures merged; 4 tracked-file skips -> hard asserts;
   `render`/`local_artifacts` markers added. Fast tier 44s -> 36s.
-- **Phase 3 pin conversions** (`aa74af1`, `8a78c4e`): the silent-rot
+- **Phase 3 pin conversions** (`d3f5c90`, `97b93fd`): the silent-rot
   absence pins re-planted as tolerant structural scans WITH positive
   controls (respelled antipatterns now caught -- proven per pin);
   import-text pins -> object identity; bake pins -> rendered-DATA
   assertions; the print() pin -> an AST scan; KEEP-list items
   untouched.
-- **Phase 4 blind spots** (`64b3e29`): six new files, 50 tests --
+- **Phase 4 blind spots** (`8071fe2`): six new files, 50 tests --
   JIT-vs-pure-Python equivalence (+ overflow-sentinel fallback, with a
   counting-shim anti-vacuity guard), ship-gate detector
   positive/negative controls, worker-logging spawn delivery,
@@ -2982,7 +2982,7 @@ test proven to FAIL against broken code before landing):
 
 **Card flip lines (Michael feature request):** the recommendation
 card's per-spread gains/loses prose -- computed vs pvpokeRefIvIdx but
-mislabeled "vs stat-product #1" since b595071, caught live on the
+mislabeled "vs stat-product #1" since 7b0badb, caught live on the
 Umbreon GL Bait Robust card -- now renders BOTH labeled lines ("vs
 stat-product #1 (a/d/s)" from a new flips_sp pass, "vs PvPoke default
 (a/d/s)"), collapsing when the references coincide, with "this spread
@@ -3023,13 +3023,13 @@ Fable-orchestrated overnight run (Michael AFK): a 9-agent read-only
 scout re-derived every candidate TODO finding at HEAD, then 7
 file-disjoint lanes (28 agents, 2 adversarial verifiers each) landed:
 
-- **fix(breakpoints) `fa1bd1d`:** Aegislash (Blade)'s whole-level rule
+- **fix(breakpoints) `89bf7b1`:** Aegislash (Blade)'s whole-level rule
   was honored at only 1 of 4 level sites in iv_breakpoints/
   iv_bulkpoints (2053/4096 rows sat at half levels while the same
   output's rank column used whole levels). CLI + tests only; no dive
   HTML, TOML, or export is affected. Surfaced a separate pre-existing
   51.0-vs-league max-level default divergence -> TODO.
-- **fix(dive SP Rank) `8c1f98e` (js-parity-3):** DATA.spRanks was baked
+- **fix(dive SP Rank) `881d415` (js-parity-3):** DATA.spRanks was baked
   from the 0.1-rounded display array with enumeration-order ties while
   the same column's off-grid path used iv_rank (unrounded SP, IV-sum
   tiebreak, PvPoke convention); Medicham GL disagreed on 1354/4096
@@ -3038,7 +3038,7 @@ file-disjoint lanes (28 agents, 2 adversarial verifiers each) landed:
   best-buddy twin, and the CLI sweep variant through one convention;
   8-test pin file. RE-RENDER ONLY (no engine hash, no cache impact);
   25-81% of SP Rank cells change per page.
-- **verify_overnight pool containment `48d37c7`:** step [3/5] now
+- **verify_overnight pool containment `e8aa1dd`:** step [3/5] now
   asserts name-set containment of each dive's own opponents_file
   against its rendered DATA.opponents -- the first completeness guard
   for UL/ML/cup dives (GL had only a 3-marker check; a deranked
@@ -3047,29 +3047,29 @@ file-disjoint lanes (28 agents, 2 adversarial verifiers each) landed:
   dissolved: counts can't work (mirror/anchor/variant entries APPEND),
   containment can. Same commit: run_website_dives' narrative patch no
   longer skips silently when the dive dir is absent (F3 tail; F3
-  proper had already shipped in `278bc44` -- the TODO was stale).
-- **verify_dev_counts --update `5b6aec9`:** opt-in flag rewrites the
+  proper had already shipped in `9457dc9` -- the TODO was stale).
+- **verify_dev_counts --update `4070436`:** opt-in flag rewrites the
   DERIVABLE sentinels (test_count, type_chart_cells_verified) in
   DEVELOPER_NOTES.md in place -- ends the six-racing-sentinel-bumps
   serialization pain from the 2026-08-08 churn. Adversarial review
   caught a real pre-commit defect: a lost `<!-- /sync -->` marker made
   the DOTALL rewrite swallow prose up to the NEXT sentinel; fixed +
   tested before landing.
-- **fix(compare methodology) `95fcf74` (G16, narrowed):** the
+- **fix(compare methodology) `3c766ab` (G16, narrowed):** the
   comparison-page "About these numbers" block said win rate counts sims
   "scoring at least 500" -- the code counts strictly > 500 and an exact
   500 is a tie. Corrected wording (user-visible on 4 published pages at
   next publish), sweep dims now derived instead of hardcoded, block
   links the How This Works guide.
-- **"Gives up vs #1" disambiguation `c911eff` (js-parity-5 follow-on):**
+- **"Gives up vs #1" disambiguation `22489d1` (js-parity-5 follow-on):**
   the dive column, owned_breakdown.py, and the compare-card each
   measure something different; docstrings now say so (the false "must
-  reproduce" claim was already deleted in `639ef1e`) and the
+  reproduce" claim was already deleted in `9017b26`) and the
   compare-card row is relabeled "Avg score behind best" so one label no
   longer covers two units. Bundle-export staleness caveat added
-  (shipped dives predate `8c1f98e`, so their rank1RefIvIdx is
+  (shipped dives predate `881d415`, so their rank1RefIvIdx is
   pre-convention).
-- **fix(#opp- landing) `b43bd2d`:** `#opp-<slug>` deep links now land
+- **fix(#opp- landing) `abd59e6`:** `#opp-<slug>` deep links now land
   on the opponent's matchup detail in the Threats section instead of a
   collapsed anchor-flip bullet (first-mention-wins registry claimed at
   compute time, and the bullets computed first); the best-buddy L51
@@ -3107,7 +3107,7 @@ AND on the live site after `publish_website.sh --push`: plotly theme
 shim chrome (`themeColor()` + `--cat-anchors` fallback), the 0v0
 Flavor Guide vocabulary, WIN_RATING in DATA, and zero live-DOM
 duplicate ids (context-aware scan; a naive grep re-reports the
-dd6b7a3 scan artifacts). First chain launch was caught re-rendering
+a1c02d9 scan artifacts). First chain launch was caught re-rendering
 the 97 superseded July blobs alongside the v8 set (double render, ~1h
 waste) and restarted at `--since-hours 60`; July-blob retirement is
 TODO'd (bulk mv is permission-gated).
@@ -3145,7 +3145,7 @@ and the two iv-tech NO-BAIT ORACLES -- both reference claims REPRODUCE
 bulkpoint, surviving on exactly 1 HP; Spidops 1s vs Altaria), with the
 old "more forgiving threshold" question resolved (bait-on wins are
 real; the reference claim is specifically no-bait). Auto-anchor gating
-tests were found already covered (test_anchors, 585a136) -- TODO was
+tests were found already covered (test_anchors, cfceabf) -- TODO was
 stale.
 
 Suite 1620 -> 1719 passed / 14 xfailed. Engine-hash inputs verified
@@ -3153,17 +3153,17 @@ byte-identical (incl. deep_dive_signature.py beyond the brief). Gate
 caught one real red: the test_count sentinel raced across lanes (six
 bump commits; recorded as a TODO tooling item). PENDING RE-RENDER
 ledger: 15 render-changing commits await the next re-render+publish,
-GATED on Michael's visual sign-off of the plotly theme shim (8da55c4:
+GATED on Michael's visual sign-off of the plotly theme shim (7fc22b4:
 theme-aware chart chrome, previews rendered for both themes; known
-limitation disclosed in 048bb3e -- two overlay hues alias a tier hue).
-- No-bait iv-tech oracles: 000ea87 (tests), cc64923 (retracts the
+limitation disclosed in 6c8e7b2 -- two overlay hues alias a tier hue).
+- No-bait iv-tech oracles: 381bfad (tests), daecde8 (retracts the
   loose-threshold note's bulk-product resolution); the pvpoke.com/battle
   browser round-trip stays a human step in TODO. Full pre-groom text:
-  TODO.md at 6c7a960.
+  TODO.md at b2df247.
 
 ## 2026-08-06/08 -- entries 12+13 shipped; v8 cold bake complete (18h sleep stall, recovered)
 
-**Entries 12+13** (commits `d95e9d0..6cfe512`, 30-agent workflow + independent
+**Entries 12+13** (commits `766d1b6..3a1cdf2`, 30-agent workflow + independent
 re-verify): the engine DRY batch landed as ONE hash bump
 (`9ac2f4ed -> 1415857072`) -- league descriptor (little-league KeyErrors
 fixed), cached `from_pokemon` accessor hop (10.27s -> 0.003s per 2000
@@ -3216,7 +3216,7 @@ adversarially verified, re-rendered, and published. Only entries 12
 (deep_dive.py split, CACHE_VERSION cold) and 13 (engine DRY batch) remain,
 both scheduled against the next bake window, plus entry 15's fold-ins.
 
-**Entries 1-3** (commits `d81c4ad..1db4f65`, hand-implemented): five live
+**Entries 1-3** (commits `58949e0..7a86215`, hand-implemented): five live
 wrong-output fixes (case-insensitive opponent-color hash; unrounded tier
 classification via `classify_tier_indices`; one `_atkBeats` mirror-CMP rule;
 `rank1_spread` -> `iv_rank` wrapper; honest surface docstring), the
@@ -3228,7 +3228,7 @@ support.html; single SHIP_GATES roster -- two chains had silently skipped the
 dash gate; filename-stamp chain-log rule; ML-slug single-sourcing;
 read-modify-write cache-sidecar primitives).
 
-**Entries 4-11 + 14 + cherries** (commits `caeded9..7e66ba2`, 30-agent
+**Entries 4-11 + 14 + cherries** (commits `a8ab18a..8d3e8f6`, 30-agent
 lane-partitioned workflow, 2 adversarial verifiers per entry, 3 must-fix
 findings caught and fixed in-flight): WIN_RATING JS tripwire + league-cap
 pins; the five Py<->JS wire strings baked from Python (score key, mode
@@ -3270,7 +3270,7 @@ invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 ## 2026-08-04 -- 2026-07-06/07 bake closed out (was left red on a fixed failure)
 
 The 2026-07-06/07 cold re-dive (chain `overnight_20260706_204813.log`, the
-first bake of the post-hunt2 engine merged in `2a63b65`) finished its work but
+first bake of the post-hunt2 engine merged in `2d8dc91`) finished its work but
 was never formally closed: `overnight_status.txt` still read `[FAIL]`, no
 CHANGELOG entry existed, and TODO's re-dive runbook still named 2026-06-28 as
 the last bake. Reconstructed and verified today.
@@ -3281,7 +3281,7 @@ of the form `../guides/...`. Root cause: the run was on a fresh laptop, where
 `userdata/website/guides/` did not exist yet -- the Reader's Guides are a build
 product and `userdata/` is gitignored, while every dive page hardcodes ~5 links
 into that tree. No dive output was wrong; the link target was absent. This was
-diagnosed and fixed the same evening in **`73747e6`**, which added chain step
+diagnosed and fixed the same evening in **`a2b6698`**, which added chain step
 **7c** (`build_guides.py`, after the dives so `{{dive:...}}` tokens resolve,
 before index + link-verify) so the chain is self-sufficient on a fresh machine.
 The guides were then built by hand at 22:28 -- but the gate was never re-run,
@@ -3350,9 +3350,9 @@ needsBoost dead-code report was reframed to a retired-or-returning
 question and held back. Open loose end: pvpoke.com's single-battle UI
 showed 429 where headless engine runs show 510 for the SB-only
 knife-edge cells (same code, data, inputs; both vintages) -- recorded in
-the drafts doc header, unexplained. Key commits: `9943862` (re-verify +
-filing guide), `8eb0360` (same-day order + opener), `19aef45` (MGL
-style pass + number drop), `51a638c` (Report 5 reframe/hold).
+the drafts doc header, unexplained. Key commits: `e8d90b4` (re-verify +
+filing guide), `8665b0a` (same-day order + opener), `117e5aa` (MGL
+style pass + number drop), `7f89b70` (Report 5 reframe/hold).
 
 ## 2026-07-08 -- matchup-fingerprint clusters shipped site-wide (render-only)
 
@@ -3369,35 +3369,35 @@ win-rate grids, in-sample depth-3 stat rules, and a matchup-flip-threshold
 table with named/UNNAMED authored-anchor flags. Zero re-sim: two full
 95-blob replay re-renders (131.8 + 129.2 min, 95/95 OK each).
 
-Key commits: `477b8fb` pure-numpy pipeline (`scripts/
+Key commits: `2707e1d` pure-numpy pipeline (`scripts/
 deep_dive_matchup_clusters.py` -- deliberately no sklearn/scipy; unique-
 pattern weighted linkage + exact full-population silhouette for byte-stable
 re-renders; cross-checked against the sklearn reference, incl. a reference
 bug found: its single-stat flip accuracies are inflated on tied stat
-values); `58bbd8f` section wiring + retirement of all five old surfaces
+values); `113a028` section wiring + retirement of all five old surfaces
 (alpha-chk block, clusterGaps DATA, cluster-chk checkbox, engine.js
-overlay, orphaned renderers); `bcb47f3` 24 adversarial-review fixes (31
+overlay, orphaned renderers); `ee16e29` 24 adversarial-review fixes (31
 agents; e.g. degenerate constant flip rules no longer render as candidate
-anchors); `cec8070` pass 2: owned-mon gold-star overlay in the panels
+anchors); `acc9d3a` pass 2: owned-mon gold-star overlay in the panels
 (collection paste + best-buddy aware), legend-name word-wrap (closes the
 TODO legend-overflow item), and a "Matchup cluster" main-scatter color mode
 (featured-moveset/default-IVs only, honest fallback note otherwise);
-`8df0ba1` pass-2 review fixes (headline: a skeptic agent CDP-hover-tested
+`a84dbd1` pass-2 review fixes (headline: a skeptic agent CDP-hover-tested
 the panels live and caught svg-on-gl star hovers resolving to the wrong
-spread -- now scattergl + y-nudge per the c0e782d precedent).
+spread -- now scattergl + y-nudge per the c74e2d3 precedent).
 
 Also shipped: a 43-finding staleness audit + fixes across all 7 Reader's
 Guides (most rot predated this work: the 2026-06-25 Male->Female reference
 repoint broke both worked examples), a new **Matchup Clusters** guide
 (`guides/matchup-clusters/`, promoted to authorship=both), two screenshot
-retakes (debcbe3), and a new `pvpoke_cells_exact` sync sentinel so the how-this-works
+retakes (05fdf1c), and a new `pvpoke_cells_exact` sync sentinel so the how-this-works
 guide's 170-exact/37-divergence claim can't drift. JS entry points for the
 new section: `_mcRenderRoot` / `mcSelectScenario` / `mcRefreshAll` in
 `deep_dive_engine.js`.
 
 Known non-blockers at publish: `overnight_status.txt` still ends with the
 2026-07-07 17:01 chain FAIL (guides dir did not exist when that chain
-verified links -- ordering fixed in `73747e6`; the live tree passes the
+verified links -- ordering fixed in `a2b6698`; the live tree passes the
 same gate), and verify_overnight's ML-guide freshness check flags the
 render-only batch window by design (ML guide articles were not touched).
 
@@ -3405,21 +3405,21 @@ render-only batch window by design (ML guide articles were not touched).
 *(entry added retroactively 2026-08-08 when the completed narratives were
 groomed out of TODO.md; verbatim writeups in docs/TODO_archive.md)*
 
-Round-2 non-engine fixes landed on main: **F1** (`57137e4`,
+Round-2 non-engine fixes landed on main: **F1** (`856ec73`,
 migrate_cache used-set unions form-change swapped-in moves, adversarially
 verified complete), **F2 doc** (predicate-caveat recorded), **BP-1**
-(`2931d1d`, power-0 breakpoints return [] instead of ZeroDivisionError --
+(`6a7e006`, power-0 breakpoints return [] instead of ZeroDivisionError --
 was silently dropping every Aegislash-Shield GL anchor), **BP-2**
-(`cc70593`, CLI forwards shadow multipliers into damage math),
-**JIT-COV-1** (`22c0a0b`). The **hunt2 engine batch merged** (`2a63b65`:
+(`464355d`, CLI forwards shadow multipliers into damage math),
+**JIT-COV-1** (`ed8dac0`). The **hunt2 engine batch merged** (`2d8dc91`:
 NB-1 selection freeze, FC-1 Aegislash revert energy, OMT turns_planned
 divisor, would_shield-as-documented; battle.py byte-identical to the
-audit-passed engine), plus post-merge **JIT-COV-2** (`02627fe`) and
-**PROP-1** (`fe2c443`); the OMT-forced cold re-dive was the 2026-07-06/07
+audit-passed engine), plus post-merge **JIT-COV-2** (`8f9ca31`) and
+**PROP-1** (`99b6665`); the OMT-forced cold re-dive was the 2026-07-06/07
 bake (closed out 2026-08-04). The anchors.py engine-hash question was
-ruled BENIGN. Same day: **top-N Phase 1** (`b8b561e`/`f5741a3`,
+ruled BENIGN. Same day: **top-N Phase 1** (`f2c5aa0`/`e25f6be`,
 client-side opponent filter) and the **Equinox Cup pilot Phase 2**
-(gopvpsim `aa8dac8..3c153fb`, gobattlekit `0c1bd5c`: cup rankings
+(gopvpsim `d9c482f..1dea15c`, gobattlekit `0c1bd5c`: cup rankings
 loader, recipe + committed pool, --cup labeling overlay, flat
 <species>-equinox-cup slugs + cups index, threshold-export collision
 guard; five pilot dives; audit report in the reports repo). Also the
@@ -3440,25 +3440,25 @@ is the dated "what shipped" record.
 
 **Engine fixes** (all in main before the bake, each test-pinned):
 
-- **bug #1** fire_now double-fire CMP gate -> `cmp_atk` (`582f7d7`) — the
+- **bug #1** fire_now double-fire CMP gate -> `cmp_atk` (`b55748e`) — the
   missed 10th shadow-CMP site. Shadow-XOR only; measured 35/20,178 cells,
   6 winner flips, max margin 273.
-- **bug #2** float32-truncated damage constants (`f1538ff`) + shadow-def
-  `float32(5/6)` (`805cdc3`). Boundary-scattered -> this is what forced the
+- **bug #2** float32-truncated damage constants (`b2683ba`) + shadow-def
+  `float32(5/6)` (`d264251`). Boundary-scattered -> this is what forced the
   cold bake; every other fix rode it for free.
-- **bug #3** farm-down must stack self-debuffing moves (`50e8cd2`); pinned
+- **bug #3** farm-down must stack self-debuffing moves (`1123648`); pinned
   by `test_bug3_farm_stack`.
 - **bug #4** slayer-cache key includes `focal_max_level` (cache-rework,
   `slayer_cache` v4).
 - **bug #5** bandaid[929] no-bait swap documented as an INTENTIONAL
-  divergence (`cdcef73`).
-- **bug #7** `_cm_debuf_delta` dead str-vs-int branch (`30fd819`).
+  divergence (`2c9b8d0`).
+- **bug #7** `_cm_debuf_delta` dead str-vs-int branch (`2b55b46`).
 - two port-fidelity micro-fixes: bandaid[910] index + `buffApplyChance`
-  float coercion (`68ad233`).
+  float coercion (`342c859`).
 - a focal that STARTS in an alt form now gets native form stat buffs
-  (`b52250e`).
+  (`746eae0`).
 
-**Cache-rework bundle** (merged `fbbc3ad`; design
+**Cache-rework bundle** (merged `ba069c8`; design
 `docs/design/2026-06-27_cache_rework_design.md`): energy plane
 (`sweep_cache` v6, `--compare-energy` serves warm); per-column engine STAMP
 + `migrate_cache.py` predicate invalidation; ML/dive merge onto the shared
@@ -3468,9 +3468,9 @@ vintage GC. The "warm bug-#1 re-dive" follow-up was MOOTED: #2's float32 fix
 forced the bake cold, so #1 rode the cold bake rather than a warm migration.
 
 **Session-6 dive-output fixes** (rode the bake): best-buddy toggle on every
-GL/UL page, no-op where provable (`7a72394`); shadow opponents get their own
-PvPoke-default IVs (`5b474a3`, flips UL Mimikyu vs Shadow Raikou 2-2 from
-470 loss to 707 win); IV-scanner `maxLevel` single-sourced (`9f55e38`);
+GL/UL page, no-op where provable (`3b4bf27`); shadow opponents get their own
+PvPoke-default IVs (`3f03772`, flips UL Mimikyu vs Shadow Raikou 2-2 from
+470 loss to 707 win); IV-scanner `maxLevel` single-sourced (`e827e12`);
 `owned_breakdown.py` same-class fix (`786d437`).
 
 **Open verification gate** (carried to TODO as P1): rendered-output sanity
@@ -3478,34 +3478,34 @@ checks of the session-6 fixes — Registeel no-op toggle + "(no change)" hint,
 Carbink active L51 sweep, UL Mimikyu vs Shadow Raikou flip.
 
 **Same-day small fixes** (recorded at the 2026-11-18 backlog groom; full
-pre-groom text: docs/TODO_backlog.md at c861190): `_species_has_form_change`
+pre-groom text: docs/TODO_backlog.md at 9d3c81d): `_species_has_form_change`
 also detects sibling forms via `alternativeFormId` (e.g. Morpeko (Hangry)), so
 a future stat-divergent key-lacking form can't be misgrouped by the robustness
-dedup (`308589d`; now in `scripts/deep_dive_lib/robustness.py`); `SlayerCache`
+dedup (`99eefa8`; now in `scripts/deep_dive_lib/robustness.py`); `SlayerCache`
 flushed to disk at the end of every slayer round, so a crash loses at most one
-round (`3a98bd9`); rankings-cache sha256 + run-start fingerprint log line
-(`70c7465`), completing options 1+3 of the dive-reproducibility gap on top of
-the 2026-04-09 HTML-footer rankings fingerprint (`ad9f089`).
+round (`636657a`); rankings-cache sha256 + run-start fingerprint log line
+(`446ce07`), completing options 1+3 of the dive-reproducibility gap on top of
+the 2026-04-09 HTML-footer rankings fingerprint (`d0d605f`).
 
 ## 2026-06-22 -- Dive card + content/IA plan session (Phases A-E)
 
-Dive card (`e11ccc4`): compact spec-sheet card atop every dive + `--card-out`
+Dive card (`db62d25`): compact spec-sheet card atop every dive + `--card-out`
 export, single-IV and top-512 opponent-IV robustness headlines (first: Shadow
-Corviknight GL). Same day: breakpoint-coverage card spreads (`600b9d9`,
-`ea1c76e`; superseded by "Which one to build?" v4 + pole retirement
-2026-09-17); Threats section + card-at-top (`a0f0985`, `e812914`); ML IV-guide
-Close calls (`d2f2f66`) + Check-my-IVs margins (`e7049e8`); ML IV-guides merged
-under Articles (`645f8aa`). Plan item 2 (dive content audit) stays in the
-backlog. Full pre-groom text: docs/TODO_backlog.md at c861190.
+Corviknight GL). Same day: breakpoint-coverage card spreads (`6e3a815`,
+`ec1e041`; superseded by "Which one to build?" v4 + pole retirement
+2026-09-17); Threats section + card-at-top (`427881c`, `ca1a13b`); ML IV-guide
+Close calls (`c5dd0c0`) + Check-my-IVs margins (`4330108`); ML IV-guides merged
+under Articles (`af69535`). Plan item 2 (dive content audit) stays in the
+backlog. Full pre-groom text: docs/TODO_backlog.md at 9d3c81d.
 
-## 2026-06-12 -- Energy-lead sweep axis (9889555)
+## 2026-06-12 -- Energy-lead sweep axis (a6acd81)
 
 `--energy-lead` (default off): fast-move-multiple carry-over [0,1,2] converted
 to raw energy per moveset, clamped at the reachable bound, folded into the mode
 string + column cache key; pinned by `tests/test_energy_lead.py`. Calibration
 landed on Azumarill; no web-oracle calibration built or planned;
 `scripts/check_sableye_energy_lead.py` kept as the 2026-06-03 feasibility
-record. Full pre-groom text: docs/TODO_backlog.md at c861190.
+record. Full pre-groom text: docs/TODO_backlog.md at 9d3c81d.
 
 ## 2026-06-12 (evening) — S7 cleanup pass (arc COMPLETE)
 
@@ -3753,7 +3753,7 @@ JS trio W3/W4/W6 (`e302759`).
 **Features landed same day:** Notable-IVs "Copy for IV scanner"
 buttons emitting gobattlekit user-threshold JSON (`b97113f`); slayer
 signal-loss 4+3 hybrid — saturated-parent callout + rarity-coded
-badges, Oinkologne-verified, ~360KB/dive lighter (`5cb1c8e`);
+badges, Oinkologne-verified, ~360KB/dive lighter (`063eae3`);
 monitor watch-hints at dive/chain startup (`77fd880`).
 
 **Test infrastructure:** conftest pins the data-cache TTL (pytest
@@ -4077,10 +4077,10 @@ bare.
 
 Single commit: `c3edb14`.
 
-## 2026-04-22 -- compare_loadouts renders N=3/N=4 (53ade3c)
+## 2026-04-22 -- compare_loadouts renders N=3/N=4 (c756663)
 
 One all-N-in-row matchup-delta table for 3+ loadouts; N=2 keeps pairwise
-tables. Full pre-groom text: TODO.md at 6c7a960.
+tables. Full pre-groom text: TODO.md at b2df247.
 
 ## 2026-04-22 — Mirror CMP % semantic reframe + Highlight IVs scatter
 

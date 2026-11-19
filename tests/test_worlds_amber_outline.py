@@ -1,9 +1,9 @@
-"""Amber OUTLINE channel + flag origins (guard 6a7e534).
+"""Amber OUTLINE channel + flag origins (guard cf452d9).
 
 A cell can be settled in the displayed rank1/top512 slice and still be
 IV-decided in a corner of the tested space (high-attack cohort,
 max-attack probe, both at once, a probe-spread flip, or full-grid
-Tier-2 evidence). 6a7e534 gave that its own channel:
+Tier-2 evidence). cf452d9 gave that its own channel:
 
 * ``Cell.amber_origins()`` names WHICH corner flags each scenario.
 * cheat-sheet "IVs decide" flags carry the nearest-corner annotation
@@ -11,10 +11,10 @@ Tier-2 evidence). 6a7e534 gave that its own channel:
   displayed slice.
 * the solid-but-flagged cells get a flip-colored inset ring: class
   ``sc-u`` on sheet grid cells, ``u`` on hub minis. A SEPARATE channel
-  from the GTO fill (ba557ad) -- never a widened sliver, so the fill
+  from the GTO fill (e87b3b0) -- never a widened sliver, so the fill
   keeps meaning "share of THIS cohort beaten by THIS spread".
 
-Pre-guard (ba557ad, which already carries the GTO fill) observed
+Pre-guard (e87b3b0, which already carries the GTO fill) observed
 values, i.e. what these tests pin against:
 
 * ``Cell.amber_origins`` and ``build_worlds_pages._flag_label`` did not
@@ -310,7 +310,7 @@ def test_hub_mini_boxes_carry_the_outline_class(cells):
     assert outlined == expected == OUTLINED
     assert 'u' not in boxes[HEADLINE_MIXED].split()
     assert '<i class="g u"></i>' in td and '<i class="r u"></i>' in td
-    # The proportional fill is untouched by the ring channel (ba557ad
+    # The proportional fill is untouched by the ring channel (e87b3b0
     # still owns the mixed box).
     assert '<i class="a" style="background:linear-gradient(90deg,' in td
     assert ('outlined 1-0, 1-1, 2-0, 2-2 = settled here, IV-contested in '

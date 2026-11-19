@@ -243,7 +243,7 @@ stale per-guide log per run / `2d82b51` watch views surface per-worker phase /
 lines, surfaced by `iv_guides_status.py` + `chain_status.py`.)
 
 Session-1 commits (all ride the cold pass for free):
-- **#2 float32 damage constants** -- DONE (`f1538ff`). STAB/BONUS/super-effective
+- **#2 float32 damage constants** -- DONE (`b2683ba`). STAB/BONUS/super-effective
   now use float32-truncated doubles matching the game/PvPoke. Boundary-scattered,
   no clean predicate -> this is what makes the re-dive cold (so everything else
   this session rides it for free).
@@ -342,7 +342,7 @@ Master SHADOW guide it produced may carry the #1 behavior -- re-bake the
 shadow ML guides after you accept the #1 fix.
 
 **Bug-hunt follow-ups (open) -- full report `docs/reviews/2026-06-27_engine_bug_hunt.md`:**
-- **#2 [MED] FIXED 2026-06-27 (`f1538ff`)** -- damage formula now uses the
+- **#2 [MED] FIXED 2026-06-27 (`b2683ba`)** -- damage formula now uses the
   game's float32-truncated `BONUS/STAB_MULTIPLIER/SUPER_EFFECTIVE` constants
   (was exact `1.3/1.2/1.6` -> off-by-one on breakpoint boundaries). This is
   the boundary-scattered fix that forces the COLD re-dive; everything else
@@ -439,7 +439,7 @@ TODO.md. CHANGELOG '2026-07-03' carries the summary entry.
 ## hunt2 round-2 fixes + engine-batch merge + post-merge (2026-07-03)
 
 **FIXED on main (Opus, 2026-07-03) — the non-engine-batch, non-contested slice:**
-- **F1** (`57137e4`): `migrate_cache.py` `used`-set now unions form-change
+- **F1** (`856ec73`): `migrate_cache.py` `used`-set now unions form-change
   swapped-in moves via new single-sourced `formchange.form_change_swapped_moves`;
   regression test builds a minimal one-move gm delta. **Adversarially verified
   COMPLETE**: the only battle-time move swaps are Aegislash (fast) + Morpeko
@@ -450,15 +450,15 @@ TODO.md. CHANGELOG '2026-07-03' carries the summary entry.
   hunt2 merge (fresh final hash; different regions, should merge clean). No past
   migration was tainted (the one prior `--from-gamemaster` run, skarmory_mega,
   was purely additive).
-- **F2 doc** (`57137e4`): the `self_debuff_either_side` static-flag caveat is
+- **F2 doc** (`856ec73`): the `self_debuff_either_side` static-flag caveat is
   now documented in the predicate docstring + a Registeel FB+ZC test assertion
-  (measured harmless in `69876ee`; the "AURA_WHEEL is the only swap" line is
+  (measured harmless in `c6ae308`; the "AURA_WHEEL is the only swap" line is
   corrected). Trap for the next predicate author recorded, not silently false.
-- **BP-1** (`2931d1d`): `breakpoints()` returns `[]` for power-0 moves instead
+- **BP-1** (`6a7e006`): `breakpoints()` returns `[]` for power-0 moves instead
   of ZeroDivisionError (was silently dropping every anchor for the whole
-  Aegislash-Shield GL dive). **BP-2** (`cc70593`): CLI now forwards
+  Aegislash-Shield GL dive). **BP-2** (`464355d`): CLI now forwards
   `--shadow-atk/--shadow-def` into the damage math (was header-only).
-- **JIT-COV-1** (`22c0a0b`): 2 settrace-verified parity matchups now cover the
+- **JIT-COV-1** (`ed8dac0`): 2 settrace-verified parity matchups now cover the
   ttl-cmp-bonus / dedup-keep / atk-stage-clamp+4 kernel branches (were unpinned).
 - Full suite after: 1216 passed / 14 xfailed / 2 pre-existing new-machine
   fixture failures (`test_export_owned_breakdown`, missing `userdata/website`).
@@ -467,22 +467,22 @@ TODO.md. CHANGELOG '2026-07-03' carries the summary entry.
   engine-hash-coverage question (anchors feed breakpoint analysis, not the
   cached 1v1 column scores), worth a look but not a delta hole.
 
-**hunt2 engine batch MERGED to main (`2a63b65`, 2026-07-03, Michael-approved):**
+**hunt2 engine batch MERGED to main (`2d8dc91`, 2026-07-03, Michael-approved):**
 NB-1 (selection freeze) + FC-1 (Aegislash revert energy) + OMT (turns_planned
-divisor) + would_shield-as-documented. Fast-forward from `a86b0fd`; full suite on
+divisor) + would_shield-as-documented. Fast-forward from `f0359a4`; full suite on
 the merged tree 1234 passed / 14 xfailed / 2 pre-existing fixture failures.
 battle.py byte-identical to the audit-passed hunt2 engine. OMT was the
 cold-forcing change (touched set not statically characterizable), so the merged
 engine needed a cold re-dive — **DONE: the 2026-07-06/07 bake was that re-dive**
-(bake tree `753d3ba` contains `2a63b65` + `02627fe`; verified + closed out
+(bake tree `f5e8527` contains `2d8dc91` + `8f9ca31`; verified + closed out
 2026-08-04, CHANGELOG). Everything else in the batch rode it for free,
 including JIT-COV-2 below.
 
 **DONE post-merge (Opus, 2026-07-03):**
-- **JIT-COV-2** (`02627fe`): inline comment at the JIT `final_state = _DPState(0,
+- **JIT-COV-2** (`8f9ca31`): inline comment at the JIT `final_state = _DPState(0,
   ...)` site — `energy=0` is inert (no consumer reads `.energy`). Comment-only on an
   engine-hash file; rides the OMT-forced cold re-dive.
-- **PROP-1** (`fe2c443`): DEVELOPER_NOTES "Key implementation details" now documents
+- **PROP-1** (`99b6665`): DEVELOPER_NOTES "Key implementation details" now documents
   the exact-`cmp_atk`-tie -> player-index (p0-first) resolution as a PvPoke-faithful
   known property.
 - **anchors.py `_ENGINE_FILES` question** (was the F1 out-of-scope note): checked —
@@ -494,11 +494,11 @@ including JIT-COV-2 below.
 
 ## Top-N Phase 1 + Equinox Cup pilot Phase 2 (shipped 2026-07)
 
-**Phase 1 (client-side opponent filter) SHIPPED** (`b8b561e`, `f5741a3`).
+**Phase 1 (client-side opponent filter) SHIPPED** (`f2c5aa0`, `e25f6be`).
 
-**Phase 2 (Equinox Cup pilot) SHIPPED** (gopvpsim `aa8dac8..3c153fb`;
+**Phase 2 (Equinox Cup pilot) SHIPPED** (gopvpsim `d9c482f..1dea15c`;
 gobattlekit `0c1bd5c`). Implemented + verified 2026-07-03; confirmed
-2026-08-04 as pushed (`3c153fb` is an ancestor of `origin/main`) and live
+2026-08-04 as pushed (`1dea15c` is an ancestor of `origin/main`) and live
 (`pogodives.com/cups.html`, `/corviknight-equinox-cup/`,
 `/clodsire-equinox-cup/` all HTTP 200) -- this block previously read "NOT
 pushed / NOT published, pending review" and was stale. Done: cup rankings
@@ -521,7 +521,7 @@ plan doc.
 ## gobattlekit bitmask exporter shipped detail (2026-06-29)
 
 step 1, the bitmask exporter, SHIPPED
-  2026-06-29 in `c1ea231`: `bitmask_from_dive` + `--bitmask` on
+  2026-06-29 in `27c7827`: `bitmask_from_dive` + `--bitmask` on
   `scripts/export_owned_breakdown_bundle.py`, with roundtrip + size tests in
   `tests/test_export_owned_breakdown.py`; the top-K-stat-product bake was a
   DEAD END — those spreads all give up nothing; owned mons have arbitrary
@@ -573,7 +573,7 @@ analysis SHIPPED** -- full 4096x4096 joint IV grids vs Lickilicky
 with an index card. Pipeline + contract: `docs/thievul_licki_analysis.md`
 (pipeline: the generic `joint_iv_*` kit since 2026-08-19 -- `pairs/thievul_*.toml`; data in gitignored `userdata/thievul_lick*`).
 Post-publish residue: (a) RESOLVED 2026-08-19: Michael okayed
-committing the CD-day poke_genie fixture (commit 1b5ce69); (b) the
+committing the CD-day poke_genie fixture (commit c7dca4b); (b) the
 pinned gamemaster cache TTL-refreshed to `e6050f77bf06` during the
 session (disclosed on-page; re-pin from pvpoke `f60a41199` before any
 Worlds re-render, per the Worlds NOTE above).
@@ -665,7 +665,7 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    lead40 CONFIRMED on the threaded engine -- writeup addendum 3;
    cache key normalization primitives in sweep_cache with the registry
    pinned to the engine-hashed battle.py). RENDER SIDE SHIPPED
-   2026-08-25 (b67b8d4 sweep/cache consumer wiring + 744c4a5 --policy
+   2026-08-25 (c546006 sweep/cache consumer wiring + 54bcc06 --policy
    axis & Strategy dropdown; verified 2026-08-27 live on the published
    pages — both tiers baked, PvPoke tier is the JS default).
    Round-6 discovery (IV-/opponent-dependent
@@ -686,7 +686,7 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    "five losers" roster was static-tank-era and names a species that
    does not lose under the shipped rule.
    **STRICT-BAR SHEET 2026-08-26 (supersedes the uniform lead40 rule;
-   commit 8fc5764)**: Michael's overnight bar -- every start scenario
+   commit 1da3703)**: Michael's overnight bar -- every start scenario
    `>= 0` on BOTH mean rating delta and net flips vs plain PvPoke, per
    league x opp-IV mode x bait. The uniform rule failed 5 scenario
    cells; `_POGODIVES_SHEET` (per-START-scenario rows: CMP/DPT/
@@ -694,7 +694,7 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    exempt) passes everywhere -- full record:
    `docs/validations/cramorant_strict_bar_2026_08_26.md`. Any
    counters list derived pre-sheet needs re-deriving from the
-   rebaked tensors. SHEET v3 FINAL (commit 90d8811, certified
+   rebaked tensors. SHEET v3 FINAL (commit 05baa89, certified
    360/360 cells at full 4096-IV resolution over ALL 5 movesets x 2
    leagues): the 2v1 hole was closed by the ready-nuke gate (worst
    slice +2,220 net / +1.17); the skeptic round then caught a v2
@@ -803,7 +803,7 @@ formula; see the resolved note above -- not an engine divergence).
 
 **DONE 2026-08-27 (~04:30): Greninja + Annihilape are in the matrix,
 verify_worlds fully GREEN** (555 pair pages, 0 deferred; commit
-31a7361). Executed from a vintage-pinned worktree at 6a7e534
+d7070c6). Executed from a vintage-pinned worktree at cf452d9
 (gopvpsim-worlds; engine 5839391a7596 / gm 8f1d6cca5c0f) -- the
 Worlds surface is deliberately FROZEN at the pre-Cramorant engine
 until after Aug 30 (the port changes aegislash_shield modeling; 161
@@ -864,7 +864,7 @@ The queued session ran 2026-08-19: shortlist SHIPPED
 (`scripts/worlds_shortlist.py`, 455 amber pairs by combined usage, full
 table `userdata/worlds_shortlist.md`); reuse-plan S1 COMPLETE (the
 `joint_iv_*` kit replaced `thievul_licki_*`; acceptance record at
-commit 8feec47, honesty-delta wording changes documented at 319c8a2;
+commit e1e9f9c, honesty-delta wording changes documented at 71284d9;
 memory: project-joint-iv-kit); pair pages baking/building through the
 day via detached chains (`userdata/joint_iv/bake_chain*.log`), each
 bake cross-checked exact vs the Worlds Tier-2 grids. Pages land in
@@ -880,18 +880,18 @@ grids with auto-generated detail pages; (3) ~03:35: three MIRROR pages
 combinations() exclusion; all three are heavily IV-decided, e.g. the
 Licki mirror's best build is rank-3182 15/3/3) + a fix for a latent
 renderYourDenial crash. Mirror review round fixed 1 blocker + 3 majors.
-All 11 deferred review minors shipped 2026-08-24 (28f2a4d) and
-[meta.oracle] pins landed on all 18 eligible pairs (7360eb2).
+All 11 deferred review minors shipped 2026-08-24 (a20ca6f) and
+[meta.oracle] pins landed on all 18 eligible pairs (6d5b70e).
 
 **Round-2 mirrors (2026-08-24):** thievul x3 (true NS+IW mirror, IW+PR
 mirror, NS+IW-vs-IW+PR cross-arm), quagsire-shadow, altaria -- built +
 published-copy ready. DEFERRED to a later push (Michael-approved):
 empoleon__vs__empoleon and feraligatr__vs__feraligatr mirror bakes.
-Key finding baked into the kit (8ebb642): mirror grids are
+Key finding baked into the kit (9366734): mirror grids are
 seat-ASYMMETRIC by construction (row = optimized line, column =
 always-baits dive convention), so there is NO antisymmetry invariant;
 the MIRROR MATCH note is now data-driven (measured diagonal even-shield
-wins). TEST DEBT CLOSED 2026-08-27 (37ccc01 + 93b6d91): all 7 planned guard
+wins). TEST DEBT CLOSED 2026-08-27 (cd5fd06 + a61d950): all 7 planned guard
 tests landed, each proven failing against its pre-guard commit
 (writer + independent skeptic + mutation probes); the review also
 caught and fixed a real producer bug -- _BP_KNOWN was missing
@@ -917,7 +917,7 @@ panel labels) shipped 2026-08-26 with the GTO-fill/outline bundle.
   `stage_ladder_from_rank1` in pairs/thievul_lickilicky.toml preserves
   the shipped bytes and documents it). Rebuilding with the current kit
   fixes both -- republishing is your call.
-- **Deferred review minors** (all in the 319c8a2 commit message):
+- **Deferred review minors** (all in the 71284d9 commit message):
   duplicate-grid double embedding (~826KB/page), pareto-axis
   self-inclusion, one-option basis dropdown, wall-table 25-vs-12
   wording, CSV dropped-row accounting, raw key fragments in the
@@ -928,10 +928,10 @@ panel labels) shipped 2026-08-26 with the GTO-fill/outline bundle.
 ## Worlds 2026 robustness analysis — IN PROGRESS (sessions 2-5 remain)
 
 **Plan of record: `docs/worlds_prep_plan.md`** (read it before touching
-anything Worlds). Session 1 DONE 2026-08-10 (`770a74d`): `worlds/meta.toml`
+anything Worlds). Session 1 DONE 2026-08-10 (`536ea7d`): `worlds/meta.toml`
 (31 entries) + `scripts/worlds_meta.py` + tests; go/no-go probe = GO
-(60/720 amber, structured). Session 2 DONE 2026-08-10 (`4ef544d` +
-`5c414c3` + `34a3803`): bool-plane core split into
+(60/720 amber, structured). Session 2 DONE 2026-08-10 (`b861c36` +
+`e0cf3f2` + `42fc0ab`): bool-plane core split into
 `deep_dive_lib/robustness.py` (opp_plane + plane_task_worker; wrapper
 semantics pinned), Tier-0 closed-form `scripts/worlds_tier0.py` (exact
 bisected cutoffs; DragapultSim's Tinkaton-vs-Mantine numbers reproduced
@@ -980,7 +980,7 @@ publish-gating.
 Worlds is Aug 28-30. **PUBLISHED 2026-08-14** (Michael's go;
 `publish_website.sh --push`, live-verified at pogodives.com): 401/401
 amber pairs baked + pages, verify_worlds OK, plus the same-day
-pre-publish polish batch (`157bf71`: cheat-sheet grid links, moot deny
+pre-publish polish batch (`198ab01`: cheat-sheet grid links, moot deny
 annotation, curve hover readout). Gamemaster held at the pre-Worlds
 vintage 8f1d6cca5c0f throughout (only upstream delta: three added mega
 forms, sim-irrelevant). NOTE: the data cache holds that pinned old

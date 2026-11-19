@@ -211,7 +211,7 @@ STILL OUT (deferred, OK'd): Plotly canvas/marker recoloring -- needs a
 DEFAULT_THEME (gruvbox-light) resolved hex. `_TYPE_COLORS` (type-brand) stays
 out of the contract.
 
-CLOSED 2026-08-08 by 8da55c4 (+ bf58ee2, 048bb3e): the Plotly deferral above
+CLOSED 2026-08-08 by 7fc22b4 (+ f83a5e8, 6c8e7b2): the Plotly deferral above
 is no longer current. `deep_dive_engine.js` resolves chart chrome and markers
 from the active `[data-theme]` with `getComputedStyle` (memoized; a
 `data-theme` MutationObserver drops the memo and re-renders), and the

@@ -2,7 +2,7 @@
 
 Michael, 2026-09-19: "do some DRY thinking before implementing." Each rule
 below is a thing that was duplicated in the round-8 code, and each test here
-FAILED at 0ca9693 with the pre-fix value recorded in its own docstring, so a
+FAILED at b21c4c0 with the pre-fix value recorded in its own docstring, so a
 regression puts the duplicate back and the test says which one.
 
 Vocabulary (docs style rule, per document):
@@ -95,7 +95,7 @@ def _fragments(text, n=D1_WINDOW):
 # ---------------------------------------------------------------------------
 
 # Shared 121-character windows between all three preset blocks, measured at
-# 0ca9693 on the Shadow Sableye section: 3,555. Almost all of it is authored
+# b21c4c0 on the Shadow Sableye section: 3,555. Almost all of it is authored
 # prose paid for three times (the emphasis key, the notable-list intro, the
 # rocket-grunt sentence, the near-free sentences, the fixed note's definition
 # -- about 5.5 KB). What is left after the split is table DATA that happens
@@ -145,7 +145,7 @@ def _authored_constants(mod, n=120):
 def test_d1_no_authored_paragraph_is_rendered_more_than_once(shadow_section):
     """Preset-invariant authored text renders ONCE.
 
-    Pre-fix (0ca9693) these were each rendered three times, once per hidden
+    Pre-fix (b21c4c0) these were each rendered three times, once per hidden
     preset block: ``EMPH_KEY``, ``NOTABLE_LEAD``, ``STANDOUT_NOTE``,
     ``GUARANTEE_SORT_KEY``, ``WEIGHTING_NOTE``'s neighbours and the
     rocket-grunt sentence -- about 5.5 KB of byte-identical bytes.
@@ -173,7 +173,7 @@ def test_d1_no_rendered_paragraph_is_repeated_verbatim(shadow_section):
     sentence ("Single-stat line: Attack >= 148.10 decides 0v1 Annihilape.
     SP1 is 6.34 short." -- 3 copies) and the species/moveset opening of the
     verdict lead ("Sableye (Shadow) running Shadow Claw / Drain Punch, Foul
-    Play." -- 3 copies). Pre-fix (9cb2b26) this test found both.
+    Play." -- 3 copies). Pre-fix (e9f705b) this test found both.
     """
     import collections
     import html as _h
@@ -191,7 +191,7 @@ def test_d1_no_rendered_paragraph_is_repeated_verbatim(shadow_section):
     # standout and does not move with the Build criteria setting, so each is
     # a real per-setting render of identical data. Hoisting them would mean
     # lifting per-family rows out of a per-setting table, so this is a named
-    # ceiling rather than zero. Pre-fix (9cb2b26): SIX -- these four plus
+    # ceiling rather than zero. Pre-fix (e9f705b): SIX -- these four plus
     # the line-status sentence and the lead's species/moveset opening, which
     # ARE templates and now render once.
     assert len(dupes) <= 4, dupes
@@ -242,7 +242,7 @@ def _defs(js):
 def test_d2_one_mini_grid_builder():
     """One function draws a nine-mini shield-scenario grid, not two.
 
-    Pre-fix (0ca9693): TWO -- ``renderAllScenarios`` (the Matchup clusters
+    Pre-fix (b21c4c0): TWO -- ``renderAllScenarios`` (the Matchup clusters
     section's grid) and ``_wbAllScen`` (this section's), both looping the
     baked scenarios and calling Plotly.newPlot per scenario, on the same x
     axis, one directly above the other on the page.
@@ -307,7 +307,7 @@ def test_d2_one_collection_loader_and_one_manual_parser():
 def test_d2_one_scenario_setter():
     """One function puts a shield scenario on every handle in the section.
 
-    Pre-fix (9cb2b26) there were FOUR unlinked "Shield scenario:" selects
+    Pre-fix (e9f705b) there were FOUR unlinked "Shield scenario:" selects
     inside one section -- the figure box's, expander F's, expander G's and
     the clusters subsection's own ``select.dd-mc-scen`` -- and
     ``wbSelectView`` re-rendered only the ``.wb-plotbox`` that owned the
@@ -425,7 +425,7 @@ def test_d3_the_clusters_section_is_a_subsection_now():
 
 # What this measures, exactly: the bytes ``section_html`` AUTHORS, from
 # ``<details class="wb-root">`` on. It excludes the ``<style>`` prelude the
-# page hoists (11,580 bytes at 0ca9693) and it excludes the Matchup clusters
+# page hoists (11,580 bytes at b21c4c0) and it excludes the Matchup clusters
 # body, which reaches the page through a slot marker
 # (``deep_dive.generate_interactive_html`` fills it) rather than through this
 # renderer.
@@ -489,7 +489,7 @@ def test_d4_the_merged_section_fits_the_budget(shadow_section):
 # D5. No new payload keys unless the JS reads them
 # ---------------------------------------------------------------------------
 
-# The three payload keys the engine did NOT read at 0ca9693: ``T`` (the
+# The three payload keys the engine did NOT read at b21c4c0: ``T`` (the
 # full-precision threshold, carried for the masks' own documentation), and
 # ``band`` / ``nAbove``, both read by Python before the payload is built. They
 # are grandfathered; anything ADDED has to have a reader.

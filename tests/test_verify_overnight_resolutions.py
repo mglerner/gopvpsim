@@ -23,7 +23,7 @@ RESOLUTIONS = [
     {
         "chain_log": "overnight_20260706_204813.log",
         "step": "Running article link verification",
-        "fix_commit": "73747e6",
+        "fix_commit": "a2b6698",
         "reason": "guides tree absent on a fresh laptop",
         "verified": "re-run clean 2026-08-04",
     }
@@ -34,7 +34,7 @@ def test_matches_the_log_it_names():
     res = vo.match_resolution(
         RESOLUTIONS, "overnight_20260706_204813.log", FAIL_LINE)
     assert res is not None
-    assert res["fix_commit"] == "73747e6"
+    assert res["fix_commit"] == "a2b6698"
 
 
 def test_does_not_match_a_later_chain_log():

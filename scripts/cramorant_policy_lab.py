@@ -87,7 +87,7 @@ def load_pool(league):
         # _parse_opponent_pool_line already returns the charged override as
         # a LIST (opponents.py); it was a comma string when this was written.
         # Splitting the list crashed load_pool('great') on the two Thievul
-        # `charged=` rows added 2026-09-10 (6a96aa8) -- the GL half of the
+        # `charged=` rows added 2026-09-10 (21775e8) -- the GL half of the
         # strat certification was un-runnable until 2026-09-12.
         if isinstance(charged_o, str):
             charged_o = [c.strip() for c in charged_o.split(',') if c.strip()]

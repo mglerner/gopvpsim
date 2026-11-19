@@ -280,8 +280,8 @@ The plan limits S12 to 1-2 approaches; this is exactly two.
 
 ## Verification plan for S12
 
-Measurement harness (`scripts/measure_html_size.py`, built in 2f1145e
-and deleted as dead in 7126f1b on 2026-06-12; recover it from git if
+Measurement harness (`scripts/measure_html_size.py`, built in 1f7055b
+and deleted as dead in ef92f96 on 2026-06-12; recover it from git if
 needed, or inline in the audit script):
 
 1. Pick the same 2 representative files before/after.

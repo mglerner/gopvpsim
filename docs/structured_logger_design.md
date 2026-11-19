@@ -3,8 +3,8 @@
 **Status:** design only; planning output for S2 implementation.
 **Owning plan:** `~/.claude/plans/post-s5-oinkologne-arc.md` S1 → S2.
 **Motivation:** the former TODO "Diagnostics / observability" item
-(shipped 2026-04-15/16, Post-S5 S2a-S2d, first commit `2c87d31`; TODO
-entry removed in `bd85124`) — stdout buffering
+(shipped 2026-04-15/16, Post-S5 S2a-S2d, first commit `3796477`; TODO
+entry removed in `53b7034`) — stdout buffering
 makes live `tail -f` unreliable, no per-run log file, no timestamps,
 no severity levels, no way to distinguish "stalled" from "quiet."
 
@@ -327,7 +327,7 @@ finishes comfortably."
 
 **NOT natural to fold into S2:**
 - **"Incremental slayer cache flush"** (former TODO Performance item;
-  shipped as `3a98bd9`, per-round flush, recorded in CHANGELOG
+  shipped as `636657a`, per-round flush, recorded in CHANGELOG
   "2026-06-28 — cold re-dive complete"). Lives in
   `scripts/slayer_cache.py`, which has zero prints. It's a durability
   fix (crash-mid-iteration loses all sims in the cache), not an

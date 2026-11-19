@@ -250,7 +250,7 @@ def test_incremental_meta_add_extends_without_deleting(tmp_path):
     """The plan's pinned late-add affordance (docs/worlds_prep_plan.md:
     'Adding a mon later = one meta.toml row + N new pairs simmed'):
     session-2c hashed the WHOLE meta.toml into a refuse-stamp, so ANY
-    meta edit -- including the 580bfa7 prose fix -- forced --rebake-all.
+    meta edit -- including the 3bbec1b prose fix -- forced --rebake-all.
     Pre-fix behavior: SystemExit 'stamp mismatch' here. Now: additive
     delta bakes exactly the new pairs, existing planes untouched."""
     entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']

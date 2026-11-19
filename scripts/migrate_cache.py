@@ -23,8 +23,8 @@ Two migration modes:
 
 Engine predicates (PROVEN, not guessed):
 
-  signature_regroup_20260923 — the signature-dedup exactness fix a4ca14e
-                plus the neutral legacy guard 2615c6e (--from-engine
+  signature_regroup_20260923 — the signature-dedup exactness fix f2401cd
+                plus the neutral legacy guard cc87298 (--from-engine
                 9ac12a2754a1). COMPUTED per column: affected iff the old and
                 new signatures partition the column's profiles differently
                 (old grouping rebuilt from a frozen pre-fix movable_axes and
@@ -528,7 +528,7 @@ _FORM_CHANGE_SPECIES_PREFIXES = ('Aegislash', 'Cramorant', 'Mimikyu', 'Morpeko')
 
 
 def _form_change_either_side(f, c):
-    """Aegislash reuse leak fix, clone commit 2e8d36b (pin --from-engine
+    """Aegislash reuse leak fix, clone commit e3de87d (pin --from-engine
     e4d380ec3e5e, the 2026-09-12/14 rebake's engine).
 
     The hashed delta is two edits to battle.py, both reachable ONLY through
@@ -618,11 +618,11 @@ def _no_shadow_either_side_20260920(f, c):
 
 
 # ---------------------------------------------------------------------------
-# 2026-09-23: signature-dedup exactness fix (a4ca14e) + legacy guard (2615c6e)
+# 2026-09-23: signature-dedup exactness fix (f2401cd) + legacy guard (cc87298)
 # ---------------------------------------------------------------------------
 
 def _movable_axes_pre_20260923(side, other):
-    """deep_dive_signature.movable_axes EXACTLY as it was before a4ca14e
+    """deep_dive_signature.movable_axes EXACTLY as it was before f2401cd
     (frozen copy: no DP-projection attack clause). Used only to rebuild the
     OLD grouping for signature_regroup_20260923."""
     import deep_dive_signature as sig
@@ -712,11 +712,11 @@ def _signature_regroup_20260923(f, c):
     """Signature-dedup exactness fix (pin --from-engine 9ac12a2754a1).
 
     The hashed delta 9ac12a2754a1 -> d78c67fd06a7 is exactly two files:
-      (1) battle.py, 2615c6e: simulate() RAISES on mechanics='legacy'
+      (1) battle.py, cc87298: simulate() RAISES on mechanics='legacy'
           without an env opt-in, plus a docstring rewrite. A battle either
           runs byte-identically or refuses to start; no cached column (all
           simmed on 'new') can change. Neutral.
-      (2) deep_dive_signature.py, a4ca14e: the CMP column uses the carried
+      (2) deep_dive_signature.py, f2401cd: the CMP column uses the carried
           pre-shadow attack instead of atk / 1.2, and movable_axes counts a
           side's own chance-1 opponent-def-debuff charged moves as moving
           its attack axis (pvpoke_dp's _cm_buff_delta projection).
@@ -768,7 +768,7 @@ def _signature_regroup_20260923(f, c):
 def _signature_fix_slayer_20260923(f, c):
     """Slayer-cache side of the same bump (pin --slayer --from-engine
     9ac12a2754a1: the 2026-09-20 bake stamped slayer entries with the SWEEP
-    hash, before 496f366 gave the slayer cache its own stamp).
+    hash, before e871341 gave the slayer cache its own stamp).
 
     The slayer stamp is sha(sweep engine hash + deep_dive_slayer.py), so it
     moved only because the sweep hash did. Of that delta: (1) the battle.py
@@ -776,8 +776,8 @@ def _signature_fix_slayer_20260923(f, c):
     signature file is never used on the slayer path -- deep_dive_slayer.py
     does not import deep_dive_signature (pinned by
     tests/test_migrate_cache.py), so slayer scores cannot depend on it.
-    deep_dive_slayer.py is byte-identical since 36b10da (09-20 13:33, before
-    the bake); 496f366 and 4b6342b changed only slayer_cache.py's stamp
+    deep_dive_slayer.py is byte-identical since bed2c9e (09-20 13:33, before
+    the bake); e871341 and d5281ed changed only slayer_cache.py's stamp
     scheme and key-function signature (same key values for mechanics='new',
     which the bake used). Fully blessing.
     """
@@ -853,7 +853,7 @@ PREDICATES = {
     # exact post-plumbing) -- fully-blessing, like neutral_batch_20260810.
     'cramorant_knobs_20260824': lambda f, c: False,
     # (legacy_guard_20260922 was REMOVED unrun on 2026-09-23: it blessed
-    # everything from 9ac12a2754a1, but the signature fix a4ca14e landed in
+    # everything from 9ac12a2754a1, but the signature fix f2401cd landed in
     # the same hash delta, so running it would have blessed the ~15% of
     # columns that fix changes. Both deltas are covered by the two
     # *_20260923 predicates below -- see their docstrings.)

@@ -1,24 +1,24 @@
 """build_joint_iv_page: the MIRROR MATCH note is MEASURED, not asserted.
 
-Guard commit 8ebb642 (2026-08-24) replaced the mirror seat-antisymmetry
+Guard commit 9366734 (2026-08-24) replaced the mirror seat-antisymmetry
 ASSERTION with a measurement: ``build_data`` now counts diagonal
 even-shield wins and off-diagonal both-seat wins over each true-mirror
 grid and picks the MIRROR MATCH wording from those counters.
 
-Pre-guard behaviour (373bae8), recorded here as the pre-fix value: a
+Pre-guard behaviour (b2415cb), recorded here as the pre-fix value: a
 single diagonal even-shield win made the builder die with
 
     SystemExit: ABORT: <label> scenario 1-1: 1 mirror cell(s) won from
     BOTH seats -- seat bookkeeping bug; the MIRROR MATCH note would be
     false.
 
-so the two asymmetry tests below fail against 373bae8 by aborting.
+so the two asymmetry tests below fail against b2415cb by aborting.
 
 The zero-asymmetry branch is a BYTE pin: the shipped Lickilicky /
 Wigglytuff / Corviknight / Quagsire-Shadow mirror pages carry the
 round-1 (2026-08-20) wording verbatim, and the guard commit's whole
 acceptance argument is that those pages rebuild unchanged. ``_ROUND1``
-below is transcribed from 373bae8's source, i.e. from the shipped
+below is transcribed from b2415cb's source, i.e. from the shipped
 wording, not from the post-guard code.
 
 These call ``build_data`` -- the smallest real unit that contains both
@@ -47,7 +47,7 @@ assert _spec.loader is not None
 _spec.loader.exec_module(_page)
 
 
-# Byte pin, transcribed from 373bae8 scripts/build_joint_iv_page.py
+# Byte pin, transcribed from b2415cb scripts/build_joint_iv_page.py
 # (the wording the shipped round-1 mirror pages carry).
 _ROUND1 = (
     'MIRROR MATCH. Reading rules: (1) identical builds -- the '
@@ -160,7 +160,7 @@ def test_diagonal_even_shield_win_selects_measured_wording(
         monkeypatch, mirror_dir):
     """One diagonal 1-1 win -> the asymmetric note, counted 1 of 6.
 
-    Pre-fix (373bae8) this was a hard SystemExit ABORT ('1 mirror
+    Pre-fix (b2415cb) this was a hard SystemExit ABORT ('1 mirror
     cell(s) won from BOTH seats'), so no note existed at all.
     """
     won = np.zeros((2, 2, 9), dtype=bool)
@@ -181,7 +181,7 @@ def test_off_diagonal_both_seat_win_selects_measured_wording(
     """The both-seat counter alone also flips the wording.
 
     Cell (0, 1) won at 0-1 shields and its seat swap (1, 0) at 1-0 is the
-    same fight recorded as a win twice. Pre-fix (373bae8) that aborted;
+    same fight recorded as a win twice. Pre-fix (b2415cb) that aborted;
     post-guard it is measured, with zero on the diagonal counter.
     """
     won = np.zeros((2, 2, 9), dtype=bool)

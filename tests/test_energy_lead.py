@@ -1,4 +1,4 @@
-"""Energy-lead sim axis tests (axis shipped 2026-06-12, 9889555; record:
+"""Energy-lead sim axis tests (axis shipped 2026-06-12, a6acd81; record:
 CHANGELOG "2026-06-12 -- Energy-lead sweep axis").
 
 The axis rides the composite mode string as ':eN' where N counts FAST

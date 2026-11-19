@@ -17,7 +17,7 @@ y-axis metric over the shields the user has selected, not the stat-product
 rank-1 over even shields.
 
 Staleness caveat: DATA.rank1RefIvIdx is only the CLI's stat-product rank-1 for
-dives rendered at or after 8c1f98e ("Rank the dive's SP column with PvPoke's
+dives rendered at or after 881d415 ("Rank the dive's SP column with PvPoke's
 convention everywhere"). Older pages carry the pre-fix marker -- e.g. the
 currently-shipped Umbreon GL dive marks 0/15/14 where iv_rank says 0/15/15 --
 so a bundle built from them differs from the CLI in its REFERENCE SPREAD too,

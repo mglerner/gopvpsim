@@ -12,7 +12,7 @@ Two separate things can go wrong there, and only one of them ever did:
 
 1. **Registry completeness (checked 2026-08-27: NOT broken).** The
    suspicion in TODO was that the tooltip registry is the same bug class
-   as the ``#opp-<slug>`` registry fixed in ``b43bd2d`` -- i.e. that the
+   as the ``#opp-<slug>`` registry fixed in ``abd59e6`` -- i.e. that the
    L51 pass inherits an exhausted registry and ships entry-less markup.
    It is not: ``_TooltipRegistry.register`` is keyed by TEXT and returns
    the cached sid on a repeat, so the second pass re-emits the SAME sids
@@ -123,7 +123,7 @@ def test_every_data_t_sid_resolves_in_the_tooltip_table(small_dive_html):
     ``data_obj['tooltips'] = dump_tooltip_registry()`` has to run AFTER the
     best-buddy render pass; hoisting it above would leave every L51-only
     tooltip pointing at a missing table entry. This is the check that shows
-    the tooltip registry is NOT the ``b43bd2d`` bug class -- nothing is lost
+    the tooltip registry is NOT the ``abd59e6`` bug class -- nothing is lost
     across the two passes today.
     """
     m = re.search(r'<script>var DATA = (\{.*?\});\n', small_dive_html, re.S)

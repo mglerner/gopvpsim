@@ -4,7 +4,7 @@ DRY review 2026-08-05 entry 12 / June review D9: the same eight-line
 pass-through was hand-typed at five ``iv_sweep`` call sites in
 ``deep_dive.main`` (Phase 2, the extra composite modes, the reference sweep,
 the base-form census, the best-buddy pass). Adding a knob meant editing five
-argument lists, and a miss is silent -- commit 06bedca is the worked example.
+argument lists, and a miss is silent -- commit 7803f90 is the worked example.
 
 The load-bearing property is that ``SweepConfig`` stays a faithful shadow of
 ``iv_sweep``'s signature: the tests below introspect ``iv_sweep`` rather than

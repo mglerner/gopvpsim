@@ -3,8 +3,8 @@
 The bug-#3 oracle surfaced ~117 pre-existing divergences on the broader
 both-self-debuff population (Lurantis, Blaziken, Flareon; non-default
 movesets). Investigation: docs/reviews/2026-06-28_both_self_debuff_divergence
-_cluster.md, re-measured 2026-07-03 on c7f9ba2 (post-bandaid[910]-fix
-ffb582b) -- all 8 GL flip rows reproduced byte-identical, and the fix's total
+_cluster.md, re-measured 2026-07-03 on e02ee17 (post-bandaid[910]-fix
+4e1ec72) -- all 8 GL flip rows reproduced byte-identical, and the fix's total
 footprint on this 864-cell population was 4 score-only cells, every one moved
 to exact PvPoke agreement.
 
@@ -70,7 +70,7 @@ def test_blaziken_vs_bastiodon_gl_flip_pin():
 def test_braviary_vs_lugia_ml_default_moveset_flip_pin():
     # ML 2-0: ours 695/304 (Braviary wins); PvPoke 417/582 (Braviary loses).
     # The one default-moveset winner-flip in the population (pre-existing
-    # w.r.t. ffb582b; PvPoke throws double-resisted Close Combat into
+    # w.r.t. 4e1ec72; PvPoke throws double-resisted Close Combat into
     # psychic/flying where we lead Brave Bird). Moveset = the 2026-07-03
     # ML defaults, frozen here.
     bra = _make_battle_pokemon('Braviary', 'AIR_SLASH',
@@ -86,7 +86,7 @@ def test_braviary_vs_lugia_ml_default_moveset_flip_pin():
 
 def test_zacian_vs_swampert_ul_bandaid910_agreement_pin():
     # UL 1-0: ours 625/374 == PvPoke 625/374 (exact agreement). Before the
-    # bandaid[910] fix (ffb582b) we scored 519 here -- this pin guards the
+    # bandaid[910] fix (4e1ec72) we scored 519 here -- this pin guards the
     # fix's effect on the cluster's population (the investigation doc's
     # stale "ours 519" number is dead; do not resurrect it).
     zac = _make_battle_pokemon('Zacian (Hero)', 'SNARL',

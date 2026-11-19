@@ -46,7 +46,7 @@ def _reference_aggregate(scores_flat, nIvs, nS, nO,
     ``win_threshold`` (500) is a TIE, not a win — ``> win_threshold``,
     matching ``battle.is_win``/PvPoke and the sibling probe/losses
     paths. History: pre-S8a production used ``>=``; the S8a
-    vectorisation (8a7fdc7) silently corrected it to ``>``, and this
+    vectorisation (c496d97) silently corrected it to ``>``, and this
     oracle — transcribed from the pre-S8a code — carried the old
     ``>=`` until 2026-08-10, masked because the fixture emitted only
     700/300. The fixture now plants exact-500 cells (losses vs OPP_0)

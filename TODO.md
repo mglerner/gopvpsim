@@ -6,7 +6,7 @@ one condensed CHANGELOG.md entry + delete the bullet (gated, .hygiene.toml). -->
 Current state and next steps only. Replace in place, max 40 lines (gated);
 detail lives in the sections below.
 
-- First hygiene groom done (2f2e785..close-out): TODO 89,491 -> ~30k chars,
+- First hygiene groom done (2bc45b4..close-out): TODO 89,491 -> ~30k chars,
   cap now 45,000 (`.hygiene.toml`). Over the cap: close or park, don't raise.
 - Groom follow-ups done 2026-11-19: CLAUDE.md b-i and memory m2-m12
   (CHANGELOG 2026-11-19).
@@ -100,8 +100,8 @@ engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
   the pruned diggersby / snorlax / shadow-snorlax GL pages from the live
   site. UL Snorlax pages stay.
 - **Every other page is opponents short until re-dived.** The shipped pages
-  were baked 09-27 at the 09-17 pools (a85d62e), so they miss every pool change
-  since (383518b, 410bd5e, 75d13b6; `git diff a85d62e -- opponent_pools/`):
+  were baked 09-27 at the 09-17 pools (68b7f1a), so they miss every pool change
+  since (99e1219, 9a762de, e7478a5; `git diff 68b7f1a -- opponent_pools/`):
   e.g. UL lacks Golisopod (Shadow), Kingdra, Malamar, Toucannon (Shadow),
   Togekiss; GL top50 lacks Dunsparce, Dragonair (Shadow), Kingdra (Shadow) and
   still sims Diggersby / Snorlax / Snorlax (Shadow). Unbuilt registry slugs
@@ -233,7 +233,7 @@ raise `--selftest` N.
   2026-09-12 audit flagged: the hero's "certified never worse ... in any of
   the nine shield scenarios ... on both win rate and average battle rating",
   the 1-1/1-2 row's "lead of 40+ percentage points" (the LEAD constant is
-  inert, 460a63e), the 2-1 cheat-sheet row, Methods' "no negative cell
+  inert, 5b29e84), the 2-1 cheat-sheet row, Methods' "no negative cell
   shipped", and the UL "honest flags" 2-1 headroom framing. The audit's
   counter-example to the hero and Methods claims (UL 0v1 Dondozo -2) was a
   single-spread artefact at full resolution (deep-vet doc), and the
@@ -248,14 +248,14 @@ raise `--selftest` N.
   lethal Cramorant Dive. Check the tracker for duplicates first. (Report 9
   was fixed upstream in e87448291, 2026-09-27: do not file.)
 - **Opponent-pool curation (Cramorant accepted test debt (b)):** Cramorant
-  IS in `gl_top50_plus_cs.txt` (since f92bec1) and `ul_top60.txt` and is an
+  IS in `gl_top50_plus_cs.txt` (since c0968bc) and `ul_top60.txt` and is an
   opponent in every bake; `verify_opponent_pools.py` labels it "curated out"
   only because `curated_out = excluded & live` (:181, :208). Decide keep
   (today's reality) or exclude in the recipe; fix the label either way.
 
 **Lens-grid item, OPEN: the data-cache TTL keeper.** A launch-time
 preflight should refuse a bare `run_website_dives.py` run without the TTL
-keeper, or the runner should own the keeper. 88bec7b (2026-09-20) pins the
+keeper, or the runner should own the keeper. 7090ce0 (2026-09-20) pins the
 data cache (`GOPVPSIM_PIN_DATA_CACHE=1`) only inside `overnight_redive.sh`;
 a direct `run_website_dives.py` launch -- how the 2026-09-12 rebake ran,
 letting the live gamemaster refresh mid-bake -- is still unpinned.
@@ -277,7 +277,7 @@ decisions, deferred bakes, polish) is parked in docs/TODO_backlog.md
   standing rules" (gamemaster re-pin, `WORLDS_RERENDER=1`, publish/bake
   rules; a 2027 bake is new-mechanics).
 - **Un-skip at the 2027 cycle** (or earlier if IV-robustness needs them):
-  the three Worlds artifact tests skipped in 066e528
+  the three Worlds artifact tests skipped in e044959
   (`test_worlds_meta.py`, `test_worlds_bake_guards.py`,
   `test_build_worlds_pair_pages.py`; reason in each skip marker).
 
@@ -301,7 +301,7 @@ Little, Fantasy, Halloween, GO LAIC, Mega Catch).
   mechanism + season-start bake checklist in docs/article_archive_plan.md
   "Site lifecycle and removal policy".
 
-## Mirror population -- open residue (built 2026-09-28, 60481e5 / 6ad44b7; record: CHANGELOG 2026-09-28)
+## Mirror population -- open residue (built 2026-09-28, e83a834 / d5ca413; record: CHANGELOG 2026-09-28)
 
 Decision of record: `docs/expert_verdict_plan.md` "Mirror population:
 decision of record". Schema: the `scripts/deep_dive_lib/mirror_population.py`
@@ -351,12 +351,12 @@ the spread-sets and builds-lattice analyses and the section's v4 (rounds
   that are both material and survive all opponent IV/bait modes); (3)
   objective B under the prior needs the per-scenario win cube. Item (4),
   the product, shipped as v4.
-- **Rankings-vintage sensitivity** (9adc094, e9c70ed): opponent PvPoke
+- **Rankings-vintage sensitivity** (49507a3, 1d33e7c): opponent PvPoke
   ranks are a LIVE read at render time (`build_opp_meta_ranks` ->
   `get_rankings_for`), so a rankings refresh can change a page's verdict
   with no sim change (2026-09-15: Charjabug 60 -> 41 deleted Melmetal's
   floor). Bakes now see one vintage via the chain's data-cache pin
-  (88bec7b; the direct-launch gap is the TTL-keeper item in the Cramorant
+  (7090ce0; the direct-launch gap is the TTL-keeper item in the Cramorant
   section). Proper fix still open: stamp opponent facts (ranks, default
   builds) into the blob at dive time (expert_verdict_plan Phase 0 "blob
   stamping") so replay re-renders cannot drift; other test modules that read
@@ -388,7 +388,7 @@ findings dispositioned, record CHANGELOG 2026-07-03 + 2026-08-09.)
   (50.0 in GL/UL), so `scripts/breakpoints.py`'s rank column and damage
   table can disagree on level for EVERY species. Changing the default
   moves every CLI number -- needs its own scoped decision. (Surfaced by
-  the BP-3 fix `fa1bd1d`, which strictly reduced the mismatch.)
+  the BP-3 fix `89bf7b1`, which strictly reduced the mismatch.)
 - **[render, product decision] js-parity-3 scale half:** on a
   `--species-iv-floor` dive, `spRanks` is dense 1..n over the pruned
   subset while `rankLookup` stays global 1..4096, and the JS column
@@ -401,7 +401,7 @@ findings dispositioned, record CHANGELOG 2026-07-03 + 2026-08-09.)
 - **[render] matchup_clusters' own SP rank**
   (`deep_dive_matchup_clusters.py:~980-983`) is a FOURTH convention
   (argsort over the 2dp display arrays); it now diverges from the
-  unified three post-`8c1f98e`. Fixing changes rendered cluster
+  unified three post-`881d415`. Fixing changes rendered cluster
   "SP #a-#b" labels.
 
 ## Top-N opponent filter + limited-cup dives -- Phase 3
@@ -512,7 +512,7 @@ History: CHANGELOG 2026-09-02..03, 2026-09-09..10, 2026-09-27/28.
   2026-09-28).
 - **Threshold-TOML prose (3b(c) of the 2026-09-09 re-vet):** 182
   descriptions cited a decimal number in prose; each one whose underlying
-  threshold moved is now a wrong published sentence. d363b1d has since
+  threshold moved is now a wrong published sentence. e35db9f has since
   archived the 58 derived stat-cutoff spreads, so re-count first
   (`grep -hE '^\s*description\s*=.*[0-9]+\.[0-9]+' thresholds/*.toml`
   finds 135 single-line hits on 2026-09-25; not the same method). Where a

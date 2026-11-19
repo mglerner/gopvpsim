@@ -25,7 +25,7 @@ the references' `0-1` / `1s` vocabulary (`docs/concepts.md`). Both sides
 run `pvpoke_simulate_shield`; the focal side's charged policy is
 `pvpoke_dp` with `bait_shields` toggled, the opponent always baits.
 
-Measured at repo HEAD `2896a25`, engine untouched (this lane adds tests
+Measured at repo HEAD `32e4216`, engine untouched (this lane adds tests
 and this note only).
 
 ## Case 1 -- Tinkaton vs rank #1 Shadow Altaria, 0-1

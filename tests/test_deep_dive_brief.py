@@ -1361,7 +1361,7 @@ def test_retired_aegislash_caveat_prints_no_divergence_on_a_real_page():
 
     CHANGELOG 2026-09-27 'Aegislash': the Shield-form charged-damage estimate
     now prices at the Blade attack, as PvPoke does, and every oracle cell
-    matches, so ``CAVEAT_SPECIES`` ships empty. Pre-fix (main 0a05ff1, this
+    matches, so ``CAVEAT_SPECIES`` ships empty. Pre-fix (main e501dfa, this
     blob and arm) the page still printed the divergence wording ('engine
     divergence' 4 times in the HTML), field 13 carried
     n_excluded_by_caveat == 3, the census clean_excluded == 3, and no ladder
@@ -1721,7 +1721,7 @@ def test_a_priority_line_sitting_on_the_cut_is_tagged_on_the_page(
 
 # ---------------------------------------------------------------------------
 # Round-3 fixes. Each test below fails against the round-2 build
-# (commit f6cf5f5); the pre-fix value is recorded in the test or its docstring.
+# (commit ca8ef23); the pre-fix value is recorded in the test or its docstring.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.local_artifacts

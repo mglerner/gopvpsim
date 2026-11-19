@@ -19,7 +19,7 @@ PvPoke's live engine via scripts/pvpoke_trace.js at 15/15/15 IVs both sides
 (9/9 exact on winner + score).
 
 The values below were RE-DERIVED 2026-09-09 under the new turn system
-(fa7d801; 0-0 is now 555). They came from our engine, on the warrant that
+(4143783; 0-0 is now 555). They came from our engine, on the warrant that
 the oracle harness matches PvPoke master on 229 of 243 cells; Pinsir vs
 Cresselia is not itself a harness matchup and was not re-traced then.
 

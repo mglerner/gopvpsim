@@ -9,7 +9,7 @@ vs plain PvPoke. No negative cells ship.
 
 **Result: the bar is met.** The uniform rule (dive gate 3.0 + adaptive
 tank lead40 + 2-0 exemption) was replaced by a per-START-scenario
-strategy sheet (`_POGODIVES_SHEET` in `battle.py`, commit 8fc5764).
+strategy sheet (`_POGODIVES_SHEET` in `battle.py`, commit 1da3703).
 Verified on the production score tensors at 512-IV stride before the
 rebake; every changed cell passes with positive value, and the four
 untouched scenarios are byte-identical to the previously baked
@@ -133,7 +133,7 @@ Two adversarial audits ran against v1/v2 and changed the outcome:
 **v3** makes the 2v2 row gate-only (tank plain PvPoke): gate-live
 builds keep the gains, gate-inert builds are exactly zero.
 
-**Final certification (v3, commit 90d8811): 360/360 cells pass the
+**Final certification (v3, commit 05baa89): 360/360 cells pass the
 strict bar at FULL 4096-IV resolution** -- all 5 movesets x 2 leagues
 x 9 start scenarios x 2 opp-IV modes x 2 bait modes. The 200
 changed-row cells were re-simmed live; the 160 unchanged-row cells
@@ -143,7 +143,7 @@ campaign): UL Dive+Surf 2v2 under the OLD tank was +15-21k flips at
 passing rating -- a per-build tank discriminator would recover it;
 the sheet takes zero there instead.
 
-## Sheet v4 (the final overnight iteration, commit bac20cd)
+## Sheet v4 (the final overnight iteration, commit 9b1dd74)
 
 Two more agent campaigns ran after v3 shipped, and their results
 merged into one final change:
@@ -181,7 +181,7 @@ merged into one final change:
   -3.27). Direct re-simulation at coprime stride, then full
   resolution, is the search that works.
 
-## Sheet v5 (daytime 2026-08-26, commit 56a68b3 -- the SHIPPED sheet)
+## Sheet v5 (daytime 2026-08-26, commit 307a88d -- the SHIPPED sheet)
 
 Two more campaigns ran the next day (0v0 oracle capture + 1v0
 loaded-tank, both post-skeptic); v5 is the sheet actually committed

@@ -77,7 +77,7 @@ NORMALIZERS below is the complete list; each entry records why it exists.
 Also normalized: the literal per-run paths of the render root and the
 inputs dir (placeholders <RENDER_ROOT> / <INPUTS>; the page footer prints
 the rankings cache file's path, which lives in inputs/). Verified
-2026-09-25 at HEAD 4c20eae: two HEAD renders of all five default blobs
+2026-09-25 at HEAD 19f141f: two HEAD renders of all five default blobs
 into different output dirs gave 25/25 HTML files byte-identical RAW, and
 the five vintage.toml files differed only in rendered_at; the check
 reported IDENTICAL. A negative control (baseline copy with one moveset

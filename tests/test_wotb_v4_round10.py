@@ -1,8 +1,8 @@
 """The 2026-09-19 round-10 review's findings, pinned.
 
-Two independent reviews read the round-9 section (9cb2b26) -- a
+Two independent reviews read the round-9 section (e9f705b) -- a
 numbers/JS/DOM/DRY lens and a scientific-communication lens. Every test here
-FAILED at 9cb2b26 with the pre-fix value recorded in its own docstring, per
+FAILED at e9f705b with the pre-fix value recorded in its own docstring, per
 the project's testing policy.
 
 Vocabulary (docs style rule, per document):
@@ -80,7 +80,7 @@ def test_the_wide_row_never_claims_it_gives_up_nothing(shadow_facts):
     """A region that guarantees LESS than a build on the same table gives
     something up, and the cell says what.
 
-    Pre-fix (9cb2b26): ``run_preset`` called ``region_block`` for the wide
+    Pre-fix (e9f705b): ``run_preset`` called ``region_block`` for the wide
     with ``others=[]``, so ``gives_up`` was empty BY CONSTRUCTION on every
     page and ``_gives_up_text`` turned "not computed" into the positive
     claim "nothing the other builds guarantee" -- one line above the row's
@@ -204,7 +204,7 @@ def test_the_advice_callout_does_not_point_at_a_line_that_is_not_there(
     """On a no-line page whose SP1 already wins the most, the call-out says
     so; it never points at a single-stat line the strip says does not exist.
 
-    Pre-fix (9cb2b26) the call-out was a fixed string and Melmetal GL --
+    Pre-fix (e9f705b) the call-out was a fixed string and Melmetal GL --
     whose strip says "No single-stat line on this moveset." and whose
     summary says "Your stat-product rank-1 (SP1): it already wins more
     matchups than any other spread" -- read "If you are hunting, hunt a

@@ -181,7 +181,7 @@ assert_focal_default_moveset = true
 # source for the S1 byte-identity pin (rank-1 opponent instead of the
 # simulated probe; stage -3 read 21 where the correct ladder says 22).
 # FLIPPED OFF 2026-08-19 evening for the corrected republish; the pin
-# record lives at commit 8feec47.
+# record lives at commit e1e9f9c.
 stage_ladder_from_rank1 = false
 
 # Pins the stage probe's ORIGINAL engine policy (simulate() defaults,

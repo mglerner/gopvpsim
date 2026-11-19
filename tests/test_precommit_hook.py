@@ -4,8 +4,8 @@ Runs the WORKING-TREE hook, scripts and notes inside a throwaway local
 clone (the clone is brought to the working tree's state and committed
 --no-verify as a baseline), so each scenario is a real `git commit`.
 
-Pre-fix values, from the 2026-10-24 adversarial reviews of b1f054e and
-f88e230: the hook read the working tree, so an unstaged over-cap edit
+Pre-fix values, from the 2026-10-24 adversarial reviews of 53f7c3a and
+d9a4ac1: the hook read the working tree, so an unstaged over-cap edit
 blocked unrelated commits and a staged dangling citation passed once the
 working copy was fixed; `--diff-filter=ACM` made deletion-only commits
 exit 0 before the check; a missing interpreter was reported as notes
@@ -103,7 +103,7 @@ def test_unstaged_overcap_notes_do_not_block_unrelated_commit(clone):
 def test_deletion_only_commit_still_runs_the_gate(clone):
     # Delete a test file the notes name, so the deletion alone must be
     # blocked. Picked from the notes at run time: the hard-coded
-    # tests/test_pvpoke_sandbox.py went stale when 87d212c dropped its
+    # tests/test_pvpoke_sandbox.py went stale when f23eaea dropped its
     # citation, and the commit was then caught by the dev-count gate instead.
     notes = (clone / 'DEVELOPER_NOTES.md').read_text()
     cited = [m for m in re.findall(r'`(tests/test_\w+\.py)[`:]', notes) if (clone / m).is_file()]

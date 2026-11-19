@@ -33,6 +33,6 @@ def test_great_pool_keeps_the_moveset_override_rows():
     from cramorant_policy_lab import load_pool
     pool, _ = load_pool('great')
     thievul = [row for row in pool if row[1] == 'Thievul']
-    # Two Thievul rows since 6a96aa8, distinguished by their charged sets.
+    # Two Thievul rows since 21775e8, distinguished by their charged sets.
     assert len(thievul) >= 2
     assert len({tuple(row[4]) for row in thievul}) == len(thievul)

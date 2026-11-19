@@ -20,7 +20,7 @@ they were validated against PvPoke's live engine via scripts/pvpoke_trace.js
 (Shadow Quagsire vs Gastrodon, IVs 0/15/15 both), and 2v1 was the bug
 signature: pre-fix our sim said Quagsire won 625/375, PvPoke (and the fix)
 said Gastrodon won 459/540. They were RE-DERIVED 2026-09-09 under the new
-turn system from our engine (fa7d801; this matchup is not an oracle-harness
+turn system from our engine (4143783; this matchup is not an oracle-harness
 matchup and was not re-traced), and the fight changed: 2v1 is now 625/375
 for Quagsire WITH the fix. Measured 2026-09-25: reverting both `cmp_atk`
 lines changes 0 of the 9 cells (the fire_now branch is reached, but never
@@ -44,7 +44,7 @@ GA = ('Gastrodon', 'MUD_SLAP', ['BODY_SLAM', 'EARTH_POWER'], 'great')
 @pytest.mark.parametrize("s1,s2,score0,score1,winner", [
     # RE-DERIVED 2026-09-09 under the NEW turn system from our engine, on
     # the warrant that the oracle harness matches PvPoke master on 229/243
-    # cells (this matchup is not one of them). See fa7d801. Not a
+    # cells (this matchup is not one of them). See 4143783. Not a
     # discriminator for the fire_now fix -- see the module docstring.
     (0, 0, 412, 587, 1),
     (0, 1, 257, 742, 1),
@@ -120,7 +120,7 @@ def test_fire_now_double_fire_gate_uses_cmp_atk(
 
 
 # ---------------------------------------------------------------------------
-# The exact shadow-vs-plain CMP tie (2026-09-20; fix ebf5944, CHANGELOG "2026-08-31..09-25 -- Worlds 2026 post-event")
+# The exact shadow-vs-plain CMP tie (2026-09-20; fix 18e4be4, CHANGELOG "2026-08-31..09-25 -- Worlds 2026 post-event")
 # ---------------------------------------------------------------------------
 
 Q = ('Quagsire', 'MUD_SHOT', ['AQUA_TAIL', 'STONE_EDGE'], 'great')

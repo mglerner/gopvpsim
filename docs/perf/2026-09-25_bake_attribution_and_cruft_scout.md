@@ -7,7 +7,7 @@ Source: friday-big-swing-scout workflow, 10 Opus scouts + 2 Opus refuters per to
 Chain envelope: dive step 134,522 s = 37.37 h (99.2%); all 8 non-dive steps 1,122 s = 0.31 h, of which run_ship_gates 885 s (pytest 413.5 s + link/dash/dev-count scans ~471 s), ML IV guides 194 s (warm), Reader's Guides 29 s, matchup webs 13 s. Inside the dive step, the 136 per-dive logs span 37.26 h; the remaining 0.11 h (384 s) is inter-dive process startup + narrative patcher.
 
   phase (inside the 37.26 h of dive logs)                   hours   single-core?   note
-  sweep sims, pool (signature dedup -> 'N sims in')         15.38   no (18 wkrs)   only 42.2% of 268,024 columns hit; ebf5944 shadow bump ~10-11 h of it (both refuters)
+  sweep sims, pool (signature dedup -> 'N sims in')         15.38   no (18 wkrs)   only 42.2% of 268,024 columns hit; 18e4be4 shadow bump ~10-11 h of it (both refuters)
   mirror-slayer sims, pool (L50 0.72 + L51 0.66)             1.35   no             L51 re-convergence runs with cache=None (unverified sub-finding)
   screening                                                  0.10   yes (no Pool)  tail-and-gates read of sweep.py:121-216; trivial either way
   render passes (narrative + analysis + results), 2 per pg  12.38   YES            pass1 6.19 + pass2 6.19; pass2 on the 100 no-op best-buddy dives = 4.61 h pure duplicate
@@ -24,7 +24,7 @@ Chain envelope: dive step 134,522 s = 37.37 h (99.2%); all 8 non-dive steps 1,12
 
 Attribution residual: 'Done in' minus log span sums to 240 s over 136 dives (median 1.7 s); the OTHER bucket is 0.000 h. So the unattributed remainder is ~0.1-0.2 h total. bake_timing_report.py's 21.9 h parallel / 15.5 h serial is wrong: it files 'sims in' / 'Running...' / Replay/Split intervals as parallel and has no sleep bucket; the orchestration refuters put true serial at 20.3-20.5 h (54-55%) once the ~2 h of per-sweep fixed cost inside 'sims in' windows is counted, vs 18.6 h by log-attribution's per-second bucketing. Either way: >50% of the bake is one core on an 18-core box.
 
-Corrections to TODO.md:107 (verified by 4 refuters): 'sweep sims were only ~1.4 h' is the mirror-slayer 'sim done in' sum (1.374 h); sweep pool time was 15.4 h. And 'next bake ~35-40 h migrated' is roughly right but NOT nearly-warm: the engine hash is now d78c67fd06a7 (a4ca14e), the built signature migration re-sims 15.3% (43,077 columns), and non-shadow key churn (09-17 pool regen, new movesets) cost ~2.9-3.6 h of all-miss GL sweeps last time.
+Corrections to TODO.md:107 (verified by 4 refuters): 'sweep sims were only ~1.4 h' is the mirror-slayer 'sim done in' sum (1.374 h); sweep pool time was 15.4 h. And 'next bake ~35-40 h migrated' is roughly right but NOT nearly-warm: the engine hash is now d78c67fd06a7 (f2401cd), the built signature migration re-sims 15.3% (43,077 columns), and non-shadow key churn (09-17 pool regen, new movesets) cost ~2.9-3.6 h of all-miss GL sweeps last time.
 
 Combined serial-fix ceiling (inferred, overlaps removed): no-op pass2 skip 4.6 + aggregate dedup/vectorize on the remaining 903 passes ~3.9-5.0 + iv_rank memo 3.2-4.0 + boundaries dedup ~0.75 + pack_u16 ~0.2 = ~12.7-14.5 h off the 18.6 h serial. Same-shape bake 37.3 h -> ~23-25 h; with a mostly-warm sweep cache the serial share would then be ~5 h out of ~10-12 h.
 
@@ -64,7 +64,7 @@ Hour 0-4, concurrent agents (disjoint files):
 
 Hour 4-8: R3 no-op pass2 skip, one careful hand, on top of Agent 1's merge (both touch deep_dive.py); harness mode B on the no-op blobs, mode A on the active-best-buddy blobs (must be untouched); update test_dive_dom_ids pins; run fast tier.
 
-Hour 8-9: merge, run the full fast tier once, re-time one replay render before/after (Jellicent UL 2-file replay was 158 s wall, Tinkaton GL 52 s) and record the numbers in CLAUDE.md Testing / TODO (the fast-tier numbers there are already stale: 63bbc14 measured 228 s, not 310 s). Commit small, push.
+Hour 8-9: merge, run the full fast tier once, re-time one replay render before/after (Jellicent UL 2-file replay was 158 s wall, Tinkaton GL 52 s) and record the numbers in CLAUDE.md Testing / TODO (the fast-tier numbers there are already stale: 15ab1ac measured 228 s, not 310 s). Commit small, push.
 
 Must wait for a human decision: R7 deletes (Q1), R1 placement (Q2), R3 template drop (Q3), Worlds retire (Q4), replay keep policy (Q5), CLAUDE.md/DEVELOPER_NOTES edits (Q7), applying the signature migrations (Q6; a prerequisite for the next bake, not for today's code).
 
@@ -72,16 +72,16 @@ Do NOT do today: any byte change to battle.py / pokemon.py / moves.py / formchan
 
 4. CRUFT CLEANUP (V = both refuters failed to refute; U = scout-only, unverified)
 
-Scripts (V, delete, 5 files / 1,124 lines; all five deleted 2026-09-25 in 8d5ec13):
+Scripts (V, delete, 5 files / 1,124 lines; all five deleted 2026-09-25 in 4740237):
   - scripts/status_tick.sh (101): hard-codes userdata/logs/2026-04 and a 20260419_ glob; chain_status.py --chain overnight replaces it.
   - scripts/verify_pvpoke_harness.py (188): April-era hand-typed PvPoke scores, 19/27 no longer match the 09-09 re-pinned fixtures; audit_oracle_harness.py covers the same matchups live.
   - scripts/patch_iv_guide_nav_width.py (59): 0 of 60 guides still carry 'flex:0 0 190px'; renderer emits 260px at render_iv_envelope_article.py:764.
-  - scripts/dialga_origin_etm_analysis.py + palkia_origin_etm_analysis.py (386+390): 'Do not import' one-offs, 82% shared; result lives in ~/coding/reports/dialga-palkia-origin-etm-ml-2026-06-19.html (note SHAs 48a8de9/4171011 in its provenance line and in etm_iv_floor_sweep.py:4).
+  - scripts/dialga_origin_etm_analysis.py + palkia_origin_etm_analysis.py (386+390): 'Do not import' one-offs, 82% shared; result lives in ~/coding/reports/dialga-palkia-origin-etm-ml-2026-06-19.html (note SHAs ca5c379/cd37103 in its provenance line and in etm_iv_floor_sweep.py:4).
   U: worlds_probe_expand.py (236), joint_iv_index.py (99), etm_iv_floor_sweep.py (224, named in a test docstring), corpus_new_decisions.py, summarize_perf.py, rerender_status.py -- each needs a one-line answer from Michael; Worlds cluster (~5,970 script + ~3,400 test lines) is Q4.
 
 TODO.md (V, MOVE to CHANGELOG -- it has no entry after 2026-08-27 -- ~705-735 lines out of 2,285):
   - 'Turn system' 1899-2285 (sits after the file's own footer): ~300-310 out; keep ~77-85 residue (DUP DOM af- ids, IV-ratio IDEA, Worlds un-skip note, 3b(c) prose, Aegislash x Azumarill 6-cell trace with mechanics_notice.py deletion folded under it, un-xfail candidates).
-  - Cramorant hand-off 135-340: ~140-150 out; KEEP the three decisions 271-300, the TTL-keeper lens item 163-165 (88bec7b pins the cache only in overnight_redive.sh, not run_website_dives.py -- NOT closed), and the post-bake verification runbook 245-269 (no evidence it ran after 09-20; the strategy article is still the 09-12 render).
+  - Cramorant hand-off 135-340: ~140-150 out; KEEP the three decisions 271-300, the TTL-keeper lens item 163-165 (7090ce0 pins the cache only in overnight_redive.sh, not run_website_dives.py -- NOT closed), and the post-bake verification runbook 245-269 (no evidence it ran after 09-20; the strategy article is still the 09-12 render).
   - Six DONE sections (1113-1194, 1269-1304, 1334-1376, 1067-1111, 744-784, 812-828): ~255-265 out; keep the season policy 788-810, the band-crosser glossary gap, and the battle.py:3424-3426 'UNVALIDATED' comment as a next-engine-bump line.
   - Duplicates: ~10 lines (Report 9 at 341-344 folds into 291-302; Guzzlord/gate clauses trimmed from 397-400, keep P-C/P-D; 130-131 is a deliberate pointer).
   - Line-level: :107 '~1.4 h' -> 15.4 h pool sweeps (+1.4 h slayer); :98-104 resolved ship-gate note can go (docs/chain_resolutions.toml keeps it).
@@ -89,11 +89,11 @@ TODO.md (V, MOVE to CHANGELOG -- it has no entry after 2026-08-27 -- ~705-735 li
 
 Docs / comments:
   V: stale numbers in run_ship_gates.py:27-28 (44 s -> ~310-414 s), overnight_redive.sh:4-6 (44 dives -> 136), :15-16 ('~7h cold' ML tail: unmeasured, flag it), :289-290 and phase2_preship.sh:116 (2 of 4 gates named), verify_overnight.py:33-34, run_iv_guides.py:7/14-16/21/128-130/191 (16-worker cap is gone; '--jobs 2' now ABORTs at the preflight), verify_tests.py:22-24 ('runs twice' -> 3x); sweep_cache.py:26-34 ('.npy one score column' -> multi-plane .npz), sweep.py:652-653 ('Capturing forces the disk cache off' is false), deep_dive.py:5516 cache=None rationale predates slayer v4.
-  U (re-verify each against code before editing, then fine): DEVELOPER_NOTES.md:112-170 turn-model section (says default legacy / UNVALIDATED / cache force-disabled; all false), ~330 lines of dated history to CHANGELOG, CACHE_VERSION 7 -> 8; CLAUDE.md:145-149 two of three 'intentional deviation' examples (bestChargedMove per-turn; Mimikyu SS) and :174/:190 'v7' / 'GC keeps v7 dirs'; CLAUDE.md fast-tier 310 s / '~245 of 310' (63bbc14: 228 s / 125 s); 7 docs/ status headers; ~335 lines of closed-event docs to archive; ~10 '(deleted 7126f1b)' annotations; README setup missing `git config core.hooksPath .githooks`; docs/rebalance_checklist.md 'near-zero disk' snapshot claim.
+  U (re-verify each against code before editing, then fine): DEVELOPER_NOTES.md:112-170 turn-model section (says default legacy / UNVALIDATED / cache force-disabled; all false), ~330 lines of dated history to CHANGELOG, CACHE_VERSION 7 -> 8; CLAUDE.md:145-149 two of three 'intentional deviation' examples (bestChargedMove per-turn; Mimikyu SS) and :174/:190 'v7' / 'GC keeps v7 dirs'; CLAUDE.md fast-tier 310 s / '~245 of 310' (15ab1ac: 228 s / 125 s); 7 docs/ status headers; ~335 lines of closed-event docs to archive; ~10 '(deleted ef92f96)' annotations; README setup missing `git config core.hooksPath .githooks`; docs/rebalance_checklist.md 'near-zero disk' snapshot claim.
 
 Tests (V):
   - tests/test_battle.py 13 strict xfails pinned to April legacy values (12/13 scores differ from the current engine): 5 become plain PvPoke-certified pins (Aegi (0,1)=348, (0,2)=112, (1,2)=382, (2,2)=382 with Shadow Ball logs; Corvi (0,0) MG=456), 2 Aegi divergence pins recording ours 564/550 vs PvPoke 618, 6 MG divergence pins recording both (Jellicent 531/670/670 vs 639/779/779, Corvi 580/689 vs 652/760, Lapras 482 vs 611); PvPoke values are on disk in docs/validations/2026-09-09_oracle_new_vs_master_raw.txt; fix the :1753-1760 docstring and the MG block comment.
-  - tests/test_pogodives.py:408-420 body-less skip: delete (~15 lines, cite f116674~1).
+  - tests/test_pogodives.py:408-420 body-less skip: delete (~15 lines, cite d11b694~1).
   - tests/test_nb1_selection_freeze.py: 5 stale oracle comments (:70 :78 :95 :98 :160) + 'Group D xfails' docstring; also test_bug3_farm_stack.py:15-16 and test_pokemon.py:530.
   - tests/test_fire_now_cmp_shadow.py: reverting battle.py:1804-1805 changes 0/9 cells (fire_now branch reached 7x but never with 2x charged energy). Step 1: run the 2-line mutant against the fast tier to see if anything else catches it; step 2: fixture search or a direct unit assertion on the gate inputs; fix the docstring either way.
   U: Icy Wind always-skip guards and Worlds DORMANT skips (Q4), 47 clean-first gate_recompute runs (~29 s fast tier), session-scoped W.prepare memo (~137 s full suite, memory caveat), node-skip marker + 4 _node helpers, 6 replay-blob lookup copies, 4 identical script loaders, cross-imported test helpers, 21 legacy-coupled tests (only if legacy is ever removed).
@@ -173,7 +173,7 @@ and the cruft passes for scripts, dead code and tests. Fast tier on merged
 main: 2855 passed, 0 xfailed. All five baseline blobs render byte-identical.
 
 Paired timing, the same two blobs rendered at the same moment by the
-pre-change tree (4c20eae) and merged main (through 1f77e9d), full 5-moveset
+pre-change tree (19f141f) and merged main (through f24559f), full 5-moveset
 replay render, `--jobs 2` each:
 
 | blob         | before  | after   | speedup |
@@ -246,7 +246,7 @@ steps: ML guides 204 s; ship gates 317 s (concurrent roster) vs 885 s.
 Next lever, already built on `swing/sweep-ivrank-memo`: the sweep-side
 rank-1 IV memo (the ~2.6 h "pre-sim sweep setup" row of the attribution).
 
-## Addendum: sweep-side rank-1 IV memo (merged 2026-09-27, ea32bd9)
+## Addendum: sweep-side rank-1 IV memo (merged 2026-09-27, c4083f1)
 
 Michael reversed the Q2 ruling on 2026-09-26: the `resolve_opp_ivs` memo
 lands in `deep_dive_lib/opponents.py` with NO CACHE_VERSION bump (a bump
@@ -272,7 +272,7 @@ Fly + Surf 0v1 vs Araquanid, PoGoDives -1,971 net. Not a regression -- that
 page first existed in the 09-20 bake (the 09-17 pool regeneration changed the
 moveset screen) and had never been certified. Cause: the (0,1) CMP dive-gate
 threshold 3.0 was fitted to Fly vs Dive and, with a Surf gulp, admitted
-two-type-step ratios. Sheet v7 (dfebbd8): `surf_gate_dpe` 2.25 on row (0,1),
+two-type-step ratios. Sheet v7 (e3e752f): `surf_gate_dpe` 2.25 on row (0,1),
 read only for a Surf gulp; stride-1 recert PASS (+11 / +0 net), Dive pages
 byte-identical; engine 32a20be48379, predicate applied (796 columns re-sim).
 Re-dived both Cramorant pages (5.9 + 10.5 min), re-rendered the strategy
