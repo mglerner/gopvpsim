@@ -283,7 +283,7 @@ Start with fixed heuristic (throw cheap move first). Later: EV-based baiting
 parameterized by opponent shield probability.
 
 ## Shielding
-Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
+Pluggable policy. Simulate all nine shield scenarios (0-2 x 0-2).
 
 ## CLI scripts
 - `scripts/battle.py` — simulate a 1v1 matchup across all 9 shield scenarios
