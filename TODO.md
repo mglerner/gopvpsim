@@ -8,13 +8,8 @@ detail lives in the sections below.
 
 - First hygiene groom done (2f2e785..close-out): TODO 89,491 -> ~30k chars,
   cap now 45,000 (`.hygiene.toml`). Over the cap: close or park, don't raise.
-- Awaiting Michael's yes/no per item (groom follow-up, standing behaviour):
-  CLAUDE.md b: trim sweep-cache dup of DN "Sweep disk cache"; c: Testing
-  history/timings -> CHANGELOG; d: fix "three shield scenarios" vs "all 9";
-  e: Baiting "Later: EV-based" -> backlog pointer; f: drop pre-dive story
-  (dup of predive_checklist); g: uv-switch history -> CHANGELOG; h: drop
-  formatter dotfiles-promotion paragraph; i: drop ship-mode hook mechanics.
-  Memory (snapshot first to userdata/hygiene/memory-snapshot-*.tgz, OK?):
+- CLAUDE.md groom b-i done 2026-11-19 (CHANGELOG). Awaiting Michael's
+  yes/no per item on the memory follow-ups (snapshot first to userdata/hygiene/memory-snapshot-*.tgz, OK?):
   m2-m4 strip repo status from Minior/Cramorant/pvpoke-sync; m5 delete
   wotb-v4-state; m6 DN-cap gate history -> CHANGELOG; m7-m10 fix stale
   lines (Aegislash "unmerged", statfx "applied", sandbox-fidelity branch,

@@ -435,25 +435,10 @@ Claude-drafted prose. When drafting for these blocks:
    present. That's the way to ship expert-authored narrative without
    fighting the templates.
 
-The `.githooks/pre-commit` hook enforces this by rejecting a commit
-(or a non-fast-forward clean merge, via the `pre-merge-commit`
-symlink) that stages a ship-tracked TOML with an `authored_by` whose
-value reads as `ai` after `.strip().lower()` in ANY table (broader
-than the renderer, which reads only intro/meta_role/verdict), or that
-stages one as a symlink; it does not rescan files the commit leaves
-untouched, and a fast-forward pull brings commits in unchecked. The same
-hook also gates the DEVELOPER_NOTES dev-count sentinels
-(`scripts/verify_dev_counts.py`) and, on every commit, the notes' size
-cap and pointer integrity (`scripts/verify_dev_notes.py`); all three
-read the content being committed from the index (step 2's live counts
-and the checker scripts themselves come from the working tree). The
-hook finds the interpreter
-itself (this checkout's `.venv`, else the main worktree's, else
-`python` on PATH), so it works from GUI git clients and worktrees
-without direnv as long as the main checkout has its venv. To activate
-the hook, run once per clone:
-
-    git config core.hooksPath .githooks
+The `.githooks/pre-commit` hook enforces this (and the DEVELOPER_NOTES
+gates) on staged files only: untouched files are not rescanned and
+fast-forward pulls arrive unchecked. Activate it once per clone with
+`git config core.hooksPath .githooks`.
 
 Exploration-mode is unchanged: session chat, `/tmp/` analysis,
 `docs/` design notes, and plan files can carry Claude prose freely.
