@@ -361,36 +361,19 @@ names the template tests to copy):
 
 Commands:
 
-- `python -m pytest tests -q -m "not slow"` — the fast tier, **~4-5 min**
-  (314 s in the 2026-09-26 overnight gate: 2,860 passed, 7 skipped, 159
-  deselected, 0 xfailed; 238 s measured 2026-09-28 from a worktree at load
-  ~10-14). This is what the
-  `verify_tests.py` ship gate runs, and it is gate 1 of every publish
-  path AND the tail of the overnight chain, so budget ~5-7 min at each
-  (it was 549 s under load at the 397 s baseline, so assume ~1.4x when
-  the machine is busy).
+- `python -m pytest tests -q -m "not slow"` — the fast tier, **~4-5 min**.
+  This is what the `verify_tests.py` ship gate runs, and it is gate 1 of
+  every publish path AND the tail of the overnight chain, so budget ~5-7
+  min at each (assume ~1.4x when the machine is busy).
 
-  History: "~36s" until 2026-09-20, 397 s after the wotb-v4 merge, 310 s
-  on 2026-09-22 when the five fast-tier tests over ~10 s were marked
-  `slow`; the 13 xfails were `tests/test_battle.py`'s, converted to real
-  pins 2026-09-25 (`9f1da69`).
-
-  **What is left, and why.** `tests/test_deep_dive_brief.py` is ~108 s
-  of the 238 (230 fast-tier tests, measured alone 2026-09-28; ~134 of
-  them are blob-backed, none now over ~10 s). Moving the whole module
-  behind `slow` would drop ~230 published-prose contracts out of every
-  publish path, so that is a coverage decision, not a timing one. The
-  other standing cost is the session-scoped `small_dive_html` real render
-  (a Marill dive since 2026-09-25; 42 s under load 2026-09-28), shared by
-  eleven modules; its consumers carry
-  `@pytest.mark.render`, which the policy above deliberately keeps
-  SEPARATE from `slow`, so marking one of them slow only moves the
-  render onto the next consumer and saves nothing.
+  **Don't move `tests/test_deep_dive_brief.py` behind `slow`** to save
+  time (it is ~108 s of the fast tier): it carries ~230 published-prose
+  contracts that would drop out of every publish path. Marking a
+  `@pytest.mark.render` consumer `slow` saves nothing either: the shared
+  `small_dive_html` render just moves onto the next consumer.
 - `python -m pytest tests -q` — full suite incl. the slow gamemaster
-  sweep and the blob-backed render tests, **~16-18 min** (two runs on
-  2026-09-20: 960 s and 1,042 s). Was "~80s" here until the same date.
-- `python -m pytest tests/test_battle.py -q` — battle tests only (260
-  passed, 0 xfails, as of 2026-09-28)
+  sweep and the blob-backed render tests, **~16-18 min**.
+- `python -m pytest tests/test_battle.py -q` — battle tests only
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 - **Default movesets** — when a test or sim needs "the default moveset" for a
   species in a given league, ALWAYS call `gopvpsim.data.get_default_moveset(

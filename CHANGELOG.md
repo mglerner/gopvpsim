@@ -2,6 +2,19 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-11-19 -- CLAUDE.md groom: history moved here (items b-i)
+
+Test-suite timing history (was in CLAUDE.md "Testing"): fast tier "~36s"
+until 2026-09-20, 397 s after the wotb-v4 merge (549 s under load), 310 s on
+2026-09-22 when the five fast-tier tests over ~10 s were marked `slow`,
+314 s in the 2026-09-26 overnight gate (2,860 passed, 7 skipped, 159
+deselected, 0 xfailed), 238 s on 2026-09-28 from a worktree at load ~10-14
+(`test_deep_dive_brief.py` ~108 s of it: 230 tests, ~134 blob-backed;
+`small_dive_html` Marill render 42 s under load, shared by eleven modules).
+The 13 `tests/test_battle.py` xfails became real pins 2026-09-25
+(`9f1da69`); 260 passed there as of 2026-09-28. Full suite "~80s" until
+2026-09-20, then 960 s and 1,042 s on that date.
+
 ## 2026-11-17 -- PvPoke sync at d02018eb6: re-vet, Mega Level 4 ML fix, pools, data cache, Tinkaton re-dive (NOT published)
 
 Commits 21710cd (Morpeko bug #8 fixed upstream; audit 375/387 exact),
