@@ -45,7 +45,7 @@ new since the launch post (2026-07-02), strongest first:
    since launch, for the "how do I read all this" on-ramp.
 
 Also: TODO records the standing IV Flavor Guide write-up commitment to
-an HSH Discord member (the tinkaton_expert commitment; closing it =
+an HSH Discord member (the write-up commitment; closing it =
 promoting that guide from `ai` to expert-reviewed). If that member is
 in Henry's orbit, this message is a natural moment to mention the
 guide is live and awaiting the expert pass.

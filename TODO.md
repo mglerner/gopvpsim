@@ -495,11 +495,9 @@ legality-filter eval, app-side cup toggles (needs a coordinated
   `depressed-band-crosser`, `deep_dive_rendering.py:~1551`); found closing
   the Shadow Sableye GL bands reminder (CHANGELOG 2026-09-22).
 
-The IV Flavor Guide write-up is owed to an HSH Discord member per
-`project_tinkaton_expert_writeup_commitment.md` (NB: that memory file
-lives in the retired pogo-simulator project's memory dir,
-`~/.claude/projects/-Users-mglerner-coding-MGLPoGo-pogo-simulator/memory/`,
-not this project's) — the guide sits at `both` today; promoting it to
+The IV Flavor Guide write-up is owed to an HSH Discord member (the
+write-up commitment note lives in the retired pogo-simulator project's
+memory dir, not this project's) — the guide sits at `both` today; promoting it to
 `expert` is the closing of that commitment.
 
 ## Turn-system / Aegislash residue
