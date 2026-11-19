@@ -118,11 +118,13 @@ def test_form_change_swapped_moves_includes_gulp_missiles():
 
 
 def test_default_moveset_and_none_padding():
-    """Cramorant's PvPoke GL default is Peck / Dive + Fly. And the
+    """Cramorant's PvPoke GL default is Peck / Surf + Fly (pvpoke
+    d02018eb6 rankings; it was Peck / Dive + Fly before the 2026-11-17 data
+    refresh -- UL is still Dive + Fly). And the
     'none' second-charged-move padding pvpoke 78c64048a introduced in
     regenerated rankings (Unown is the only species today) is treated as
     absent, not as a move id."""
-    assert get_default_moveset('Cramorant', 'great') == ('PECK', ['DIVE', 'FLY'])
+    assert get_default_moveset('Cramorant', 'great') == ('PECK', ['SURF', 'FLY'])
     fast, charged = get_default_moveset('Unown', 'great')
     assert 'none' not in charged
     assert charged == ['STRUGGLE']
