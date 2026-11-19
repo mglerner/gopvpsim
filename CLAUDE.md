@@ -277,9 +277,9 @@ Pluggable policy. Simulate all nine shield scenarios (0-2 x 0-2).
 
 ## Running Python
 This project requires Python **3.13+** (`pyproject.toml` `requires-python =
-">=3.13"`). The environment is **uv-managed** (switched from pyenv
-2026-06-15): `uv venv` created `.venv/` (Python 3.13.x), and `.envrc`
-auto-activates `.venv/bin` via **direnv** when you enter the directory.
+">=3.13"`). The environment is **uv-managed**: `uv venv` created `.venv/`
+(Python 3.13.x), and `.envrc` auto-activates `.venv/bin` via **direnv** when
+you enter the directory.
 `uv.lock` is committed for reproducibility.
 
 **How bare `python` resolves depends on the shell:**
@@ -301,18 +301,15 @@ auto-activates `.venv/bin` via **direnv** when you enter the directory.
   - `uv run python …` — resolves the project env without direnv.
 
 Script shebangs all use `#!/usr/bin/env python`, which lands on
-`.venv/bin/python` whenever the venv is on PATH (no per-script edits
-were needed for the uv switch).
+`.venv/bin/python` whenever the venv is on PATH.
 
 **Install / fresh-machine setup:** `uv venv` → `uv pip install -e
 ".[dev,perf]"` → `direnv allow` → `git config core.hooksPath .githooks`
-(activates the pre-commit gates; the 2026-08-09 test-suite review found
-this documented-but-never-run in the working clone). Runtime deps are declared in
+(activates the pre-commit gates). Runtime deps are declared in
 `pyproject.toml` (currently `certifi`, `markdown`, `numpy`); `[dev]`
 adds `pytest`; `[perf]` adds `numba`. **Do not skip `[perf]`:**
 `_dp_jit.py` falls back to a pure-Python inner loop without numba, and
-deep dives run several × slower (the 2026-06-15 uv switch initially
-missed `[perf]`, which is the kind of regression to watch for).
+deep dives run several × slower.
 
 ## Testing
 

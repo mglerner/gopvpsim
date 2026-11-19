@@ -15,6 +15,13 @@ The 13 `tests/test_battle.py` xfails became real pins 2026-09-25
 (`9f1da69`); 260 passed there as of 2026-09-28. Full suite "~80s" until
 2026-09-20, then 960 s and 1,042 s on that date.
 
+Python env history (was in CLAUDE.md "Running Python"): switched from pyenv
+to uv 2026-06-15 (no per-script shebang edits needed); that switch at first
+installed without `[perf]`, so numba was missing and dives ran on the slow
+pure-Python `_dp_jit` fallback. The 2026-08-09 test-suite review found
+`git config core.hooksPath .githooks` documented but never run in the
+working clone.
+
 ## 2026-11-17 -- PvPoke sync at d02018eb6: re-vet, Mega Level 4 ML fix, pools, data cache, Tinkaton re-dive (NOT published)
 
 Commits 21710cd (Morpeko bug #8 fixed upstream; audit 375/387 exact),
