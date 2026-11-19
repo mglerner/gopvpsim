@@ -190,28 +190,19 @@ assertions exist to catch.
 
 ## Sweep cache: use `--no-sweep-cache` while changing the engine
 
-The sweep disk cache (`scripts/sweep_cache.py`, cache-rework v7) keys a
-column on focal + opponent but **NOT** the engine hash OR the gamemaster
-hash — both are per-column stamps in the `.json` sidecar (v6 engine, v7
-gamemaster). A stale stamp is a safe miss (re-simmed, never served), so
-correctness is always protected. But `put_column` overwrites a column **in
-place**, so running a dive/sweep **with the cache on under a work-in-progress
-engine overwrites the trusted columns** with WIP results — you lose the warm
-backup (not correctness) for everything you re-ran.
+The engine and gamemaster hashes are per-column stamps, not part of the key,
+so a stale stamp is a safe miss (correctness is protected). But `put_column`
+overwrites a column **in place**, so running a dive/sweep **with the cache on
+under a work-in-progress engine overwrites the trusted columns** with WIP
+results — you lose the warm backup (not correctness) for everything you
+re-ran.
 
 So when you're iterating on engine code (`battle.py`, `_dp_jit.py`,
 `moves.py`, `formchange.py`, `pokemon.py`), run dives with
 **`--no-sweep-cache`**. Only bake with the cache on once the engine change is
-trusted; then re-bake, or bless selectively with `scripts/migrate_cache.py`
-(`--from-engine` for an engine fix, `--from-gamemaster --old-gamemaster-file`
-for a gamemaster/balance patch). The v7 gamemaster hash is NARROWED to
-`md5(pokemon + moves)`, so non-sim gamemaster churn (timestamp/cups/formats/
-rankings) no longer invalidates the cache at all. GC keeps current-schema
-dirs (meta `v` >= `CACHE_VERSION`, now 8; the v7 layout is unchanged at v8)
-always (gamemaster is per-column) and reclaims at column granularity, so cache
-work never deletes your trusted columns. Older-schema dirs, the v7 ones
-included, fall back to legacy vintage pruning (`gc_cache.plan_sweep`). Full
-mechanics + the warm re-dive recipe: DEVELOPER_NOTES "Sweep disk cache".
+trusted; then re-bake, or bless selectively with `scripts/migrate_cache.py`.
+Mechanics (stamps, the narrowed gamemaster hash, GC, gamemaster migration):
+DEVELOPER_NOTES "Sweep disk cache".
 
 ### Before a cold re-dive, check for a tractable migration first
 
@@ -244,17 +235,9 @@ Predicates are one-shot: each is pinned to a specific `--from-engine` hash,
 never re-run after its migration, and doesn't interact with the others — so
 there's no growing ruleset to maintain (delete or keep them as history).
 
-**Gamemaster changes (v7) are migrate-able too, and without a hand-proven
-predicate.** A gamemaster edit changes only the per-column gamemaster stamp
-(v7), and the affected set is COMPUTED from the actual pokemon/moves delta by
-`migrate_cache.py --from-gamemaster <stamp> --old-gamemaster-file <old blob>`
-— no per-change boolean to write. A column is re-simmed iff a gamemaster entry
-the battle reads for it (base species entry, transitively-expanded form-change
-alt forms, or a move it uses) changed or was removed; a purely-additive delta
-(e.g. "a new species was added") blesses everything. Keep the OLD
-gamemaster.json blob around (pull it from the pvpoke git history) so the delta
-can be computed. The narrowed `md5(pokemon + moves)` hash means non-sim churn
-(timestamp/cups/formats/rankings) never invalidates in the first place.
+**Gamemaster changes need no hand-proven predicate:** `migrate_cache.py
+--from-gamemaster <stamp> --old-gamemaster-file <old blob>` computes the
+affected set from the delta (DEVELOPER_NOTES "Sweep disk cache").
 
 ## Pre-dive assessment: scope it as a {layer} x {lens} grid
 
