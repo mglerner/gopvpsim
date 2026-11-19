@@ -25,7 +25,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import prepared_blob
+from tests.conftest import pin_data_vintage, prepared_blob
+
+# Blob-backed pins taken against PvPoke data at this commit (the 09-27 data
+# cache); prepare() reads rankings and the gamemaster live, so on newer data
+# they drift with no renderer change (tests/test_which_build_section.py).
+_data_vintage = pin_data_vintage('e87448291')
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'

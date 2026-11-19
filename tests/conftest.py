@@ -127,7 +127,10 @@ def find_blob(name):
 
 
 def require_blob(name):
-    """Path to replay blob ``name``; skips the test when it is absent."""
+    """Path to replay blob ``name``; skips the test when it is absent (or
+    when the module's pinned data vintage could not be built)."""
+    if _VINTAGE_UNAVAILABLE:
+        pytest.skip(f"data vintage unavailable: {_VINTAGE_UNAVAILABLE}")
     p = find_blob(name)
     if p is None:
         pytest.skip(f"{name} is not on this machine")
@@ -151,8 +154,14 @@ _PREPARED = {}
 
 
 def prepared_blob(name):
-    """``(state, all_facts, path_str)`` for replay blob ``name``, memoised."""
-    if name not in _PREPARED:
+    """``(state, all_facts, path_str)`` for replay blob ``name``, memoised.
+
+    Memoised per data directory too: ``prepare`` reads rankings and the
+    gamemaster live, so facts built under ``data_vintage`` must not be
+    served to a test running on the live cache, or the other way round.
+    """
+    key = (name, str(data_module.CACHE_DIR))
+    if key not in _PREPARED:
         path = str(require_blob(name))
         for p in (REPO_ROOT / 'src', SCRIPTS_DIR):
             if str(p) not in sys.path:
@@ -160,8 +169,93 @@ def prepared_blob(name):
         import deep_dive_brief as B
         import deep_dive_which_build as W
         state = B.load_blob(path)
-        _PREPARED[name] = (state, W.prepare(state, path), path)
-    return _PREPARED[name]
+        _PREPARED[key] = (state, W.prepare(state, path), path)
+    return _PREPARED[key]
+
+
+# ---------------------------------------------------------------------------
+# data_vintage -- run tests against PvPoke data from a fixed pvpoke commit.
+#
+# The deep-dive renderers read rankings and the gamemaster LIVE by design, so
+# a test that pins numbers rendered from an old replay blob drifts with every
+# data refresh (18 which_build pins went red after the 2026-11-17 refresh and
+# all passed again on the 09-27 data). data_vintage rebuilds the data cache
+# from a sibling ../pvpoke checkout at one commit, so those pins only move
+# when the renderer does.
+# ---------------------------------------------------------------------------
+
+PVPOKE_DIR = REPO_ROOT.parent / 'pvpoke'
+
+# cache key -> path inside the pvpoke repo (mirrors data.URLS and the
+# group / cup-rankings URL templates).
+_VINTAGE_FILES = {
+    'gamemaster': 'src/data/gamemaster.json',
+    'great': 'src/data/rankings/all/overall/rankings-1500.json',
+    'ultra': 'src/data/rankings/all/overall/rankings-2500.json',
+    'master': 'src/data/rankings/all/overall/rankings-10000.json',
+    'group_championshipseries': 'src/data/groups/championshipseries.json',
+    **{f'rankings_mega_{cp}': f'src/data/rankings/mega/overall/rankings-{cp}.json'
+       for cp in (1500, 2500, 10000)},
+}
+_VINTAGE_DIRS = {}
+
+
+def _build_vintage(commit, root):
+    """Write the cache files for ``commit`` under ``root``; None on success,
+    else the reason the vintage cannot be built on this machine."""
+    import subprocess
+    if not (PVPOKE_DIR / '.git').exists():
+        return f'no pvpoke checkout at {PVPOKE_DIR}'
+    root.mkdir(parents=True, exist_ok=True)
+    for key, rel in _VINTAGE_FILES.items():
+        r = subprocess.run(['git', '-C', str(PVPOKE_DIR), 'show',
+                            f'{commit}:{rel}'], capture_output=True)
+        if r.returncode:
+            return f'pvpoke {commit} lacks {rel}'
+        (root / f'{key}.json').write_bytes(r.stdout)
+    # Sprites are images keyed by URL, not data that moves a number.
+    sprites = data_module.CACHE_DIR / 'sprites'
+    if sprites.exists():
+        (root / 'sprites').symlink_to(sprites)
+    return None
+
+
+# Set while a module whose vintage could not be built is running: the reason.
+# prepared_blob / require_blob skip on it, so a blob-pinned test never runs
+# silently on the live cache; the module's blob-free tests still run.
+_VINTAGE_UNAVAILABLE = None
+
+
+def pin_data_vintage(commit):
+    """Module-scoped autouse fixture running a module on pvpoke ``commit``.
+
+    Usage, at module level: ``_data_vintage = pin_data_vintage('e87448291')``.
+    The data cache points at files rebuilt from ../pvpoke git for the whole
+    module, with every library cache invalidated on the way in and out.
+    """
+    @pytest.fixture(autouse=True, scope='module')
+    def _fixture(tmp_path_factory):
+        global _VINTAGE_UNAVAILABLE
+        if commit not in _VINTAGE_DIRS:
+            root = tmp_path_factory.mktemp(f'pvpoke_{commit}')
+            _VINTAGE_DIRS[commit] = (root, _build_vintage(commit, root))
+        root, reason = _VINTAGE_DIRS[commit]
+        if reason:
+            _VINTAGE_UNAVAILABLE = reason
+            try:
+                yield
+            finally:
+                _VINTAGE_UNAVAILABLE = None
+            return
+        orig = data_module.CACHE_DIR
+        data_module.CACHE_DIR = root
+        gopvpsim.invalidate_caches()
+        try:
+            yield
+        finally:
+            data_module.CACHE_DIR = orig
+            gopvpsim.invalidate_caches()
+    return _fixture
 
 
 # ---------------------------------------------------------------------------

@@ -52,7 +52,15 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import prepared_blob, replay_dirs, require_blob
+from tests.conftest import pin_data_vintage, prepared_blob, replay_dirs
+from tests.conftest import require_blob
+
+# The blob-backed pins below were taken against PvPoke data at this commit
+# (the 09-27 data cache). prepare() reads rankings and the gamemaster live,
+# so on the 11-17 data 18 of them read e.g. "53 of 85" instead of "55 of 87"
+# with no renderer change. Pinning the data makes a red test mean the
+# renderer moved. Move this only together with re-taking the pins.
+_data_vintage = pin_data_vintage('e87448291')
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / 'scripts'
