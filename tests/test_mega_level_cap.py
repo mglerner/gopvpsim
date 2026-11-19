@@ -102,12 +102,13 @@ def test_ordinary_levels_keep_the_game_published_cpm():
 
 def test_non_supermegas_and_non_megas_are_unaffected():
     """Ordinary Master League mons, supermega or not, stay <= 51."""
-    for species in ('Dialga', 'Metagross', 'Sableye (Mega)'):
+    for species in ('Dialga', 'Metagross', 'Altaria (Mega)'):
         p = Pokemon.at_best_level(species, 15, 15, 15, league='master')
         assert p.level <= MAX_CPM_LEVEL, (species, p.level)
-    # Sableye (Mega) is mega-tagged but NOT supermega -- the discriminator
-    assert mega_level('Sableye (Mega)') is not None
-    assert mega_level('Sableye (Mega)') != MEGA_LEVEL_SUPERMEGA
+    # Altaria (Mega) is mega-tagged but NOT supermega -- the discriminator.
+    # (This was Sableye (Mega) until pvpoke 04b2a3910 tagged it supermega.)
+    assert mega_level('Altaria (Mega)') is not None
+    assert mega_level('Altaria (Mega)') != MEGA_LEVEL_SUPERMEGA
 
 
 @pytest.mark.parametrize('league', ['great', 'ultra'])
