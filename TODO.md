@@ -10,17 +10,30 @@ detail lives in the sections below.
   cap now 45,000 (`.hygiene.toml`). Over the cap: close or park, don't raise.
 - Groom follow-ups done 2026-11-19: CLAUDE.md b-i and memory m2-m12
   (CHANGELOG 2026-11-19).
+- History rewritten 2026-11-19 (gopvpsim, gobattlekit, claude-memory) to
+  drop a contributor's handles; CHANGELOG 2026-11-19. Rollback mirrors sit
+  in that session's scratchpad: DELETE them next session (they still hold
+  the handles). Salvaged unreachable objects:
+  `userdata/hygiene/unreachable-archive-20261119/` (skim or delete).
 - `opponent_pools/master_top60.txt:5` cites TODO "Reproducibility" (now in
-  docs/TODO_backlog.md; pool file is data, left alone). Agent worktree
-  .claude/worktrees/agent-ab8b90f5b273c7934 has an uncommitted edit to
-  src/gopvpsim/pokemon.py (engine-hash file): keep or discard?
-- 18 slow-tier `local_artifacts` tests in tests/test_which_build_section.py
-  fail at HEAD (e.g. expects "55 of 87", page says "guarantees 40"); likely
-  rankings drift from the 11-17 refresh. Look before the next full-suite gate.
+  docs/TODO_backlog.md; pool file is data, left alone). The CPM 52.5-55
+  experiment from the removed agent worktree is saved as
+  `userdata/hygiene/agent-worktree-cpm-52.5-55.patch` (TODO "Minior").
+- 18 slow-tier tests in tests/test_which_build_section.py fail at HEAD and
+  ALL pass against the 09-27 data vintage (pvpoke `e87448291`): the brief
+  reads rankings + gamemaster live by design, so blob-pinned numbers drift
+  with every data refresh. Michael's call: re-pin to 11-17 data, or have
+  these tests load the blob's own data vintage from ../pvpoke git.
+- Fast tier (2026-11-19): 3 pins re-pinned to upstream data (f16a85b,
+  b245471, 6613b4b). Note Cramorant's PvPoke GL default is now Peck / Surf +
+  Fly (was Dive + Fly; UL unchanged) -- relevant to the Cramorant re-dive.
+  Still red, expected: pool containment (pages predate the 11-17 pools;
+  clears at the next bake); test_ml_guide_progress fails only in the
+  sandbox (`ps` blocked).
 - Publishing waits on Michael's go: Tinkaton GL + UL and the Minior pages
   are local only ("PvPoke sync 2026-11-17", "Minior -- open items"); a
   Cramorant UL re-dive is owed before any Cramorant publish.
-- Before the next bake: refresh the mega rankings; the bake is cold.
+- The next bake is cold; mega rankings are already current.
 
 ## Minior -- open items (port shipped 2026-10-24; record: CHANGELOG 2026-10-24)
 
@@ -83,13 +96,12 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
 Re-vetted at pvpoke `d02018eb6` (DEVELOPER_NOTES "PvPoke re-vetting log"):
 engine `a6dffb536332`, slayer `1294f3bbff20`, gamemaster `10d0d903c162`.
 
-- **Mega rankings were NOT refreshed** (`rankings_mega_{1500,2500,10000}.json`
-  in `~/Documents/gopvpsim_cache/` are 09-27): Mega Sableye still resolves to
-  Shadow Claw / Foul Play + Dazzling Gleam (upstream GL adds Night Shade+),
-  including on the 11-17 Tinkaton GL page. Upstream, 11 GL mega defaults
-  differ (4 changed incl. Sableye (Mega), 7 newly ranked) and 18 UL (15
-  changed, 3 new). Refresh (recipe below) before the next bake, then re-dive
-  Tinkaton GL (UL has no mega opponents).
+- **Tinkaton GL page has a stale Mega Sableye moveset.** The mega rankings
+  were refreshed 11-17 15:03 (verified 2026-11-19: all three
+  `rankings_mega_*.json` equal pvpoke `d02018eb6`), but the Tinkaton GL
+  re-dive ran 13:50-14:37, before it, so Mega Sableye there resolves to
+  Shadow Claw / Foul Play + Dazzling Gleam (upstream GL adds Night Shade+).
+  Re-dive Tinkaton GL before publishing it (UL has no mega opponents).
 - **Publish Tinkaton GL + UL on Michael's go** (re-dived 11-17 on the
   current pools, local only, probe-verified; GL carries the Mega Sableye
   caveat above). `scripts/publish_website.sh` (dry run), then `--push`,
