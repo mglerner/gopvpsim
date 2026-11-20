@@ -141,5 +141,36 @@ depend on the opponent.
 Scratch: the hypothesis scans and the per-Minior prediction tables were run
 in-session (2026-10-25); the numbers above are from those runs. The two
 Poke Genie rows stored as Meteor (7/1/7 L16 CP 624, 11/6/2 L4 CP 147) are
-scan misreads (no Core IV/level reproduces their CP and HP together), so
-there is no stored-Meteor reading to take.
+not stored Meteors: each duplicates a Core row with the same IVs, level and
+HP (Core CP 939 and 219), and its CP is the Meteor form's CP at the Core's
+level. They are stale records from the 2026-10-25 scan, so there is no
+stored-Meteor reading to take. (Corrected 2026-11-20; this note first called
+them scan misreads.)
+
+## Re-read 2026-11-20
+
+Michael re-read four Miniors and read one new one, to test whether the game
+had changed since October. It has not: all seven re-reads are identical.
+
+| Minior (IVs, Core level) | Core CP | League | Shell CP | Shell level | 2026-10-25 | PvPoke formula |
+| ------------------------ | ------- | ------ | -------- | ----------- | ---------- | -------------- |
+| 1/4/3, L26               | 1484    | Great  | 1496     | 52.0        | 1496       | 49.5 (1452)    |
+| 12/15/7, L15             | 946     | Great  | 1113     | 26.5        | 1113       | 29.0 (1218)    |
+| 0/9/15, L25              | 1500    | Great  | 1494     | 48.5        | 1494       | 48.0 (1485)    |
+| 7/8/6, L22               | 1321    | Great  | 1402     | 41.0        | new        | 42.0 (1420)    |
+| 1/4/3, L26               | 1484    | Ultra  | 978      | 26.5        | 978        | 39.0 (1274)    |
+| 12/15/7, L15             | 946     | Ultra  | 1029     | 24.5        | 1029       | 22.5 (945)     |
+| 0/9/15, L25              | 1500    | Ultra  | 1297     | 37.5        | 1297       | 37.5 (1297)    |
+| 15/13/13, L35            | 2101    | Ultra  | 1829     | 55.0        | 1829       | 52.0 (1766)    |
+| 7/8/6, L22               | 1321    | Ultra  | 1246     | 33.0        | new        | 33.0 (1246)    |
+
+- **The no-boost threshold is between IV totals 20 and 21.** 7/8/6 (total
+  21) is boosted in Ultra; 1/14/5 (total 20) is not. This replaces the
+  21-24 bracket above.
+- **Ultra shell level over Core level** for the nine boosted readings: 1.500
+  exactly at totals 21 and 24 (where PvPoke's formula is exact), then 1.58
+  to 1.64 at totals 30-38 (PvPoke 1 to 4.5 levels low). The multiplier
+  rises with IVs; its form is open.
+- **Great, away from the cap, is neither rule:** 7/8/6 reads L41.0 where
+  PvPoke gives 42.0 and the cap rule 46.0, the same direction as 12/15/7
+  (26.5 vs 29.0 vs 41.5).

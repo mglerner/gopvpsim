@@ -55,9 +55,10 @@ port is PvPoke-exact on its 90 oracle cells; these are the loose ends.
   regardless. That is an engine bump that must first pin the Aegislash
   shield-level clamp (formchange.py:222 `max(CPM)`) at 52; predicate "Minior
   or Aegislash on either side". Below the ceiling PvPoke's formula is wrong
-  too: low IV totals (<=20) get no boost (shell = Core + 0.5), threshold
-  21-24, and the boost formula above it is open. Next: read the
-  threshold-pinning Miniors listed in the doc, then decide the model. Until
+  too: low IV totals (<=20) get no boost (shell = Core + 0.5; total 21 is
+  boosted, re-read 2026-11-20, game unchanged), and the boost formula
+  above it is open (Ultra multiplier 1.5 to 1.64, rising with IVs). Next:
+  decide the model. Until
   then the UL Core page keeps its caveat callout and stays unpublished; the
   Core-only page is unaffected.
 - **Engine fix riding the next bump: Mimikyu break-disguise runs BEFORE
